@@ -1,0 +1,146 @@
+/*
+   Copyright (C) 2015 Jacopo Urbani.
+
+   This file is part of Vlog.
+
+   Vlog is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 2 of the License, or
+   (at your option) any later version.
+
+   Vlog is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with Vlog.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#ifndef RULEEXECUTOR_H
+#define RULEEXECUTOR_H
+
+#include <vlog/concepts.h>
+#include <vlog/edb.h>
+
+#include <boost/chrono.hpp>
+
+class BindingsTable;
+class QSQR;
+class DictMgmt;
+class TupleTable;
+
+//#define LINEAGE 1
+
+#ifdef LINEAGE
+struct LineageInfo {
+    Rule *adornedRule;
+    int bodyAtomId;
+    size_t nQueries;
+
+    uint8_t sizeQuery;
+    std::vector<Term_t> queries;
+
+    size_t offset;
+    void *pointerToInput;
+
+    Literal *query;
+};
+#endif
+
+struct QSQR_Task;
+class RuleExecutor {
+private:
+    Rule adornedRule;
+
+//    boost::chrono::system_clock::time_point startEvaluation;
+//    boost::chrono::duration<double> durationRecursion;
+//    boost::chrono::duration<double> durationEDB;
+
+#ifdef LINEAGE
+    Program *program;
+    DictMgmt *dict;
+#endif
+
+    //Used to create the supplementary relations
+    std::vector<size_t> sizeSupplRelations;
+    std::vector<int> posFromHeadToFirstSupplRelation;
+    std::vector<std::vector<int>> posToCopyFromPreviousStep;
+
+    //Used during unification
+    std::vector<std::pair<int, int>> repeatedBoundVarsInHead;
+    std::vector<std::pair<uint8_t, std::pair<uint8_t, uint8_t>>> headVarsInEDB;
+
+    //Used to add tuples to the inputs when sub-idb queries are invoked
+    std::vector<std::vector<std::pair<uint8_t, uint8_t>>> posFromLiteral;
+    std::vector<std::vector<std::pair<uint8_t, uint8_t>>> posFromSupplRelation;
+
+    //Used to perform the joins
+    std::vector<uint8_t> njoins;
+    std::vector<int16_t> startJoins;
+    std::vector<std::pair<uint8_t, uint8_t>> joins;
+
+    //Used to populate the answer set
+    std::vector<uint8_t> projectionLastSuppl;
+
+#ifdef LINEAGE
+    std::vector<LineageInfo> lineage;
+#endif
+
+    BindingsTable **createSupplRelations();
+
+    void deleteSupplRelations(BindingsTable **supplRelations);
+
+    void calculateJoinsSizeIntermediateRelations();
+
+    bool isUnifiable(const Term_t * const value, const size_t sizeTuple,
+                     const size_t *posInAdorment, const EDBLayer &layer);
+
+    size_t estimateRule(const int depth, const uint8_t bodyAtom,
+                          BindingsTable **supplRelations,
+                          QSQR *qsqr, EDBLayer &layer);
+
+    void evaluateRule(const uint8_t bodyAtom, BindingsTable **supplRelations,
+                      QSQR *qsqr, EDBLayer &layer
+#ifdef LINEAGE
+                      , std::vector<LineageInfo> &lineage
+#endif
+                     );
+
+    void join(TupleTable *r1, TupleTable *r2, std::pair<uint8_t, uint8_t> *joins, uint8_t njoins, BindingsTable *output);
+
+    void copyLastRelInAnswers(QSQR *qsqr,
+                              size_t nTuples,
+                              BindingsTable **supplRelations,
+                              BindingsTable *lastSupplRelation);
+
+    static char cmp(const uint64_t *row1, const uint64_t *row2, const std::pair<uint8_t, uint8_t> *joins, const uint8_t njoins);
+
+#ifdef LINEAGE
+    void printLineage(std::vector<LineageInfo> &lineage);
+#endif
+
+public:
+    RuleExecutor(Rule &rule, uint8_t headAdornment
+#ifdef LINEAGE
+                 , Program *program, DictMgmt *dict
+#endif
+                );
+
+    size_t estimate(const int depth, BindingsTable *input/*, size_t offsetInput*/, QSQR *qsqr,
+                      EDBLayer &edbLayer);
+
+    void evaluate(BindingsTable *input, size_t offsetInput, QSQR *qsqr,
+                  EDBLayer &edbLayer
+#ifdef LINEAGE
+                  , std::vector<LineageInfo> &lineage
+#endif
+
+                 );
+
+    void processTask(QSQR_Task *task);
+
+    ~RuleExecutor();
+};
+
+#endif

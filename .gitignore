@@ -1,0 +1,6 @@
+/makefile.platform
+/cscope*
+.ycm*
+.DS_Store
+/build*
+/vlog*

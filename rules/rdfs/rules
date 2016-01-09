@@ -1,0 +1,8 @@
+TI(A,B,C) :- TE(A,B,C)
+
+TI(A,P,B) :- TI(A,P1,B),TI(P1,rdfs:subPropertyOf,P)
+TI(A,rdf:type,B) :- TI(A,P,X),TI(P,rdfs:domain,B)
+TI(A,rdf:type,B) :- TI(X,P,A),TI(P,rdfs:range,B)
+TI(A,rdf:type,C) :- TI(B,rdfs:subClassOf,C),TI(A,rdf:type,B)
+TI(A,rdfs:subPropertyOf,C) :- TI(A,rdfs:subPropertyOf,B),TI(B,rdfs:subPropertyOf,C)
+TI(A,rdfs:subClassOf,C) :- TI(A,rdfs:subClassOf,B),TI(B,rdfs:subClassOf,C)
