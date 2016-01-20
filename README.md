@@ -29,4 +29,3 @@ The result can be stored on disk by adding the flags:
 
 which will create a directory "materialization\_lubm1 with the result of the
 instantiation.
-# vlog
