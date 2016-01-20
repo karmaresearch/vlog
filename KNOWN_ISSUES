@@ -1,1 +1,0 @@
-- there is a problem in querying the database with the pattern -1 -1 -1, for some indices but not all.
