@@ -1,22 +1,3 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef KBB_H_
 #define KBB_H_
 
@@ -25,9 +6,10 @@
 #include <trident/kb/dictmgmt.h>
 #include <trident/kb/kbconfig.h>
 #include <trident/kb/cacheidx.h>
-#include <trident/memory/memorymgr.h>
+#include <trident/utils/memorymgr.h>
 
 #include <boost/thread.hpp>
+#include <boost/filesystem.hpp>
 
 #include <string>
 
@@ -38,8 +20,10 @@ class TableStorage;
 class Root;
 class StringBuffer;
 struct FileSegment;
+class FileDescriptor;
 
 using namespace std;
+namespace fs = boost::filesystem;
 
 class KB {
 private:
@@ -60,8 +44,12 @@ private:
     int dictPartitions;
     bool dictHash;
 
+    long ntables[N_PARTITIONS];
+    long nFirstTables[N_PARTITIONS];
+
     long totalNumberTriples;
     long totalNumberTerms;
+    long nextID;
 
     int nindices;
     bool aggrIndices;
@@ -69,6 +57,8 @@ private:
 
     bool useFixedStrategy;
     char storageFixedStrategy;
+
+    size_t thresholdSkipTable;
 
     bool dictEnabled;
 
@@ -78,7 +68,7 @@ private:
     DictMgmt *dictManager;
 
     TableStorage *files[N_PARTITIONS];
-    MemoryManager<FileSegment> *bytesTracker[N_PARTITIONS];
+    MemoryManager<FileDescriptor> *bytesTracker[N_PARTITIONS];
 
     CacheIdx *pso;
     CacheIdx *osp;
@@ -88,7 +78,8 @@ private:
     void loadDict(int id, KBConfig *config);
 
 public:
-    KB(const char *path, bool readOnly, bool reasoning, bool dictEnabled, KBConfig &config);
+    KB(const char *path, bool readOnly, bool reasoning,
+       bool dictEnabled, KBConfig &config);
 
     Querier *query();
 
@@ -126,12 +117,20 @@ public:
         return dictPartitions;
     }
 
+    int getNTablesPerPartition(int idx) {
+        return ntables[idx];
+    }
+
     double getSampleRate() {
         return sampleRate;
     }
 
     long getSize() {
         return totalNumberTriples;
+    }
+
+    long getNextID() {
+        return nextID;
     }
 
     TreeItr *getItrTerms();

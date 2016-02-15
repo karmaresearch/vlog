@@ -1,22 +1,3 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include <trident/sparql/joins.h>
 #include <boost/log/trivial.hpp>
 
@@ -50,8 +31,8 @@ long NestedMergeJoinItr::executePlan() {
          */
 //nextPair:
 
-        if (currentItr->has_next()) {
-            currentItr->next_pair();
+        if (currentItr->hasNext()) {
+            currentItr->next();
         } else {
             /* If the initial iterator is finished, then the join is terminated*/
             if (idxCurrentPattern == 0) {
@@ -100,27 +81,6 @@ skipNext:
                 outputTuples = 0;
                 return maxTuplesInBuffer;
             }
-
-            /*if (dictionaryLookup) {
-                for (int j = 0; j < sVarsToReturn; ++j) {
-                    outputBuffer.addTerm(compressedRow[varsToReturn[j]]);
-                }
-                if (outputTuples == maxTuplesInBuffer) {
-                    //                  timens::system_clock::time_point start =
-                    //                          timens::system_clock::now();
-                    dict->threadlookupTerms(outputBuffer.getBuffer(),
-                                            outputTuples, sVarsToReturn, printResults);
-                    //                  timeLookup += timens::system_clock::now() - start;
-                    outputTuples = 0;
-                    invokedThread = true;
-                }
-            } else {
-                if (printResults) {
-                    printNumericRow(compressedRow, idxCurrentRow);
-                } else if (outputTable != NULL) {
-                    outputTable->addRow((uint64_t*)compressedRow, sVarsToReturn, varsToReturn);
-                }
-            }*/
         } else {
             /***** PERFORM THE JOIN *****/
             //          timens::system_clock::time_point start =
@@ -161,34 +121,6 @@ skipNext:
     }
 
 exit:
-
-    //  timens::system_clock::time_point start =
-    //                      timens::system_clock::now();
-
-    //Print the last tuples in the buffer
-    /*if (dictionaryLookup) {
-
-        if (invokedThread) {
-            //          timens::system_clock::time_point start =
-            //                  timens::system_clock::now();
-            dict->waitUntilFinish();
-            //          finalWaitTime += timens::system_clock::now() - start;
-        }
-
-        if (outputTuples > 0) {
-            dict->lookupTerms(outputBuffer.getBuffer(), outputTuples,
-                              sVarsToReturn, printResults);
-        }
-    }*/
-
-    //  timeLookup += timens::system_clock::now() - start;
-
-    //  cerr << "Timings: " << endl;
-    //  for (int i = 0; i < plan->nPatterns; ++i) {
-    //      cerr << "Pattern " << i << ": " << timings[i].count() * 1000 << endl;
-    //  }
-    //  cerr << "Lookup time: " << timeLookup.count() * 1000 << endl;
-    //  cerr << "Final Wait time: " << finalWaitTime.count() * 1000 << endl;
 
     cleanup();
     long results = outputTuples;
@@ -247,7 +179,7 @@ int NestedMergeJoinItr::executeJoin(long *row, Pattern *patterns, int idxPattern
         }
         itr = iterators[idxPattern] = q->get(patterns[idxPattern].idx(), s, p,
                                              o);
-        if (!itr->has_next()) {
+        if (!itr->hasNext()) {
             if (!need_new_iterator) {
                 return NOMORE_JOIN;
             } else {
@@ -260,19 +192,19 @@ int NestedMergeJoinItr::executeJoin(long *row, Pattern *patterns, int idxPattern
         for (int i = performed_joins; i < nJoins; ++i) {
             long v = compressedRow[joins[i].posRow];
             if (joins[i].posIndex == 1) {
-                itr->set_constraint1(v);
-                itr->move_first_term(v);
+                itr->setConstraint1(v);
+                itr->gotoFirstTerm(v);
             } else { // can only be 2
-                if (itr->has_next()) {
-                    itr->set_constraint2(v);
-                    itr->move_second_term(v);
+                if (itr->hasNext()) {
+                    itr->setConstraint2(v);
+                    itr->gotoSecondTerm(v);
                 }
             }
             joins[i].lastValue = v;
         }
 
-        if (itr->has_next()) {
-            itr->next_pair();
+        if (itr->hasNext()) {
+            itr->next();
             return JOIN_SUCCESSFUL;
         } else {
             return try_merge_join(iterators, idxPattern,
@@ -292,7 +224,7 @@ int NestedMergeJoinItr::executeJoin(long *row, Pattern *patterns, int idxPattern
             //the iterator first...
 
             if (joins[performed_joins].lastValue > value_to_join_with
-                    || !itr->has_next() || itr->getValue1() == LONG_MIN) {
+                    || !itr->hasNext() || itr->getValue1() == LONG_MIN) {
                 itr->reset(0);
             } else {
                 if (joins[performed_joins].lastValue == value_to_join_with) {
@@ -308,11 +240,11 @@ int NestedMergeJoinItr::executeJoin(long *row, Pattern *patterns, int idxPattern
             joins[performed_joins].lastValue = value_to_join_with;
 
             if (joins[performed_joins].posIndex == 1) {
-                itr->set_constraint1(value_to_join_with);
-                itr->move_first_term(value_to_join_with);
+                itr->setConstraint1(value_to_join_with);
+                itr->gotoFirstTerm(value_to_join_with);
             } else {
-                itr->set_constraint2(value_to_join_with);
-                itr->move_second_term(value_to_join_with);
+                itr->setConstraint2(value_to_join_with);
+                itr->gotoSecondTerm(value_to_join_with);
             }
         } else if (rem_joins == 2) {
             long value_to_join_with1 =
@@ -325,25 +257,26 @@ int NestedMergeJoinItr::executeJoin(long *row, Pattern *patterns, int idxPattern
             int comp2 = (int)(joins[performed_joins + 1].lastValue
                               - value_to_join_with2);
 
-            if (comp1 > 0 || !itr->has_next() || itr->getValue1() == LONG_MIN) {
+            if (comp1 > 0 || !itr->hasNext() || itr->getValue1() == LONG_MIN) {
                 itr->reset(0);
             } else if (comp1 == 0 && comp2 >= 0) {
                 itr->reset(1);
             }
 
-            itr->set_constraint1(value_to_join_with1);
-            itr->move_first_term(value_to_join_with1);
-            if (itr->has_next()) {
-                itr->set_constraint2(value_to_join_with2);
-                itr->move_second_term(value_to_join_with2);
+            itr->setConstraint1(value_to_join_with1);
+            itr->setConstraint2(-1);
+            itr->gotoFirstTerm(value_to_join_with1);
+            if (itr->hasNext()) {
+                itr->setConstraint2(value_to_join_with2);
+                itr->gotoSecondTerm(value_to_join_with2);
             }
 
             joins[performed_joins].lastValue = value_to_join_with1;
             joins[performed_joins + 1].lastValue = value_to_join_with2;
         }
 
-        if (itr->has_next()) {
-            itr->next_pair();
+        if (itr->hasNext()) {
+            itr->next();
             return JOIN_SUCCESSFUL;
         } else {
             return try_merge_join(iterators, idxPattern,
@@ -366,8 +299,8 @@ int NestedMergeJoinItr::try_merge_join(PairItr **iterators, int idxCurrentPatter
         PairItr *sourceItr = iterators[joins[0].sourcePattern];
         PairItr *currentItr = iterators[idxCurrentPattern];
 
-        if (!sourceItr->allowMerge() || !currentItr->allowMerge())
-            return JOIN_FAILED;
+        /*if (!sourceItr->allowMerge() || !currentItr->allowMerge())
+            return JOIN_FAILED;*/
 
         long value_to_join_with =
             joins[0].sourcePosIndex == 1 ?
@@ -378,15 +311,15 @@ int NestedMergeJoinItr::try_merge_join(PairItr **iterators, int idxCurrentPatter
         //Two cases: the current value is smaller or larger.
         if (value_to_join_with < current_value) {
             if (joins[0].sourcePosIndex == 1) {
-                sourceItr->move_first_term(current_value);
+                sourceItr->gotoFirstTerm(current_value);
             } else {
-                sourceItr->move_second_term(current_value);
+                sourceItr->gotoSecondTerm(current_value);
             }
 
             if (joins[0].posIndex == 1) {
-                currentItr->set_constraint1(current_value);
+                currentItr->setConstraint1(current_value);
             } else {
-                currentItr->set_constraint2(current_value);
+                currentItr->setConstraint2(current_value);
             }
 
             return GO_BACK(joins[0].sourcePattern);

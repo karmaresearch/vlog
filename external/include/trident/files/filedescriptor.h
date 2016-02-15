@@ -1,26 +1,7 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef FILEDESCRIPTOR_H_
 #define FILEDESCRIPTOR_H_
 
-#include <trident/memory/memorymgr.h>
+#include <trident/utils/memorymgr.h>
 
 #include <boost/interprocess/file_mapping.hpp>
 #include <boost/interprocess/mapped_region.hpp>
@@ -29,7 +10,8 @@
 
 namespace bip = boost::interprocess;
 
-#define SMALLEST_INCR 4*1024
+//#define SMALLEST_INCR 1*1024*1024
+#define SMALLEST_INCR 16*1024*1024
 
 class Stats;
 class FileDescriptor {
@@ -65,22 +47,35 @@ public:
 
     char* getBuffer(int offset, int *length);
 
+    char* getBuffer(int offset, int *length, int &memoryBlock, const int sesID);
+
     int getFileLength();
 
     int getId() {
         return id;
     }
 
-    bool isUsed() {
-        return false;
-    }
+    bool isUsed();
 
     void shiftFile(int pos, int diff);
 
     void append(char *bytes, const int size);
 
+    int appendVLong(const long v);
+
+    int appendVLong2(const long v);
+
+    void appendLong(const long v);
+
+    void appendLong(const uint8_t nbytes, const uint64_t v);
+
+    void overwriteAt(int pos, char byte);
+
+    void overwriteVLong2At(int pos, long number);
+
+    void reserveBytes(const uint8_t n);
+
     ~FileDescriptor();
 };
 
 #endif /* FILEDESCRIPTOR_H_ */
-

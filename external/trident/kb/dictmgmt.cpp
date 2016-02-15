@@ -1,21 +1,9 @@
 /*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ * dictmgmt.cpp
+ *
+ *  Created on: Nov 30, 2013
+ *      Author: jacopo
+ */
 
 #include <trident/kb/dictmgmt.h>
 #include <trident/tree/root.h>
@@ -78,13 +66,23 @@ TreeItr *DictMgmt::getInvDictIterator(int part) {
 }
 
 bool DictMgmt::getText(nTerm key, char *value) {
-
     int index = key % dictPartitions;
     long coordinates;
     if (invDicts[index]->get(key, coordinates)) {
         int size = 0;
         stringbuffers[index]->get(coordinates, value, size);
         value[size] = '\0';
+        return true;
+    }
+    return false;
+}
+
+bool DictMgmt::getText(nTerm key, char *value,
+                       int &size) {
+    int index = key % dictPartitions;
+    long coordinates;
+    if (invDicts[index]->get(key, coordinates)) {
+        stringbuffers[index]->get(coordinates, value, size);
         return true;
     }
     return false;
@@ -115,6 +113,8 @@ bool DictMgmt::putPair(int part, const char *key, int sizeKey, nTerm &value) {
     if (dicts[part]->insertIfNotExists((tTerm*) key, sizeKey, value)) {
         invDicts[part]->put(value, coordinates);
         insertedNewTerms[part]++;
+        if (value > largestID)
+            largestID = value;
         return true;
     }
     return false;
@@ -123,6 +123,8 @@ bool DictMgmt::putPair(int part, const char *key, int sizeKey, nTerm &value) {
 bool DictMgmt::putDict(int part, const char *key, int sizeKey, nTerm &value) {
     if (dicts[part]->insertIfNotExists((tTerm*) key, sizeKey, value)) {
         insertedNewTerms[part]++;
+        if (value > largestID)
+            largestID = value;
         return true;
     }
     return false;
@@ -133,6 +135,8 @@ bool DictMgmt::putDict(int part, const char *key, int sizeKey, nTerm &value,
     coordinates = stringbuffers[part]->getSize();
     if (dicts[part]->insertIfNotExists((tTerm*) key, sizeKey, value)) {
         insertedNewTerms[part]++;
+        if (value > largestID)
+            largestID = value;
         return true;
     }
     return false;

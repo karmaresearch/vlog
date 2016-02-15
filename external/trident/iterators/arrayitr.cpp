@@ -1,55 +1,75 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include <trident/iterators/arrayitr.h>
+#include <assert.h>
 
 #include <iostream>
 
 using namespace std;
 
-bool ArrayItr::has_next() {
+bool ArrayItr::hasNext() {
 
     if (hasNextChecked) {
-        return next;
+        return n;
+    }
+
+    if (ignSecondColumn) {
+        //Is there a new first term?
+        bool found = false;
+        while (pos < nElements) {
+            if (array->at(pos).first != v1) {
+                found = true;
+                break;
+            }
+            pos++;
+        }
+        if (found) {
+            n = true;
+        } else {
+            n = false;
+        }
+        hasNextChecked = true;
     }
 
     if (constraint1 == -1) {
-        next = pos < nElements;
+        n = pos < nElements;
     } else {
         // Check whether the elements in pos1 and pos2 satisfy the
         // constraints
         if (pos == nElements || array->at(pos).first != constraint1
                 || (constraint2 != -1 && array->at(pos).second != constraint2)) {
-            next = false;
+            n = false;
         } else {
-            next = true;
+            n = true;
         }
     }
     hasNextChecked = true;
-    return next;
+    return n;
 }
 
-void ArrayItr::next_pair() {
+long ArrayItr::getCount() {
+    if (!ignSecondColumn) {
+        throw 10;
+    }
+
+    if (countElems == 0) {
+        countElems = 1;
+        //Pos points to the next element than the current one. This is
+        //because this method is called after next()
+        while ((pos) < nElements && array->at(pos).first ==
+                array->at(pos - 1).first) {
+            pos++;
+            countElems++;
+        }
+    }
+
+    return countElems;
+}
+
+void ArrayItr::next() {
     v1 = array->at(pos).first;
     v2 = array->at(pos).second;
     pos++;
     hasNextChecked = false;
+    countElems = 0;
 }
 
 void ArrayItr::clear() {
@@ -65,7 +85,7 @@ void ArrayItr::reset(const char i) {
     hasNextChecked = false;
 }
 
-void ArrayItr::move_first_term(long c1) {
+void ArrayItr::gotoFirstTerm(long c1) {
     pos = binarySearch(array, nElements, c1);
     if (pos < 0) {
         pos = 0;
@@ -73,7 +93,13 @@ void ArrayItr::move_first_term(long c1) {
     hasNextChecked = false;
 }
 
-void ArrayItr::move_second_term(long c2) {
+void ArrayItr::ignoreSecondColumn() {
+    ignSecondColumn = true;
+
+
+}
+
+void ArrayItr::gotoSecondTerm(long c2) {
     //Simple solution: Linear search
     while (pos < nElements  && array->at(pos).first == constraint1 && array->at(pos).second < c2) {
         pos++;
@@ -112,7 +138,9 @@ void ArrayItr::init(Pairs *values, int64_t v1, int64_t v2) {
     nElements = (int)values->size();
     constraint1 = v1;
     constraint2 = v2;
+    countElems = 0;
     hasNextChecked = false;
+    ignSecondColumn = false;
     this->v1 = this->v2 = -1;
 
     if (constraint1 != -1) {
@@ -126,18 +154,51 @@ void ArrayItr::init(Pairs *values, int64_t v1, int64_t v2) {
                     pos++;
                 }
                 hasNextChecked = true;
-                next = pos < nElements && array->at(pos).second == constraint2;
+                n = pos < nElements && array->at(pos).second == constraint2;
             } else {
-                hasNextChecked = next = true;
+                hasNextChecked = n = true;
             }
         } else {
             hasNextChecked = true;
-            next = false;
+            n = false;
             pos = 0;
         }
     } else {
         pos = 0;
-        hasNextChecked = next = true;
+        hasNextChecked = n = true;
     }
 }
 
+uint64_t ArrayItr::getCardinality() {
+    if (n) {
+        if (ignSecondColumn) {
+            uint64_t count = 1;
+            size_t pos2 = pos + 1;
+            while (pos2 < nElements) {
+                if (array->at(pos2).first != array->at(pos2 - 1).first) {
+                    count++;
+                }
+                pos2++;
+            }
+            return count;
+        } else {
+            assert(constraint1 >= 0);
+            uint64_t count = 1;
+            size_t pos2 = pos + 1;
+            while (pos2 < nElements) {
+                if (array->at(pos2).first != constraint1) {
+                    break;
+                }
+                count++;
+                pos2++;
+            }
+            return count;
+        }
+    } else {
+        return 0;
+    }
+}
+
+uint64_t ArrayItr::estCardinality() {
+    return getCardinality();
+}

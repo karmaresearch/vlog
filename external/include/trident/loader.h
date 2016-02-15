@@ -1,22 +1,3 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef LOADER_H_
 #define LOADER_H_
 
@@ -103,7 +84,8 @@ private:
     const int ncoordinates;
 
     TreeEl elspo, elops, elpos, elsop, elosp, elpso;
-    bool spoFinished, opsFinished, posFinished;
+    bool spoFinished, opsFinished, posFinished,
+         sopFinished, ospFinished, psoFinished;
     TermCoordinates value;
 
     bool getFirst(TreeEl *el, ifstream *buffer);
@@ -130,9 +112,9 @@ public:
             sop.open(coordinates[3]);
             osp.open(coordinates[4]);
             pso.open(coordinates[5]);
-            getFirst(&elsop, &sop);
-            getFirst(&elosp, &osp);
-            getFirst(&elpso, &pso);
+            sopFinished = !getFirst(&elsop, &sop);
+            ospFinished = !getFirst(&elosp, &osp);
+            psoFinished = !getFirst(&elpso, &pso);
         }
     }
 
@@ -198,23 +180,29 @@ private:
     bool isFinished;
     boost::condition_variable cond;
     boost::mutex mut;
+    bool printStats;
 
     BufferCoordinates buffer1;
     BufferCoordinates buffer2;
     BufferCoordinates *bufferToFill;
     BufferCoordinates *bufferToReturn;
 
-    void sortAndInsert(int permutation, int nindices, bool inputSorted, string inputDir,
+    void sortAndInsert(int permutation, int nindices, string inputDir,
                        string *POSoutputDir, TreeWriter *treeWriter, Inserter *ins,
-                       const bool aggregated) {
-        sortAndInsert(permutation, nindices, inputSorted, inputDir, POSoutputDir,
-                      treeWriter, ins, aggregated, false, NULL, 0.0);
+                       const bool aggregated,
+                       const bool canSkipTables) {
+        sortAndInsert(permutation, nindices, false, inputDir, POSoutputDir,
+                      treeWriter, ins, aggregated, canSkipTables,
+                      false, NULL, 0.0);
     }
 
     void sortAndInsert(int permutation, int nindices, bool inputSorted, string inputDir,
                        string *POSoutputDir, TreeWriter *treeWriter, Inserter *ins,
-                       const bool aggregated, const bool storeRaw,
-                       SimpleTripleWriter *sampleWriter, double sampleRate);
+                       const bool aggregated,
+                       const bool canSkipTables,
+                       const bool storeRaw,
+                       SimpleTripleWriter *sampleWriter,
+                       double sampleRate);
 
     void mergeTermCoordinates(string *coordinates, int ncoordinates);
 
@@ -228,13 +216,11 @@ private:
                           bool insertDictionary, bool insertInverseDictionary,
                           bool sortNumberCoordinates, nTerm *maxValueCounter);
 
-    void exportFiles(string tripleDir, string* dictFiles, const
-                     int ndicts, string outputFileTriple, string outputFileDict);
-
     void addSchemaTerms(const int dictPartitions, nTerm highestNumber, DictMgmt *dict);
 
     void loadKB(KB &kb, string kbDir, bool storeDicts, int dictionaries, string dictMethod,
-                int nindices, bool aggrIndices, bool sample, double sampleRate,
+                int nindices, bool aggrIndices, const bool canSkipTables,
+                bool sample, double sampleRate,
                 bool storePlainList, string *fileNameDictionaries, int nperms,
                 int signaturePerms, string *permDirs, long totalCount);
 
@@ -245,13 +231,16 @@ public:
         bufferToFill = bufferToReturn = &buffer1;
         buffersReady = 0;
         isFinished = false;
+        printStats = true;
     }
 
     void load(bool onlyCompress, string triplesInputDir, string kbDir,
               string dictMethod, int sampleMethod, int sampleArg,
               int parallelThreads, int maxReadingThreads, int dictionaries,
-              int nindices, bool aggrIndices, bool enableFixedStrat, int fixedStrat,
-              bool storePlainList, bool sample, double sampleRate);
+              int nindices, bool aggrIndices, const bool canSkipTables,
+              bool enableFixedStrat, int fixedStrat,
+              bool storePlainList, bool sample, double sampleRate,
+              int thresholdSkipTable);
 };
 
 #endif /* LOADER_H_ */

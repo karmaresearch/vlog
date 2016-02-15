@@ -1,22 +1,3 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include <trident/model/table.h>
 
 #include <algorithm>
@@ -301,7 +282,10 @@ TupleTable::JoinHitStats TupleTable::joinHitRates(TupleTable *o) {
     }
 }
 
-std::pair<std::shared_ptr<TupleTable>, std::shared_ptr<TupleTable>> TupleTable::getDenseSparseForBifocalSampling(TupleTable *o) {
+std::pair<std::shared_ptr<TupleTable>,
+    std::shared_ptr<TupleTable>> TupleTable::getDenseSparseForBifocalSampling(
+TupleTable *o) {
+
     //Calculate the number of fields on which we should perfom the join
     std::vector<uint8_t> joinFields;
     for (uint8_t i = 0; i < signature.size(); ++i) {
@@ -315,15 +299,15 @@ std::pair<std::shared_ptr<TupleTable>, std::shared_ptr<TupleTable>> TupleTable::
     TupleTable *sortedTable = sortBy(joinFields);
 
     //Threshold is...
-    const double threshold = sqrt(this->getNRows());
-    std::shared_ptr<TupleTable> denseTable(new TupleTable(this->getSizeRow()));
-    std::shared_ptr<TupleTable> sparseTable(new TupleTable(this->getSizeRow()));
+    const double threshold = sqrt(sortedTable->getNRows());
+    std::shared_ptr<TupleTable> denseTable(new TupleTable(sortedTable->getSizeRow(), signature));
+    std::shared_ptr<TupleTable> sparseTable(new TupleTable(sortedTable->getSizeRow(), signature));
 
     int startRow = 0;
-    const uint64_t *prevRow = this->getRow(0);
-    for (size_t i = 1; i < this->getNRows(); ++i) {
+    const uint64_t *prevRow = sortedTable->getRow(0);
+    for (size_t i = 1; i < sortedTable->getNRows(); ++i) {
         //cmp with previous row
-        const uint64_t *row = this->getRow(i);
+        const uint64_t *row = sortedTable->getRow(i);
         bool same = true;
         for (std::vector<uint8_t>::iterator itr = joinFields.begin(); itr != joinFields.end();
                 ++itr) {

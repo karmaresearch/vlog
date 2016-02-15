@@ -1,30 +1,7 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Vlog.
-
-   Vlog is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Vlog is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Vlog.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef CONCEPTS_H
 #define CONCEPTS_H
 
-
 #include <vlog/support.h>
-#include <trident/kb/dictmgmt.h>
-#include <trident/kb/kb.h>
-#include <trident/model/model.h>
 
 #include <string>
 #include <inttypes.h>
@@ -39,6 +16,76 @@
 #define OUT_OF_PREDICATES   32768
 
 typedef uint16_t PredId_t;
+
+class EDBLayer;
+
+using namespace std;
+
+/*** TERMS ***/
+class VTerm {
+private:
+    uint8_t id; //ID != 0 => variable. ID==0 => const value
+    uint64_t value;
+public:
+    VTerm() : id(0), value(0) {}
+    VTerm(const uint8_t id, const uint64_t value) : id(id), value(value) {}
+    uint8_t getId() const {
+        return id;
+    }
+    uint64_t getValue() const {
+        return value;
+    }
+    void setId(const uint8_t i) {
+        id = i;
+    }
+    void setValue(const uint64_t v) {
+        value = v;
+    }
+    bool isVariable() const {
+        return id > 0;
+    }
+    bool operator==(const VTerm& rhs) const {
+        return id == rhs.getId() && value == rhs.getValue();
+    }
+    bool operator!=(const VTerm& rhs) const {
+        return id != rhs.getId() || value != rhs.getValue();
+    }
+};
+
+/*** TUPLES ***/
+#define SIZETUPLE 3
+class VTuple {
+private:
+    const uint8_t sizetuple;
+    VTerm terms[SIZETUPLE];
+public:
+    VTuple(const uint8_t sizetuple) : sizetuple(sizetuple) {}
+    size_t getSize() const {
+        return sizetuple;
+    }
+    VTerm get(const int pos) const {
+        return terms[pos];
+    }
+    void set(const VTerm term, const int pos) {
+        terms[pos] = term;
+    }
+
+    std::vector<std::pair<uint8_t, uint8_t>> getRepeatedVars() const {
+        std::vector<std::pair<uint8_t, uint8_t>> output;
+        for (uint8_t i = 0; i < sizetuple; ++i) {
+            VTerm t1 = get(i);
+            if (t1.isVariable()) {
+                for (uint8_t j = i + 1; j < sizetuple; ++j) {
+                    VTerm t2 = get(j);
+                    if (t2.getId() == t1.getId()) {
+                        output.push_back(std::make_pair(i, j));
+                    }
+                }
+            }
+        }
+        return output;
+    }
+};
 
 class Predicate {
 private:
@@ -84,7 +131,7 @@ public:
         return pred.at(pred.size() - 1) == 'E';
     }
 
-    static uint8_t calculateAdornment(Tuple &t) {
+    static uint8_t calculateAdornment(VTuple &t) {
         uint8_t adornment = 0;
         for (size_t i = 0; i < t.getSize(); ++i) {
             if (!t.get(i).isVariable()) {
@@ -113,9 +160,9 @@ public:
 /*** SUBSTITUTIONS ***/
 struct Substitution {
     uint8_t origin;
-    Term destination;
+    VTerm destination;
     Substitution() {}
-    Substitution(uint8_t origin, Term destination) : origin(origin), destination(destination) {}
+    Substitution(uint8_t origin, VTerm destination) : origin(origin), destination(destination) {}
 };
 
 /*** LITERALS ***/
@@ -123,9 +170,9 @@ class Program;
 class Literal {
 private:
     const Predicate pred;
-    const Tuple tuple;
+    const VTuple tuple;
 public:
-    Literal(const Predicate pred, const Tuple tuple) : pred(pred), tuple(tuple) {}
+    Literal(const Predicate pred, const VTuple tuple) : pred(pred), tuple(tuple) {}
 
     Predicate getPredicate() const {
         return pred;
@@ -135,7 +182,7 @@ public:
         return pred.isMagic();
     }
 
-    Term getTermAtPos(const int pos) const {
+    VTerm getTermAtPos(const int pos) const {
         return tuple.get(pos);
     }
 
@@ -143,7 +190,7 @@ public:
         return tuple.getSize();
     }
 
-    Tuple getTuple() const {
+    VTuple getTuple() const {
         return tuple;
     }
 
@@ -166,6 +213,8 @@ public:
 
     uint8_t getNUniqueVars() const;
 
+    bool hasRepeatedVars() const;
+
     std::vector<uint8_t> getPosVars() const;
 
     std::vector<std::pair<uint8_t, uint8_t>> getRepeatedVars() const;
@@ -176,7 +225,9 @@ public:
 
     std::vector<uint8_t> getAllVars() const;
 
-    std::string tostring(Program *program, DictMgmt *dict) const;
+    std::string tostring(Program *program, EDBLayer *db) const;
+
+    std::string toprettystring(Program *program, EDBLayer *db) const;
 
     std::string tostring() const;
 
@@ -249,7 +300,9 @@ public:
         return i;
     }
 
-    std::string tostring(Program *program, DictMgmt *dict) const;
+    std::string tostring(Program *program, EDBLayer *db) const;
+
+    std::string toprettystring(Program * program, EDBLayer *db) const;
 
     std::string tostring() const;
 
@@ -263,7 +316,8 @@ public:
 
 class Program {
 private:
-    KB *kb;
+    const uint64_t assignedIds;
+    EDBLayer *kb;
     std::vector<Rule> rules[MAX_NPREDS];
     Dictionary dictVariables;
 
@@ -277,8 +331,8 @@ private:
     std::string rewriteRDFOWLConstants(std::string input);
 
 public:
-    Program(KB *kb) : kb(kb), additionalConstants(kb->getNTerms()) {
-    }
+    Program(const uint64_t assignedIds,
+            EDBLayer *kb);
 
     Literal parseLiteral(std::string literal);
 
@@ -299,12 +353,14 @@ public:
     std::vector<Rule> *getAllRulesByPredicate(PredId_t predid);
 
     std::string getFromAdditional(Term_t val) {
-	return additionalConstants.getRawValue(val);
+        return additionalConstants.getRawValue(val);
     }
 
     void sortRulesByIDBPredicates();
 
     std::vector<Rule> getAllRules();
+
+    int getNRules() const;
 
     Program clone() const;
 
@@ -317,6 +373,10 @@ public:
     bool isPredicateIDB(const PredId_t id);
 
     std::string getAllPredicates();
+
+    int getNEDBPredicates();
+
+    int getNIDBPredicates();
 
     std::string tostring();
 

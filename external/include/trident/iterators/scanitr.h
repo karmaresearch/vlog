@@ -1,27 +1,12 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef SCANITR_H_
 #define SCANITR_H_
 
+#include <trident/kb/consts.h>
 #include <trident/iterators/pairitr.h>
 #include <trident/tree/coordinates.h>
+#include <trident/iterators/termitr.h>
+#include <trident/binarytables/storagestrat.h>
+#include <trident/binarytables/tableshandler.h>
 
 class Querier;
 class TreeItr;
@@ -30,48 +15,71 @@ class ScanItr: public PairItr {
 
 private:
     Querier *q;
-    TreeItr *itr;
-    long v1, v2, currentKey;
-    bool hasNext, hasNextChecked;
-    PairItr *currentItr;
-    TermCoordinates currentValue;
+    int idx;
+    PairItr *currentTable;
+    PairItr *reversedItr;
+    bool ignseccolumn;
 
-//  long processedKeys;
+    TermItr *itr1;
+    TermItr *itr2;
+    TableStorage *storage;
+    StorageStrat *strat;
+
 public:
-    void init(TreeItr *itr, Querier *q);
+    void init(int idx, Querier *q);
 
-    int getType() {
-        return 3;
+    int getTypeItr() {
+        return SCAN_ITR;
     }
 
     long getValue1() {
-        return v1;
+        if (!reversedItr)
+            return currentTable->getValue1();
+        else
+            return reversedItr->getValue1();
     }
 
     long getValue2() {
-        return v2;
+        if (!reversedItr)
+            return currentTable->getValue2();
+        else
+            return reversedItr->getValue2();
     }
 
     bool allowMerge() {
         return true;
     }
 
+    void ignoreSecondColumn() {
+        ignseccolumn = true;
+    }
+
+    long getCount() {
+        if (!reversedItr)
+            return currentTable->getCount();
+        else
+            return reversedItr->getCount();
+    }
+
     void mark();
 
     void reset(const char i);
 
-    bool has_next();
+    bool hasNext();
 
-    void next_pair();
+    void next();
 
     void clear();
 
-    uint64_t getCard();
+    uint64_t getCardinality();
 
-    void move_first_term(long c1);
+    uint64_t estCardinality();
 
-    void move_second_term(long c2);
+    void gotoKey(long k);
 
+    void gotoFirstTerm(long c1);
+
+    void gotoSecondTerm(long c2);
 };
 
 #endif

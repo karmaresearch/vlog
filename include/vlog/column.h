@@ -1,22 +1,3 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Vlog.
-
-   Vlog is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Vlog is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Vlog.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef _COLUMN_H
 #define _COLUMN_H
 
@@ -26,7 +7,7 @@
 #include <inttypes.h>
 #include <assert.h>
 #include <algorithm>
-#include <trident/storage/pairhandler.h>
+//#include <trident/storage/pairhandler.h>
 
 #include <memory>
 #include <cstring>
@@ -49,7 +30,7 @@ public:
 };
 
 struct CompressedColumnBlock;
-class ColumnWriter : public SequenceWriter {
+class ColumnWriter {
 private:
     bool cached;
     std::shared_ptr<Column> cachedColumn;
@@ -62,7 +43,7 @@ public:
 
     ColumnWriter(std::vector<Term_t> &values);
 
-    void add(const uint64_t v);		// No Term_t: overrides method in trident
+    void add(const uint64_t v);     // No Term_t: overrides method in trident
 
     bool isEmpty() const;
 
@@ -95,6 +76,8 @@ public:
 
     virtual bool supportsDirectAccess() const = 0;
 
+    virtual bool isIn(const Term_t t) const = 0;
+
     virtual std::unique_ptr<ColumnReader> getReader() const = 0;
 
     virtual std::shared_ptr<Column> sort() const = 0;
@@ -107,6 +90,14 @@ public:
         std::shared_ptr<Column> c1,
         std::shared_ptr<Column> c2,
         ColumnWriter &writer);
+
+    static uint64_t countMatches(
+        std::shared_ptr<Column> c1,
+        std::shared_ptr<Column> c2);
+
+    static bool subsumes(
+        std::shared_ptr<Column> subsumer,
+        std::shared_ptr<Column> subsumed);
 };
 //----- END GENERIC INTERFACES -------
 
@@ -204,6 +195,8 @@ public:
     std::shared_ptr<Column> sort() const;
 
     std::shared_ptr<Column> unique() const;
+
+    bool isIn(const Term_t t) const;
 
     bool isConstant() const {
         assert(_size > 0);
@@ -305,6 +298,10 @@ public:
     bool isConstant() const {
         return values.size() < 2;
     }
+
+    bool isIn(const Term_t t) const {
+        return std::binary_search(values.begin(), values.end(), t);
+    }
 };
 //----- END INMEMORY COLUMN ----------
 
@@ -325,9 +322,9 @@ private:
     Term_t lastCached;
 
     static std::vector<Term_t> load(const Literal &l,
-                                      const uint8_t posColumn,
-                                      const std::vector<uint8_t> presortPos,
-                                      EDBLayer &layer, const bool unq);
+                                    const uint8_t posColumn,
+                                    const std::vector<uint8_t> presortPos,
+                                    EDBLayer &layer, const bool unq);
 
 
     void setupItr();
@@ -338,8 +335,8 @@ public:
                     EDBLayer &layer, const bool unq)
         : l(l), layer(layer), posColumn(posColumn), presortPos(presortPos),
           unq(unq),
-          posInItr(l.getPosVars()[posColumn]), itr(NULL), firstCached((Term_t) -1),
-          lastCached((Term_t) -1) {
+          posInItr(l.getPosVars()[posColumn]), itr(NULL), firstCached((Term_t) - 1),
+          lastCached((Term_t) - 1) {
     }
 
     Term_t first();
@@ -354,14 +351,14 @@ public:
 
     void clear() {
         //Release the iterator
-	if (itr != NULL) {
+        if (itr != NULL) {
             layer.releaseIterator(itr);
-	}
-	itr = NULL;
+        }
+        itr = NULL;
     }
 
     ~EDBColumnReader() {
-	clear();
+        clear();
     }
 };
 
@@ -424,6 +421,8 @@ public:
     bool containsDuplicates() const {
         return !unq;
     }
+
+    bool isIn(const Term_t t) const;
 
     std::unique_ptr<ColumnReader> getReader() const;
 

@@ -1,21 +1,9 @@
 /*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ * utils.h
+ *
+ *  Created on: Oct 1, 2013
+ *      Author: jacopo
+ */
 
 #ifndef UTILS_H_
 #define UTILS_H_
@@ -96,12 +84,18 @@ public:
     static void encode_short(char* buffer, int n);
 
     static int decode_int(char* buffer, int offset);
+    static int decode_int(const char* buffer);
     static void encode_int(char* buffer, int offset, int n);
     static int decode_intLE(char* buffer, int offset);
     static void encode_intLE(char* buffer, int offset, int n);
 
     static long decode_long(char* buffer, int offset);
+    static long decode_long(const char* buffer);
+    static long decode_longFixedBytes(const char* buffer, const uint8_t nbytes);
+
     static void encode_long(char* buffer, int offset, long n);
+    static void encode_longNBytes(char* buffer, const uint8_t nbytes,
+                                  const uint64_t n);
 
     static long decode_longWithHeader(char* buffer);
     static void encode_longWithHeader0(char* buffer, long n);
@@ -110,6 +104,8 @@ public:
     static long decode_vlong(char* buffer, int *offset);
     static int encode_vlong(char* buffer, int offset, long n);
     static int numBytes(long number);
+
+    static int numBytesFixedLength(long number);
 
     static int decode_vint2(char* buffer, int *offset);
     static int encode_vint2(char* buffer, int offset, int n);
@@ -155,6 +151,8 @@ public:
 
     static long getIOReadBytes();
 
+    static long getIOReadChars();
+
     static int getNumberPhysicalCores();
 
     static long quickSelect(long *vector, int size, int k);
@@ -170,7 +168,7 @@ public:
     static long long unsigned getCPUCounter();
 
     static int getPartition(const char *key, const int size,
-                                const int partitions) {
+                            const int partitions) {
         return abs(Hashes::dbj2s(key, size) % partitions);
     }
 };

@@ -1,22 +1,3 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef CONSTS_H_
 #define CONSTS_H_
 
@@ -30,9 +11,17 @@
 #define IDX_OSP 4
 #define IDX_PSO 5
 
-#define ROW_LAYOUT 0
-#define CLUSTER_LAYOUT 1
-#define COLUMN_LAYOUT 2
+#define ROW_ITR 0
+#define CLUSTER_ITR 1
+#define COLUMN_ITR 2
+#define NEWCOLUMN_ITR 3
+#define ARRAY_ITR 4
+#define CACHE_ITR 5
+#define AGGR_ITR 6
+#define SCAN_ITR 7
+#define SIMPLESCAN_ITR 8
+#define EMPTY_ITR 9
+#define TERM_ITR 10
 
 //Use for dynamic layout
 #define DIFFERENCE 0
@@ -66,5 +55,9 @@
 #define NO_BLOCK_SESSION -1
 #define EMPTY_SESSION -2
 #define FREE_SESSION -3
+
+//Size indices in the binary tables
+#define ADDITIONAL_SECOND_INDEX_SIZE 512
+#define FIRST_INDEX_SIZE 256
 
 #endif /* CONSTS_H_ */

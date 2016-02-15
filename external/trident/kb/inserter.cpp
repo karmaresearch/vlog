@@ -1,52 +1,47 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include <trident/kb/inserter.h>
-#include <trident/storage/storagestrat.h>
-#include <trident/storage/pairstorage.h>
-#include <trident/storage/pairhandler.h>
+#include <trident/binarytables/storagestrat.h>
+#include <trident/binarytables/tableshandler.h>
+#include <trident/binarytables/binarytableinserter.h>
 
 #include <boost/chrono.hpp>
 #include <boost/log/trivial.hpp>
 
 char Inserter::STRATEGY_FOR_POS =
-    StorageStrat::getStrategy(ROW_LAYOUT, NO_DIFFERENCE, NO_COMPR, NO_COMPR, true);
+    StorageStrat::getStrategy(ROW_ITR, NO_DIFFERENCE, NO_COMPR, NO_COMPR, true);
 
 namespace timens = boost::chrono;
 
-bool Inserter::insert(const int permutation, const long t1, const long t2, const long t3, const long count,
-                      TripleWriter *posArray, TreeInserter *treeInserter, const bool aggregated) {
+bool Inserter::insert(const int permutation,
+                      const long t1,
+                      const long t2,
+                      const long t3,
+                      const long count,
+                      TripleWriter *posArray,
+                      TreeInserter *treeInserter,
+                      const bool aggregated,
+                      const bool canSkipTables) {
 
     bool ret = false;
     if (t1 != currentT1[permutation]) {
+        ntables[permutation]++;
+        nFirstElsNTables[permutation]++;
         if (currentT1[permutation] != -1) {
-            writeCurrentEntryIntoTree(permutation, posArray, treeInserter, aggregated);
+            writeCurrentEntryIntoTree(permutation, posArray,
+                                      treeInserter, aggregated, canSkipTables);
         }
         currentT1[permutation] = t1;
         currentT2[permutation] = t2;
         nElements[permutation] = 0;
+        posElements[permutation] = 0;
 
         if (posArray != NULL) {
             lastFirstTerm[permutation] = -1;
             countLastFirstTerm[permutation] = 0;
             coordinatesLastFirstTerm[permutation] = 0;
         }
+    } else if (t2 != currentT2[permutation]) {
+        nFirstElsNTables[permutation]++;
+        currentT2[permutation] = t2;
     }
 
     long n = nElements[permutation]++;
@@ -61,7 +56,10 @@ bool Inserter::insert(const int permutation, const long t1, const long t2, const
         if (n == THRESHOLD_KEEP_MEMORY) {
             storeInmemoryValuesIntoFiles(permutation, values1[permutation],
                                          values2[permutation], (int) n, posArray,
-                                         aggregated);
+                                         aggregated, canSkipTables);
+        }
+        if (skipTable[permutation]) {
+            throw 10; //should never happen
         }
 
         if (posArray != NULL) {
@@ -112,65 +110,83 @@ void Inserter::insert(nTerm key, TermCoordinates *value) {
 }
 
 void Inserter::writeCurrentEntryIntoTree(int permutation,
-        TripleWriter *posArray, TreeInserter *treeInserter, const bool aggregated) {
+        TripleWriter *posArray, TreeInserter *treeInserter,
+        const bool aggregated,
+        const bool canSkipTables) {
 
     if (nElements[permutation] <= THRESHOLD_KEEP_MEMORY) {
         storeInmemoryValuesIntoFiles(permutation, values1[permutation],
-                                     values2[permutation], (int) nElements[permutation],
-                                     posArray, aggregated);
-    }
-    if (posArray != NULL && lastFirstTerm[permutation] != -1) {
-        posArray->write(lastFirstTerm[permutation], currentT1[permutation],
-                        coordinatesLastFirstTerm[permutation], countLastFirstTerm[permutation]);
+                                     values2[permutation],
+                                     (int) nElements[permutation],
+                                     posArray, aggregated, canSkipTables);
     }
 
-    //Stop append
-    files[permutation]->stopAppend();
+    if (!skipTable[permutation]) {
+        if (posArray != NULL && lastFirstTerm[permutation] != -1) {
+            posArray->write(lastFirstTerm[permutation], currentT1[permutation],
+                            coordinatesLastFirstTerm[permutation], countLastFirstTerm[permutation]);
+        }
 
-    //Release PairHandler
-    switch (currentPairHandler[permutation]->getType()) {
-    case ROW_LAYOUT:
-        listFactory[permutation].release(
-            (ListPairHandler *) (currentPairHandler[permutation]));
-        break;
-    case CLUSTER_LAYOUT:
-        comprFactory[permutation].release(
-            (GroupPairHandler *) (currentPairHandler[permutation]));
-        break;
-    case COLUMN_LAYOUT:
-        list2Factory[permutation].release(
-            (SimplifiedGroupPairHandler*) (currentPairHandler[permutation]));
+        //Stop append
+        files[permutation]->stopAppend();
+
+        //Release PairHandler
+        switch (currentPairHandler[permutation]->getType()) {
+        case ROW_ITR:
+            listFactory[permutation].release(
+                (RowTableInserter *) (currentPairHandler[permutation]));
+            break;
+        case CLUSTER_ITR:
+            comprFactory[permutation].release(
+                (ClusterTableInserter *) (currentPairHandler[permutation]));
+            break;
+        case COLUMN_ITR:
+            list2Factory[permutation].release(
+                (ColumnTableInserter *) (currentPairHandler[permutation]));
+            break;
+        case NEWCOLUMN_ITR:
+            ncFactory[permutation].release((NewColumnTableInserter *) (currentPairHandler[permutation]));
+        }
+
+        long nels;
+        if (aggregated) {
+            nels = posElements[permutation];
+            nels /= 2; //I divide it by two because each table receives twice number of counts. One of each rows, and one for the aggregated ones.
+            posElements[permutation] = 0;
+        } else {
+            nels = nElements[permutation];
+        }
+
+        treeInserter->addEntry(currentT1[permutation], nels,
+                               fileIdx[permutation],
+                               startPositions[permutation],
+                               strategies[permutation]);
     }
-
-    long nels;
-    if (aggregated) {
-        nels = posElements[permutation];
-        nels /= 2; //I divide it by two because each table receives twice number of counts. One of each rows, and one for the aggregated ones.
-        posElements[permutation] = 0;
-    } else {
-        nels = nElements[permutation];
-    }
-
-    treeInserter->addEntry(currentT1[permutation], nels,
-                           fileIdx[permutation], startPositions[permutation],
-                           strategies[permutation]);
 }
 
 void Inserter::storeInmemoryValuesIntoFiles(int permutation, long* v1, long* v2,
-        int n, TripleWriter *posArray, const bool aggregated) {
+        int n, TripleWriter *posArray, const bool aggregated,
+        const bool canSkipTables) {
+    //Can I skip the storage of the table?
+    skipTable[permutation] = false;
+    if (permutation == IDX_SOP || permutation == IDX_PSO ||
+            permutation == IDX_OSP) {
+        if (canSkipTables && n < thresholdSkipTable) {
+            //The table is small enough to be skipped
+            skipTable[permutation] = true;
+            skippedTables[permutation]++;
+            return;
+        }
+    }
+
     //Determine the storage strategy to use and register the coordinates
     char strat;
-    if (!aggregated) {
-        if (useFixedStrategy) {
-            strat = fixedStrategy;
-        } else { //Dynamic strategy
-            strat = StorageStrat::determineStrategy(v1, v2, n, nTerms,
-                                                    thresholdForColumnStorage,
-                                                    stats[permutation]);
-        }
+    if (useFixedStrategy) {
+        strat = fixedStrategy;
+        onlyReferences[permutation] = false;
     } else {
         //Should I store only the reference or the elements directly?
-        onlyReferences[permutation] = StorageStrat::determineAggregatedStrategy(v1, v2, n, nTerms, stats[permutation]);
+        onlyReferences[permutation] = aggregated && StorageStrat::determineAggregatedStrategy(v1, v2, n, nTerms, stats[permutation]);
         if (onlyReferences[permutation]) {
             strat = STRATEGY_FOR_POS;
         } else {
@@ -181,11 +197,14 @@ void Inserter::storeInmemoryValuesIntoFiles(int permutation, long* v1, long* v2,
     }
 
     currentPairHandler[permutation] =
-        storageStrategy[permutation].getPairHandler(strat);
-    startPositions[permutation] = files[permutation]->startAppend(
-                                      currentPairHandler[permutation]);
-    fileIdx[permutation] = files[permutation]->getLastCreatedFile();
+        storageStrategy[permutation].getBinaryTableInserter(strat);
     strategies[permutation] = strat;
+    startPositions[permutation] = files[permutation]->startAppend(
+                                      currentT1[permutation],
+                                      strategies[permutation],
+                                      currentPairHandler[permutation]);
+
+    fileIdx[permutation] = files[permutation]->getLastCreatedFile();
 
     // Copy the values in-memory to disk
     for (int i = 0; i < n; ++i) {
@@ -220,10 +239,12 @@ void Inserter::storeInmemoryValuesIntoFiles(int permutation, long* v1, long* v2,
     }
 }
 
-void Inserter::flush(int permutation, TripleWriter *posArray,
-                     TreeInserter *treeInserter, const bool aggregated) {
+void Inserter::flush(int permutation, TripleWriter * posArray,
+                     TreeInserter * treeInserter, const bool aggregated,
+                     const bool canSkipTables) {
     if (currentT1[permutation] != -1) {
-        writeCurrentEntryIntoTree(permutation, posArray, treeInserter, aggregated);
+        writeCurrentEntryIntoTree(permutation, posArray, treeInserter,
+                                  aggregated, canSkipTables);
     }
     currentT1[permutation] = -1;
 }

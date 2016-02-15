@@ -1,22 +1,3 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Vlog.
-
-   Vlog is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Vlog is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Vlog.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef QSQEVALUATION_H
 #define QSQEVALUATION_H
 
@@ -28,14 +9,11 @@
 
 #include <tridentcompr/utils/utils.h>
 
-#include <trident/kb/querier.h>
-#include <trident/kb/kb.h>
 #include <trident/model/table.h>
 
 #include <vector>
 
 class TupleTable;
-class DictMgmt;
 
 #define QSQR_EVAL 0
 #define QSQR_EST 1
@@ -70,7 +48,6 @@ class QSQR {
 private:
     EDBLayer &layer;
     Program *program;
-    DictMgmt *dict;
 
     //Store all the inputs used during the computation
     uint8_t sizePreds[MAX_NPREDS];
@@ -90,8 +67,8 @@ private:
     void processTask(QSQR_Task &task);
 
 public:
-    QSQR(EDBLayer &layer, Program *program, DictMgmt *dict) : layer(layer),
-        program(program), dict(dict) {
+    QSQR(EDBLayer &layer, Program *program) : layer(layer),
+        program(program) {
         for (int i = 0; i < MAX_NPREDS; ++i) {
             inputs[i] = NULL;
             answers[i] = NULL;

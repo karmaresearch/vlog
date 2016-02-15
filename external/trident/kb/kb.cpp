@@ -1,22 +1,3 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include <trident/kb/memoryopt.h>
 #include <trident/kb/kb.h>
 #include <trident/kb/querier.h>
@@ -25,7 +6,8 @@
 #include <trident/kb/kbconfig.h>
 #include <trident/tree/root.h>
 #include <trident/tree/stringbuffer.h>
-#include <trident/storage/pairstorage.h>
+#include <trident/binarytables/binarytable.h>
+#include <trident/binarytables/tableshandler.h>
 
 #include <boost/log/trivial.hpp>
 
@@ -37,8 +19,14 @@
 
 using namespace std;
 
-KB::KB(const char *path, bool readOnly, bool reasoning, bool dictEnabled, KBConfig &config) :
-    path(path), readOnly(readOnly), dictEnabled(dictEnabled) {
+KB::KB(const char *path,
+       bool readOnly,
+       bool reasoning,
+       bool dictEnabled,
+       KBConfig &config) :
+    path(path), readOnly(readOnly), ntables(), nFirstTables(),
+    dictEnabled(dictEnabled) {
+
     timens::system_clock::time_point start = timens::system_clock::now();
 
     //Get some statistics
@@ -53,6 +41,8 @@ KB::KB(const char *path, bool readOnly, bool reasoning, bool dictEnabled, KBConf
         totalNumberTerms = Utils::decode_long(data, 0);
         fis.read(data, 8);
         totalNumberTriples = Utils::decode_long(data, 0);
+        fis.read(data, 8);
+        nextID = Utils::decode_long(data, 0);
 
         fis.read(data, 4);
         nindices = Utils::decode_int(data, 0);
@@ -64,17 +54,27 @@ KB::KB(const char *path, bool readOnly, bool reasoning, bool dictEnabled, KBConf
         }
         incompleteIndices = fis.get() != 0;
         dictHash = fis.get() != 0;
+
+        //Read the number of tables per partitions
+        for (int i = 0; i < N_PARTITIONS; ++i) {
+            fis.read(data, 8);
+            ntables[i] = Utils::decode_long(data, 0);
+            fis.read(data, 8);
+            nFirstTables[i] = Utils::decode_long(data, 0);
+        }
         fis.close();
     } else {
         dictPartitions = config.getParamInt(DICTPARTITIONS);
         dictHash = config.getParamBool(DICTHASH);
         totalNumberTerms = 0;
         totalNumberTriples = 0;
+        nextID = 0;
         nindices = config.getParamInt(NINDICES);
         aggrIndices = config.getParamBool(AGGRINDICES);
         incompleteIndices = config.getParamBool(INCOMPLINDICES);
         useFixedStrategy = config.getParamBool(USEFIXEDSTRAT);
         storageFixedStrategy = (char) config.getParamInt(FIXEDSTRAT);
+        thresholdSkipTable = config.getParamInt(THRESHOLD_SKIP_TABLE);
     }
 
     //Optimize the memory management
@@ -147,11 +147,11 @@ KB::KB(const char *path, bool readOnly, bool reasoning, bool dictEnabled, KBConf
     }
 
     //Initialize the memory tracker for the storage partitions
-    bytesTracker[0] = new MemoryManager<FileSegment>(
+    bytesTracker[0] = new MemoryManager<FileDescriptor>(
         config.getParamLong(STORAGE_CACHE_SIZE));
     for (int i = 1; i < nindices; ++i) {
         if (!readOnly) {
-            bytesTracker[i] = new MemoryManager<FileSegment>(
+            bytesTracker[i] = new MemoryManager<FileDescriptor>(
                 config.getParamLong(STORAGE_CACHE_SIZE));
         } else {
             bytesTracker[i] = NULL;
@@ -171,9 +171,17 @@ KB::KB(const char *path, bool readOnly, bool reasoning, bool dictEnabled, KBConf
         stringstream is;
         is << path << "/p" << i;
         if (readOnly) {
-            files[i] = new TableStorage(readOnly, is.str(),
-                                        config.getParamInt(STORAGE_MAX_FILE_SIZE),
-                                        config.getParamInt(STORAGE_MAX_N_FILES), bytesTracker[0], stats);
+            //Check if there are actually files in the directory
+            boost::filesystem::directory_iterator endItr;
+            boost::filesystem::directory_iterator itr(is.str());
+            if  (itr != endItr) {
+                files[i] = new TableStorage(readOnly, is.str(),
+                                            config.getParamInt(STORAGE_MAX_FILE_SIZE),
+                                            config.getParamInt(STORAGE_MAX_N_FILES),
+                                            bytesTracker[0], stats);
+            } else {
+                files[i] = NULL;
+            }
         } else {
             files[i] = new TableStorage(readOnly, is.str(),
                                         config.getParamInt(STORAGE_MAX_FILE_SIZE),
@@ -249,8 +257,9 @@ void KB::loadDict(int id, KBConfig *config) {
 }
 
 Querier *KB::query() {
-    return new Querier(tree, dictManager, files, totalNumberTriples, totalNumberTerms, nindices,
-                       /*aggrIndices,*/ pso, sampleKB);
+    return new Querier(tree, dictManager, files, totalNumberTriples,
+                       totalNumberTerms, nindices, ntables, nFirstTables,
+                       sampleKB);
 }
 
 Inserter *KB::insert() {
@@ -258,8 +267,14 @@ Inserter *KB::insert() {
         BOOST_LOG_TRIVIAL(error) << "Insert() is not available if the knowledge base is opened in read_only mode.";
     }
 
-    return new Inserter(tree, files, totalNumberTerms + (dictEnabled ? dictManager->getNTermsInserted() : 0),
-                        useFixedStrategy, storageFixedStrategy);
+    return new Inserter(tree,
+                        files,
+                        totalNumberTerms + (dictEnabled ? dictManager->getNTermsInserted() : 0),
+                        useFixedStrategy,
+                        storageFixedStrategy,
+                        thresholdSkipTable,
+                        ntables,
+                        nFirstTables);
 }
 
 void KB::closeDict() {
@@ -310,8 +325,10 @@ Stats *KB::getStatsDict() {
 KB::~KB() {
     //Update stats about the KB
     if (!readOnly) {
-        if (dictEnabled)
+        if (dictEnabled) {
             totalNumberTerms += dictManager->getNTermsInserted();
+            nextID = dictManager->getLargestIDInserted() + 1;
+        }
         totalNumberTriples += files[0]->getNTriplesInserted();
     }
 
@@ -345,10 +362,14 @@ KB::~KB() {
             BOOST_LOG_TRIVIAL(debug) << "Delete storage " << i;
             delete files[i];
         }
+        // Commented out; see below. --Ceriel
+        // if (bytesTracker[i] != NULL) {
+        //     delete bytesTracker[i];
+        // }
     }
 
     // Delete bytesTrackers after deleting all files, because
-    // in read-only case, all files share the same bytesTracker.
+    // in read-only case, all files share the same bytesTracker. --Ceriel
     for (int i = 0; i < nindices; ++i) {
         if (bytesTracker[i] != NULL) {
             delete bytesTracker[i];
@@ -377,6 +398,10 @@ KB::~KB() {
         Utils::encode_long(data, 0, totalNumberTriples);
         fos.write(data, 8);
 
+        //Write the highest ID in the KB
+        Utils::encode_long(data, 0, nextID);
+        fos.write(data, 8);
+
         //Write number indices
         Utils::encode_int(data, 0, nindices);
         fos.write(data, 4);
@@ -388,8 +413,16 @@ KB::~KB() {
         //Write whether the indices are complete or not
         fos.put(incompleteIndices);
 
+        //Dict is hash based?
         fos.put(dictHash);
 
+        //Write the number of virtual tables per partition
+        for (int i = 0; i < N_PARTITIONS; ++i) {
+            Utils::encode_long(data, 0, ntables[i]);
+            fos.write(data, 8);
+            Utils::encode_long(data, 0, nFirstTables[i]);
+            fos.write(data, 8);
+        }
         fos.close();
     }
 

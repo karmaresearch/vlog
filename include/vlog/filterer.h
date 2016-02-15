@@ -1,22 +1,3 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Vlog.
-
-   Vlog is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Vlog is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Vlog.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef _FILTERER_H
 #define _FILTERER_H
 
@@ -26,6 +7,10 @@
 #include <vlog/concepts.h>
 
 #include <vector>
+#include <map>
+#include <set>
+
+using namespace std;
 
 class FCInternalTable;
 class TableFilterer {
@@ -72,13 +57,13 @@ public:
                              const FCBlock & block);
 
     static void setOptIntersect(bool v) {
-	opt_intersection = v;
+        opt_intersection = v;
     }
 
     static bool getOptIntersect() {
-	return opt_intersection;
+        return opt_intersection;
     }
-    
+
     bool producedDerivationInPreviousSteps(const Literal &outputQuery,
                                            const Literal &currentQuery,
                                            const FCBlock *block);

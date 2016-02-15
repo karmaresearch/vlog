@@ -1,33 +1,15 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef QUERIER_H_
 #define QUERIER_H_
 
-#include <trident/iterators/storageitr.h>
+//#include <trident/iterators/storageitr.h>
 #include <trident/iterators/arrayitr.h>
 #include <trident/iterators/scanitr.h>
 #include <trident/iterators/simplescanitr.h>
 #include <trident/iterators/aggritr.h>
 #include <trident/iterators/cacheitr.h>
+#include <trident/iterators/termitr.h>
 #include <trident/tree/coordinates.h>
-#include <trident/storage/storagestrat.h>
+#include <trident/binarytables/storagestrat.h>
 
 #include <tridentcompr/utils/factory.h>
 
@@ -54,36 +36,46 @@ private:
     bool lastKeyFound;
     const long inputSize;
     const long nTerms;
+    const long *nTablesPerPartition;
+    const long *nFirstTablesPerPartition;
 
     std::string pathRawData;
     bool copyRawData;
 
     const int nindices;
-    CacheIdx *cachePSO;
+    //CacheIdx *cachePSO;
 
     std::unique_ptr<Querier> sampler;
 
     TermCoordinates currentValue;
 
     //Factories
-    Factory<StorageItr> factory1;
     Factory<ArrayItr> factory2;
     Factory<ScanItr> factory3;
     Factory<AggrItr> factory4;
     Factory<CacheItr> factory5;
     Factory<SimpleScanItr> factory6;
-    Factory<ListPairHandler> listFactory;
-    Factory<GroupPairHandler> comprFactory;
-    Factory<SimplifiedGroupPairHandler> list2Factory;
+    Factory<TermItr> factory7;
+
+    Factory<RowTable> listFactory;
+    Factory<ClusterTable> comprFactory;
+    Factory<ColumnTable> list2Factory;
+    Factory<NewColumnTable> ncFactory;
+
     StorageStrat strat;
 
     //Statistics
     long aggrIndices, notAggrIndices, cacheIndices;
     long spo, ops, pos, sop, osp, pso;
 
-    PairItr *getPairIterator(const int perm, const long c1, const long c2);
+    void initBinaryTable(TableStorage *storage,
+                         int fileIdx,
+                         int mark,
+                         BinaryTable *t,
+                         long v1,
+                         long v2,
+                         const bool setConstraints);
 
-    PairItr *newItrOnReverse(PairItr *itr, const long v1, const long v2);
 public:
 
     struct Counters {
@@ -96,27 +88,83 @@ public:
         long spo, ops, pos, sop, osp, pso;
     };
 
-    Querier(Root* tree, DictMgmt *dict, TableStorage** files, const long inputSize,
-            const long nTerms, const int nindices, /*const bool aggregated,*/ CacheIdx *cachePSO,
+    Querier(Root* tree, DictMgmt *dict, TableStorage** files,
+            const long inputSize,
+            const long nTerms, const int nindices,
+            const long* nTablesPerPartition,
+            const long* nFirstTablesPerPartition,
             KB *sampleKB);
 
-    PairItr *get(const long s, const long p, const long o);
+    TermItr *getTermList(const int perm) {
+        return getTermList(perm, false);
+    }
 
-    PairItr *get(const int idx, const long s, const long p, const long o);
+    TermItr *getTermList(const int perm, const bool enforcePerm);
 
-    uint64_t getCardOnIndex(const int idx, const long first, const long second, const long third);
+    TableStorage *getTableStorage(const int perm) {
+        if (nindices <= perm)
+            return NULL;
+        else
+            return files[perm];
+    }
+
+    StorageStrat *getStorageStrat() {
+        return &strat;
+    }
+
+    PairItr *get(const int idx, const long s, const long p, const long o) {
+        return get(idx, s, p, o, true);
+    }
+
+    PairItr *get(const int idx, const long s, const long p,
+                 const long o, const bool cons);
+
+    PairItr *get(const int idx, TermCoordinates &value,
+                 const long key, const long v1,
+                 const long v2, const bool cons);
+
+    PairItr *get(const int perm,
+                 const long key,
+                 const short fileIdx,
+                 const int mark,
+                 const char strategy,
+                 const long v1,
+                 const long v2,
+                 const bool constrain,
+                 const bool noAggr);
+
+    PairItr *getPermuted(const int idx, const long el1, const long el2,
+                         const long el3, const bool constrain);
+
+    uint64_t isAggregated(const int idx, const long first, const long second,
+                   const long third);
+
+    uint64_t isReverse(const int idx, const long first, const long second,
+                   const long third);
+
+    uint64_t getCardOnIndex(const int idx, const long first, const long second, const long third) {
+        return getCardOnIndex(idx, first, second, third, false);
+    }
+
+    uint64_t getCardOnIndex(const int idx, const long first, const long second,
+                            const long third, bool skipLast);
 
     long getCard(const long s, const long p, const long o);
 
     long getCard(const long s, const long p, const long o, uint8_t pos);
+
+    uint64_t getCard(const int idx, const long v);
+
+    uint64_t estCardOnIndex(const int idx, const long first, const long second,
+                            const long third);
+
+    long estCard(const long s, const long p, const long o);
 
     bool isEmpty(const long s, const long p, const long o);
 
     int getIndex(const long s, const long p, const long o);
 
     char getStrategy(const int idx, const long v);
-
-    uint64_t getCard(const int idx, const long v);
 
     Querier &getSampler();
 
@@ -128,8 +176,18 @@ public:
 
     int *getOrder(int idx);
 
+    bool permExists(const int perm) const;
+
     uint64_t getInputSize() const {
         return inputSize;
+    }
+
+    /*uint64_t getNTablesPerPartition(const int idx) const {
+        return nTablesPerPartition[idx];
+    }*/
+
+    uint64_t getNFirstTablesPerPartition(const int idx) const {
+        return nFirstTablesPerPartition[idx];
     }
 
     uint64_t getNTerms() const {
@@ -161,10 +219,19 @@ public:
 
     ArrayItr *getArrayIterator();
 
-    PairItr *getPairIterator(TermCoordinates *value, int perm, long c1, long c2);
+    PairItr *getPairIterator(TermCoordinates *value,
+                             int perm,
+                             const long key,
+                             long c1,
+                             long c2,
+                             const bool constrain,
+                             const bool noAggr);
+
+    PairItr *newItrOnReverse(PairItr *itr, const long v1, const long v2);
 
     PairItr *getFilePairIterator(const int perm, const long constraint1,
-                                 const char strategy, const short file, const int pos);
+                                 const char strategy, const short file,
+                                 const int pos);
 
     void releaseItr(PairItr *itr);
 

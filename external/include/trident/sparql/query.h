@@ -1,27 +1,10 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef QUERYPARSER_H_
 #define QUERYPARSER_H_
 
 #include <trident/sparql/filter.h>
 #include <trident/kb/dictmgmt.h>
+//#include <cts/infra/QueryGraph.hpp>
+//#include <cts/parser/SPARQLParser.hpp>
 
 #include <vector>
 #include <cstring>
@@ -222,7 +205,14 @@ private:
     std::vector<std::string> projections;
 
 public:
-    int parseQuery(DictMgmt *dict, string filequery);
+    //void parseFromRDF3XQueryGraph(SPARQLParser &parser, QueryGraph &graph);
+    Query(std::vector<Pattern*> &patterns,
+          std::vector<Filter*> &filters,
+          std::vector<std::string> &projections) :
+        patterns(patterns),
+        filters(filters),
+        projections(projections) {
+    }
 
     int npatterns() {
         return patterns.size();
@@ -253,4 +243,4 @@ public:
     }
 };
 
-#endif /* QUERYPARSER_H_ */
+#endif

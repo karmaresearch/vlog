@@ -1,106 +1,103 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef POSITR_H_
 #define POSITR_H_
 
+#include <trident/kb/consts.h>
 #include <trident/iterators/pairitr.h>
+
+#include <iostream>
 
 class Querier;
 
 class AggrItr: public PairItr {
-private:
-    Querier *q;
-    PairItr *mainItr;
-    PairItr *secondItr;
+    private:
+        Querier *q;
+        PairItr *mainItr;
+        PairItr *secondItr;
+        bool noSecColumn;
 
-    bool hasNextChecked, next;
-    int idx;
+        bool hasNextChecked, n;
+        int idx;
 
-    long p;
+        //long p;
 
-    char strategy(long coordinates) {
-        return (char) ((coordinates >> 48) & 0xFF);
-    }
+        char strategy(long coordinates) {
+            return (char) ((coordinates >> 48) & 0xFF);
+        }
 
-    short file(long coordinates) {
-        return (short)((coordinates >> 32) & 0xFFFF);
-    }
+        short file(long coordinates) {
+            return (short)((coordinates >> 32) & 0xFFFF);
+        }
 
-    int pos(long coordinates) {
-        return (int) coordinates;
-    }
+        int pos(long coordinates) {
+            return (int) coordinates;
+        }
 
-    void setup_second_itr(const int idx);
+        void setup_second_itr(const int idx);
 
-public:
-    int getType() {
-        return 4;
-    }
+    public:
+        int getTypeItr() {
+            return AGGR_ITR;
+        }
 
-    long getValue1() {
-        return mainItr->getValue1();
-    }
+        long getValue1() {
+            return mainItr->getValue1();
+        }
 
-    long getValue2() {
-        return secondItr->getValue2();
-    }
+        long getValue2() {
+            return secondItr->getValue2();
+        }
 
-    bool allowMerge() {
-        return true;
-    }
+        bool hasNext();
 
-    bool has_next();
+        void next();
 
-    void next_pair();
+        void mark();
 
-    void mark();
+        void reset(const char i);
 
-    void reset(const char i);
+        void clear();
 
-    void clear();
+        void gotoFirstTerm(long c1);
 
-    void move_first_term(long c1);
+        void gotoSecondTerm(long c2);
 
-    void move_second_term(long c2);
+        void init(int idx, PairItr* itr, Querier *q);
 
-    void init(long p, int idx, PairItr* itr, Querier *q);
+        uint64_t getCardinality();
 
-    uint64_t getCard();
+        uint64_t estCardinality();
 
-    void set_constraint1(const long c1) {
-        PairItr::set_constraint1(c1);
-        mainItr->set_constraint1(c1);
-    }
+        long getCount();
 
-    void set_constraint2(const long c2) {
-        PairItr::set_constraint2(c2);
-        secondItr->set_constraint2(c2);
-    }
+        //uint64_t estimateCardinality();
 
-    PairItr *getMainItr() {
-        return mainItr;
-    }
+        void setConstraint1(const long c1) {
+            PairItr::setConstraint1(c1);
+            mainItr->setConstraint1(c1);
+        }
 
-    PairItr *getSecondItr() {
-        return secondItr;
-    }
+        void setConstraint2(const long c2) {
+            PairItr::setConstraint2(c2);
+            if (secondItr)
+                secondItr->setConstraint2(c2);
+        }
+
+        PairItr *getMainItr() {
+            return mainItr;
+        }
+
+        PairItr *getSecondItr() {
+            return secondItr;
+        }
+
+        void ignoreSecondColumn() {
+            noSecColumn = true;
+            if (mainItr != NULL) {
+                mainItr->ignoreSecondColumn();
+            } else {
+                throw 10;
+            }
+        }
 };
 
 #endif

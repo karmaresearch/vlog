@@ -1,27 +1,12 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef SPARQL_OPERATOR_H
 #define SPARQL_OPERATOR_H
 
+
 #include <trident/sparql/joins.h>
+#include <trident/iterators/tupleiterators.h>
 #include <trident/model/table.h>
+#include <trident/model/tuple.h>
+
 #include <trident/kb/kb.h>
 
 #include <cctype>
@@ -115,11 +100,11 @@ public:
     void print(int indent);
 };
 
-class HashJoin : public Join {
+class TridentHashJoin : public Join {
 public:
-    HashJoin(std::vector<std::shared_ptr<SPARQLOperator>> children);
+    TridentHashJoin(std::vector<std::shared_ptr<SPARQLOperator>> children);
 
-    HashJoin(std::vector<std::shared_ptr<SPARQLOperator>> children,
+    TridentHashJoin(std::vector<std::shared_ptr<SPARQLOperator>> children,
              std::vector<string> &projections);
 
     Op getType() {
@@ -167,6 +152,7 @@ public:
 class KBScan : public Scan {
 private:
     Querier *q;
+    Tuple t;
 
 public:
     KBScan(Querier *q, Pattern *p);
@@ -179,4 +165,56 @@ public:
 
     void releaseIterator(TupleIterator *itr);
 };
+
+/*class MaterializedScan : public Scan {
+private:
+
+    std::shared_ptr<TupleTable> table;
+
+public:
+    MaterializedScan(std::shared_ptr<SemiNaiver> sn, Pattern *pattern,
+                     Program *program);
+
+    TupleIterator *getIterator();
+
+    long estimateCost();
+
+    TupleIterator *getSampleIterator();
+
+    void releaseIterator(TupleIterator *itr);
+};
+
+
+class EDBLayer;
+class DictMgmt;
+class ReasoningScan : public Scan {
+protected:
+    Pattern *pattern;
+    EDBLayer *layer;
+    Program *program;
+    DictMgmt *dict;
+
+    Reasoner reasoner;
+    ReasoningMode mode;
+
+public:
+    ReasoningScan(Pattern *pattern, EDBLayer *layer, Program *program,
+                  DictMgmt *dict, const uint64_t reasoningThreshold);
+
+    virtual TupleIterator *getIterator();
+
+    void optimize(std::vector<uint8_t> *posBindings,
+                  std::vector<uint64_t> *valueBindings);
+
+    long estimateCost();
+
+    virtual TupleIterator *getIterator(std::vector<uint8_t> &positions,
+                                       std::vector<uint64_t> &values);
+
+    bool doesSupportsSideways() {
+        return true;
+    }
+
+    void releaseIterator(TupleIterator *itr);
+};*/
 #endif

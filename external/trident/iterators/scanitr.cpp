@@ -1,92 +1,155 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include <trident/iterators/scanitr.h>
 #include <trident/tree/treeitr.h>
 #include <trident/kb/querier.h>
+
+#include <trident/binarytables/storagestrat.h>
 
 #include <iostream>
 
 using namespace std;
 
-void ScanItr::init(TreeItr *itr, Querier *q) {
-    this->itr = itr;
+void ScanItr::init(int idx, Querier *q) {
+    this->idx = idx;
     this->q = q;
-    currentItr = NULL;
-    hasNextChecked = false;
-}
+    currentTable = NULL;
+    reversedItr = NULL;
+    //hasNextChecked = false;
 
-uint64_t ScanItr::getCard() {
-    return q->getInputSize();
-}
-
-bool ScanItr::has_next() {
-    if (!hasNextChecked) {
-        if (currentItr != NULL && currentItr->has_next()) {
-            hasNext = true;
-        } else {
-
-            //move to the following key
-            if (currentItr != NULL)
-                q->releaseItr(currentItr);
-
-            if (itr->hasNext()) {
-                currentKey = itr->next(&currentValue);
-                if (!currentValue.exists(0)) {
-                    bool ok = false;
-                    while (itr->hasNext()) {
-                        currentKey = itr->next(&currentValue);
-                        if (currentValue.exists(0)) {
-                            ok = true;
-                            break;
-                        }
-                    }
-                    if (!ok) {
-                        hasNext = false;
-                        hasNextChecked = true;
-                        return hasNext;
-                    }
-                }
-                currentItr = q->getPairIterator(&currentValue, 0, -1, -1);
-                hasNext = currentItr->has_next();
+    itr1 = q->getTermList(idx, true);
+    if (idx > 2 || itr1 == NULL) {
+        itr2 = q->getTermList(idx - 3);
+        if (itr1) {
+            if (itr1->hasNext()) {
+                itr1->next();
             } else {
-                hasNext = false;
+                q->releaseItr(itr1);
+                itr1 = NULL;
             }
         }
-        hasNextChecked = true;
-    }
-    return hasNext;
+    } else
+        itr2 = NULL;
+    storage = q->getTableStorage(idx);
+    strat = q->getStorageStrat();
+    ignseccolumn = false;
 }
 
-void ScanItr::next_pair() {
-    currentItr->next_pair();
-    v1 = currentItr->getValue1();
-    v2 = currentItr->getValue2();
-    setKey(currentKey);
-    hasNextChecked = false;
+uint64_t ScanItr::getCardinality() {
+    if (ignseccolumn) {
+        return q->getNFirstTablesPerPartition(idx);
+    } else {
+        return q->getInputSize();
+    }
+}
+
+uint64_t ScanItr::estCardinality() {
+    if (ignseccolumn) {
+        return q->getNFirstTablesPerPartition(idx);
+    } else {
+        return q->getInputSize();
+    }
+}
+
+bool ScanItr::hasNext() {
+    if (currentTable != NULL) {
+        if (currentTable->hasNext()) {
+            return true;
+        } else {
+            q->releaseItr(currentTable);
+            currentTable = NULL;
+        }
+    } else if (reversedItr != NULL) {
+        if (reversedItr->hasNext()) {
+            return true;
+        } else {
+            q->releaseItr(reversedItr);
+            reversedItr = NULL;
+        }
+    }
+
+    //Move to the next key
+    if (itr2) {
+        if (itr2->hasNext()) {
+            itr2->next();
+            const long key2 = itr2->getKey();
+            //itr1 can be either equal, greater or being finished
+            if (itr1) {
+                if (itr1->getKey() < key2) {
+                    if (itr1->hasNext()) {
+                        itr1->next();
+                    } else {
+                        q->releaseItr(itr1);
+                        itr1 = NULL;
+                    }
+                }
+            }
+            return true;
+        } else {
+            return false;
+        }
+    } else {
+        if (itr1->hasNext()) {
+            itr1->next();
+            return true;
+        } else {
+            return false;
+        }
+    }
+}
+
+void ScanItr::next() {
+    if (currentTable == NULL) {
+        if (reversedItr == NULL) {
+            if (itr2 && (!itr1 || itr2->getKey() != itr1->getKey())) {
+                const long key = itr2->getKey();
+                char strategy = itr2->getCurrentStrat();
+                short file = itr2->getCurrentFile();
+                int mark = itr2->getCurrentMark();
+                //cerr << "New reversed iterator for key " << key << " itr1=" << itr1->getKey() << " mark=" << mark << " file=" << file << endl;
+                //Need to get reversed table
+                PairItr *itr = q->get(idx - 3, key, file, mark, strategy,
+                                      -1, -1, false, false);
+                reversedItr = q->newItrOnReverse(itr, -1, -1);
+                if (ignseccolumn)
+                    reversedItr->ignoreSecondColumn();
+                if (!reversedItr->hasNext()) {
+                    throw 10; //should not happen
+                }
+                reversedItr->next();
+                q->releaseItr(itr);
+                setKey(key);
+            } else {
+                const long key = itr1->getKey();
+                char strategy = itr1->getCurrentStrat();
+                short file = itr1->getCurrentFile();
+                int mark = itr1->getCurrentMark();
+                //cerr << "New table for key " << key << " itr2 " << itr2->getKey() << " mark=" << mark << " file=" << file << endl;
+                currentTable = q->get(idx, key, file, mark, strategy,
+                                      -1, -1, false, false);
+                if (ignseccolumn)
+                    currentTable->ignoreSecondColumn();
+                setKey(key);
+                if (!currentTable->hasNext()) {
+                    throw 10;
+                }
+                currentTable->next();
+            }
+        } else {
+            reversedItr->next();
+        }
+    } else {
+        currentTable->next();
+    }
 }
 
 void ScanItr::clear() {
-    if (currentItr != NULL) {
-        q->releaseItr(currentItr);
-    }
-    delete itr;
+    if (currentTable)
+        q->releaseItr(currentTable);
+    if (itr1)
+        q->releaseItr(itr1);
+    if (itr2)
+        q->releaseItr(itr2);
+    if (reversedItr)
+        q->releaseItr(reversedItr);
 }
 
 void ScanItr::mark() {
@@ -95,11 +158,43 @@ void ScanItr::mark() {
 void ScanItr::reset(const char i) {
 }
 
-void ScanItr::move_first_term(long c1) {
-    cerr << "scanitr: not implemented" << endl;
+void ScanItr::gotoKey(long k) {
+    if (k > getKey()) {
+        if (currentTable) {
+            //release it
+            q->releaseItr(currentTable);
+            currentTable = NULL;
+        }
+        if (reversedItr) {
+            q->releaseItr(reversedItr);
+            reversedItr = NULL;
+        }
+
+        //Move forward
+        if (itr2) {
+            itr2->gotoKey(k);
+            //I do not advance this iteration because it will be increased
+            //the first time we call the hasNext() method.
+        }
+        itr1->gotoKey(k);
+    }
 }
 
-void ScanItr::move_second_term(long c2) {
-    cerr << "scanitr: not implemented" << endl;
+void ScanItr::gotoFirstTerm(long c1) {
+    assert(reversedItr != NULL || currentTable != NULL);
+    if (reversedItr) {
+        reversedItr->gotoFirstTerm(c1);
+    } else {
+        currentTable->gotoFirstTerm(c1);
+    }
+
 }
 
+void ScanItr::gotoSecondTerm(long c2) {
+    assert(reversedItr != NULL || currentTable != NULL);
+    if (reversedItr) {
+        reversedItr->gotoSecondTerm(c2);
+    } else {
+        currentTable->gotoSecondTerm(c2);
+    }
+}

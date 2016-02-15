@@ -1,22 +1,3 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include <trident/iterators/cacheitr.h>
 #include <trident/kb/querier.h>
 #include <trident/kb/cacheidx.h>
@@ -46,7 +27,7 @@ void CacheItr::init(Querier *q, const uint64_t estimatedSize, CacheIdx *cache,
     //be some. The first time that the iterator is moved to a location then
     //the flags will be set accordingly.
     hasNextChecked = true;
-    next = true;
+    n = true;
 
     //Get existing pairs from cache
     std::pair<std::vector<std::pair<uint64_t, uint64_t>>*, std::vector<CacheBlock>*> pair =
@@ -63,25 +44,25 @@ long CacheItr::getValue2() {
     return v2;
 }
 
-bool CacheItr::has_next() {
+bool CacheItr::hasNext() {
     if (!hasNextChecked) {
-        next = true;
+        n = true;
         if (groupSet) {
             if (currentIdx >= idxEndGroup || p->at(currentIdx).first != v1) {
-                next = false;
+                n = false;
             } else if (constraint2 != -1 && p->at(currentIdx).second != constraint2) {
-                next = false;
+                n = false;
             }
         } else {
-            next = false;
+            n = false;
         }
         hasNextChecked = true;
     }
-    assert(groupSet || !next);
-    return next;
+    assert(groupSet || !n);
+    return n;
 }
 
-void CacheItr::next_pair() {
+void CacheItr::next() {
     assert(groupSet);
     v2 = p->at(currentIdx).second;
     currentIdx++;
@@ -162,7 +143,7 @@ CacheBlock *CacheItr::searchBlock(std::vector<CacheBlock> *blocks,
     }
 }
 
-void CacheItr::move_first_term(long c1) {
+void CacheItr::gotoFirstTerm(long c1) {
     //does c1 exist in the existing blocks? For now, assume it does not
     CacheBlock *block = searchBlock(existingBlocks, c1);
     if (block != NULL) {
@@ -176,7 +157,7 @@ void CacheItr::move_first_term(long c1) {
         v1 = c1;
         v2 = p->at(currentIdx).second;
         hasNextChecked = true;
-        next = p->at(currentIdx).first == c1;
+        n = p->at(currentIdx).first == c1;
         groupSet = true;
         return;
     }
@@ -194,8 +175,8 @@ void CacheItr::move_first_term(long c1) {
 
     currentIdx = newPairs.size();
     PairItr *subitr = q->get(IDX_SPO, c1, getKey(), -1);
-    while (subitr->has_next()) {
-        subitr->next_pair();
+    while (subitr->hasNext()) {
+        subitr->next();
         newPairs.push_back(std::make_pair(c1, subitr->getValue2()));
     }
     q->releaseItr(subitr);
@@ -205,26 +186,26 @@ void CacheItr::move_first_term(long c1) {
         lastDeltaValue = c1;
         v1 = c1;
         v2 = newPairs.at(currentIdx).second;
-        next = true;
+        n = true;
         groupSet = true;
         idxEndGroup = newPairs.size();
     } else {
-        next = false;
+        n = false;
         groupSet = false;
     }
     hasNextChecked = true;
 }
 
-void CacheItr::move_second_term(long c2) {
+void CacheItr::gotoSecondTerm(long c2) {
     while (currentIdx < idxEndGroup && v1 == p->at(currentIdx).first &&
             p->at(currentIdx).second < c2) {
         currentIdx++;
     }
     if (currentIdx < idxEndGroup && v1 == p->at(currentIdx).first &&
             p->at(currentIdx).second == c2)
-        next = true;
+        n = true;
     else
-        next = false;
+        n = false;
     hasNextChecked = true;
 }
 
@@ -234,6 +215,10 @@ void CacheItr::mark() {
 void CacheItr::reset(const char i) {
 }
 
-uint64_t CacheItr::getCard() {
-    return estimatedSize;
+uint64_t CacheItr::getCardinality() {
+    throw 10;
 }
+
+/*uint64_t CacheItr::estimateCardinality() {
+    return estimatedSize;
+}*/

@@ -1,24 +1,8 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
+#ifndef _COMPRFILEDESCRIPTOR_H
+#define _COMPRFILEDESCRIPTOR_H
 
 #include <trident/kb/consts.h>
-#include <trident/memory/memorymgr.h>
+#include <trident/utils/memorymgr.h>
 
 #include <tridentcompr/utils/utils.h>
 #include <boost/interprocess/file_mapping.hpp>
@@ -49,7 +33,10 @@ private:
 
     int uncompressedSize;
     FileSegment *uncompressedBuffers[MAX_N_MAPPINGS];
-    char specialTmpBuffer[BLOCK_MIN_SIZE];
+
+    //char specialTmpBuffer[BLOCK_MIN_SIZE];
+    std::unique_ptr<char[]> specialTmpBuffers[MAX_SESSIONS];
+
     int lastAccessedSegment;
 
     //Used for writing
@@ -63,16 +50,15 @@ private:
 
     void uncompressBlock(const int b);
     void writeFile();
+    //bool isUsed();
 public:
     ComprFileDescriptor(bool readOnly, int id, std::string file, int maxSize,
                         MemoryManager<FileSegment> *tracker,
                         ComprFileDescriptor **parentArray, Stats* const stats);
 
-    char* getBuffer(int offset, int *length);
+    char* getBuffer(int offset, int *length, const int sesID);
 
-    char* getBuffer(int offset, int *length, int &memoryBlock);
-
-    bool isUsed();
+    char* getBuffer(int offset, int *length, int &memoryBlock, const int sesID);
 
     int getFileLength() {
         return uncompressedSize;
@@ -120,3 +106,5 @@ public:
 
     ~ComprFileDescriptor();
 };
+
+#endif

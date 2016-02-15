@@ -1,22 +1,3 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include <trident/files/filedescriptor.h>
 #include <trident/files/filemanager.h>
 #include <trident/kb/consts.h>
@@ -52,7 +33,7 @@ void FileDescriptor::mapFile(int requiredIncrement) {
     if (memoryTrackerId != -1) {
         tracker->update(memoryTrackerId, requiredIncrement);
     } else {
-        memoryTrackerId = tracker->add(requiredIncrement, this, id,
+        memoryTrackerId = tracker->add(sizeFile, this, id,
                                        parentArray);
     }
 }
@@ -111,6 +92,79 @@ void FileDescriptor::append(char *bytes, const int size) {
     this->size += size;
 }
 
+char* FileDescriptor::getBuffer(int offset, int *length,
+                                int &memoryBlock, const int sesID) {
+    //sedID is used only by the comprfiledescriptor.
+    memoryBlock = memoryTrackerId;
+    if (*length > size - offset) {
+        *length = size - offset;
+    }
+    return buffer + offset;
+}
+
+int FileDescriptor::appendVLong(const long v) {
+    if (8 + this->size > sizeFile) {
+        int increment = std::max(SMALLEST_INCR, std::max(8, (int) sizeFile));
+        mapFile(increment);
+    }
+    const int pos = Utils::encode_vlong(buffer, size, v);
+    this->size = pos;
+    return pos;
+}
+
+int FileDescriptor::appendVLong2(const long v) {
+    if (8 + this->size > sizeFile) {
+        int increment = std::max(SMALLEST_INCR, std::max(8, (int) sizeFile));
+        mapFile(increment);
+    }
+    const int pos = Utils::encode_vlong2(buffer, size, v);
+    this->size = pos;
+    return pos;
+}
+
+void FileDescriptor::appendLong(const long v) {
+    if (8 + this->size > sizeFile) {
+        int increment = std::max(SMALLEST_INCR, std::max(8, (int) sizeFile));
+        mapFile(increment);
+    }
+    Utils::encode_long(buffer, size, v);
+    this->size += 8;
+}
+
+void FileDescriptor::appendLong(const uint8_t nbytes, const uint64_t v) {
+    if (nbytes + this->size > sizeFile) {
+        int increment = std::max(SMALLEST_INCR, std::max((int)nbytes,
+                                 (int) sizeFile));
+        mapFile(increment);
+    }
+    Utils::encode_longNBytes(buffer + size, nbytes, v);
+    this->size += nbytes;
+}
+
+
+void FileDescriptor::reserveBytes(const uint8_t n) {
+    if (n + this->size > sizeFile) {
+        int increment = std::max(SMALLEST_INCR, std::max((int)n, (int) sizeFile));
+        mapFile(increment);
+    }
+    this->size += n;
+}
+
+void FileDescriptor::overwriteAt(int pos, char byte) {
+    buffer[pos] = byte;
+}
+
+void FileDescriptor::overwriteVLong2At(int pos, long number) {
+    Utils::encode_vlong2(buffer, pos, number);
+}
+
+bool FileDescriptor::isUsed() {
+    if (tracker->isUsed(memoryTrackerId))
+        return true;
+    else
+        return false;
+}
+
 FileDescriptor::~FileDescriptor() {
     tracker->removeBlockWithoutDeallocation(memoryTrackerId);
 
@@ -127,9 +181,7 @@ FileDescriptor::~FileDescriptor() {
             //Remove the file
             fs::remove(fs::path(filePath));
         } else if (size < sizeFile) {
-            //For some reasons this method does not work in linux...
             fs::resize_file(fs::path(filePath), size);
         }
     }
 }
-

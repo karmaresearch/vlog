@@ -1,21 +1,9 @@
 /*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ * leaf.cpp
+ *
+ *  Created on: Oct 7, 2013
+ *      Author: jacopo
+ */
 
 #include <trident/tree/leaf.h>
 #include <trident/tree/treecontext.h>
@@ -771,8 +759,8 @@ Coordinates * Leaf::addCoordinates(Coordinates * list,
 //n. combinations
 const char NCOMBS[64] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6};
 //idx elements in combinations
-const char ICOMBS[64] = {0, 0, 1, 0, 2, 3, 1, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 0, 23};
-const uint8_t COMBS[29] = {0, 1, 2, 0, 2, 0, 3, 1, 4, 2, 5, 0, 1, 3, 4, 1, 2, 4, 5, 0, 2, 3, 5, 0, 1, 2, 3, 4, 5};
+//const char ICOMBS[64] = {0, 0, 1, 0, 2, 3, 1, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 0, 23};
+//const uint8_t COMBS[29] = {0, 1, 2, 0, 2, 0, 3, 1, 4, 2, 5, 0, 1, 3, 4, 1, 2, 4, 5, 0, 2, 3, 5, 0, 1, 2, 3, 4, 5};
 
 Coordinates *Leaf::parseInternalLine(const int pos) {
     unsigned char permutations = rawNode[pos];
@@ -783,14 +771,21 @@ Coordinates *Leaf::parseInternalLine(const int pos) {
     Coordinates *first = NULL;
     Coordinates *previousEl = NULL;
 
-    int idx = ICOMBS[permutations];
-    for (int i = 0; i < NCOMBS[permutations]; ++i) {
+    //int idx = ICOMBS[permutations];
+    int idx = 0;
+    for (int i = 0; i < NCOMBS[rawNode[pos]]; ++i) {
         Coordinates *currentEl = getContext()->getIlFactory()->get();
         currentEl->nElements = Utils::decode_vlong2(rawNode, &startPos);
         currentEl->file = (uint16_t) Utils::decode_vint2(rawNode, &startPos);
         currentEl->posInFile = Utils::decode_vint2(rawNode, &startPos);
         currentEl->strategy = rawNode[startPos++];
-        currentEl->permutation = COMBS[idx + i];
+        while (!(permutations & 1)) {
+            permutations >>= 1;
+            idx++;
+        }
+        currentEl->permutation = idx;
+        permutations >>= 1;
+        idx++;
         currentEl->next = NULL;
 
         if (previousEl != NULL) {
@@ -899,4 +894,3 @@ Leaf::~Leaf() {
         delete[] numValue;
     }
 }
-

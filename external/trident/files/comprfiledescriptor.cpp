@@ -1,22 +1,3 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include <trident/files/comprfiledescriptor.h>
 #include <trident/files/filemanager.h>
 #include <trident/kb/consts.h>
@@ -74,7 +55,7 @@ ComprFileDescriptor::ComprFileDescriptor(bool readOnly, int id,
     if (readOnly) {
         if (uncompressedSize > 0) {
             readOnlyInput.open(file);
-            BOOST_LOG_TRIVIAL(debug) << "Readonly open file " << file;
+            //BOOST_LOG_TRIVIAL(debug) << "Readonly open file " << file;
         } else {
             BOOST_LOG_TRIVIAL(error) << "File empty!" << endl;
             throw 10;
@@ -115,20 +96,20 @@ void ComprFileDescriptor::uncompressBlock(const int block) {
     uncompressedBuffer = new FileSegment();
 
     readOnlyInput.seekg(startCompr);
-    BOOST_LOG_TRIVIAL(debug) << "Readonly seek to pos " << startCompr << " file " << file;
+    //BOOST_LOG_TRIVIAL(debug) << "Readonly seek to pos " << startCompr << " file " << file;
     if (readOnlyInput.fail() || readOnlyInput.eof()) {
         BOOST_LOG_TRIVIAL(error) << "Problems with the seek at pos " << startCompr << " file " << file;
-	throw 10;
+        throw 10;
     }
 
     if (COMPRESSION_ENABLED) {
         readOnlyInput.read(rawBuffer, mappings[block] - startCompr);
-	BOOST_LOG_TRIVIAL(debug) << "Readonly read " << (mappings[block] - startCompr) << " from " << file;
+        //BOOST_LOG_TRIVIAL(debug) << "Readonly read " << (mappings[block] - startCompr) << " from " << file;
         LZ4_decompress_safe(rawBuffer, uncompressedBuffer->block,
                             mappings[block] - startCompr, BLOCK_SIZE);
     } else {
         readOnlyInput.read(uncompressedBuffer->block, mappings[block] - startCompr);
-	BOOST_LOG_TRIVIAL(debug) << "Readonly read " << (mappings[block] - startCompr) << " from " << file;
+        //BOOST_LOG_TRIVIAL(debug) << "Readonly read " << (mappings[block] - startCompr) << " from " << file;
     }
     stats->addNReadIndexBytes(mappings[block] - startCompr);
     stats->incrNReadIndexBlocks();
@@ -139,13 +120,15 @@ void ComprFileDescriptor::uncompressBlock(const int block) {
     uncompressedBuffer->memId = memoryId;
 }
 
-char* ComprFileDescriptor::getBuffer(int pos, int *length, int &memoryBlock) {
-    char *ret = getBuffer(pos, length);
+char* ComprFileDescriptor::getBuffer(int pos, int *length, int &memoryBlock,
+                                     const int sessionID) {
+    char *ret = getBuffer(pos, length, sessionID);
     memoryBlock = lastAccessedSegment;
     return ret;
 }
 
-char* ComprFileDescriptor::getBuffer(int pos, int *length) {
+char* ComprFileDescriptor::getBuffer(int pos, int *length,
+                                     const int sessionID) {
     if (!readOnly) {
         if (pos + *length >= uncompressedSize) {
             *length = uncompressedSize - pos;
@@ -174,19 +157,23 @@ char* ComprFileDescriptor::getBuffer(int pos, int *length) {
             uncompressBlock(startBlock + 1);
         }
         //3b - Copy the buffer
-        memcpy(specialTmpBuffer, b, len);
-        memcpy(specialTmpBuffer + len, uncompressedBuffers[startBlock + 1],
+        if (specialTmpBuffers[sessionID] == NULL) {
+            specialTmpBuffers[sessionID] = std::move(std::unique_ptr<char[]>(new char[BLOCK_MIN_SIZE]));
+        }
+        memcpy(specialTmpBuffers[sessionID].get(), b, len);
+        memcpy(specialTmpBuffers[sessionID].get() + len, uncompressedBuffers[startBlock + 1],
                BLOCK_MIN_SIZE - len);
 
         len = BLOCK_MIN_SIZE;
-        b = specialTmpBuffer;
+        b = specialTmpBuffers[sessionID].get();
+
         lastAccessedSegment = NO_BLOCK_SESSION;
     }
     *length = len;
     return b;
 }
 
-bool ComprFileDescriptor::isUsed() {
+/*bool ComprFileDescriptor::isUsed() {
     for (int i = 0; i < sizeMappings; ++i) {
         if (uncompressedBuffers[i] != NULL) {
             if (tracker->isUsed(uncompressedBuffers[i]->memId))
@@ -194,7 +181,7 @@ bool ComprFileDescriptor::isUsed() {
         }
     }
     return false;
-}
+}*/
 
 ComprFileDescriptor::~ComprFileDescriptor() {
     if (!readOnly) {
@@ -208,7 +195,7 @@ ComprFileDescriptor::~ComprFileDescriptor() {
         }
 
         readOnlyInput.close();
-	BOOST_LOG_TRIVIAL(debug) << "Readonly close " << file;
+        //BOOST_LOG_TRIVIAL(debug) << "Readonly close " << file;
     }
     delete[] rawBuffer;
 }

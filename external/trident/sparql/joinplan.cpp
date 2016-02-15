@@ -1,22 +1,3 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include <trident/sparql/joinplan.h>
 #include <trident/sparql/filter.h>
 #include <trident/sparql/sparqloperators.h>
@@ -143,6 +124,7 @@ void NestedJoinPlan::rearrange(std::vector<std::pair<Pattern *, uint64_t> > &pat
         for (std::vector<std::pair<Pattern *, uint64_t> >::iterator itr = patterns.begin();
                 itr != patterns.end(); ++itr) {
             //Check if the pattern joins with current patterns. If so, then we remove it.
+            // int njoins = itr->first->joinsWith(currentPattern); Ceriel: Why not:
             int njoins = itr->first->joinsWith(vars);
             if (njoins > 0) {
                 PatternInfo info;
@@ -183,7 +165,7 @@ void NestedJoinPlan::rearrange(std::vector<std::pair<Pattern *, uint64_t> > &pat
 std::vector<int> NestedJoinPlan::reorder(std::vector<Pattern*> patterns,
         std::vector<std::shared_ptr<SPARQLOperator>> scans) {
     //Rearrange the order execution of the patterns
-    timens::system_clock::time_point start = timens::system_clock::now();
+    //timens::system_clock::time_point start = timens::system_clock::now();
 
     std::vector<std::pair<Pattern *, uint64_t> > pairs;
     BOOST_LOG_TRIVIAL(debug) << "UNOPTIMIZED ORDER OF PATTERNS:";
@@ -191,7 +173,7 @@ std::vector<int> NestedJoinPlan::reorder(std::vector<Pattern*> patterns,
         Pattern *p = patterns[i];
         uint64_t card = std::static_pointer_cast<Scan>(scans[i])->estimateCost();
         pairs.push_back(std::make_pair(p, card));
-        BOOST_LOG_TRIVIAL(debug) << " " << p->toString();
+        BOOST_LOG_TRIVIAL(debug) << card << " " << p->toString();
     }
 
     //Rearrange the patterns making sure that: there is always a join and the
@@ -218,10 +200,10 @@ std::vector<int> NestedJoinPlan::reorder(std::vector<Pattern*> patterns,
         BOOST_LOG_TRIVIAL(debug) << " " << itr->first->toString() << " card: " << itr->second;
     }
 
-    boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
-                                          - start;
-    BOOST_LOG_TRIVIAL(info) << "Time optimizing the query = " << sec.count() * 1000
-                            << " milliseconds";
+    //boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+    //                                      - start;
+    //BOOST_LOG_TRIVIAL(info) << "Time optimizing the query = " << sec.count() * 1000
+    //                        << " milliseconds";
 
     return output;
 }

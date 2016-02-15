@@ -1,27 +1,8 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include <trident/kb/kb.h>
 #include <trident/kb/querier.h>
 #include <trident/tree/root.h>
-#include <trident/storage/pairstorage.h>
-#include <trident/storage/pairhandler.h>
+#include <trident/binarytables/tableshandler.h>
+#include <trident/binarytables/binarytable.h>
 
 #include <tridentcompr/utils/factory.h>
 
@@ -33,10 +14,10 @@
 
 using namespace std;
 
-class EMPTY_ITR: public PairItr {
+class EmptyItr: public PairItr {
 public:
-    int getType() {
-        return 2;
+    int getTypeItr() {
+        return EMPTY_ITR;
     }
 
     long getValue1() {
@@ -47,11 +28,18 @@ public:
         return 0;
     }
 
-    bool has_next() {
+    long getCount() {
+        return 0;
+    }
+
+    bool hasNext() {
         return false;
     }
 
-    void next_pair() {
+    void next() {
+    }
+
+    void ignoreSecondColumn() {
     }
 
     void clear() {
@@ -63,17 +51,21 @@ public:
     void reset(const char i) {
     }
 
-    void move_first_term(long c1) {
+    void gotoFirstTerm(long c1) {
     }
 
-    void move_second_term(long c2) {
+    void gotoSecondTerm(long c2) {
     }
 
     bool allowMerge() {
         return false;
     }
 
-    uint64_t getCard() {
+    uint64_t estCardinality() {
+        return 0;
+    }
+
+    uint64_t getCardinality() {
         return 0;
     }
 } emptyItr;
@@ -93,15 +85,19 @@ int PERM_SOP[] = { 0, 2, 1 };
 int INV_PERM_SOP[] = { 0, 2, 1 };
 
 Querier::Querier(Root* tree, DictMgmt *dict, TableStorage** files,
-                 const long inputSize, const long nTerms, const int nindices, /*const bool aggregated,*/
-                 CacheIdx *cachePSO, KB *sampleKB)
-    : inputSize(inputSize), nTerms(nTerms), nindices(nindices), /*aggregated(aggregated),*/ cachePSO(cachePSO) {
+                 const long inputSize, const long nTerms, const int nindices,
+                 const long *nTablesPerPartition,
+                 const long *nFirstTablesPerPartition, KB *sampleKB)
+    : inputSize(inputSize), nTerms(nTerms),
+      nTablesPerPartition(nTablesPerPartition),
+      nFirstTablesPerPartition(nFirstTablesPerPartition), nindices(nindices) {
     this->tree = tree;
     this->dict = dict;
     this->files = files;
     lastKeyFound = false;
     lastKeyQueried = -1;
-    strat.init(&listFactory, &comprFactory, &list2Factory);
+    strat.init(&listFactory, &comprFactory, &list2Factory, &ncFactory,
+               NULL, NULL, NULL, NULL);
 
     std::string pathFirstPerm = files[0]->getPath();
     pathRawData = pathFirstPerm + std::string("raw");
@@ -129,46 +125,68 @@ uint64_t Querier::getCard(const int idx, const long v) {
 }
 
 uint64_t Querier::getCardOnIndex(const int idx, const long first, const long second,
-                                 const long third) {
-//Check if first element is variable
+                                 const long third, bool skipLast) {
+    //Check if first element is variable
     switch (idx) {
     case IDX_SPO:
     case IDX_SOP:
-        if (first < 0)
+        if (first < 0 && !skipLast)
             return inputSize;
         break;
     case IDX_POS:
     case IDX_PSO:
-        if (second < 0)
+        if (second < 0 && !skipLast)
             return inputSize;
         break;
     case IDX_OPS:
     case IDX_OSP:
-        if (third < 0)
+        if (third < 0 && !skipLast)
             return inputSize;
         break;
     }
 
     //The first term is a constant.
     PairItr *itr = get(idx, first, second, third);
-    if (itr->getType() != 2 && itr->has_next()) {
+    if (itr->getTypeItr() != EMPTY_ITR && itr->hasNext()) {
         int countUnbound = 0;
         if (first < 0) countUnbound++;
         if (second < 0) countUnbound++;
         if (third < 0) countUnbound++;
-        if (countUnbound == 2) {
-            releaseItr(itr);
-            return currentValue.getNElements(idx);
+        if (countUnbound >= 2) {
+            if (skipLast) {
+                itr->ignoreSecondColumn();
+                uint64_t card = itr->getCardinality();
+                releaseItr(itr);
+                return card;
+            } else {
+                releaseItr(itr);
+                if (currentValue.exists(idx)) {
+                    return currentValue.getNElements(idx);
+                } else if (idx > 2) {
+                    return currentValue.getNElements(idx - 3);
+                } else {
+                    throw 10; //should not happen
+                }
+            }
         } else if (countUnbound == 1) {
-            uint64_t card = itr->getCard();
+            uint64_t card;
+            if (skipLast) {
+                card = 1;
+            } else {
+                card = itr->getCardinality();
+            }
             releaseItr(itr);
             return card;
         } else {
             assert(countUnbound == 0);
+            releaseItr(itr);
             return 1;
         }
     } else {
-        //EMPTY_ITR
+        //No results
+        if (itr->getTypeItr() != EMPTY_ITR) {
+            releaseItr(itr);
+        }
         return 0;
     }
 }
@@ -181,7 +199,7 @@ long Querier::getCard(const long s, const long p, const long o, uint8_t pos) {
     //At least one variable is bound. Thus "pos" must refer to another one
     int idx = getIndex(s, p, o);
     PairItr *itr = get(idx, s, p, o);
-    if (itr->getType() != 2 && itr->has_next()) {
+    if (itr->getTypeItr() != EMPTY_ITR && itr->hasNext()) {
         int countUnbound = 0;
         if (s < 0) countUnbound++;
         if (p < 0) countUnbound++;
@@ -190,7 +208,7 @@ long Querier::getCard(const long s, const long p, const long o, uint8_t pos) {
             releaseItr(itr);
             return 1;
         } else if (countUnbound == 1) {
-            uint64_t card = itr->getCard();
+            uint64_t card = itr->getCardinality();
             releaseItr(itr);
             return card;
         } else if (countUnbound == 2) {
@@ -219,13 +237,9 @@ long Querier::getCard(const long s, const long p, const long o, uint8_t pos) {
                 itr = get(idx2, s, p, o);
             }
 
-            PairHandler *ph = itr->getPairHandler();
-            if (ph->getType() != COLUMN_LAYOUT) {
-                throw 10; //not supported
-            }
-
-            long nElements = ((SimplifiedGroupPairHandler*)ph)->
-                             getNFirstColumn();
+            //BinaryTable *ph = itr->getBinaryTable();
+            itr->ignoreSecondColumn();
+            long nElements = itr->getCardinality();
             releaseItr(itr);
             return nElements;
         } else {
@@ -234,10 +248,194 @@ long Querier::getCard(const long s, const long p, const long o, uint8_t pos) {
 
 
     } else {
-        if (itr->getType() != 2)
+        if (itr->getTypeItr() != EMPTY_ITR)
             releaseItr(itr);
         return 0; //EMPTY_ITR. Join will fail...
     }
+}
+
+uint64_t Querier::isAggregated(const int idx, const long first, const long second,
+                               const long third) {
+    if (idx != IDX_POS && idx != IDX_PSO)
+        return 0;
+
+    const long key = second;
+    if (key >= 0) {
+        if (lastKeyQueried != key) {
+            lastKeyFound = tree->get(key, &currentValue);
+            lastKeyQueried = key;
+        }
+        if (currentValue.exists(idx)) {
+            if (StorageStrat::isAggregated(currentValue.getStrategy(idx))) {
+                //Is the second term bound?
+                if (idx == IDX_PSO && first >= 0) {
+                    return 1;
+                } else if (idx == IDX_POS && third >= 0) {
+                    return 1;
+                } else {
+                    PairItr *itr = getPairIterator(&currentValue, idx, key, -1, -1,
+                                                   true, true);
+                    itr->ignoreSecondColumn();
+                    uint64_t count = itr->getCount();
+                    releaseItr(itr);
+                    return count;
+                }
+            }
+        }
+    } else {
+        //Is it all aggregated?
+    }
+    return 0;
+}
+
+uint64_t Querier::isReverse(const int idx, const long first, const long second,
+                            const long third) {
+    if (idx < 3)
+        return 0;
+
+    long key1;
+    switch (idx) {
+    case IDX_SPO:
+    case IDX_SOP:
+        if (first < 0)
+            return inputSize;
+        key1 = first;
+        break;
+    case IDX_POS:
+    case IDX_PSO:
+        if (second < 0)
+            return inputSize;
+        key1 = second;
+        break;
+    case IDX_OPS:
+    case IDX_OSP:
+        if (third < 0)
+            return inputSize;
+        key1 = third;
+        break;
+    }
+
+    //Check key
+    if (lastKeyQueried != key1) {
+        lastKeyFound = tree->get(key1, &currentValue);
+        lastKeyQueried = key1;
+    }
+    if (!currentValue.exists(idx)) {
+        if (currentValue.exists(idx - 3)) {
+            return currentValue.getNElements(idx - 3);
+        }
+    }
+    return 0;
+}
+
+uint64_t Querier::estCardOnIndex(const int idx, const long first, const long second,
+                                 const long third) {
+    //Check if first element is variable
+    long key1, key2;
+    switch (idx) {
+    case IDX_SPO:
+    case IDX_SOP:
+        if (first < 0)
+            return inputSize;
+        key1 = first;
+        if (idx == IDX_SPO) {
+            key2 = second;
+        } else {
+            key2 = third;
+        }
+        break;
+    case IDX_POS:
+    case IDX_PSO:
+        if (second < 0)
+            return inputSize;
+        key1 = second;
+        if (idx == IDX_POS)
+            key2 = third;
+        else
+            key2 = first;
+        break;
+    case IDX_OPS:
+    case IDX_OSP:
+        if (third < 0)
+            return inputSize;
+        key1 = third;
+        if (idx == IDX_OPS)
+            key2 = second;
+        else
+            key2 = first;
+        break;
+    }
+
+    //The first term is a constant.
+    int countUnbound = 0;
+    if (first < 0) countUnbound++;
+    if (second < 0) countUnbound++;
+    if (third < 0) countUnbound++;
+    if (countUnbound == 0) {
+        return 1;
+    } else if (countUnbound == 1 && key2 >= 0) {
+        PairItr *itr = get(idx, first, second, third);
+        long card = itr->estCardinality();
+        releaseItr(itr);
+        return card;
+    } else {
+        if (lastKeyQueried != key1) {
+            lastKeyFound = tree->get(key1, &currentValue);
+            lastKeyQueried = key1;
+        }
+        int perm = idx;
+        if (perm > 2)
+            perm = perm - 3;
+        if (currentValue.exists(perm)) {
+            return currentValue.getNElements(perm);
+        } else {
+            return 0;
+        }
+    }
+}
+
+long Querier::estCard(const long s, const long p, const long o) {
+    if (s < 0 && p < 0 && o < 0) {
+        //They are all variables. Return the input size...
+        return inputSize;
+    }
+
+    int countUnbound = 0;
+    if (s < 0) countUnbound++;
+    if (p < 0) countUnbound++;
+    if (o < 0) countUnbound++;
+    if (countUnbound == 0) {
+        return 1;
+    } else if (countUnbound == 1) {
+        int perm = getIndex(s, p, o);
+        PairItr *itr = get(perm, s, p, o);
+        long card = itr->estCardinality();
+        releaseItr(itr);
+        return card;
+    } else if (countUnbound == 2) {
+        long key;
+        int perm;
+        if (s >= 0) {
+            key = s;
+            perm = IDX_SPO;
+        } else if (p >= 0) {
+            key = p;
+            perm = IDX_POS;
+        } else {
+            key = o;
+            perm = IDX_OPS;
+        }
+        if (lastKeyQueried != key) {
+            lastKeyFound = tree->get(key, &currentValue);
+            lastKeyQueried = key;
+        }
+        if (currentValue.exists(perm)) {
+            return currentValue.getNElements(perm);
+        } else {
+            return 0;
+        }
+    }
+    throw 10;
 }
 
 long Querier::getCard(const long s, const long p, const long o) {
@@ -248,7 +446,7 @@ long Querier::getCard(const long s, const long p, const long o) {
 
     int idx = getIndex(s, p, o);
     PairItr *itr = get(idx, s, p, o);
-    if (itr->getType() != 2 && itr->has_next()) {
+    if (itr->getTypeItr() != EMPTY_ITR && itr->hasNext()) {
         int countUnbound = 0;
         if (s < 0) countUnbound++;
         if (p < 0) countUnbound++;
@@ -263,11 +461,12 @@ long Querier::getCard(const long s, const long p, const long o) {
             return currentValue.getNElements(idx);
         }
 
-        uint64_t card = itr->getCard();
+        itr->next();
+        uint64_t card = itr->getCardinality();
         releaseItr(itr);
         return card;
     } else {
-        if (itr->getType() != 2)
+        if (itr->getTypeItr() != EMPTY_ITR)
             releaseItr(itr);
         return 0; //EMPTY_ITR. Join will fail...
     }
@@ -281,8 +480,8 @@ bool Querier::isEmpty(const long s, const long p, const long o) {
 
     int idx = getIndex(s, p, o);
     PairItr *itr = get(idx, s, p, o);
-    if (itr->getType() != 2) {
-        const bool resp = itr->has_next();
+    if (itr->getTypeItr() != EMPTY_ITR) {
+        const bool resp = itr->hasNext();
         releaseItr(itr);
         return !resp;
     } else {
@@ -359,29 +558,45 @@ int Querier::getIndex(long s, long p, long o) {
     return IDX_SPO;
 }
 
-PairItr *Querier::get(const long s, const long p, const long o) {
-    int idx = getIndex(s, p, o);
-    return get(idx, s, p, o);
-}
-
-
 ArrayItr *Querier::getArrayIterator() {
     return factory2.get();
 }
 
-PairItr *Querier::getPairIterator(TermCoordinates * value, int perm, long v1,
-                                  long v2) {
-    if (value->getFileIdx(perm) == -1) {
-        return NULL;
-    } else {
-        short fileIdx = value->getFileIdx(perm);
-        int mark = value->getMark(perm);
-        char strategy = value->getStrategy(perm);
-        StorageItr *itr = factory1.get();
-        itr->init(files[perm], fileIdx, mark, strat.getPairHandler(strategy),
-                  v1, v2);
-        return itr;
+PairItr *Querier::getPairIterator(TermCoordinates * value, int perm,
+                                  const long key,
+                                  long v1,
+                                  long v2,
+                                  const bool constrain,
+                                  const bool noAggr) {
+    short fileIdx = value->getFileIdx(perm);
+    int mark = value->getMark(perm);
+    char strategy = value->getStrategy(perm);
+    return get(perm, key, fileIdx, mark, strategy, v1, v2, constrain, noAggr);
+}
+
+void Querier::initBinaryTable(TableStorage *storage,
+                              int file,
+                              int mark,
+                              BinaryTable *t,
+                              long v1,
+                              long v2,
+                              const bool setConstraints) {
+    storage->setupPairHandler(t, file, mark);
+    if (v1 != -1) {
+        t->moveToClosestFirstTerm(v1);
+        if (t->getValue1() == v1 && v2 != -1) {
+            t->moveToClosestSecondTerm(v1, v2);
+        }
     }
+    //Check whether the current line in the table respects the constraints.
+    if (setConstraints) {
+        t->setConstraint1(v1);
+        t->setConstraint2(v2);
+    } else {
+        t->setConstraint1(-1);
+        t->setConstraint2(-1);
+    }
+    t->setNextFromConstraints();
 }
 
 Querier &Querier::getSampler() {
@@ -395,29 +610,107 @@ Querier &Querier::getSampler() {
 
 PairItr *Querier::getFilePairIterator(const int perm, const long constraint1,
                                       const char strategy, const short fileIdx, const int pos) {
-    StorageItr *itr = factory1.get();
-    itr->init(files[perm], fileIdx, pos, strat.getPairHandler(strategy),
-              constraint1, -1);
-    return itr;
+    BinaryTable *t = strat.getBinaryTable(strategy);
+    initBinaryTable(files[perm], fileIdx, pos, t, constraint1, -1, true);
+    return t;
 }
 
-PairItr *Querier::getPairIterator(const int perm, const long v1,
-                                  const long v2) {
-    if (currentValue.getFileIdx(perm) == -1) {
-        return NULL;
+PairItr *Querier::getPermuted(const int idx, const long el1, const long el2,
+                              const long el3, const bool constrain) {
+    switch (idx) {
+    case IDX_SPO:
+        return get(idx, el1, el2, el3, constrain);
+    case IDX_SOP:
+        return get(idx, el1, el3, el2, constrain);
+    case IDX_POS:
+        return get(idx, el3, el1, el2, constrain);
+    case IDX_PSO:
+        return get(idx, el2, el1, el3, constrain);
+    case IDX_OSP:
+        return get(idx, el2, el3, el1, constrain);
+    case IDX_OPS:
+        return get(idx, el3, el2, el1, constrain);
+    }
+    throw 10;
+}
+
+bool Querier::permExists(const int perm) const {
+    return files[perm] != NULL;
+}
+
+TermItr *Querier::getTermList(const int perm, const bool enforcePerm) {
+    TableStorage *storage;
+    if (perm > 2 && !enforcePerm) {
+        storage = files[perm - 3];
     } else {
-        short fileIdx = currentValue.getFileIdx(perm);
-        int mark = currentValue.getMark(perm);
-        char strategy = currentValue.getStrategy(perm);
-        StorageItr *itr = factory1.get();
-        itr->init(files[perm], fileIdx, mark, strat.getPairHandler(strategy),
-                  v1, v2);
+        storage = files[perm];
+    }
+
+    if (storage != NULL) {
+        TermItr *itr = factory7.get();
+        itr->init(storage, nTablesPerPartition[perm]);
+        return itr;
+    } else {
+        return NULL;
+    }
+}
+
+PairItr *Querier::get(const int idx, TermCoordinates &value,
+                      const long key, const long v1,
+                      const long v2, const bool cons) {
+
+    if (value.exists(idx)) {
+        if (StorageStrat::isAggregated(value.getStrategy(idx))) {
+            aggrIndices++;
+            AggrItr *itr = factory4.get();
+            itr->init(idx, getPairIterator(&value, idx, key, v1, v2,
+                                           true, true),
+                      this);
+            itr->setKey(key);
+            return itr;
+        } else {
+            notAggrIndices++;
+            PairItr *itr = getPairIterator(&value, idx, key, v1, v2, cons,
+                                           false);
+            //itr->setKey(key);
+            return itr;
+        }
+    } else if (idx - 3 >= 0 && value.exists(idx - 3)) {
+        PairItr *itr = get(idx - 3, value, key, -1, -1, cons);
+        PairItr *itr2 = newItrOnReverse(itr, v1, v2);
+        itr2->setKey(key);
+        releaseItr(itr);
+        return itr2;
+    } else {
+        return &emptyItr;
+    }
+}
+
+PairItr *Querier::get(const int perm,
+                      const long key,
+                      const short fileIdx,
+                      const int mark,
+                      const char strategy,
+                      const long v1,
+                      const long v2,
+                      const bool constrain,
+                      const bool noAggr) {
+    BinaryTable *itr = strat.getBinaryTable(strategy);
+    initBinaryTable(files[perm], fileIdx, mark, itr, v1, v2, constrain);
+    if (StorageStrat::isAggregated(strategy) && !noAggr) {
+        AggrItr *itr2 = factory4.get();
+        itr2->init(perm, itr, this);
+        itr2->setKey(key);
+        return itr2;
+    } else {
+        itr->setKey(key);
         return itr;
     }
 }
 
-PairItr *Querier::get(const int idx, const long s, const long p, const long o) {
 
+PairItr *Querier::get(const int idx, const long s, const long p, const long o,
+                      const bool cons) {
     switch (idx) {
     case IDX_SPO:
         spo++;
@@ -426,173 +719,111 @@ PairItr *Querier::get(const int idx, const long s, const long p, const long o) {
                 lastKeyFound = tree->get(s, &currentValue);
                 lastKeyQueried = s;
             }
-            if (lastKeyFound && currentValue.exists(0)) {
-                notAggrIndices++;
-                PairItr *itr = getPairIterator(0, p, o);
-                itr->setKey(s);
-                return itr;
+            if (lastKeyFound) {
+                return get(IDX_SPO, currentValue, s, p, o, cons);
             } else {
                 return &emptyItr;
             }
         } else {
-            if (!copyRawData) {
-                ScanItr *itr = factory3.get();
-                itr->init(tree->itr(), this);
-                return itr;
-            } else {
-                SimpleScanItr *itr = factory6.get();
-                itr->init(this);
-                return itr;
-            }
+            //if (!copyRawData) {
+            ScanItr *itr = factory3.get();
+            itr->init(IDX_SPO, this);
+            return itr;
+            //} else {
+            //    SimpleScanItr *itr = factory6.get();
+            //    itr->init(this);
+            //    return itr;
+            //}
         }
     case IDX_OPS:
         ops++;
-        if (lastKeyQueried != o) {
-            lastKeyFound = tree->get(o, &currentValue);
-            lastKeyQueried = o;
-        }
-        if (lastKeyFound && currentValue.exists(1)) {
-            notAggrIndices++;
-            PairItr *itr = getPairIterator(1, p, s);
-            itr->setKey(o);
-            return itr;
+        if (o >= 0) {
+            if (lastKeyQueried != o) {
+                lastKeyFound = tree->get(o, &currentValue);
+                lastKeyQueried = o;
+            }
+            if (lastKeyFound) {
+                return get(IDX_OPS, currentValue, o, p, s, cons);
+            } else {
+                return &emptyItr;
+            }
         } else {
-            return &emptyItr;
+            ScanItr *itr = factory3.get();
+            itr->init(IDX_OPS, this);
+            return itr;
         }
     case IDX_POS:
         pos++;
-        lastKeyFound = tree->get(p, &currentValue);
-        lastKeyQueried = p;
-        if (lastKeyFound && currentValue.exists(2)) {
-            if (StorageStrat::isAggregated(currentValue.getStrategy(2))) {
-                aggrIndices++;
-                AggrItr *itr = factory4.get();
-                itr->init(p, IDX_OPS, getPairIterator(2, o, s), this);
-                itr->setKey(p);
-                return itr;
+        if (p >= 0) {
+            lastKeyFound = tree->get(p, &currentValue);
+            lastKeyQueried = p;
+            if (lastKeyFound) {
+                return get(IDX_POS, currentValue, p, o, s, cons);
             } else {
-                notAggrIndices++;
-                PairItr *itr = getPairIterator(2, o, s);
-                itr->setKey(p);
-                return itr;
+                return &emptyItr;
             }
         } else {
-            return &emptyItr;
+            ScanItr *itr = factory3.get();
+            itr->init(IDX_POS, this);
+            return itr;
         }
     case IDX_SOP:
         sop++;
-        if (lastKeyQueried != s) {
-            lastKeyFound = tree->get(s, &currentValue);
-            lastKeyQueried = s;
-        }
-        if (lastKeyFound) {
-            if (nindices == 3) {
-                if (currentValue.exists(0)) {
-                    PairItr *itr = getPairIterator(0, -1, -1);
-                    itr->setKey(s);
-                    //Prepare a fake iterator
-                    PairItr *itr2 = newItrOnReverse(itr, o, p);
-                    itr2->setKey(s);
-                    releaseItr(itr);
-                    return itr2;
-                } else {
-                    return &emptyItr;
-                }
-            } else { //nindices = 6
-                if (currentValue.exists(3)) {
-                    notAggrIndices++;
-                    PairItr *itr = getPairIterator(3, o, p);
-                    itr->setKey(s);
-                    return itr;
-                } else {
-                    return &emptyItr;
-                }
+        if (s >= 0) {
+            if (lastKeyQueried != s) {
+                lastKeyFound = tree->get(s, &currentValue);
+                lastKeyQueried = s;
+            }
+            if (lastKeyFound) {
+                return get(IDX_SOP, currentValue, s, o, p, cons);
+            } else {
+                return &emptyItr;
             }
         } else {
-            return &emptyItr;
+            ScanItr *itr = factory3.get();
+            itr->init(IDX_SOP, this);
+            return itr;
         }
     case IDX_OSP:
         osp++;
-        if (lastKeyQueried != o) {
-            lastKeyFound = tree->get(o, &currentValue);
-            lastKeyQueried = o;
-        }
-        if (lastKeyFound) {
-            if (nindices == 3) {
-                BOOST_LOG_TRIVIAL(error) << "This shouldn't happen";
-                throw 10;
-                /*if (currentValue.exists(1)) {
-                    CacheItr *itr = factory5.get();
-                    itr->setKey(o);
-                    return itr;
-                } else {
-                    return &emptyItr;
-                }*/
-            } else { //indices = 6
-                if (currentValue.exists(4)) {
-                    notAggrIndices++;
-                    PairItr *itr = getPairIterator(4, s, p);
-                    itr->setKey(o);
-                    return itr;
-                } else {
-                    return &emptyItr;
-                }
+        if (o >= 0) {
+            if (lastKeyQueried != o) {
+                lastKeyFound = tree->get(o, &currentValue);
+                lastKeyQueried = o;
+            }
+            if (lastKeyFound) {
+                return get(IDX_OSP, currentValue, o, s, p, cons);
+            } else {
+                return &emptyItr;
             }
         } else {
-            return &emptyItr;
+            ScanItr *itr = factory3.get();
+            itr->init(IDX_OSP, this);
+            return itr;
         }
     case IDX_PSO:
         pso++;
-        lastKeyFound = tree->get(p, &currentValue);
-        lastKeyQueried = p;
-        if (lastKeyFound) {
-            if (nindices == 3) {
-                if (currentValue.exists(2)) {
-                    if (s == -1 && o == -1) {
-                        BOOST_LOG_TRIVIAL(error) << "The CacheIterator does work if c1 is not bound";
-                        throw 10;
-                    }
-                    cacheIndices++;
-                    CacheItr *itr = factory5.get();
-                    itr->setKey(p);
-                    itr->init(this, currentValue.getNElements(2), cachePSO, s, o);
-                    return itr;
-                } else {
-                    return &emptyItr;
-                }
-            } else { // indices = 6
-                if (currentValue.exists(5)) {
-                    if (StorageStrat::isAggregated(currentValue.getStrategy(5))) {
-                        aggrIndices++;
-                        AggrItr *itr = factory4.get();
-                        itr->init(p, IDX_SPO, getPairIterator(5, s, o), this);
-                        itr->setKey(p);
-                        return itr;
-                    } else {
-                        notAggrIndices++;
-                        PairItr *itr = getPairIterator(5, s, o);
-                        itr->setKey(p);
-                        return itr;
-                    }
-                } else {
-                    return &emptyItr;
-                }
+        if (p >= 0) {
+            lastKeyFound = tree->get(p, &currentValue);
+            lastKeyQueried = p;
+            if (lastKeyFound) {
+                return get(IDX_PSO, currentValue, p, s, o, cons);
+            } else {
+                return &emptyItr;
             }
         } else {
-            return &emptyItr;
+            ScanItr *itr = factory3.get();
+            itr->init(IDX_PSO, this);
+            return itr;
         }
     }
     return NULL;
 }
 
-//bool sortPairs(pair<uint64_t,uint64_t> i, pair<uint64_t,uint64_t> j) {
-//  return ((i.second < j.second) && (i.first < j.first));
-//}
-
 PairItr *Querier::newItrOnReverse(PairItr * oldItr, const long v1, const long v2) {
     Pairs *tmpVector = new Pairs();
-    while (oldItr->has_next()) {
-        oldItr->next_pair();
+    while (oldItr->hasNext()) {
+        oldItr->next();
         if (v1 < 0 || oldItr->getValue2() == v1) {
             tmpVector->push_back(
                 std::pair<uint64_t, uint64_t>(oldItr->getValue2(),
@@ -647,42 +878,41 @@ int *Querier::getInvOrder(int idx) {
 }
 
 void Querier::releaseItr(PairItr * itr) {
-    if (itr->getPairHandler() != NULL) {
-        PairHandler *handler = itr->getPairHandler();
-        handler->clear();
-        switch (handler->getType()) {
-        case ROW_LAYOUT:
-            listFactory.release((ListPairHandler *) handler);
-            break;
-        case CLUSTER_LAYOUT:
-            comprFactory.release((GroupPairHandler *) handler);
-            break;
-        case COLUMN_LAYOUT:
-            list2Factory.release((SimplifiedGroupPairHandler*) handler);
-            break;
-        }
-    }
-
-    switch (itr->getType()) {
-    case 0:
-        factory1.release((StorageItr*) itr);
+    switch (itr->getTypeItr()) {
+    case ROW_ITR:
+        ((BinaryTable*)itr)->clear();
+        listFactory.release((RowTable *) itr);
         break;
-    case 1:
+    case CLUSTER_ITR:
+        ((BinaryTable*)itr)->clear();
+        comprFactory.release((ClusterTable *) itr);
+        break;
+    case COLUMN_ITR:
+        ((BinaryTable*)itr)->clear();
+        list2Factory.release((ColumnTable *) itr);
+        break;
+    case NEWCOLUMN_ITR:
+        ((BinaryTable*)itr)->clear();
+        ncFactory.release((NewColumnTable *) itr);
+        break;
+    case ARRAY_ITR:
         itr->clear();
         factory2.release((ArrayItr*) itr);
         break;
-    //case 2 is the empty iterator
-    case 3:
+    case SCAN_ITR:
         factory3.release((ScanItr*) itr);
         break;
-    case 5:
+    case CACHE_ITR:
         itr->clear();
         factory5.release((CacheItr*)itr);
         break;
-    case 6:
+    case SIMPLESCAN_ITR:
         factory6.release((SimpleScanItr*)itr);
         break;
-    case 4:
+    case TERM_ITR:
+        factory7.release((TermItr*)itr);
+        break;
+    case AGGR_ITR:
         AggrItr *citr = (AggrItr*) itr;
         if (citr->getMainItr() != NULL)
             releaseItr(citr->getMainItr());

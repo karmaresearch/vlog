@@ -1,24 +1,4 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include <tridentcompr/utils/utils.h>
-#include <tridentcompr/utils/lz4io.h>
 
 /**** MEMORY STATISTICS ****/
 #if defined(_WIN32)
@@ -43,6 +23,8 @@
 #else
 #error "I don't know which OS it is being used. Cannot optimize the code..."
 #endif
+
+#include <tridentcompr/utils/lz4io.h>
 
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
@@ -71,6 +53,15 @@ int Utils::numBytes(long number) {
     return -1;
 }
 
+int Utils::numBytesFixedLength(long number) {
+    uint8_t bytes = 0;
+    do {
+        bytes++;
+        number = number >> 8;
+    } while (number > 0);
+    return bytes;
+}
+
 int Utils::numBytes2(long number) {
     int nbytes = 0;
     do {
@@ -85,6 +76,14 @@ int Utils::decode_int(char* buffer, int offset) {
     n += (buffer[offset++] & 0xFF) << 16;
     n += (buffer[offset++] & 0xFF) << 8;
     n += buffer[offset] & 0xFF;
+    return n;
+}
+
+int Utils::decode_int(const char* buffer) {
+    int n = (buffer[0] & 0xFF) << 24;
+    n += (buffer[1] & 0xFF) << 16;
+    n += (buffer[2] & 0xFF) << 8;
+    n += buffer[3] & 0xFF;
     return n;
 }
 
@@ -122,6 +121,78 @@ long Utils::decode_long(char* buffer, int offset) {
     return n;
 }
 
+long Utils::decode_longFixedBytes(const char* buffer, const uint8_t nbytes) {
+    uint8_t offset = 0;
+    long n = 0;
+    switch (nbytes) {
+    case 1:
+        n += buffer[offset] & 0xFF;
+        break;
+    case 2:
+        n += (buffer[offset++] & 0xFF) << 8;
+        n += buffer[offset] & 0xFF;
+        break;
+    case 3:
+        n += (buffer[offset++] & 0xFF) << 16;
+        n += (buffer[offset++] & 0xFF) << 8;
+        n += buffer[offset] & 0xFF;
+        break;
+    case 4:
+        n += (long) (buffer[offset++] & 0xFF) << 24;
+        n += (buffer[offset++] & 0xFF) << 16;
+        n += (buffer[offset++] & 0xFF) << 8;
+        n += buffer[offset] & 0xFF;
+        break;
+    case 5:
+        n += (long) (buffer[offset++] & 0xFF) << 32;
+        n += (long) (buffer[offset++] & 0xFF) << 24;
+        n += (buffer[offset++] & 0xFF) << 16;
+        n += (buffer[offset++] & 0xFF) << 8;
+        n += buffer[offset] & 0xFF;
+        break;
+    case 6:
+        n += (long) (buffer[offset++] & 0xFF) << 40;
+        n += (long) (buffer[offset++] & 0xFF) << 32;
+        n += (long) (buffer[offset++] & 0xFF) << 24;
+        n += (buffer[offset++] & 0xFF) << 16;
+        n += (buffer[offset++] & 0xFF) << 8;
+        n += buffer[offset] & 0xFF;
+        break;
+    case 7:
+        n += (long) (buffer[offset++] & 0xFF) << 48;
+        n += (long) (buffer[offset++] & 0xFF) << 40;
+        n += (long) (buffer[offset++] & 0xFF) << 32;
+        n += (long) (buffer[offset++] & 0xFF) << 24;
+        n += (buffer[offset++] & 0xFF) << 16;
+        n += (buffer[offset++] & 0xFF) << 8;
+        n += buffer[offset] & 0xFF;
+        break;
+    case 8:
+        n += (long) (buffer[offset++]) << 56;
+        n += (long) (buffer[offset++] & 0xFF) << 48;
+        n += (long) (buffer[offset++] & 0xFF) << 40;
+        n += (long) (buffer[offset++] & 0xFF) << 32;
+        n += (long) (buffer[offset++] & 0xFF) << 24;
+        n += (buffer[offset++] & 0xFF) << 16;
+        n += (buffer[offset++] & 0xFF) << 8;
+        n += buffer[offset] & 0xFF;
+        break;
+    }
+    return n;
+}
+
+long Utils::decode_long(const char* buffer) {
+    long n = (long) (buffer[0]) << 56;
+    n += (long) (buffer[1] & 0xFF) << 48;
+    n += (long) (buffer[2] & 0xFF) << 40;
+    n += (long) (buffer[3] & 0xFF) << 32;
+    n += (long) (buffer[4] & 0xFF) << 24;
+    n += (buffer[5] & 0xFF) << 16;
+    n += (buffer[6] & 0xFF) << 8;
+    n += buffer[7] & 0xFF;
+    return n;
+}
+
 void Utils::encode_long(char* buffer, int offset, long n) {
     buffer[offset++] = (n >> 56) & 0xFF;
     buffer[offset++] = (n >> 48) & 0xFF;
@@ -131,6 +202,67 @@ void Utils::encode_long(char* buffer, int offset, long n) {
     buffer[offset++] = (n >> 16) & 0xFF;
     buffer[offset++] = (n >> 8) & 0xFF;
     buffer[offset++] = n & 0xFF;
+}
+
+void Utils::encode_longNBytes(char* buffer, const uint8_t nbytes,
+                              const uint64_t n) {
+    uint8_t offset = 0;
+    switch (nbytes) {
+    case 1:
+        buffer[offset] = n & 0xFF;
+        break;
+    case 2:
+        buffer[offset++] = (n >> 8) & 0xFF;
+        buffer[offset++] = n & 0xFF;
+        break;
+    case 3:
+        buffer[offset++] = (n >> 16) & 0xFF;
+        buffer[offset++] = (n >> 8) & 0xFF;
+        buffer[offset++] = n & 0xFF;
+        break;
+    case 4:
+        buffer[offset++] = (n >> 24) & 0xFF;
+        buffer[offset++] = (n >> 16) & 0xFF;
+        buffer[offset++] = (n >> 8) & 0xFF;
+        buffer[offset++] = n & 0xFF;
+        break;
+    case 5:
+        buffer[offset++] = (n >> 32) & 0xFF;
+        buffer[offset++] = (n >> 24) & 0xFF;
+        buffer[offset++] = (n >> 16) & 0xFF;
+        buffer[offset++] = (n >> 8) & 0xFF;
+        buffer[offset++] = n & 0xFF;
+        break;
+    case 6:
+        buffer[offset++] = (n >> 40) & 0xFF;
+        buffer[offset++] = (n >> 32) & 0xFF;
+        buffer[offset++] = (n >> 24) & 0xFF;
+        buffer[offset++] = (n >> 16) & 0xFF;
+        buffer[offset++] = (n >> 8) & 0xFF;
+        buffer[offset++] = n & 0xFF;
+        break;
+    case 7:
+        buffer[offset++] = (n >> 48) & 0xFF;
+        buffer[offset++] = (n >> 40) & 0xFF;
+        buffer[offset++] = (n >> 32) & 0xFF;
+        buffer[offset++] = (n >> 24) & 0xFF;
+        buffer[offset++] = (n >> 16) & 0xFF;
+        buffer[offset++] = (n >> 8) & 0xFF;
+        buffer[offset++] = n & 0xFF;
+        break;
+    case 8:
+        buffer[offset++] = (n >> 56) & 0xFF;
+        buffer[offset++] = (n >> 48) & 0xFF;
+        buffer[offset++] = (n >> 40) & 0xFF;
+        buffer[offset++] = (n >> 32) & 0xFF;
+        buffer[offset++] = (n >> 24) & 0xFF;
+        buffer[offset++] = (n >> 16) & 0xFF;
+        buffer[offset++] = (n >> 8) & 0xFF;
+        buffer[offset++] = n & 0xFF;
+        break;
+    default:
+        throw 10;
+    }
 }
 
 long Utils::decode_longWithHeader(char* buffer) {
@@ -458,7 +590,7 @@ int Utils::compare(const char* o1, int s1, int e1, const char* o2, int s2,
                    int e2) {
     for (int i = s1, j = s2; i < e1 && j < e2; i++, j++) {
         if (o1[i] != o2[j]) {
-            return ((int) o1[i] & 0xff) - ((int) o2[j] & 0xff);
+            return ((int)o1[i] & 0xff) - ((int) o2[j] & 0xff);
         }
     }
     return (e1 - s1) - (e2 - s2);
@@ -555,7 +687,7 @@ long Utils::getUsedMemory() {
 #endif
 }
 
-long Utils::getIOReadBytes() {
+long Utils::getIOReadChars() {
 #if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
     std::ifstream file("/proc/self/io");
     std::string line;
@@ -571,6 +703,25 @@ long Utils::getIOReadBytes() {
     return (size_t)0L; /* Unsupported. */
 #endif
 }
+
+long Utils::getIOReadBytes() {
+#if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
+    std::ifstream file("/proc/self/io");
+    std::string line;
+    while (std::getline(file, line)) {
+        string::size_type loc = line.find("read_bytes", 0);
+        if (loc != string::npos) {
+            string number = line.substr(12);
+            return stol(number);
+        }
+    }
+    return (size_t)0L;
+#else
+    return -1; /* Unsupported. */
+#endif
+}
+
+
 
 long long unsigned Utils::getCPUCounter() {
     unsigned a, d;

@@ -1,22 +1,3 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include <trident/iterators/aggritr.h>
 #include <trident/kb/querier.h>
 #include <iostream>
@@ -25,47 +6,67 @@ using namespace std;
 
 void AggrItr::setup_second_itr(const int idx) {
     long coordinates = mainItr->getValue2();
-    secondItr = q->getFilePairIterator(idx, p, strategy(coordinates),
+    int idx2;
+    if (idx == IDX_POS)
+        idx2 = IDX_OPS;
+    else if (idx == IDX_PSO)
+        idx2 = IDX_SPO;
+    else
+        throw 10; // not supported
+    secondItr = q->getFilePairIterator(idx2, key, strategy(coordinates),
                                        file(coordinates), pos(coordinates));
-    secondItr->mark();
+//    secondItr->mark();
 }
 
-bool AggrItr::has_next() {
+bool AggrItr::hasNext() {
     if (!hasNextChecked) {
         if (secondItr == NULL) {
-            if (mainItr->has_next()) {
-                mainItr->next_pair();
-                setup_second_itr(idx);
-                next = secondItr->has_next();
-                secondItr->next_pair();
+            if (mainItr->hasNext()) {
+                mainItr->next();
+                if (!noSecColumn) {
+                    setup_second_itr(idx);
+                    n = secondItr->hasNext();
+                    secondItr->next();
+                } else {
+                    n = true;
+                }
             } else {
-                next = false;
+                n = false;
             }
         } else {
-            next = secondItr->has_next();
-            if (next) {
-                secondItr->next_pair();
+            n = secondItr->hasNext();
+            if (n) {
+                secondItr->next();
             } else if (constraint1 == NO_CONSTRAINT) {
                 q->releaseItr(secondItr);
                 secondItr = NULL;
-                if (mainItr->has_next()) {
-                    mainItr->next_pair();
+                if (mainItr->hasNext()) {
+                    mainItr->next();
                     setup_second_itr(idx);
-                    next = secondItr->has_next();
-                    if (next) {
-                        secondItr->next_pair();
+                    n = secondItr->hasNext();
+                    if (n) {
+                        secondItr->next();
                     }
                 } else {
-                    next = false;
+                    n = false;
                 }
             }
         }
         hasNextChecked = true;
     }
-    return next;
+    return n;
 }
 
-void AggrItr::next_pair() {
+long AggrItr::getCount() {
+    assert(noSecColumn);
+    setup_second_itr(idx);
+    long els = secondItr->getCardinality();
+    q->releaseItr(secondItr);
+    secondItr = NULL;
+    return els;
+}
+
+void AggrItr::next() {
     hasNextChecked = false;
 }
 
@@ -92,48 +93,78 @@ void AggrItr::clear() {
     secondItr = NULL;
 }
 
-void AggrItr::move_first_term(long c1) {
-    mainItr->move_first_term(c1);
+void AggrItr::gotoFirstTerm(long c1) {
+    mainItr->gotoFirstTerm(c1);
     hasNextChecked = true;
-    next = mainItr->has_next();
-    if (next) {
-        mainItr->next_pair();
-        if (secondItr != NULL) {
-            q->releaseItr(secondItr);
+    n = mainItr->hasNext();
+    if (n) {
+        mainItr->next();
+        if (mainItr->getValue1() < c1) { //End of the stream. Stop
+            n = false;
+        } else {
+            if (!noSecColumn) {
+                if (secondItr != NULL) {
+                    q->releaseItr(secondItr);
+                }
+                setup_second_itr(idx);
+                n = secondItr->hasNext();
+                if (n)
+                    secondItr->next();
+            }
         }
-        setup_second_itr(idx);
-        next = secondItr->has_next();
-        if (next)
-            secondItr->next_pair();
     }
 }
 
-void AggrItr::move_second_term(long c2) {
-    secondItr->move_second_term(c2);
+void AggrItr::gotoSecondTerm(long c2) {
+    secondItr->gotoSecondTerm(c2);
     hasNextChecked = true;
-    next = secondItr->has_next();
-    if (next)
-        secondItr->next_pair();
+    n = secondItr->hasNext();
+    if (n)
+        secondItr->next();
 }
 
-void AggrItr::init(long p, int idx, PairItr* itr, Querier *q) {
-    this->p = p;
+void AggrItr::init(int idx, PairItr* itr, Querier *q) {
     mainItr = itr;
     this->q = q;
     this->idx = idx;
     hasNextChecked = false;
-    PairItr::set_constraint1(mainItr->getConstraint1());
-    PairItr::set_constraint2(mainItr->getConstraint2());
+    noSecColumn = false;
+    secondItr = NULL;
+    PairItr::setConstraint1(mainItr->getConstraint1());
+    PairItr::setConstraint2(mainItr->getConstraint2());
 }
 
-uint64_t AggrItr::getCard() {
-    if (next) {
-        uint64_t cardSec = secondItr->getCard();
-        if (getConstraint1() >= 0) {
-            return cardSec;
+uint64_t AggrItr::getCardinality() {
+    if (n) {
+        if (noSecColumn) {
+            return mainItr->getCardinality();
         } else {
-            uint64_t cardFirst = mainItr->getCard();
-            return cardFirst * cardSec;
+            uint64_t cardSec = secondItr->getCardinality();
+            if (getConstraint1() >= 0) {
+                return cardSec;
+            } else {
+                throw 10;
+            }
+        }
+    } else {
+        return 0;
+    }
+}
+
+uint64_t AggrItr::estCardinality() {
+    if (n) {
+        if (noSecColumn) {
+            return mainItr->estCardinality();
+        } else {
+            if (secondItr == NULL)
+                setup_second_itr(idx);
+            uint64_t cardSec = secondItr->estCardinality();
+            if (getConstraint1() >= 0) {
+                return cardSec;
+            } else {
+                uint64_t cardFirst = mainItr->estCardinality();
+                return cardFirst * cardSec;
+            }
         }
     } else {
         return 0;

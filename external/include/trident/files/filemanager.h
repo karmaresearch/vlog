@@ -1,26 +1,7 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef FILEMANAGER_H_
 #define FILEMANAGER_H_
 
-#include <trident/memory/memorymgr.h>
+#include <trident/utils/memorymgr.h>
 #include <trident/kb/consts.h>
 #include <trident/kb/statistics.h>
 
@@ -124,7 +105,8 @@ public:
         load_file(id);
         int memoryBlock;
 
-        char *result = openedFiles[id]->getBuffer(offset, length, memoryBlock);
+        char *result = openedFiles[id]->getBuffer(offset, length,
+                       memoryBlock, sessionId);
 
         if (sessionId != EMPTY_SESSION && sessions[sessionId] != memoryBlock) {
             //Tell the memory manager that we don't need this block anymore
@@ -152,10 +134,10 @@ public:
                 throw 10;
             }
         }
-	sessions[lastSession] = EMPTY_SESSION;
-	cnt = lastSession;
-	lastSession = (lastSession + 1) % MAX_SESSIONS;
-	// BOOST_LOG_TRIVIAL(debug) << "This = " << this << ", Open session " << cnt;
+        sessions[lastSession] = EMPTY_SESSION;
+        cnt = lastSession;
+        lastSession = (lastSession + 1) % MAX_SESSIONS;
+        // BOOST_LOG_TRIVIAL(debug) << "This = " << this << ", Open session " << cnt;
         return cnt;
     }
 
@@ -164,7 +146,7 @@ public:
         if (sessions[idx] >= 0) {
             bytesTracker->releaseLock(sessions[idx]);
         }
-	// BOOST_LOG_TRIVIAL(debug) << "This = " << this << ", Close session " << idx;
+        // BOOST_LOG_TRIVIAL(debug) << "This = " << this << ", Close session " << idx;
         sessions[idx] = FREE_SESSION;
     }
 
@@ -180,10 +162,12 @@ public:
         load_file(idx);
         int size =  openedFiles[idx]->getFileLength();
 
-        if (idx >= cacheFileSize.size()) {
-            cacheFileSize.resize(idx + 1, 0);
+        if (readOnly || idx < lastFileId) {
+            if (idx >= cacheFileSize.size()) {
+                cacheFileSize.resize(idx + 1, 0);
+            }
+            cacheFileSize[idx] = size;
         }
-        cacheFileSize[idx] = size;
         return size;
     }
 
@@ -223,7 +207,6 @@ public:
     int appendVLong(long n) {
         load_file(lastFileId);
         return openedFiles[lastFileId]->appendVLong(n);
-
     }
 
     int appendVLong2(long n) {
@@ -234,6 +217,11 @@ public:
     void appendLong(long n) {
         load_file(lastFileId);
         openedFiles[lastFileId]->appendLong(n);
+    }
+
+    void appendLong(const uint8_t nbytes, const uint64_t n) {
+        load_file(lastFileId);
+        openedFiles[lastFileId]->appendLong(nbytes, n);
     }
 
     void reserveBytes(const uint8_t bytes) {

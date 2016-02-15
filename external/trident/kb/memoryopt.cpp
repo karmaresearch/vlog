@@ -1,21 +1,9 @@
 /*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ * memoryopt.cpp
+ *
+ *  Created on: Jan 31, 2014
+ *      Author: jacopo
+ */
 
 #include <trident/kb/memoryopt.h>
 #include <trident/kb/consts.h>
@@ -134,7 +122,7 @@ void MemoryOptimizer::optimizeForWriting(long inputTriples, KBConfig &config) {
 
 //This parameter does not count. The only thing that matters are the opened files...
     config.setParamLong(STORAGE_CACHE_SIZE,
-                        (long) config.getParamInt(STORAGE_MAX_FILE_SIZE) * 3);
+                        (long) config.getParamInt(STORAGE_MAX_FILE_SIZE) * 4);
     config.setParamLong(STORAGE_MAX_N_FILES, 4);
 }
 
@@ -234,5 +222,5 @@ void MemoryOptimizer::optimizeForReading(int ndicts, KBConfig &config) {
 
     //Storage
     config.setParamLong(STORAGE_CACHE_SIZE, totalMemory / 2);
-    config.setParamLong(STORAGE_MAX_N_FILES, MAX_N_FILES);
+    config.setParamLong(STORAGE_MAX_N_FILES, 128);
 }

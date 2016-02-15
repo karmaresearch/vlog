@@ -1,21 +1,9 @@
 /*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Trident.
-
-   Trident is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Trident is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Trident.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ * stringbuffer.cpp
+ *
+ *  Created on: Jan 18, 2014
+ *      Author: jacopo
+ */
 
 #include <trident/tree/stringbuffer.h>
 
@@ -479,7 +467,6 @@ int StringBuffer::cmp(long pos, char *string, int sizeString) {
         stringBeginningCmp = stringStart;
         for (int i = 0; i < size && stringStart < sizeString; ++i) {
             if (block[i] != string[stringStart++]) {
-                return block[i] - string[stringStart - 1];
                 return ((int) block[i] & 0xff) - ((int) string[stringStart - 1] & 0xff);
             }
         }
@@ -611,5 +598,3 @@ StringBuffer::~StringBuffer() {
         }
     }
 }
-
-

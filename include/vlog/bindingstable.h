@@ -1,22 +1,3 @@
-/*
-   Copyright (C) 2015 Jacopo Urbani.
-
-   This file is part of Vlog.
-
-   Vlog is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 2 of the License, or
-   (at your option) any later version.
-
-   Vlog is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Vlog.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #ifndef BINDINGS_TABLE_H
 #define BINDINGS_TABLE_H
 
@@ -42,10 +23,10 @@ struct hash_BindingsRow {
         uint64_t h = 0;
         std::hash<uint64_t> hashf;
         for (uint8_t i = 0; i < x.size; ++i) {
-	    h = (h << 5) ^ ((h & 0xf800000000000000) >> 59);
-	    h = h ^ x.row[i];
-	}
-	return hashf(h);
+            h = (h << 5) ^ ((h & 0xf800000000000000) >> 59);
+            h = h ^ x.row[i];
+        }
+        return hashf(h);
     }
 };
 
