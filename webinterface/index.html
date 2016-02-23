@@ -1,0 +1,289 @@
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
+		<meta name="author" content="Jacopo Urbani" >
+		<meta name="description" content="VLog" >
+        <script type="text/javascript" src="d3/d3.min.js"></script>
+        <script type="text/javascript" src="d3/radial.js"></script>
+        <script type="text/javascript" src="d3/d3-tip.js"></script>
+        <script type="text/javascript" src="scripts.js"></script>
+		<link href="main.css" rel="stylesheet" type="text/css" >
+		<link href="d3/radial.css" rel="stylesheet" type="text/css" >
+		<title>VLog Monitor Web Interface</title>
+	</head>
+
+<script>
+//Global vars for the graph
+var ruleOutputs = [];
+var allrules = [];
+
+function draw(ramperc) {
+        var rp1 = radialProgress(document.getElementById('divRAM'))
+            .label("")
+                .diameter(150)
+                .value(ramperc)
+                .render();
+}
+
+function updateOutputGraph() {
+    //Get all params
+    var hide = document.getElementById('hideempty').checked;
+    var startIt = document.getElementById('startIt').value;
+    var stopIt = document.getElementById('stopIt').value;
+    var minDer = document.getElementById('minDer').value;
+    var maxDer = document.getElementById('maxDer').value;
+    if (stopIt == 'inf') {
+        stopIt = -1;
+    }
+    if (maxDer == 'inf') {
+        maxDer = -1;
+    }
+    draw_rule_output(ruleOutputs, hide, +startIt, +stopIt, +minDer, +maxDer);
+}
+
+function updateRuntimeGraph() {
+    var startIt = document.getElementById('startIt1').value;
+    var stopIt = document.getElementById('stopIt1').value;
+    if (stopIt == 'inf') {
+        stopIt = -1;
+    }
+    var minTime = document.getElementById('minTime').value;
+    draw_rule_execs(ruleOutputs, startIt, stopIt, minTime);
+}
+
+function refresh() {
+    //Get the various stats
+    var stats;
+    var http_request = new XMLHttpRequest();
+    http_request.open("GET", "http://localhost:8088/refresh", true);
+    http_request.onreadystatechange = function () {
+        var done = 4, ok = 200;
+        if (http_request.readyState === done && http_request.status === ok) {
+            stats = JSON.parse(http_request.responseText);
+            var ramperc = stats.ramperc;
+            draw(ramperc);
+            //Update the several fields            
+            document.getElementById('usedram').innerHTML = stats.usedmem;
+            document.getElementById('runtime').innerHTML = stats.runtime;
+            var milli = +stats.runtime;
+            var hours = parseInt(milli / (3600 * 1000));
+            var sHours = hours.toString();
+            if (hours < 10) {
+                sHours = '0' + sHours;
+            }
+            milli -= hours * 3600 * 1000;
+            var minutes = parseInt(milli / (60 * 1000));
+            var sMinutes = minutes.toString();
+            if (minutes < 10) {
+                sMinutes = '0' + sMinutes;
+            }
+            milli -= minutes * 60 * 1000;
+            var seconds = milli / 1000;
+            var sSeconds = seconds.toFixed(3).toString();
+            if (seconds < 10) {
+                sSeconds = '0' + sSeconds;
+            }
+
+            document.getElementById('runtime').innerHTML = sHours + ":" + sMinutes + ":" + sSeconds;
+
+            document.getElementById('iteration').innerHTML = stats.iteration;
+            document.getElementById('rule').innerHTML = stats.rule;
+
+            //Update the data for the rules output graph
+            var iterations = stats.outputrules.split(';');
+            //updates are incremental
+            //ruleOutputs = [];            
+            for(var i = 0; i < iterations.length; i++) {
+                var el = iterations[i].split(',');
+                ruleOutputs.push({it: +el[0], der: +el[1], rule: +el[2], timeexec: +el[3] });
+            }
+
+            if (stats.finished == 'true') {
+                get_size_IDBs();
+                document.getElementById('finished').innerHTML= 'Computation is finished. No more refreshing.';
+                clearInterval(interID);
+            }
+
+            updateOutputGraph();
+            updateRuntimeGraph();
+        } else {
+            if (http_request.status != ok) {
+                document.getElementById('finished').innerHTML= 'Lost connection. No more refreshing.';
+                clearInterval(interID);
+            }
+        }
+    };
+    http_request.send(null);
+}
+
+function showDetailIDBWindow(e, predicate) {
+    var a = stats_IDB[predicate];
+    var hc = '';
+    for(var i = 0; i < a.length; ++i) {
+       hc += 'Iteration: ' + a[i].it;
+       hc += '<br/>Rule: ' + allrules[a[i].ruleid];
+       hc += '<br/>Derivation: ' + Number(a[i].der).toLocaleString('en');
+       hc += '<hr/>';
+    }
+
+    document.getElementById('detailsIDB').innerHTML = hc;
+    //Move it to next the cursor
+    var posx = 0;
+    var posy = 0;
+    if (!e) var e = window.event;
+    if (e.pageX || e.pageY)
+    {
+        posx = e.pageX;
+        posy = e.pageY;
+    }
+    else if (e.clientX || e.clientY)
+    {
+        posx = e.clientX;
+        posy = e.clientY;
+    }
+	document.getElementById('detailsIDB').style.position = 'absolute';
+	document.getElementById('detailsIDB').style.left = posx + 30;
+	document.getElementById('detailsIDB').style.top = posy - 5;
+    document.getElementById('detailsIDB').style.display = 'block';
+}
+
+function hideDetailIDBWindow() {
+    document.getElementById('detailsIDB').style.display = 'none';
+}
+
+var stats_IDB = new Array();
+function get_size_IDBs() {
+    //Change the label of the button
+    document.getElementById('buttonSizeIDBs').value = 'Calculating ...';
+    var stats;
+    var http_request = new XMLHttpRequest();
+    http_request.open("GET", "http://localhost:8088/sizeidbs", true);
+    http_request.onreadystatechange = function () {
+        var done = 4, ok = 200;
+        if (http_request.readyState === done && http_request.status === ok) {
+            stats = JSON.parse(http_request.responseText);
+            //Get size IDB predicates
+            var allsizes = '<table><th>Predicate</th><th>#Rows</th>';
+            var sIDBs = stats.sizeidbs.split(';');            
+            var totalsize = 0;
+            for (var i = 0; i < sIDBs.length; i+=2) {
+                //Parse the second string
+                var detailsPredicate = sIDBs[i+1].split(',');
+                var totalDer = 0;
+                stats_IDB[sIDBs[i]] = [];
+                for(var j = 0; j < detailsPredicate.length; j+=3) {
+                    //0=iteration
+                    //1=ruleid
+                    //2=derivation
+                    stats_IDB[sIDBs[i]].push({ it: +detailsPredicate[j], ruleid: +detailsPredicate[j+1], der: +detailsPredicate[j+2]});
+                    totalDer += +detailsPredicate[j+2];
+                }
+                if (totalDer > 0) {
+                    allsizes += '<tr><td><label onmouseout="hideDetailIDBWindow();" onmouseover="showDetailIDBWindow(event,\'' + sIDBs[i] + '\');">' + sIDBs[i] + '</label></td><td>' + Number(totalDer).toLocaleString('en')  + '</td></tr>';
+                    totalsize += totalDer;
+                }
+            }
+            allsizes += '</table>';
+            allsizes = "<p><i>Total size: </i><label>" + Number(totalsize).toLocaleString('en') + "</label></p>" + allsizes;
+            document.getElementById('sizeidbs').innerHTML = allsizes;
+            document.getElementById('buttonSizeIDBs').value = 'Get size IDB tables';
+        }
+    };
+    http_request.send(null);
+}
+
+function get_generic_stats() {
+    var stats;
+    var http_request = new XMLHttpRequest();
+    http_request.open("GET", "http://localhost:8088/genopts", true);
+    http_request.onreadystatechange = function () {
+        var done = 4, ok = 200;
+        if (http_request.readyState === done && http_request.status === ok) {
+            stats = JSON.parse(http_request.responseText);
+            var ramperc = stats.ramperc;
+            draw(ramperc);
+            //Update the several fields            
+            document.getElementById('totalram').innerHTML = stats.totmem;
+            document.getElementById('commandline').innerHTML = stats.commandline;
+            document.getElementById('nrules').innerHTML = stats.nrules;
+            document.getElementById('nedbs').innerHTML = stats.nedbs;
+            document.getElementById('nidbs').innerHTML = stats.nidbs;
+
+            allrules = [];
+            var r = stats.rules.split(";");
+            for(var i = 0; i < r.length; ++i) {
+                allrules.push(r[i]);
+            }
+        }
+    };
+    http_request.send(null);
+}
+get_generic_stats();
+
+var interID = -1;
+function setRefresh() {
+    if (interID != -1) {
+        //Clear the previous interval
+        clearInterval(interID);
+    }
+    //Get the value in the box
+    var refRate = document.getElementById('refreshRate').value;
+    interID = setInterval(refresh, refRate)
+}
+
+</script>
+
+    <body>
+        <div id="wrapper" >
+            <div id="header"><h1>VLog Monitor Interface</h1></div>
+            <div id="faux" >
+                <div id="leftcolumn">
+                    <h3>Resource Monitor</h3>
+                    <div id="rambox">
+                        <p><i>Occupied RAM: </i><label id="usedram"></label>/<label id="totalram"></label> MB</p>
+                        <div id="divRAM" class="radial"></div>
+                    </div>
+                    <p><i>Refresh rate (ms): </i><input id="refreshRate" size="5" text="1000" value="1000" onchange="setRefresh();" /></p>
+
+                    <br/>
+                    <h3>Non-empty IDB tables</h3>
+                    <div id="detailsIDB" style="display: none"></div>
+                    <input type="button" id="buttonSizeIDBs" value="Get size IDB tables" onclick="get_size_IDBs();" />                                <div id="sizeidbs"></div>
+                </div>
+                <div id="rightmiddle" >
+                    <div id="finishedBox"><h3><label id="finished"></h3></label></div>
+                    <h3>Input</h3>
+                    <p><i>Command line arguments:</i></p>
+                    <p><small><label id="commandline"></label></small></p>
+                    <p><i>N. EDB predicates: </i><label id="nedbs"></label></p>
+                    <p><i>N. IDB predicates: </i><label id="nidbs"></label></p>
+                    <p><i>N. Rules: </i><label id="nrules"></label></p>
+                    <br/>
+                    <h3>Statistics</h3>
+                    <p><i>Runtime: </i><label id="runtime"></label></p>
+                    <p><i>Current iteration: </i><label id="iteration"></label></p>
+                    <p><i>Current rule: </i></p>
+                    <p><label id="rule"></label></p>
+
+                    <br/>
+                    <h3>Outputs of Rule Executions:</h3>
+                    <p><small>Hide empty iterations<input id="hideempty"
+                                                          onchange="updateOutputGraph();" type="checkbox"/><br/>Show iterations from: <input size="3" id="startIt" text="0" value="0" onchange="updateOutputGraph();"/> to <input id="stopIt" size="3" text="inf" value="inf" onchange="updateOutputGraph();"/> ('0' and 'inf' for unrestricted bounds).<br/>Filter iterations with output less than<input id="minDer" text="0" value="0" size="3" onchange="updateOutputGraph();"/> or higher than <input id="maxDer" text="inf" value="inf" size="3" onchange="updateOutputGraph();"/> ('0' and 'inf' for unrestricted bounds).</small></p>
+                    <div id="ruleoutput"></div>
+
+                    <br/>
+                    <h3>Runtimes of Rule Executions:</h3>
+                    <p><small>Show iterations from: <input size="3" id="startIt1" text="0" value="0" onchange="updateRuntimeGraph();"/> to <input id="stopIt1" size="3" text="inf" value="inf" onchange="updateRuntimeGraph();"/> ('0' and 'inf' for unrestricted bounds).<br/>Filter iterations with time less than ms. <input id="minTime" text="1" value="1" size="3" onchange="updateRuntimeGraph();"/> ('0' for unrestricted bounds).</small></p>
+                    <div id="ruleruntime"</div>
+                </div>
+                <div class="clear" ></div>
+            </div>
+            <div id="footer" ></div>
+        </div>
+	</body>
+
+<script>
+setRefresh();
+</script>
+    
+</html>
