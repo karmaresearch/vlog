@@ -19,10 +19,10 @@ private:
             Program *p,
             QSQQuery *q,
             TupleTable **output,
-            long timeoutSeconds);
+            long timeoutMicros);
 
     bool execMatQuery(Literal &l, bool timeout, EDBLayer &kb,
-                      Program &p, int &predIdx, long timeoutSeconds);
+                      Program &p, int &predIdx, long timeoutMicros);
 
     bool cardIsTooLarge(const Literal &lit, Program &p, EDBLayer &layer);
 
@@ -32,11 +32,13 @@ public:
 
     void loadLiteralsFromFile(Program &p, std::string filePath);
 
+    void loadLiteralsFromString(Program &p, std::string queries);
+
     void guessLiteralsFromRules(Program &p, EDBLayer &layer);
 
     void getAndStorePrematerialization(EDBLayer &layer, Program &p,
                                         bool timeout,
-                                       long timeoutSeconds);
+                                       long timeoutMicros);
 
     void rewriteLiteralInProgram(Literal &prematLiteral,
                                  Literal &rewrittenLiteral, EDBLayer &kb,

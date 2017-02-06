@@ -4,6 +4,8 @@
 #include <vlog/concepts.h>
 #include <vlog/edb.h>
 
+#include <tbb/parallel_sort.h>
+
 #include <inttypes.h>
 #include <assert.h>
 #include <algorithm>
@@ -29,34 +31,7 @@ public:
     virtual std::vector<Term_t> asVector() = 0;
 };
 
-struct CompressedColumnBlock;
-class ColumnWriter {
-private:
-    bool cached;
-    std::shared_ptr<Column> cachedColumn;
-
-    std::vector<CompressedColumnBlock> blocks;
-    size_t _size;
-
-public:
-    ColumnWriter() : cached(false), _size(0) {}
-
-    ColumnWriter(std::vector<Term_t> &values);
-
-    void add(const uint64_t v);     // No Term_t: overrides method in trident
-
-    bool isEmpty() const;
-
-    size_t size() const;
-
-    Term_t lastValue() const;
-
-    void concatenate(Column *c);
-
-    std::shared_ptr<Column> getColumn();
-
-    static std::shared_ptr<Column> compress(const std::vector<Term_t> &values);
-};
+class ColumnWriter;
 
 class Column {
 public:
@@ -76,13 +51,31 @@ public:
 
     virtual bool supportsDirectAccess() const = 0;
 
+    virtual bool isBackedByVector() {
+        return false;
+    }
+
+    virtual const std::vector<Term_t> &getVectorRef() {
+        throw 10; //Should be used only on subclasses that supports this
+    }
+
     virtual bool isIn(const Term_t t) const = 0;
 
     virtual std::unique_ptr<ColumnReader> getReader() const = 0;
 
     virtual std::shared_ptr<Column> sort() const = 0;
 
+    virtual std::shared_ptr<Column> sort(const int nthreads) const = 0;
+
     virtual std::shared_ptr<Column> unique() const = 0;
+
+    virtual std::shared_ptr<Column> sort_and_unique() const {
+        return this->sort()->unique();
+    }
+
+    virtual std::shared_ptr<Column> sort_and_unique(const int nthreads) const {
+        return this->sort(nthreads)->unique();
+    }
 
     virtual bool isConstant() const = 0;
 
@@ -91,6 +84,12 @@ public:
         std::shared_ptr<Column> c2,
         ColumnWriter &writer);
 
+    static void intersection(
+        std::shared_ptr<Column> c1,
+        std::shared_ptr<Column> c2,
+        ColumnWriter &writer,
+        int nthreads);
+
     static uint64_t countMatches(
         std::shared_ptr<Column> c1,
         std::shared_ptr<Column> c2);
@@ -98,57 +97,24 @@ public:
     static bool subsumes(
         std::shared_ptr<Column> subsumer,
         std::shared_ptr<Column> subsumed);
+
+    virtual ~Column() {
+    }
 };
-//----- END GENERIC INTERFACES -------
 
 //----- COMPRESSED COLUMN ----------
+
 #define COLCOMPRB 1000000
 struct CompressedColumnBlock {
     const Term_t value;
-    int32_t delta;
+    int64_t delta;
     size_t size;
 
     CompressedColumnBlock(const Term_t value,
-                          const int32_t delta,
+                          const int64_t delta,
                           size_t size) : value(value),
         delta(delta), size(size) {}
 };
-
-class ColumnReaderImpl : public ColumnReader {
-private:
-    /*uint32_t beginRange, endRange;
-    uint64_t lastBasePos;
-    const int32_t *lastDelta;*/
-
-    const std::vector<CompressedColumnBlock> &blocks;
-    const size_t _size;
-
-    size_t currentBlock;
-    size_t posInBlock;
-
-    //Term_t get(const size_t pos);
-
-public:
-    ColumnReaderImpl(const std::vector<CompressedColumnBlock> &blocks,
-                     const size_t size) : /*beginRange(0), endRange(0),*/
-        blocks(blocks), /*offsetsize(offsetsize), deltas(deltas),*/
-        _size(size), currentBlock(0), posInBlock(0) {
-    }
-
-    Term_t first();
-
-    Term_t last();
-
-    std::vector<Term_t> asVector();
-
-    bool hasNext();
-
-    Term_t next();
-
-    void clear() {
-    }
-};
-
 
 class CompressedColumn: public Column {
 private:
@@ -194,6 +160,12 @@ public:
 
     std::shared_ptr<Column> sort() const;
 
+    std::shared_ptr<Column> sort_and_unique() const;
+
+    std::shared_ptr<Column> sort(const int nthreads) const;
+
+    std::shared_ptr<Column> sort_and_unique(const int nthreads) const;
+
     std::shared_ptr<Column> unique() const;
 
     bool isIn(const Term_t t) const;
@@ -204,6 +176,117 @@ public:
     }
 };
 //----- END COMPRESSED COLUMN ----------
+
+class ColumnWriter {
+private:
+    bool cached;
+    std::shared_ptr<Column> cachedColumn;
+
+    std::vector<CompressedColumnBlock> blocks;
+    std::vector<Term_t> values;
+    size_t _size;
+    Term_t lastv;
+    bool compressed;
+
+public:
+    ColumnWriter() : cached(false), _size(0), lastv((Term_t) - 1), compressed(true) {}
+
+    ColumnWriter(std::vector<Term_t> &values) : cached(false), _size(values.size()), compressed(false) {
+       this->values.swap(values);
+       lastv = _size > 0 ? this->values[this->values.size()-1] : (Term_t) -1;
+    }
+
+    void add(const uint64_t v) {
+#ifdef DEBUG
+	if (cached)
+	    throw 10;
+#endif
+
+#ifdef USE_COMPRESSED_COLUMNS
+	if (! compressed) {
+	    values.push_back((Term_t) v);
+	} else {
+	    if (isEmpty()) {
+		blocks.push_back(CompressedColumnBlock((Term_t) v, 0, 0));
+	    } else {
+		CompressedColumnBlock *b = &blocks.back();
+		if (v == lastv + b->delta) {
+		    b->size++;
+		} else if (b->size == 0) {
+		    b->delta = v - b->value;
+		    b->size++;
+		} else {
+		    blocks.push_back(CompressedColumnBlock((Term_t) v, 0, 0));
+		    if (_size > 16384 && blocks.size() > _size / 4) {
+			// Compression not very effective; convert to uncompressed
+			compressed = false;
+			CompressedColumn col(blocks, /*offsetsize, deltas,*/ _size);
+			values = col.getReader()->asVector();
+			blocks.clear();
+		    }
+		}
+	    }
+	}
+#else
+	values.push_back((Term_t) v);
+#endif
+	lastv = v;
+	_size++;
+    }
+
+    bool isEmpty() const { return _size == 0; }
+
+    size_t size() const { return _size; }
+
+    Term_t lastValue() const {
+        return lastv;
+    }
+
+    void concatenate(Column *c);
+
+    std::shared_ptr<Column> getColumn();
+
+    static std::shared_ptr<Column> getColumn(std::vector<Term_t> &values, bool isSorted);
+};
+
+//----- END GENERIC INTERFACES -------
+
+class ColumnReaderImpl : public ColumnReader {
+private:
+    /*uint32_t beginRange, endRange;
+    uint64_t lastBasePos;
+    const int32_t *lastDelta;*/
+
+    const std::vector<CompressedColumnBlock> &blocks;
+    const size_t _size;
+
+    size_t currentBlock;
+    size_t posInBlock;
+
+    //Term_t get(const size_t pos);
+
+public:
+    ColumnReaderImpl(const std::vector<CompressedColumnBlock> &blocks,
+                     const size_t size) : /*beginRange(0), endRange(0),*/
+        blocks(blocks), /*offsetsize(offsetsize), deltas(deltas),*/
+        _size(size), currentBlock(0), posInBlock(0) {
+    }
+
+    Term_t first();
+
+    Term_t last();
+
+    std::vector<Term_t> asVector();
+
+    bool hasNext();
+
+    Term_t next();
+
+    void clear() {
+    }
+};
+
+
 
 //----- INMEMORY COLUMN ----------
 class InmemColumnReader : public ColumnReader {
@@ -245,8 +328,14 @@ private:
     std::vector<Term_t> values;
 
 public:
-    InmemoryColumn(std::vector<Term_t> v) {
-        values = v;
+    InmemoryColumn(std::vector<Term_t> &v) : InmemoryColumn(v, false) {
+    }
+
+    InmemoryColumn(std::vector<Term_t> &v, bool swap) {
+        if (swap)
+            values.swap(v);
+        else
+            values = v;
     }
 
     size_t size() const {
@@ -269,6 +358,15 @@ public:
         return true;
     }
 
+    bool isBackedByVector() {
+        return true;
+    }
+
+    const std::vector<Term_t> &getVectorRef() {
+        return values;
+    }
+
+
     bool isEDB() const {
         return false;
     }
@@ -284,15 +382,56 @@ public:
     std::shared_ptr<Column> sort() const {
         std::vector<Term_t> newvals = values;
         std::sort(newvals.begin(), newvals.end());
-        return std::shared_ptr<Column>(new InmemoryColumn(newvals));
+        return std::shared_ptr<Column>(new InmemoryColumn(newvals, true));
+    }
+
+    std::shared_ptr<Column> sort_and_unique() const {
+        std::vector<Term_t> newvals = values;
+        std::sort(newvals.begin(), newvals.end());
+        auto last = std::unique(newvals.begin(), newvals.end());
+        newvals.erase(last, newvals.end());
+        newvals.shrink_to_fit();
+        return std::shared_ptr<Column>(new InmemoryColumn(newvals, true));
+    }
+
+    std::shared_ptr<Column> sort(const int nthreads) const {
+        if (nthreads <= 1) {
+            return sort();
+        }
+        std::vector<Term_t> newvals = values;
+        //TBB is configured at the beginning to use nthreads to parallelize the computation
+        tbb::parallel_sort(newvals.begin(), newvals.end());
+        return std::shared_ptr<Column>(new InmemoryColumn(newvals, true));
+    }
+
+    std::shared_ptr<Column> sort_and_unique(const int nthreads) const {
+        if (nthreads <= 1) {
+            return sort_and_unique();
+        }
+        std::vector<Term_t> newvals = values;
+        //TBB is configured at the beginning to use nthreads to parallelize the computation
+        tbb::parallel_sort(newvals.begin(), newvals.end());
+        auto last = std::unique(newvals.begin(), newvals.end());
+        newvals.erase(last, newvals.end());
+        newvals.shrink_to_fit();
+        return std::shared_ptr<Column>(new InmemoryColumn(newvals, true));
     }
 
     std::shared_ptr<Column> unique() const {
         //I assume the column is already sorted
-        std::vector<Term_t> newvals = values;
-        auto last = std::unique(newvals.begin(), newvals.end());
-        newvals.erase(last, newvals.end());
-        return std::shared_ptr<Column>(new InmemoryColumn(newvals));
+        std::vector<Term_t> newvals;
+        newvals.reserve(values.size());
+        Term_t prev = (Term_t) - 1;
+        for (size_t i = 0; i < values.size(); i++) {
+            Term_t v = values[i];
+            if (v != prev) {
+                newvals.push_back(v);
+                prev = v;
+            }
+        }
+        newvals.shrink_to_fit();
+
+        return std::shared_ptr<Column>(new InmemoryColumn(newvals, true));
     }
 
     bool isConstant() const {
@@ -300,6 +439,16 @@ public:
     }
 
     bool isIn(const Term_t t) const {
+	/*
+        if (values.size() > 100) {
+            BOOST_LOG_TRIVIAL(warning) << "InmemoryColumn::isIn(): Performance problem. Linear search on array of " << values.size() << " elements";
+        }
+        for(size_t i = 0; i < values.size(); ++i) {
+            if (values[i] == t)
+                return true;
+        }
+        return false;
+	*/
         return std::binary_search(values.begin(), values.end(), t);
     }
 };
@@ -332,12 +481,7 @@ private:
 public:
     EDBColumnReader(const Literal &l, const uint8_t posColumn,
                     const std::vector<uint8_t> presortPos,
-                    EDBLayer &layer, const bool unq)
-        : l(l), layer(layer), posColumn(posColumn), presortPos(presortPos),
-          unq(unq),
-          posInItr(l.getPosVars()[posColumn]), itr(NULL), firstCached((Term_t) - 1),
-          lastCached((Term_t) - 1) {
-    }
+                    EDBLayer &layer, const bool unq);
 
     Term_t first();
 
@@ -348,6 +492,11 @@ public:
     bool hasNext();
 
     Term_t next();
+
+    const char *getUnderlyingArray();
+    std::pair<uint8_t, std::pair<uint8_t, uint8_t>> getSizeElemUnderlyingArray();
+
+    size_t size();
 
     void clear() {
         //Release the iterator
@@ -428,9 +577,16 @@ public:
 
     std::shared_ptr<Column> sort() const;
 
+    std::shared_ptr<Column> sort(const int nthreads) const;
+
     std::shared_ptr<Column> unique() const;
 
     bool isConstant() const;
+
+    //Returns a Trident column -- hack to get data to export
+    const char *getUnderlyingArray() const;
+    std::pair<uint8_t, std::pair<uint8_t, uint8_t>> getSizeElemUnderlyingArray() const;
+
 };
 //----- END EDB COLUMN ----------
 

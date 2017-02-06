@@ -1,22 +1,29 @@
 #ifndef QSQEVALUATION_H
 #define QSQEVALUATION_H
 
+// #define RECURSIVE_QSQR
+
 #include <vlog/qsqquery.h>
 #include <vlog/concepts.h>
 #include <vlog/bindingstable.h>
-#include <vlog/ruleexecutor.h>
+//#include <vlog/ruleexecutor.h>
 #include <vlog/edb.h>
 
-#include <tridentcompr/utils/utils.h>
+#include <kognac/utils.h>
 
 #include <trident/model/table.h>
 
 #include <vector>
 
 class TupleTable;
+class RuleExecutor;
 
 #define QSQR_EVAL 0
 #define QSQR_EST 1
+
+#ifndef RECURSIVE_QSQR
+
+class QSQR;
 
 enum QSQR_TaskType { RULE, QUERY, RULE_QUERY}; //Execute rule or query
 struct QSQR_Task {
@@ -28,7 +35,6 @@ struct QSQR_Task {
     size_t offsetInput;
     bool repeat;
     int currentRuleIndex;
-    //bool shouldRepeat;
     size_t totalAnswers;
 
     //To execute a rule I need to know:
@@ -43,6 +49,7 @@ struct QSQR_Task {
 
     QSQR_Task(QSQR_TaskType type, Predicate &p) : type(type), pred(p), repeat(false) {}
 };
+#endif
 
 class QSQR {
 private:
@@ -57,14 +64,15 @@ private:
 
     //const Timeout * timeout;
 
+#ifndef RECURSIVE_QSQR
     std::vector<QSQR_Task> tasks;
+    void processTask(QSQR_Task &task);
+#endif
 
 
     size_t calculateAllAnswers();
 
     void createRules(Predicate &pred);
-
-    void processTask(QSQR_Task &task);
 
 public:
     QSQR(EDBLayer &layer, Program *program) : layer(layer),
@@ -82,9 +90,11 @@ public:
             timeout->raiseIfExpired();
     }*/
 
+#ifndef RECURSIVE_QSQR
     void pushTask(QSQR_Task &task) {
         tasks.push_back(task);
     }
+#endif
 
     void setProgram(Program *program) {
         this->program = program;

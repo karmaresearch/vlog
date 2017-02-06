@@ -7,7 +7,7 @@
 std::vector<std::shared_ptr<Column>> SQLTable::checkNewIn(const Literal &l1,
                                   std::vector<uint8_t> &posInL1,
                                   const Literal &l2,
-std::vector<uint8_t> posInL2) {
+std::vector<uint8_t> &posInL2) {
 
     BOOST_LOG_TRIVIAL(debug) << "checkNewIn version 1";
     std::vector<uint8_t> posVars1 = l1.getPosVars();
@@ -105,7 +105,7 @@ std::vector<std::shared_ptr<Column>> SQLTable::checkNewIn(
                                       std::vector <
                                       std::shared_ptr<Column >> &checkValues,
                                       const Literal &l,
-std::vector<uint8_t> posInL) {
+std::vector<uint8_t> &posInL) {
 
     BOOST_LOG_TRIVIAL(debug) << "checkNewIn version 2";
 

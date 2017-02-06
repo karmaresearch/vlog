@@ -132,11 +132,6 @@ MAPIIterator::MAPIIterator(Mapi con, string sqlQuery,
 
 
 
-void MAPIIterator::moveTo(const uint8_t fieldId, const Term_t t) {
-    // TODO?
-    throw 10;
-}
-
 bool MAPIIterator::hasNext() {
     if (hasNextChecked) {
 	return hasNextValue;

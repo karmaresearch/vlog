@@ -1,10 +1,12 @@
 #include <vlog/concepts.h>
 #include <vlog/optimizer.h>
 #include <vlog/edb.h>
+#include <vlog/fcinttable.h>
 
-#include <tridentcompr/main/consts.h>
+#include <kognac/consts.h>
 
 #include <boost/log/trivial.hpp>
+#include <boost/tokenizer.hpp>
 
 #include <cctype>
 #include <stdlib.h>
@@ -108,13 +110,16 @@ std::string Literal::tostring(Program *program, EDBLayer *db) const {
                 if (db->getDictText(id, text)) {
                     out += Program::compressRDFOWLConstants(std::string(text));
                 } else {
-                    std::string t = program->getFromAdditional(id);
-                    if (t == std::string("")) {
-                        out += std::to_string(tuple.get(i).getValue());
+                    if (program == NULL) {
+                        out += std::to_string(id);
                     } else {
-                        out += Program::compressRDFOWLConstants(t);
+                        std::string t = program->getFromAdditional(id);
+                        if (t == std::string("")) {
+                            out += std::to_string(id);
+                        } else {
+                            out += Program::compressRDFOWLConstants(t);
+                        }
                     }
-
                 }
             }
         }
@@ -152,13 +157,16 @@ std::string Literal::toprettystring(Program *program, EDBLayer *db) const {
                         v = v.substr(1, v.size() - 2);
                     out += v;
                 } else {
-                    std::string t = program->getFromAdditional(id);
-                    if (t == std::string("")) {
-                        out += std::to_string(tuple.get(i).getValue());
+                    if (program == NULL) {
+                        out += std::to_string(id);
                     } else {
-                        out += Program::compressRDFOWLConstants(t);
+                        std::string t = program->getFromAdditional(id);
+                        if (t == std::string("")) {
+                            out += std::to_string(id);
+                        } else {
+                            out += Program::compressRDFOWLConstants(t);
+                        }
                     }
-
                 }
             }
         }
@@ -438,6 +446,27 @@ bool Rule::checkRecursion(const Literal &head,
     return false;
 }
 
+void Rule::checkRule() const {
+    bool vars[256];
+    memset(vars, 0, sizeof(bool) * 256);
+    int varCount = 0;
+    for (int i = 0; i < body.size(); ++i) {
+	Literal l = body[i];
+	std::vector<uint8_t> v = l.getAllVars();
+	for (int j = 0; j < v.size(); j++) {
+	    if (! vars[v[j]]) {
+		vars[v[j]] = true;
+		varCount++;
+	    }
+	}
+    }
+    BOOST_LOG_TRIVIAL(debug) << "Rule " << this->tostring() << " has " << varCount << " variables";
+    if (varCount > MAX_ROWSIZE) {
+	BOOST_LOG_TRIVIAL(error) << "MAX_ROWSIZE needs to be set to at least " << varCount << "!";
+	abort();
+    }
+}
+
 bool Rule::doesVarAppearsInFollowingPatterns(int startingPattern, uint8_t value) {
     for (int i = startingPattern; i < body.size(); ++i) {
         Literal l = body[i];
@@ -454,6 +483,29 @@ bool Rule::doesVarAppearsInFollowingPatterns(int startingPattern, uint8_t value)
     }
 
     return false;
+}
+
+Rule Rule::normalizeVars() const {
+    std::vector<uint8_t> vars = head.getAllVars();
+    for (std::vector<Literal>::const_iterator itr = body.cbegin(); itr != body.cend();
+            ++itr) {
+	std::vector<uint8_t> newvars = itr->getNewVars(vars);
+	for (int i = 0; i < newvars.size(); i++) {
+	    vars.push_back(newvars[i]);
+	}
+    }
+    std::vector<Substitution> subs;
+    for (int i = 0; i < vars.size(); i++) {
+	subs.push_back(Substitution(vars[i], VTerm(i+1, 0)));
+    }
+    Literal newHead = head.substitutes(&subs[0], subs.size());
+    BOOST_LOG_TRIVIAL(debug) << "head = " << head.tostring() << ", newHead = " << newHead.tostring();
+    std::vector<Literal> newBody;
+    for (std::vector<Literal>::const_iterator itr = body.cbegin(); itr != body.cend();
+            ++itr) {
+	newBody.push_back(itr->substitutes(&subs[0], subs.size()));
+    }
+    return Rule(newHead, newBody);
 }
 
 Rule Rule::createAdornment(uint8_t headAdornment) {
@@ -564,6 +616,18 @@ void Program::readFromFile(std::string pathFile) {
     BOOST_LOG_TRIVIAL(info) << "New assigned constants: " << additionalConstants.size();
 }
 
+void Program::readFromString(std::string rules) {
+    boost::char_separator<char> sep("\n");
+    boost::tokenizer<boost::char_separator<char>> tokens(rules, sep);
+    for (const auto &rule : tokens) {
+        if (rule != "" && rule .substr(0, 2) != "//") {
+            BOOST_LOG_TRIVIAL(trace) << "Parsing rule " << rule;
+            parseRule(rule);
+        }
+    }
+    BOOST_LOG_TRIVIAL(info) << "New assigned constants: " << additionalConstants.size();
+}
+
 std::string Program::compressRDFOWLConstants(std::string input) {
     size_t rdfPos = input.find("<http://www.w3.org/1999/02/22-rdf-syntax-ns#");
     if (rdfPos != std::string::npos) {
@@ -641,7 +705,7 @@ Literal Program::parseLiteral(std::string l) {
                 //Get an ID from the temporary dictionary
                 dictTerm = additionalConstants.getOrAdd(term);
             }
-            BOOST_LOG_TRIVIAL(trace) << "Term " << term << " received the number " << dictTerm;
+
             t.push_back(VTerm(0, dictTerm));
         }
     }
@@ -702,6 +766,7 @@ std::shared_ptr<Program> Program::cloneNew() const {
     p->dictVariables = dictVariables;
     p->dictPredicates = dictPredicates;
     p->cardPredicates = cardPredicates;
+    p->additionalConstants = additionalConstants;
     return std::shared_ptr<Program>(p);
 }
 

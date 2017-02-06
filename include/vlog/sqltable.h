@@ -13,13 +13,13 @@ public:
     std::vector<std::shared_ptr<Column>> checkNewIn(const Literal &l1,
             std::vector<uint8_t> &posInL1,
             const Literal &l2,
-            std::vector<uint8_t> posInL2);
+            std::vector<uint8_t> &posInL2);
 
     std::vector<std::shared_ptr<Column>> checkNewIn(
                 std::vector <
                 std::shared_ptr<Column >> &checkValues,
                 const Literal &l2,
-                std::vector<uint8_t> posInL2);
+                std::vector<uint8_t> &posInL2);
 
     std::shared_ptr<Column> checkIn(
         std::vector<Term_t> &values,

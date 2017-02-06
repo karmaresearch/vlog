@@ -3,7 +3,7 @@
 
 #include <vlog/edb.h>
 #include <vlog/segment.h>
-#include <tridentcompr/utils/factory.h>
+#include <kognac/factory.h>
 
 #include <boost/log/trivial.hpp>
 
@@ -32,6 +32,79 @@ public:
     virtual void clear() {
     }
 
+    virtual FCInternalTableItr *copy() const {
+        throw 10;
+    }
+
+    virtual void reset() {
+        throw 10;
+    }
+
+    virtual bool sameAs(
+        const std::vector<Term_t> &row,
+        const std::vector<uint8_t> &fields) {
+
+        for (std::vector<uint8_t>::const_iterator itr = fields.cbegin(); itr != fields.cend();
+                ++itr) {
+            if (getCurrentValue(*itr) != row[*itr]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    std::vector<const std::vector<Term_t> *> getAllVectors() {
+        std::vector<std::shared_ptr<Column>> cols = getAllColumns();
+        std::vector<const std::vector<Term_t> *> vectors(cols.size());
+        for (int i = 0; i < cols.size(); i++) {
+            if (cols[i]->isBackedByVector()) {
+                vectors[i] = &cols[i]->getVectorRef();
+            } else {
+                std::vector<Term_t> *v = new std::vector<Term_t>();
+                *v = cols[i]->getReader()->asVector();
+                vectors[i] = v;
+            }
+        }
+        return vectors;
+    }
+
+    std::vector<const std::vector<Term_t> *> getAllVectors(int nthreads) {
+        std::vector<std::shared_ptr<Column>> cols = getAllColumns();
+        std::vector<const std::vector<Term_t> *> vectors(cols.size());
+        int count = cols.size();
+        for (int i = 0; i < cols.size(); i++) {
+            if (cols[i]->isBackedByVector()) {
+                count--;
+            }
+        }
+
+        if (count > 1 && nthreads > 1) {
+            tbb::parallel_for(tbb::blocked_range<int>(0, cols.size(), 1),
+                              GetVectors(cols, vectors));
+        } else {
+            for (int i = 0; i < cols.size(); i++) {
+                if (! cols[i]->isBackedByVector()) {
+                    std::vector<Term_t> *v = new std::vector<Term_t>();
+                    *v = cols[i]->getReader()->asVector();
+                    vectors[i] = v;
+                } else {
+                    vectors[i] = &cols[i]->getVectorRef();
+                }
+            }
+        }
+
+        return vectors;
+    }
+
+    void deleteAllVectors(std::vector<const std::vector<Term_t> *> vectors) {
+        std::vector<std::shared_ptr<Column>> cols = getAllColumns();
+        for (int i = 0; i < cols.size(); i++) {
+            if (! cols[i]->isBackedByVector()) {
+                delete vectors[i];
+            }
+        }
+    }
+
     virtual ~FCInternalTableItr() {}
 };
 
@@ -54,9 +127,11 @@ public:
 
     virtual FCInternalTableItr *getSortedIterator() const = 0;
 
+    virtual FCInternalTableItr *getSortedIterator(int nthreads) const = 0;
+
     virtual size_t estimateNRows(const uint8_t nconstantsToFilter,
-                                   const uint8_t *posConstantsToFilter,
-                                   const Term_t *valuesConstantsToFilter) const = 0;
+                                 const uint8_t *posConstantsToFilter,
+                                 const Term_t *valuesConstantsToFilter) const = 0;
 
     size_t estimateNRows() const {
         return estimateNRows(0, NULL, NULL);
@@ -66,7 +141,7 @@ public:
         const uint8_t nPosToCopy, const uint8_t *posVarsToCopy,
         const uint8_t nPosToFilter, const uint8_t *posConstantsToFilter,
         const Term_t *valuesConstantsToFilter, const uint8_t nRepeatedVars,
-        const std::pair<uint8_t, uint8_t> *repeatedVars) const = 0;
+        const std::pair<uint8_t, uint8_t> *repeatedVars, int nthreads) const = 0;
 
     virtual bool isSorted() const = 0;
 
@@ -81,10 +156,13 @@ public:
     }
 
     virtual std::shared_ptr<const FCInternalTable> merge(
-        std::shared_ptr<const FCInternalTable> t) const = 0;
+        std::shared_ptr<const FCInternalTable> t, int nthreads) const = 0;
 
     virtual FCInternalTableItr *sortBy(
         const std::vector<uint8_t> &fields) const = 0;
+
+    virtual FCInternalTableItr *sortBy(
+        const std::vector<uint8_t> &fields, const int nthreads) const = 0;
 
     virtual void releaseIterator(FCInternalTableItr *itr) const = 0;
 
@@ -95,6 +173,74 @@ public:
     virtual size_t getNRows() const = 0;
 
     virtual ~FCInternalTable();
+};
+
+class VectorFCInternalTableItr : public FCInternalTableItr {
+private:
+    const std::vector<const std::vector<Term_t> *> vectors;
+    int beginIndex;
+    int endIndex;
+    int currentIndex;
+    bool first;
+
+public:
+    VectorFCInternalTableItr(const std::vector<const std::vector<Term_t> *> &vectors,
+                             int beginIndex, int endIndex) :
+        vectors(vectors), beginIndex(beginIndex), endIndex(endIndex),
+        currentIndex(beginIndex), first(true) {
+        if (endIndex > vectors[0]->size()) {
+            endIndex = vectors[0]->size();
+        }
+    }
+
+    FCInternalTableItr *copy() const {
+        return new VectorFCInternalTableItr(vectors, beginIndex, endIndex);
+    }
+
+    Term_t getCurrentValue(const uint8_t pos) {
+        assert(pos < vectors.size());
+        return (*vectors[pos])[currentIndex];
+    }
+
+    size_t getCurrentIteration() const {
+        throw 10;
+    }
+
+    uint8_t getNColumns() const {
+        return vectors.size();
+    }
+
+    std::vector<std::shared_ptr<Column>> getColumn(const uint8_t ncolumns,
+    const uint8_t *columns) {
+        throw 10;
+    }
+
+    std::vector<std::shared_ptr<Column>> getAllColumns() {
+        throw 10;
+    }
+
+    bool hasNext() {
+        return currentIndex < endIndex - 1 || (first && currentIndex < endIndex);
+    }
+
+    void next() {
+        if (! first) {
+            currentIndex++;
+        }
+        first = false;
+    }
+
+    void clear() {
+    }
+
+    void reset() {
+        currentIndex = beginIndex;
+        first = true;
+    }
+
+    ~VectorFCInternalTableItr() {
+        clear();
+    }
 };
 
 class InmemoryFCInternalTableItr : public FCInternalTableItr {
@@ -132,9 +278,6 @@ public:
         return segmentIterator->hasNext();
     }
 
-    bool sameAs(const std::vector<Term_t> &row,
-                const std::vector<uint8_t> &pos);
-
     void next() {
         segmentIterator->next();
     }
@@ -146,14 +289,26 @@ public:
         segmentIterator = NULL;
     }
 
+    void reset() {
+        clear();
+        segmentIterator = values->iterator();
+    }
+
+    FCInternalTableItr *copy() const {
+        InmemoryFCInternalTableItr *itr = new InmemoryFCInternalTableItr();
+        itr->init(nfields, iteration, values);
+        return itr;
+    }
+
     ~InmemoryFCInternalTableItr() {
         clear();
     }
 };
 
-#define MAX_ROWSIZE 5
+#define MAX_ROWSIZE 10
 class EDBFCInternalTableItr : public FCInternalTableItr {
 private:
+    std::vector<uint8_t> fields;
     EDBIterator *edbItr;
     uint8_t nfields;
     uint8_t posFields[MAX_ROWSIZE];
@@ -165,6 +320,7 @@ private:
 
 public:
     void init(const size_t iteration,
+              const std::vector<uint8_t> &fields,
               const uint8_t nfields, uint8_t const *posFields,
               EDBIterator *edbItr, EDBLayer *layer, const Literal *query);
 
@@ -186,6 +342,8 @@ public:
     inline bool hasNext();
 
     inline void next();
+
+    FCInternalTableItr *copy() const ;
 
     ~EDBFCInternalTableItr() {}
 };
@@ -311,7 +469,7 @@ private:
         std::shared_ptr<const Segment> values, bool isSorted,
         const std::vector <
         InmemoryFCInternalTableUnmergedSegment > &unmergedSegments,
-        const bool outputSorted);
+        const bool outputSorted, const int nthreads);
 
     int cmp(FCInternalTableItr *itr1, FCInternalTableItr *itr2) const;
 
@@ -334,9 +492,14 @@ private:
     static std::shared_ptr<const Segment> filter_row(std::shared_ptr<const Segment> seg,
             const uint8_t nConstantsToFilter, const uint8_t *posConstantsToFilter,
             const Term_t *valuesConstantsToFilter, const uint8_t nRepeatedVars,
-            const std::pair<uint8_t, uint8_t> *repeatedVars);
+            const std::pair<uint8_t, uint8_t> *repeatedVars, int nthreads);
 
 public:
+    static std::shared_ptr<const Segment> filter_row(SegmentIterator *itr,
+            const uint8_t nConstantsToFilter, const uint8_t *posConstantsToFilter,
+            const Term_t *valuesConstantsToFilter, const uint8_t nRepeatedVars,
+            const std::pair<uint8_t, uint8_t> *repeatedVars, SegmentInserter &inserter);
+
     InmemoryFCInternalTable(const uint8_t nfields, const size_t iteration);
 
     InmemoryFCInternalTable(const uint8_t nfields, const size_t iteration, const bool sorted, std::shared_ptr<const Segment> values);
@@ -377,13 +540,15 @@ public:
 
     FCInternalTableItr *getSortedIterator() const;
 
+    FCInternalTableItr *getSortedIterator(int nthreads) const;
+
     size_t estimateNRows(const uint8_t nconstantsToFilter,
-                           const uint8_t *posConstantsToFilter,
-                           const Term_t *valuesConstantsToFilter) const;
+                         const uint8_t *posConstantsToFilter,
+                         const Term_t *valuesConstantsToFilter) const;
 
-    std::shared_ptr<const FCInternalTable> merge(std::shared_ptr<const FCInternalTable> t) const;
+    std::shared_ptr<const FCInternalTable> merge(std::shared_ptr<const FCInternalTable> t, int nthreads) const;
 
-    std::shared_ptr<const FCInternalTable> merge(std::shared_ptr<const Segment> seg) const;
+    std::shared_ptr<const FCInternalTable> merge(std::shared_ptr<const Segment> seg, int nthreads) const;
 
     std::vector<Term_t> getDistinctValues(const uint8_t columnid, const uint32_t threshold) const;
 
@@ -392,9 +557,12 @@ public:
     std::shared_ptr<const FCInternalTable> filter(const uint8_t nPosToCopy, const uint8_t *posVarsToCopy,
             const uint8_t nPosToFilter, const uint8_t *posConstantsToFilter,
             const Term_t *valuesConstantsToFilter, const uint8_t nRepeatedVars,
-            const std::pair<uint8_t, uint8_t> *repeatedVars) const;
+            const std::pair<uint8_t, uint8_t> *repeatedVars, int nthreads) const;
 
     FCInternalTableItr *sortBy(const std::vector<uint8_t> &fields) const;
+
+    FCInternalTableItr *sortBy(const std::vector<uint8_t> &fields,
+                               const int nthreads) const;
 
     void releaseIterator(FCInternalTableItr * itr) const;
 
@@ -460,7 +628,11 @@ public:
 
     FCInternalTableItr *getSortedIterator() const;
 
-    std::shared_ptr<const FCInternalTable> merge(std::shared_ptr<const FCInternalTable> t) const;
+    FCInternalTableItr *getSortedIterator(int nthreads) const {
+        return getSortedIterator();
+    }
+
+    std::shared_ptr<const FCInternalTable> merge(std::shared_ptr<const FCInternalTable> t, int nthreads) const;
 
     bool isSorted() const;
 
@@ -471,15 +643,18 @@ public:
     Term_t getValueConstantColumn(const uint8_t columnid) const;
 
     size_t estimateNRows(const uint8_t nconstantsToFilter,
-                           const uint8_t *posConstantsToFilter,
-                           const Term_t *valuesConstantsToFilter) const;
+                         const uint8_t *posConstantsToFilter,
+                         const Term_t *valuesConstantsToFilter) const;
 
     std::shared_ptr<const FCInternalTable> filter(const uint8_t nPosToCopy, const uint8_t *posVarsToCopy,
             const uint8_t nPosToFilter, const uint8_t *posConstantsToFilter,
             const Term_t *valuesConstantsToFilter, const uint8_t nRepeatedVars,
-            const std::pair<uint8_t, uint8_t> *repeatedVars) const;
+            const std::pair<uint8_t, uint8_t> *repeatedVars, int nthreads) const;
 
     FCInternalTableItr *sortBy(const std::vector<uint8_t> &fields) const;
+
+    FCInternalTableItr *sortBy(const std::vector<uint8_t> &fields,
+                               const int nthreads) const;
 
     void releaseIterator(FCInternalTableItr *itr) const;
 
@@ -495,6 +670,10 @@ public:
 
     SingletonItr(const size_t iteration) : iteration(iteration) {
         first = true;
+    }
+
+    FCInternalTableItr *copy() const {
+        return new SingletonItr(iteration);
     }
 
     Term_t getCurrentValue(const uint8_t pos) {
@@ -574,7 +753,11 @@ public:
         return new SingletonItr(iteration);
     }
 
-    std::shared_ptr<const FCInternalTable> merge(std::shared_ptr<const FCInternalTable> t) const {
+    FCInternalTableItr *getSortedIterator(int nthreads) const {
+        return new SingletonItr(iteration);
+    }
+
+    std::shared_ptr<const FCInternalTable> merge(std::shared_ptr<const FCInternalTable> t, int nthreads) const {
         throw 10;
     }
 
@@ -595,19 +778,24 @@ public:
     }
 
     size_t estimateNRows(const uint8_t nconstantsToFilter,
-                           const uint8_t *posConstantsToFilter,
-                           const Term_t *valuesConstantsToFilter) const {
+                         const uint8_t *posConstantsToFilter,
+                         const Term_t *valuesConstantsToFilter) const {
         return 1;
     }
 
     std::shared_ptr<const FCInternalTable> filter(const uint8_t nPosToCopy, const uint8_t *posVarsToCopy,
             const uint8_t nPosToFilter, const uint8_t *posConstantsToFilter,
             const Term_t *valuesConstantsToFilter, const uint8_t nRepeatedVars,
-            const std::pair<uint8_t, uint8_t> *repeatedVars) const {
+            const std::pair<uint8_t, uint8_t> *repeatedVars, int nthreads) const {
         throw 10;
     }
 
     FCInternalTableItr *sortBy(const std::vector<uint8_t> &fields) const {
+        return new SingletonItr(iteration);
+    }
+
+    FCInternalTableItr *sortBy(const std::vector<uint8_t> &fields,
+                               const int nthreads) const {
         return new SingletonItr(iteration);
     }
 

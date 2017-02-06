@@ -1,0 +1,73 @@
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
+		<meta name="author" content="Jacopo Urbani" >
+		<meta name="description" content="VLog" >
+        <script type="text/javascript" src="d3/d3.min.js"></script>
+        <script type="text/javascript" src="d3/radial.js"></script>
+        <script type="text/javascript" src="d3/d3-tip.js"></script>
+        <script type="text/javascript" src="scripts.js"></script>
+		<link href="main.css" rel="stylesheet" type="text/css" >
+		<link href="d3/radial.css" rel="stylesheet" type="text/css" >
+		<title>VLog Monitor Web Interface</title>
+	</head>
+
+    <script src="functions.js"/>
+    <script type="text/javascript">
+        get_generic_stats();
+    </script>
+
+    <body>
+        <div id="wrapper" >
+            <div id="header"><h1>VLog Materialization Monitor</h1></div>
+            <div id="faux" >
+                <div id="leftcolumn">
+                    <h3>Resource Monitor</h3>
+                    <div id="rambox">
+                        <p><i>Occupied RAM: </i><label id="usedram"></label>/<label id="totalram"></label> MB</p>
+                        <div id="divRAM" class="radial"></div>
+                    </div>
+                    <p><i>Refresh rate (ms): </i><input id="refreshRate" size="5" text="1000" value="1000" onchange="setRefresh();" /></p>
+
+                    <br/>
+                    <h3>Non-empty IDB tables</h3>
+                    <div id="detailsIDB" style="display: none"></div>
+                    <input type="button" id="buttonSizeIDBs" value="Get size IDB tables" onclick="get_size_IDBs();" />                                <div id="sizeidbs"></div>
+                </div>
+                <div id="rightmiddle" >
+                    <div id="finishedBox"><h3><label id="finished"></h3></label></div>
+                    <h3>Input</h3>
+                    <p><i>Command line arguments:</i></p>
+                    <p><small><label id="commandline"></label></small></p>
+                    <p><i>N. EDB predicates: </i><label id="nedbs"></label></p>
+                    <p><i>N. IDB predicates: </i><label id="nidbs"></label></p>
+                    <p><i>N. Rules: </i><label id="nrules"></label></p>
+                    <br/>
+                    <h3>Statistics</h3>
+                    <p><i>Runtime: </i><label id="runtime"></label></p>
+                    <p><i>Current iteration: </i><label id="iteration"></label></p>
+                    <p><i>Current rule: </i></p>
+                    <p><label id="rule"></label></p>
+
+                    <br/>
+                    <h3>Outputs of Rule Executions:</h3>
+                    <p><small>Hide empty iterations<input id="hideempty"
+                                                          onchange="updateOutputGraph();" type="checkbox"/><br/>Show iterations from: <input size="3" id="startIt" text="0" value="0" onchange="updateOutputGraph();"/> to <input id="stopIt" size="3" text="inf" value="inf" onchange="updateOutputGraph();"/> ('0' and 'inf' for unrestricted bounds).<br/>Filter iterations with output less than<input id="minDer" text="0" value="0" size="3" onchange="updateOutputGraph();"/> or higher than <input id="maxDer" text="inf" value="inf" size="3" onchange="updateOutputGraph();"/> ('0' and 'inf' for unrestricted bounds).</small></p>
+                    <div id="ruleoutput"></div>
+
+                    <br/>
+                    <h3>Runtimes of Rule Executions:</h3>
+                    <p><small>Show iterations from: <input size="3" id="startIt1" text="0" value="0" onchange="updateRuntimeGraph();"/> to <input id="stopIt1" size="3" text="inf" value="inf" onchange="updateRuntimeGraph();"/> ('0' and 'inf' for unrestricted bounds).<br/>Filter iterations with time less than ms. <input id="minTime" text="1" value="1" size="3" onchange="updateRuntimeGraph();"/> ('0' for unrestricted bounds).</small></p>
+                    <div id="ruleruntime"</div>
+                </div>
+                <div class="clear" ></div>
+            </div>
+            <div id="footer" ></div>
+        </div>
+	</body>
+
+<script>
+setRefresh();
+</script>
+    
+</html>

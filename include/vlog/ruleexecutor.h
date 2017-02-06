@@ -3,6 +3,7 @@
 
 #include <vlog/concepts.h>
 #include <vlog/edb.h>
+#include <vlog/qsqr.h>
 
 #include <boost/chrono.hpp>
 
@@ -29,7 +30,6 @@ struct LineageInfo {
 };
 #endif
 
-struct QSQR_Task;
 class RuleExecutor {
 private:
     Rule adornedRule;
@@ -38,10 +38,8 @@ private:
 //    boost::chrono::duration<double> durationRecursion;
 //    boost::chrono::duration<double> durationEDB;
 
-#ifdef LINEAGE
     Program *program;
-    DictMgmt *dict;
-#endif
+    EDBLayer &layer;
 
     //Used to create the supplementary relations
     std::vector<size_t> sizeSupplRelations;
@@ -102,10 +100,8 @@ private:
 #endif
 
 public:
-    RuleExecutor(Rule &rule, uint8_t headAdornment
-#ifdef LINEAGE
-                 , Program *program, DictMgmt *dict
-#endif
+    RuleExecutor(Rule &rule, uint8_t headAdornment,
+                 Program *program, EDBLayer &layer
                 );
 
     size_t estimate(const int depth, BindingsTable *input/*, size_t offsetInput*/, QSQR *qsqr,
@@ -119,7 +115,13 @@ public:
 
                  );
 
+#ifndef RECURSIVE_QSQR
     void processTask(QSQR_Task *task);
+#endif
+
+    string tostring() {
+        return adornedRule.tostring(NULL, NULL);
+    }
 
     ~RuleExecutor();
 };

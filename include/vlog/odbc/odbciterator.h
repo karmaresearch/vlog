@@ -43,8 +43,6 @@ public:
 
     void skipDuplicatedFirstColumn();
 
-    void moveTo(const uint8_t fieldId, const Term_t t);
-
     PredId_t getPredicateID() {
         return predid;
     }

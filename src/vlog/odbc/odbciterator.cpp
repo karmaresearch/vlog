@@ -135,11 +135,6 @@ ODBCIterator::ODBCIterator(SQLHANDLE con, string sqlQuery,
 
 
 
-void ODBCIterator::moveTo(const uint8_t fieldId, const Term_t t) {
-    // TODO?
-    throw 10;
-}
-
 bool ODBCIterator::hasNext() {
     if (hasNextChecked) {
 	return hasNextValue;

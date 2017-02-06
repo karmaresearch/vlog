@@ -4,7 +4,7 @@
 #include <vlog/column.h>
 #include <vlog/sqltable.h>
 
-#include <mapi.h>
+#include <monetdb/mapi.h>
 
 class MAPITable : public SQLTable {
 private:

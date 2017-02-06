@@ -24,7 +24,10 @@ size_t EDBFCInternalTable::getNRows() const {
 
 bool EDBFCInternalTable::isEmpty() const {
     const Literal l = *query.getLiteral();
-    return layer->isEmpty(l, NULL, NULL);
+    // BOOST_LOG_TRIVIAL(debug) << "isEmpty: literal = " << l.tostring(NULL, layer);
+    bool retval = layer->isEmpty(l, NULL, NULL);
+    // BOOST_LOG_TRIVIAL(debug) << "isEmpty(): " << retval;
+    return retval;
 }
 
 
@@ -36,7 +39,7 @@ FCInternalTableItr *EDBFCInternalTable::getIterator() const {
     EDBFCInternalTableItr *itr = new EDBFCInternalTableItr();
     const Literal &l = *query.getLiteral();
     EDBIterator *edbItr = layer->getSortedIterator(l, defaultSorting);
-    itr->init(iteration, nfields, posFields, edbItr, layer, query.getLiteral());
+    itr->init(iteration, defaultSorting, nfields, posFields, edbItr, layer, query.getLiteral());
     return itr;
 }
 
@@ -44,7 +47,7 @@ FCInternalTableItr *EDBFCInternalTable::getSortedIterator() const {
     return getIterator();
 }
 
-std::shared_ptr<const FCInternalTable> EDBFCInternalTable::merge(std::shared_ptr<const FCInternalTable> t) const {
+std::shared_ptr<const FCInternalTable> EDBFCInternalTable::merge(std::shared_ptr<const FCInternalTable> t, int nthreads) const {
     assert(false);
     throw 10;
 }
@@ -73,15 +76,15 @@ std::shared_ptr<Column> EDBFCInternalTable::getColumn(
     const uint8_t columnIdx) const {
     //bool unq = query.getLiteral()->getNVars() == 2;
     std::vector<uint8_t> presortFields;
-    for(uint8_t i = 0; i < columnIdx; ++i)
+    for (uint8_t i = 0; i < columnIdx; ++i)
         presortFields.push_back(i);
 
     return std::shared_ptr<Column>(new EDBColumn(*layer,
-                                         *query.getLiteral(),
-                                         posFields[columnIdx],
-                                         presortFields,
-                                         //unq));
-                                         false));
+                                   *query.getLiteral(),
+                                   posFields[columnIdx],
+                                   presortFields,
+                                   //unq));
+                                   false));
 }
 
 bool EDBFCInternalTable::isColumnConstant(const uint8_t columnid) const {
@@ -96,7 +99,7 @@ std::shared_ptr<const FCInternalTable> EDBFCInternalTable::filter(
     const uint8_t nPosToCopy, const uint8_t *posVarsToCopy,
     const uint8_t nPosToFilter, const uint8_t *posConstantsToFilter,
     const Term_t *valuesConstantsToFilter, const uint8_t nRepeatedVars,
-    const std::pair<uint8_t, uint8_t> *repeatedVars) const {
+    const std::pair<uint8_t, uint8_t> *repeatedVars, int nthreads) const {
 
     //Create a new literal adding the constants
     VTuple t = query.getLiteral()->getTuple();
@@ -125,8 +128,14 @@ FCInternalTableItr *EDBFCInternalTable::sortBy(const std::vector<uint8_t> &field
     EDBFCInternalTableItr *itr = new EDBFCInternalTableItr();
     const Literal &l = *query.getLiteral();
     EDBIterator *edbItr = layer->getSortedIterator(l, fields);
-    itr->init(iteration, nfields, posFields, edbItr, layer, query.getLiteral());
+    itr->init(iteration, fields, nfields, posFields, edbItr, layer, query.getLiteral());
     return itr;
+}
+
+FCInternalTableItr *EDBFCInternalTable::sortBy(const std::vector<uint8_t> &fields,
+        const int nthreads) const {
+    //Ignore the nthreads parameter
+    return sortBy(fields);
 }
 
 void EDBFCInternalTable::releaseIterator(FCInternalTableItr *itr) const {
@@ -139,6 +148,7 @@ EDBFCInternalTable::~EDBFCInternalTable() {
 }
 
 void EDBFCInternalTableItr::init(const size_t iteration,
+                                 const std::vector<uint8_t> &fields,
                                  const uint8_t nfields,
                                  uint8_t const *posFields,
                                  EDBIterator *itr,
@@ -146,6 +156,7 @@ void EDBFCInternalTableItr::init(const size_t iteration,
                                  const Literal *query) {
     this->iteration = iteration;
     this->edbItr = itr;
+    this->fields = fields;
     this->nfields = nfields;
     this->layer = layer;
     this->query = query;
@@ -155,6 +166,13 @@ void EDBFCInternalTableItr::init(const size_t iteration,
         this->posFields[i] = posFields[i];
     }
     compiled = false;
+}
+
+FCInternalTableItr *EDBFCInternalTableItr::copy() const {
+    EDBFCInternalTableItr *itr = new EDBFCInternalTableItr();
+    EDBIterator *edbItr = layer->getSortedIterator(*query, fields);
+    itr->init(iteration, fields, nfields, posFields, edbItr, layer, query);
+    return itr;
 }
 
 EDBIterator *EDBFCInternalTableItr::getEDBIterator() {
@@ -182,14 +200,29 @@ inline Term_t EDBFCInternalTableItr::getCurrentValue(const uint8_t pos) {
 std::vector<std::shared_ptr<Column>> EDBFCInternalTableItr::getColumn(
 const uint8_t ncolumns, const uint8_t *columns) {
     std::vector<std::shared_ptr<Column>> output;
-    //bool unq = query->getNVars() == 1;
 
-    std::vector<uint8_t> presortFields;
+    //Fields are the fields on which this table should be sorted
+    std::vector<uint8_t> presortFields = fields;
     for (uint8_t i = 0; i < ncolumns; ++i) {
+        std::vector<uint8_t> columnpresort;
+        for(int j = 0; j < presortFields.size(); ++j) {
+            if (presortFields[j] != i)
+                columnpresort.push_back(presortFields[j]);
+            else
+                break;
+        }
+
         output.push_back(std::shared_ptr<Column>(
-                             // new EDBColumn(*layer, *query, columns[i], i, unq)));
-                             new EDBColumn(*layer, *query, columns[i], presortFields, false)));
-        presortFields.push_back(i);
+                             new EDBColumn(*layer, *query, columns[i], columnpresort, false)));
+        //Add it only if it is not there
+        bool found = false;
+        for(int j = 0; j < presortFields.size() && !found; ++j)
+            if (presortFields[j] == i)
+                found = true;
+
+        if (!found) {
+            presortFields.push_back(i);
+        }
     }
     return output;
 }

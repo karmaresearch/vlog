@@ -1,14 +1,16 @@
-#ifndef _TRIDENT_LAYER_H
-#define _TRIDENT_LAYER_H
+#ifndef _TRIDENT_TABLE_H
+#define _TRIDENT_TABLE_H
 
 #include <vlog/trident/tridentiterator.h>
 #include <vlog/column.h>
 #include <vlog/edbtable.h>
 
+#include <boost/thread/mutex.hpp>
+
 #include <trident/kb/kb.h>
 #include <trident/kb/querier.h>
-#include <trident/binarytables/binarytable.h>
-#include <tridentcompr/utils/factory.h>
+//#include <trident/binarytables/binarytable.h>
+#include <kognac/factory.h>
 
 class SeqColumnWriter : public SequenceWriter {
 private:
@@ -30,6 +32,10 @@ private:
     Querier *q;
     DictMgmt *dict;
     Factory<TridentIterator> kbItrFactory;
+    boost::mutex mutex;
+    bool multithreaded;
+
+    TridentIterator *getTridentIter();
 
     std::vector<std::shared_ptr<Column>> performAntiJoin(const Literal &l1,
                                       std::vector<uint8_t> &pos1, const Literal &l2,
@@ -60,23 +66,24 @@ private:
 
 
 public:
-    TridentTable(string kbDir) {
+    TridentTable(string kbDir, bool multithreaded) {
         KBConfig config;
         kb = new KB(kbDir.c_str(), true, false, true, config);
         q = kb->query();
         dict = kb->getDictMgmt();
+        this->multithreaded = multithreaded;
     }
 
     std::vector<std::shared_ptr<Column>> checkNewIn(const Literal &l1,
                                       std::vector<uint8_t> &posInL1,
                                       const Literal &l2,
-                                      std::vector<uint8_t> posInL2);
+                                      std::vector<uint8_t> &posInL2);
 
     std::vector<std::shared_ptr<Column>> checkNewIn(
                                           std::vector <
                                           std::shared_ptr<Column >> &checkValues,
                                           const Literal &l2,
-                                          std::vector<uint8_t> posInL2);
+                                          std::vector<uint8_t> &posInL2);
 
     std::shared_ptr<Column> checkIn(
         std::vector<Term_t> &values,
@@ -88,6 +95,14 @@ public:
     void query(QSQQuery *query, TupleTable *outputTable,
                std::vector<uint8_t> *posToFilter,
                std::vector<Term_t> *valuesToFilter);
+
+    Querier *getQuerier() {
+        return q;
+    }
+
+    KB *getKB() {
+        return kb;
+    }
 
     size_t estimateCardinality(const Literal &query);
 

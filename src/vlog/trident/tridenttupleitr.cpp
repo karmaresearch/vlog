@@ -8,26 +8,37 @@
 TridentTupleItr::TridentTupleItr() {}
 
 void TridentTupleItr::init(Querier *querier, const VTuple *t,
-                      const std::vector<uint8_t> *fieldsToSort, bool onlyVars) {
-    this->onlyVars = onlyVars;
+                           const std::vector<uint8_t> *fieldsToSort, bool onlyVars, boost::mutex *mutex) {
+
+    this->mutex = mutex;
+    // this->onlyVars = onlyVars;
     this->querier = querier;
     long s, p, o;
+    nvars = 0;
     if (t->get(0).isVariable()) {
         s = -1;
+        nvars++;
     } else {
         s = (long)t->get(0).getValue();
     }
     if (t->get(1).isVariable()) {
         p = -1;
+        nvars++;
     } else {
         p = (long)t->get(1).getValue();
     }
     if (t->get(2).isVariable()) {
         o = -1;
+        nvars++;
     } else {
         o = (long)t->get(2).getValue();
     }
 
+
+
+    if (mutex != NULL) {
+        mutex->lock();
+    }
     if (fieldsToSort == NULL) {
         idx = querier->getIndex(s, p, o);
     } else {
@@ -56,7 +67,8 @@ void TridentTupleItr::init(Querier *querier, const VTuple *t,
         if (o < 0)
             o = -1;
     }
-    invPerm = querier->getInvOrder(idx);
+    // invPerm = querier->getInvOrder(idx);
+    int *invPerm = querier->getInvOrder(idx);
 
     if (onlyVars) {
         int idx = 0;
@@ -69,6 +81,9 @@ void TridentTupleItr::init(Querier *querier, const VTuple *t,
         }
         sizeTuple = (uint8_t) (3 - idx);
     } else {
+        for (uint8_t j = 0; j < 3; ++j) {
+            varsPos[j] = (uint8_t) invPerm[j];
+        }
         sizeTuple = 3;
     }
 
@@ -79,16 +94,17 @@ void TridentTupleItr::init(Querier *querier, const VTuple *t,
     //If some variables have the same name, then we must change it
     equalFields = t->getRepeatedVars();
     physIterator = querier->get(idx, s, p, o);
+    if (mutex != NULL) {
+        mutex->unlock();
+    }
 }
 
 bool TridentTupleItr::checkFields() {
-    if (equalFields.size() > 0) {
-        for (std::vector<std::pair<uint8_t, uint8_t>>::const_iterator itr =
-                    equalFields.begin();
-                itr != equalFields.end(); ++itr) {
-            if (getElementAt(itr->first) != getElementAt(itr->second)) {
-                return false;
-            }
+    for (std::vector<std::pair<uint8_t, uint8_t>>::const_iterator itr =
+                equalFields.begin();
+            itr != equalFields.end(); ++itr) {
+        if (getElementAt(itr->first) != getElementAt(itr->second)) {
+            return false;
         }
     }
     return true;
@@ -130,7 +146,8 @@ size_t TridentTupleItr::getTupleSize() {
 }
 
 uint64_t TridentTupleItr::getElementAt(const int p) {
-    const uint8_t pos = onlyVars ? varsPos[p] : (uint8_t) invPerm[p];
+    // const uint8_t pos = onlyVars ? varsPos[p] : (uint8_t) invPerm[p];
+    const uint8_t pos = varsPos[p];
 
     switch (pos) {
     case 0:
@@ -145,12 +162,71 @@ uint64_t TridentTupleItr::getElementAt(const int p) {
 }
 
 TridentTupleItr::~TridentTupleItr() {
-    if (querier != NULL)
-        querier->releaseItr(physIterator);
+    if (querier != NULL) {
+        if (mutex != NULL) {
+            boost::mutex::scoped_lock lock(*mutex);
+            querier->releaseItr(physIterator);
+        } else {
+            querier->releaseItr(physIterator);
+        }
+    }
 }
 
 void TridentTupleItr::clear() {
-    querier->releaseItr(physIterator);
+    if (mutex != NULL) {
+        boost::mutex::scoped_lock lock(*mutex);
+        if (querier != NULL) {
+            querier->releaseItr(physIterator);
+        }
+    } else {
+        if (querier != NULL) {
+            querier->releaseItr(physIterator);
+        }
+    }
     physIterator = NULL;
     querier = NULL;
+}
+
+const char* TridentTupleItr::getUnderlyingArray(uint8_t column) {
+    // const uint8_t pos = onlyVars ? varsPos[column] : (uint8_t) invPerm[column];
+    // return NULL;
+    const uint8_t pos = varsPos[column];
+    if (pos == 0 || nvars == 3) {
+    // Can happen if asking for TE(?,?,?)
+	return NULL;
+    }
+    switch (pos) {
+    case 1:
+	return ((NewColumnTable*)physIterator)->getUnderlyingArray(1);
+    case 2:
+	return ((NewColumnTable*)physIterator)->getUnderlyingArray(2);
+    }
+    BOOST_LOG_TRIVIAL(error) << "This should not happen";
+    throw 10;
+}
+
+size_t TridentTupleItr::getCardinality() {
+    if (mutex != NULL) {
+        boost::mutex::scoped_lock lock(*mutex);
+        NewColumnTable *nct = (NewColumnTable*) physIterator;
+        return nct->getCardinality();
+    }
+    NewColumnTable *nct = (NewColumnTable*) physIterator;
+    return nct->getCardinality();
+}
+
+std::pair<uint8_t, std::pair<uint8_t, uint8_t>> TridentTupleItr::getSizeElemUnderlyingArray(uint8_t column) {
+    // const uint8_t pos = onlyVars ? varsPos[column] : (uint8_t) invPerm[column];
+    const uint8_t pos = varsPos[column];
+    NewColumnTable *nct = (NewColumnTable*) physIterator;
+    switch (pos) {
+    case 0:
+	throw 10;
+    case 1:
+	return make_pair(nct->getReaderSize1(), std::make_pair(nct->getReaderCountSize(), nct->getReaderStartingPointSize()));
+    case 2:
+	return make_pair(nct->getReaderSize2(), std::make_pair(0, 0));
+    }
+    BOOST_LOG_TRIVIAL(error) << "This should not happen";
+    throw 10;
 }

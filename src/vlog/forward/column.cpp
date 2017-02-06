@@ -1,5 +1,8 @@
 #include <vlog/column.h>
+#include <vlog/segment.h>
 #include <vlog/qsqquery.h>
+#include <vlog/trident/tridentiterator.h>
+#include <kognac/utils.h>
 
 #include <boost/log/trivial.hpp>
 #include <boost/chrono.hpp>
@@ -19,17 +22,9 @@ bool CompressedColumn::isIn(const Term_t t) const {
 std::shared_ptr<Column> CompressedColumn::sort() const {
     //boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
 
-    std::vector<Term_t> newValues;
     std::unique_ptr<ColumnReader> reader = getReader();
-    /*for (uint32_t i = 0; i < _size; ++i) {
-        newValues.push_back(reader->get(i));
-    }*/
-    while (reader->hasNext()) {
-        newValues.push_back(reader->next());
-    }
+    std::vector<Term_t> newValues = reader->asVector();
     std::sort(newValues.begin(), newValues.end());
-    //auto last = std::unique(newValues.begin(), newValues.end());
-    //newValues.erase(last, newValues.end());
 
     ColumnWriter writer(newValues);
 
@@ -39,9 +34,53 @@ std::shared_ptr<Column> CompressedColumn::sort() const {
     return writer.getColumn();
 }
 
-std::shared_ptr<Column> CompressedColumn::unique() const {
-    //This method assumes the vector is already sorted
-    //Therefore, I only need to reset all 0 delta blocks
+std::shared_ptr<Column> CompressedColumn::sort_and_unique() const {
+    //boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+
+    std::unique_ptr<ColumnReader> reader = getReader();
+    std::vector<Term_t> newValues = reader->asVector();
+    std::sort(newValues.begin(), newValues.end());
+    boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    auto last = std::unique(newValues.begin(), newValues.end());
+    newValues.erase(last, newValues.end());
+    newValues.shrink_to_fit();
+    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
+    BOOST_LOG_TRIVIAL(debug) << "Time std::unique = " << sec.count() * 1000 << " size()=" << _size;
+
+    //boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
+    //BOOST_LOG_TRIVIAL(debug) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
+    return std::shared_ptr<Column>(new InmemoryColumn(newValues, true));
+}
+
+std::shared_ptr<Column> CompressedColumn::sort(const int nthreads) const {
+    if (nthreads <= 1) {
+        return sort();
+    }
+
+    //boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+
+    std::unique_ptr<ColumnReader> reader = getReader();
+    std::vector<Term_t> newValues = reader->asVector();
+
+    if (newValues.size() > 4096) {
+        tbb::parallel_sort(newValues.begin(), newValues.end());
+    } else {
+        std::sort(newValues.begin(), newValues.end());
+    }
+
+    ColumnWriter writer(newValues);
+    //boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
+    //BOOST_LOG_TRIVIAL(debug) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
+    return writer.getColumn();
+
+}
+
+std::shared_ptr<Column> CompressedColumn::sort_and_unique(const int nthreads) const {
+    if (nthreads <= 1) {
+        return sort_and_unique();
+    }
+
+    // First, remove the easy duplicates
     auto newblocks = blocks;
     size_t newsize = _size;
     for (auto &el : newblocks) {
@@ -50,6 +89,45 @@ std::shared_ptr<Column> CompressedColumn::unique() const {
             el.size = 0;
         }
     }
+
+    CompressedColumn *col = new CompressedColumn(newblocks, newsize);
+    //boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+
+    std::unique_ptr<ColumnReader> reader = col->getReader();
+    std::vector<Term_t> newValues = reader->asVector();
+    delete col;
+
+    if (newValues.size() > 4096) {
+        tbb::parallel_sort(newValues.begin(), newValues.end());
+    } else {
+        std::sort(newValues.begin(), newValues.end());
+    }
+
+    boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    auto last = std::unique(newValues.begin(), newValues.end());
+    newValues.erase(last, newValues.end());
+    newValues.shrink_to_fit();
+    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
+    BOOST_LOG_TRIVIAL(debug) << "Time std::unique = " << sec.count() * 1000 << " size()=" << _size;
+    //boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
+    //BOOST_LOG_TRIVIAL(debug) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
+    return std::shared_ptr<Column>(new InmemoryColumn(newValues, true));
+}
+
+std::shared_ptr<Column> CompressedColumn::unique() const {
+    //This method assumes the vector is already sorted
+    //Therefore, I only need to reset all 0 delta blocks
+    boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    auto newblocks = blocks;
+    size_t newsize = _size;
+    for (auto &el : newblocks) {
+        if (el.delta == 0) {
+            newsize -= el.size;
+            el.size = 0;
+        }
+    }
+    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
+    BOOST_LOG_TRIVIAL(debug) << "Time CompressedColumn::unique = " << sec.count() * 1000 << " size()=" << _size;
     return std::shared_ptr<Column>(new CompressedColumn(newblocks, newsize));
 }
 
@@ -134,8 +212,14 @@ std::vector<Term_t> ColumnReaderImpl::asVector() {
     for (std::vector<CompressedColumnBlock>::const_iterator itr = blocks.begin();
             itr != blocks.end(); ++itr) {
         output.push_back(itr->value);
-        for (int32_t i = 1; i < itr->size + 1; ++i) {
-            output.push_back(itr->value + itr->delta * i);
+	if (itr->delta == 0) {
+	    for (int32_t i = 1; i <= itr->size; ++i) {
+		output.push_back(itr->value);
+	    }
+	} else {
+	    for (int32_t i = 1; i <= itr->size; ++i) {
+		output.push_back(itr->value + itr->delta * i);
+	    }
         }
     }
     return output;
@@ -170,22 +254,43 @@ size_t EDBColumn::estimateSize() const {
 
 size_t EDBColumn::size() const {
     QSQQuery query(l);
+    size_t retval;
     if (!unq) {
         if (l.getNVars() == 2) {
-            return layer.getCardinality(*query.getLiteral());
+            retval = layer.getCardinality(*query.getLiteral());
+        } else if (l.getNVars() == 1) {
+            retval = layer.getCardinality(*query.getLiteral());
         } else {
-            /*BOOST_LOG_TRIVIAL(warning) << "Must go through all the column"
-                                       " to count the size";*/
-            return getReader()->asVector().size();
+            retval = EDBColumnReader(l, posColumn, presortPos, layer, unq).size();
         }
     } else {
         if (l.getNVars() == 2) {
-            return layer.getCardinalityColumn(*query.getLiteral(), posColumn);
+            retval = layer.getCardinalityColumn(*query.getLiteral(), posColumn);
         } else {
             BOOST_LOG_TRIVIAL(warning) << "Must go through all the column"
                                        " to count the size";
-            return getReader()->asVector().size();
+            retval = EDBColumnReader(l, posColumn, presortPos, layer, unq).size();
         }
+    }
+#if DEBUG
+    size_t sz = getReader()->asVector().size();
+    if (sz != retval) {
+        BOOST_LOG_TRIVIAL(debug) << "query = " << l.tostring();
+        BOOST_LOG_TRIVIAL(debug) << "sz = " << sz << ", should be " << retval;
+        BOOST_LOG_TRIVIAL(debug) << "unq = " << unq << ", l.getNVars = " << (int) l.getNVars();
+        throw 10;
+    }
+#endif
+    return retval;
+}
+
+std::shared_ptr<Column> EDBColumn::sort(const int nthreads) const {
+    //nthreads is ignored, because this computation does not require any parallelism
+    if (presortPos.empty()) {
+        return clone(); //Should be always sorted
+    } else {
+        return std::shared_ptr<Column>(new EDBColumn(layer, l, posColumn,
+                                       std::vector<uint8_t>(), unq));
     }
 }
 
@@ -229,9 +334,43 @@ std::unique_ptr<ColumnReader> EDBColumn::getReader() const {
                                          presortPos, layer, unq));
 }
 
+const char *EDBColumn::getUnderlyingArray() const {
+    EDBColumnReader reader(l, posColumn, presortPos, layer, unq);
+    return reader.getUnderlyingArray();
+}
+
+std::pair<uint8_t, std::pair<uint8_t, uint8_t>> EDBColumn::getSizeElemUnderlyingArray() const {
+    EDBColumnReader reader(l, posColumn, presortPos, layer, unq);
+    return reader.getSizeElemUnderlyingArray();
+}
+
+EDBColumnReader::EDBColumnReader(const Literal &l, const uint8_t posColumn,
+                                 const std::vector<uint8_t> presortPos,
+                                 EDBLayer &layer, const bool unq)
+    : l(l), layer(layer), posColumn(posColumn), presortPos(presortPos),
+      unq(unq), //posInItr((l.getTupleSize() - l.getNVars()) + presortPos.size()),
+      posInItr(l.getPosVars()[posColumn]),
+      itr(NULL), firstCached((Term_t) - 1),
+      lastCached((Term_t) - 1) {
+}
+
+const char *EDBColumnReader::getUnderlyingArray() {
+    if (hasNext()) {
+        return itr->getUnderlyingArray(posInItr);
+    }
+    return NULL;
+}
+
+std::pair<uint8_t, std::pair<uint8_t, uint8_t>> EDBColumnReader::getSizeElemUnderlyingArray() {
+    if (hasNext()) {
+        return itr->getSizeElemUnderlyingArray(posInItr);
+    } else {
+        return std::make_pair(0, std::make_pair(0, 0));
+    }
+}
+
 void EDBColumnReader::setupItr() {
     if (itr == NULL) {
-        //QSQQuery query(l);
         std::vector<uint8_t> fields;
         for (int i = 0; i < presortPos.size(); ++i) {
             fields.push_back(presortPos[i]);
@@ -250,7 +389,6 @@ std::vector<Term_t> EDBColumnReader::load(const Literal &l,
         EDBLayer & layer, const bool unq) {
 
     boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
-    //QSQQuery query(l);
     std::vector<uint8_t> fields;
     for (int i = 0; i < presortPos.size(); ++i) {
         fields.push_back(presortPos[i]);
@@ -259,20 +397,89 @@ std::vector<Term_t> EDBColumnReader::load(const Literal &l,
     std::vector<Term_t> values;
 
     EDBIterator *itr = layer.getSortedIterator(l, fields);
+    //const uint8_t posInItr = (l.getTupleSize() - l.getNVars()) + presortPos.size(); //n constants + presortPos
     const uint8_t posInItr = l.getPosVars()[posColumn];
+    Term_t prev = (Term_t) - 1;
+    const char *rawarray = itr->getUnderlyingArray(posInItr);
+    if (rawarray != NULL) {
+        std::pair<uint8_t, std::pair<uint8_t, uint8_t>> sizeelements
+                = itr->getSizeElemUnderlyingArray(posInItr);
+        const int totalsize = sizeelements.first + sizeelements.second.first + sizeelements.second.second;
+
+        size_t nrows = ((TridentIterator *) itr)->getCardinality();
+
+        values.reserve(nrows);
+
+        if (sizeelements.second.first != 0) {
+            //I must read the first column of a table.
+            //I must read also the counter and add a
+            //corresponding number of duplicates.
+
+            const uint8_t sizecount = sizeelements.second.first;
+            for (uint64_t j = 0; j < nrows; j++) {
+                const uint64_t el = Utils::decode_longFixedBytes(rawarray, sizeelements.first);
+                if (! unq || el != prev) {
+                    values.push_back(el);
+                    prev = el;
+                }
+                uint64_t count = Utils::decode_longFixedBytes(rawarray + sizeelements.first, sizecount);
+                j += count - 1;
+                if (! unq) {
+                    while (--count > 0) {
+                        values.push_back(el);
+                    }
+                }
+                rawarray += totalsize;
+            }
+
+        } else {
+            for (uint64_t j = 0; j < nrows; ++j) {
+                const uint64_t el = Utils::decode_longFixedBytes(rawarray, sizeelements.first);
+                if (! unq || el != prev) {
+                    values.push_back(el);
+                    prev = el;
+                }
+                rawarray += totalsize;
+            }
+        }
+    } else {
+        while (itr->hasNext()) {
+            itr->next();
+            Term_t el = itr->getElementAt(posInItr);
+            if (!unq || el != prev) {
+                values.push_back(el);
+                prev = el;
+            }
+        }
+    }
+
+    layer.releaseIterator(itr);
+    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
+    BOOST_LOG_TRIVIAL(debug) << "Time loading a vector of " << values.size() << " is " << sec.count() * 1000;
+    return values;
+}
+
+size_t EDBColumnReader::size() {
+    std::vector<uint8_t> fields;
+    for (int i = 0; i < presortPos.size(); ++i) {
+        fields.push_back(presortPos[i]);
+    }
+    fields.push_back(posColumn);
+
+    size_t sz = 0;
+
+    EDBIterator *itr = layer.getSortedIterator(l, fields);
     Term_t prev = (Term_t) - 1;
     while (itr->hasNext()) {
         itr->next();
         Term_t el = itr->getElementAt(posInItr);
         if (!unq || el != prev) {
-            values.push_back(el);
+            sz++;
             prev = el;
         }
     }
     layer.releaseIterator(itr);
-    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    BOOST_LOG_TRIVIAL(debug) << "Time loading a vector of " << values.size() << " is " << sec.count() * 1000;
-    return values;
+    return sz;
 }
 
 Term_t EDBColumnReader::last() {
@@ -284,7 +491,6 @@ Term_t EDBColumnReader::last() {
 
 Term_t EDBColumnReader::first() {
     if (firstCached == (Term_t) - 1) {
-        //QSQQuery query(l);
         std::vector<uint8_t> fields;
         fields.push_back(posColumn);
         EDBIterator *itr = layer.getSortedIterator(l, fields);
@@ -300,7 +506,9 @@ Term_t EDBColumnReader::first() {
 }
 
 bool EDBColumnReader::hasNext() {
-    setupItr();
+    if (itr == NULL) {
+        setupItr();
+    }
     bool resp = itr->hasNext();
     if (!resp) {
         //release the itr
@@ -309,18 +517,6 @@ bool EDBColumnReader::hasNext() {
     }
     return resp;
 }
-
-/*bool EDBColumnReader::hasNext(Term_t nextValue) {
-    setupItr();
-    bool resp = hasNext();
-    if (resp) {
-        if (itr->getElementAt(posInItr) + 50 < nextValue) {
-            itr->moveTo(posInItr, nextValue);
-        }
-        resp = hasNext();
-    }
-    return resp;
-}*/
 
 Term_t EDBColumnReader::next() {
     itr->next();
@@ -331,49 +527,10 @@ std::vector<Term_t> EDBColumnReader::asVector() {
     return load(l, posColumn, presortPos, layer, unq);
 }
 
-ColumnWriter::ColumnWriter(std::vector<Term_t> &values) :  ColumnWriter() {
+void ColumnWriter::concatenate(Column * c) {
+    std::vector<Term_t> values = c->getReader()->asVector();
     for (auto &value : values) {
         add(value);
-    }
-}
-
-void ColumnWriter::add(const uint64_t v) {
-    if (cached)
-        throw 10;
-
-    if (isEmpty()) {
-        blocks.push_back(CompressedColumnBlock((Term_t) v, 0, 0));
-    } else {
-        if (v == lastValue() + blocks.back().delta) {
-            blocks.back().size++;
-        } else {
-            if (blocks.back().size == 0) {
-                blocks.back().delta = v - blocks.back().value;
-                blocks.back().size++;
-            } else {
-                blocks.push_back(CompressedColumnBlock((Term_t) v, 0, 0));
-            }
-        }
-    }
-    _size++;
-}
-
-bool ColumnWriter::isEmpty() const {
-    return _size == 0;
-}
-
-size_t ColumnWriter::size() const {
-    return _size;
-}
-
-Term_t ColumnWriter::lastValue() const {
-    return blocks.back().value + blocks.back().size * blocks.back().delta;
-}
-
-void ColumnWriter::concatenate(Column * c) {
-    std::unique_ptr<ColumnReader> reader = c->getReader();
-    while (reader->hasNext()) {
-        add(reader->next());
     }
 }
 
@@ -384,31 +541,42 @@ std::shared_ptr<Column> ColumnWriter::getColumn() {
     }
     cached = true;
 
-    if (blocks.size() < _size / 5) {
-        cachedColumn = std::shared_ptr<Column>(new CompressedColumn(
-                blocks, _size));
+#ifdef USE_COMPRESSED_COLUMNS
+    if (compressed) {
+        BOOST_LOG_TRIVIAL(debug) << "ColumnWriter::getColumn: blocks.size() = " << blocks.size() << ", _size = " << _size;
+
+        if (blocks.size() < _size / 5) {
+            cachedColumn = std::shared_ptr<Column>(new CompressedColumn(
+                    blocks, _size));
+        } else {
+            CompressedColumn col(blocks, /*offsetsize, deltas,*/ _size);
+            std::vector<Term_t> values = col.getReader()->asVector();
+            cachedColumn = std::shared_ptr<Column>(new InmemoryColumn(values, true));
+        }
     } else {
-        CompressedColumn col(blocks, /*offsetsize, deltas,*/ _size);
-        std::vector<Term_t> values = col.getReader()->asVector();
-        cachedColumn = std::shared_ptr<Column>(new InmemoryColumn(values));
+        cachedColumn = std::shared_ptr<Column>(new InmemoryColumn(values, true));
     }
+#else
+    cachedColumn = std::shared_ptr<Column>(new InmemoryColumn(values, true));
+#endif
     return cachedColumn;
 }
 
-/*std::shared_ptr<Column> ColumnWriter::compress(
-    const std::vector<Term_t> &values) {
+std::shared_ptr<Column> ColumnWriter::getColumn(std::vector<Term_t> &values, bool isSorted) {
 
+#ifdef USE_COMPRESSED_COLUMNS
     bool shouldCompress = false;
     //I should compress the table only if the number of unique terms is much
     //smaller than the number of total terms. I use simple heuristics to
     //determine that
-    if (values.empty() || values.front() == values.back()) {
+    if (values.empty() || (isSorted && values.front() == values.back())) {
         shouldCompress = true;
     }
 
 
     if (shouldCompress) {
-        std::vector<CompressedColumnBlock> blocks;
+        return std::shared_ptr<Column>(new CompressedColumn(values.front(), values.size()));
+        /*std::vector<CompressedColumnBlock> blocks;
         uint32_t offsetsize = 1;
         std::vector<int32_t> deltas;
 
@@ -446,57 +614,112 @@ std::shared_ptr<Column> ColumnWriter::getColumn() {
         }
 
         return std::shared_ptr<Column>(new CompressedColumn(blocks, offsetsize,
-                                       deltas, values.size()));
+                                       deltas, values.size()));*/
     } else {
-        return std::shared_ptr<Column>(new InmemoryColumn(values));
+        //swap the values. After, "values" is empty
+        return std::shared_ptr<Column>(new InmemoryColumn(values, true));
     }
-}*/
+#else
+    return std::shared_ptr<Column>(new InmemoryColumn(values, true));
+#endif
+}
 
 void Column::intersection(std::shared_ptr<Column> c1,
                           std::shared_ptr<Column> c2, ColumnWriter &writer) {
     std::unique_ptr<ColumnReader> r1 = c1->getReader();
     std::unique_ptr<ColumnReader> r2 = c2->getReader();
     Term_t v1, v2;
-    bool ok1 = r1->hasNext();
-    if (ok1)
-        v1 = r1->next();
-    bool ok2 = r2->hasNext();
-    if (ok2)
-        v2 = r2->next();
+    if (! r1->hasNext()) {
+        return;
+    }
+    v1 = r1->next();
+    if (! r2->hasNext()) {
+        return;
+    }
+    v2 = r2->next();
 
-    long count1 = ok1 ? 1 : 0;
-    long count2 = ok2 ? 1 : 0;
-    long countout = 0;
+    // long count1 = ok1 ? 1 : 0;
+    // long count2 = ok2 ? 1 : 0;
+    // long countout = 0;
 
     //boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
 
 
-    while (ok1 && ok2) {
+    for (;;) {
         if (v1 < v2) {
-            ok1 = r1->hasNext();
-            if (ok1) {
-                v1 = r1->next();
-                count1++;
+            if (! r1->hasNext()) {
+                return;
             }
+            v1 = r1->next();
+            // count1++;
         } else if (v1 > v2) {
-            ok2 = r2->hasNext();
-            if (ok2) {
-                v2 = r2->next();
-                count2++;
+            if (! r2->hasNext()) {
+                return;
             }
+            v2 = r2->next();
+            // count2++;
         } else {
             writer.add(v1);
-            countout++;
-            ok2 = r2->hasNext();
-            if (ok2) {
-                v2 = r2->next();
-                count2++;
+            // countout++;
+            if (! r1->hasNext()) {
+                return;
             }
+            v1 = r1->next();
+            // count1++;
+            if (! r2->hasNext()) {
+                return;
+            }
+            v2 = r2->next();
+            // count2++;
         }
     }
     //boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
     //BOOST_LOG_TRIVIAL(info) << "Count1=" << count1 << " Count2=" << count2 <<
     //                        " countout=" << countout << " " << sec.count() * 1000;
+}
+
+// The parallel version may very well be slower than the sequential one, because the parallel
+// version has to actually obtain the complete columns.
+void Column::intersection(std::shared_ptr<Column> c1,
+                          std::shared_ptr<Column> c2, ColumnWriter &writer, int nthreads) {
+    if (nthreads <= 1 || c1->size() < 1024 || c2->size() < 1024) {
+        return intersection(c1, c2, writer);
+    }
+    std::vector<std::shared_ptr<Column>> cols;
+    cols.push_back(c1);
+    cols.push_back(c2);
+    const std::vector<const std::vector<Term_t> *> vectors = Segment::getAllVectors(cols);
+    size_t c1Size = vectors[0]->size();
+    size_t c2Size = vectors[1]->size();
+
+    // TODO: parallelize this!
+    Term_t v1, v2;
+    size_t i1 = 1, i2 = 1;
+    v1 = (*vectors[0])[0];
+    v2 = (*vectors[1])[0];
+    for (;;) {
+        if (v1 < v2) {
+            if (i1 >= c1Size) {
+                return;
+            }
+            v1 = (*vectors[0])[i1++];
+        } else if (v1 > v2) {
+            if (i2 >= c2Size) {
+                return;
+            }
+            v2 = (*vectors[1])[i2++];
+        } else {
+            writer.add(v1);
+            if (i1 >= c1Size) {
+                return;
+            }
+            v1 = (*vectors[0])[i1++];
+            if (i2 >= c2Size) {
+                return;
+            }
+            v2 = (*vectors[1])[i2++];
+        }
+    }
 }
 
 uint64_t Column::countMatches(
@@ -524,9 +747,9 @@ uint64_t Column::countMatches(
                 v1 = r1->next();
             }
         } else {
-	    if (v1 == v2) {
-		countout++;
-	    }
+            if (v1 == v2) {
+                countout++;
+            }
             ok2 = r2->hasNext();
             if (ok2) {
                 v2 = r2->next();
@@ -553,12 +776,12 @@ bool Column::subsumes(
         v2 = r2->next();
 
     while (ok1 && ok2) {
-	// BOOST_LOG_TRIVIAL(debug) << "v1 = " << v1 << ", v2 = " << v2;
-	if (v1 > v2) {
-	    // BOOST_LOG_TRIVIAL(debug) << "subsumes returns false";
-	    return false;
-	}
-	if (v1 == v2) {
+        // BOOST_LOG_TRIVIAL(debug) << "v1 = " << v1 << ", v2 = " << v2;
+        if (v1 > v2) {
+            // BOOST_LOG_TRIVIAL(debug) << "subsumes returns false";
+            return false;
+        }
+        if (v1 == v2) {
             ok1 = r1->hasNext();
             if (ok1) {
                 v1 = r1->next();
@@ -567,7 +790,7 @@ bool Column::subsumes(
             if (ok2) {
                 v2 = r2->next();
             }
-	} else {
+        } else {
             ok1 = r1->hasNext();
             if (ok1) {
                 v1 = r1->next();

@@ -1,6 +1,7 @@
 #include <vlog/qsqr.h>
 #include <vlog/concepts.h>
 #include <vlog/bindingstable.h>
+#include <vlog/ruleexecutor.h>
 #include <trident/model/table.h>
 #include <trident/iterators/arrayitr.h>
 
@@ -117,14 +118,15 @@ void QSQR::createRules(Predicate &pred) {
     }
 
     if (rules[pred.getId()][pred.getAdorment()] == NULL) {
+        std::vector<Rule> *r = program->getAllRulesByPredicate(pred.getId());
+        // BOOST_LOG_TRIVIAL(debug) << "createRules for predicate " << pred.getId() << ", adornment = " << pred.getAdorment() << ", r->size = " << r->size();
         rules[pred.getId()][pred.getAdorment()] =
-            new RuleExecutor*[program->getAllRulesByPredicate(pred.getId())->size()];
+            new RuleExecutor*[r->size()];
         int m = 0;
         for (std::vector<Rule>::iterator itr =
-                    program->getAllRulesByPredicate(pred.getId())->begin();
-                itr != program->getAllRulesByPredicate(pred.getId())->end(); ++itr) {
+                    r->begin(); itr != r->end(); ++itr) {
             rules[pred.getId()][pred.getAdorment()][m] =
-                new RuleExecutor(*itr, pred.getAdorment());
+                new RuleExecutor(*itr, pred.getAdorment(), program, layer);
             m++;
         }
     }
@@ -133,22 +135,46 @@ void QSQR::createRules(Predicate &pred) {
 size_t QSQR::estimate(int depth, Predicate &pred, BindingsTable *inputTable/*, size_t offsetInput*/) {
 
     if (depth > 2) {
-        return 1;
+        return 0;
     }
 
     createRules(pred);
 
+    std::vector<size_t> outputs;
     size_t output = 0;
     for (int i = 0; i < program->getAllRulesByPredicate(pred.getId())->size(); ++i) {
         RuleExecutor *exec = rules[pred.getId()][pred.getAdorment()][i];
-        output += exec->estimate(depth + 1, inputTable/*, offsetInput*/, this, layer);
+        size_t r = exec->estimate(depth + 1, inputTable/*, offsetInput*/, this, layer);
+	if (r != 0) {
+	    // if (depth > 0 || r <= 10) {
+		output += r;
+	    /*
+	    } else {
+		// Somewhat silly duplicate detection heuristic ...
+		bool found = false;
+		for (int i = 0; i < outputs.size(); i++) {
+		    if (outputs[i] == r) {
+			BOOST_LOG_TRIVIAL(debug) << "Ignoring " << r << " results";
+			// Assume it is the same answer ...
+			found = true;
+			break;
+		    }
+		}
+		if (! found) {
+		    outputs.push_back(r);
+		    output += r;
+		}
+	    }
+	    */
+	}
     }
     return output;
 }
 
 void QSQR::evaluate(Predicate &pred, BindingsTable *inputTable,
                     size_t offsetInput, bool repeat) {
-    /*size_t totalAnswers;
+#ifdef RECURSIVE_QSQR
+    size_t totalAnswers;
     bool shouldRepeat = false;
 
     //Calculate all answers produced so far.
@@ -168,62 +194,62 @@ void QSQR::evaluate(Predicate &pred, BindingsTable *inputTable,
         shouldRepeat = newTotalAnswers > totalAnswers;
         totalAnswers = newTotalAnswers;
     } while (repeat && shouldRepeat);
-    BOOST_LOG_TRIVIAL(debug) << "QSQR: finished execution of query";*/
-
+    // BOOST_LOG_TRIVIAL(debug) << "QSQR: finished execution of query";
+#else
     createRules(pred);
-    if (program->getAllRulesByPredicate(pred.getId())->size() > 0) {
-        QSQR_Task task(QSQR_TaskType::QUERY, pred);
-        task.currentRuleIndex = 0;
-        task.inputTable = inputTable;
-        task.offsetInput = offsetInput;
-        task.repeat = repeat;
-        //task.shouldRepeat = false;
-        task.totalAnswers = calculateAllAnswers();
-        tasks.push_back(task);
-
+    size_t sz = program->getAllRulesByPredicate(pred.getId())->size();
+    if (sz > 0) {
+	QSQR_Task task(QSQR_TaskType::QUERY, pred);
+	task.currentRuleIndex = 1;
+	task.inputTable = inputTable;
+	task.offsetInput = offsetInput;
+	task.repeat = repeat;
+	task.totalAnswers = calculateAllAnswers();
+	pushTask(task);
         RuleExecutor *exec = rules[pred.getId()][pred.getAdorment()][0];
         exec->evaluate(inputTable, offsetInput, this, layer);
     }
+#endif
 }
 
+#ifndef RECURSIVE_QSQR
 void QSQR::processTask(QSQR_Task &task) {
     switch (task.type) {
-    case QUERY:
-        if (task.currentRuleIndex <
-                (program->getAllRulesByPredicate(task.pred.getId())->size() - 1)) {
+    case QUERY: {
+	size_t sz = program->getAllRulesByPredicate(task.pred.getId())->size();
+	if (task.currentRuleIndex < sz) {
             //Execute the next rule
-            QSQR_Task newTask(QSQR_TaskType::QUERY, task.pred);
-            newTask.currentRuleIndex = task.currentRuleIndex + 1;
-            newTask.inputTable = task.inputTable;
-            newTask.offsetInput = task.offsetInput;
-            newTask.repeat = task.repeat;
-            newTask.totalAnswers = task.totalAnswers;
-            //newTask.shouldRepeat = false;
-            tasks.push_back(newTask);
-
+	    QSQR_Task newTask(QSQR_TaskType::QUERY, task.pred);
+	    newTask.currentRuleIndex = task.currentRuleIndex + 1;
+	    newTask.inputTable = task.inputTable;
+	    newTask.offsetInput = task.offsetInput;
+	    newTask.repeat = task.repeat;
+	    newTask.totalAnswers = task.totalAnswers;
+	    pushTask(newTask);
+            // BOOST_LOG_TRIVIAL(debug) << "pushed new task QUERY, totalAnswers = " << newTask.totalAnswers;
             RuleExecutor *exec = rules[task.pred.getId()]
-                                 [task.pred.getAdorment()][newTask.currentRuleIndex];
+                                 [task.pred.getAdorment()][task.currentRuleIndex];
             exec->evaluate(task.inputTable, task.offsetInput, this, layer);
-
         } else {
             size_t newAnswers = calculateAllAnswers();
             if (task.repeat && newAnswers > task.totalAnswers) {
                 createRules(task.pred);
-                QSQR_Task newTask(QSQR_TaskType::QUERY, task.pred);
-                newTask.currentRuleIndex = 0;
-                newTask.inputTable = task.inputTable;
-                newTask.offsetInput = task.offsetInput;
-                newTask.repeat = task.repeat;
-                //newTask.shouldRepeat = false;
-                newTask.totalAnswers = calculateAllAnswers();
-                tasks.push_back(newTask);
-
+		QSQR_Task newTask(QSQR_TaskType::QUERY, task.pred);
+		newTask.currentRuleIndex = 1;
+		newTask.inputTable = task.inputTable;
+		newTask.offsetInput = task.offsetInput;
+		newTask.repeat = task.repeat;
+		//newTask.shouldRepeat = false;
+		newTask.totalAnswers = newAnswers;
+		pushTask(newTask);
+                // BOOST_LOG_TRIVIAL(debug) << "pushed new task QUERY(0), totalAnswers = " << newTask.totalAnswers;
                 RuleExecutor *exec = rules[task.pred.getId()]
                                      [task.pred.getAdorment()][0];
                 exec->evaluate(task.inputTable, task.offsetInput, this, layer);
             }
         }
         break;
+    }
     case RULE:
     case RULE_QUERY:
         RuleExecutor *exec = task.executor;
@@ -231,6 +257,7 @@ void QSQR::processTask(QSQR_Task &task) {
         break;
     }
 }
+#endif
 
 TupleTable *QSQR::evaluateQuery(int evaluateOrEstimate, QSQQuery *query,
                                 std::vector<uint8_t> *posJoins,
@@ -294,19 +321,24 @@ TupleTable *QSQR::evaluateQuery(int evaluateOrEstimate, QSQQuery *query,
 
                 if (evaluateOrEstimate == QSQR_EVAL) {
                     evaluate(pred2, inputTable, 0, false);
-
+#ifndef RECURSIVE_QSQR
                     //evaluate in this case is not recursive. Process the tasks
                     //until the queue is empty
                     while (tasks.size() > 0) {
-                        //BOOST_LOG_TRIVIAL(debug) << "Task size=" << tasks.size();
+                        // BOOST_LOG_TRIVIAL(debug) << "Task size=" << tasks.size();
                         QSQR_Task task = tasks.back();
                         tasks.pop_back();
                         processTask(task);
                     }
+#endif
 
                 } else {
                     TupleTable *output = new TupleTable(1);
                     uint64_t est = estimate(0, pred2, inputTable/*, 0*/);
+		    // Incorporate size of possible join values?
+		    // Useless, I think, because in the planning phase, we don't actually have more than
+		    // one possiblevaluesjoin. --Ceriel
+		    est = est + (est * (possibleValuesJoins->size() / posJoins->size() - 1)) / 10; 
                     output->addRow(&est);
                     return output;
                 }
@@ -316,7 +348,7 @@ TupleTable *QSQR::evaluateQuery(int evaluateOrEstimate, QSQQuery *query,
                 if (evaluateOrEstimate == QSQR_EVAL) {
                     totalAnswers = calculateAllAnswers();
                     evaluate(pred, inputTable, 0, false);
-
+#ifndef RECURSIVE_QSQR
                     //evaluate in this case is not recursive. Process the tasks
                     //until the queue is empty
                     while (tasks.size() > 0) {
@@ -325,6 +357,7 @@ TupleTable *QSQR::evaluateQuery(int evaluateOrEstimate, QSQQuery *query,
                         tasks.pop_back();
                         processTask(task);
                     }
+#endif
 
                 } else { //ESTIMATE
                     TupleTable *output = new TupleTable(1);

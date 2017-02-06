@@ -19,6 +19,7 @@ bool BindingsRow::operator==(const BindingsRow &other) const {
 }
 
 BindingsTable::BindingsTable(uint8_t sizeAdornment, uint8_t adornment) {
+    uniqueElements.max_load_factor(0.75);
     //Mark positions to copy
     std::vector<int> pc;
     for (int i = 0; i < sizeAdornment; ++i) {
@@ -45,6 +46,7 @@ BindingsTable::BindingsTable(uint8_t sizeAdornment, uint8_t adornment) {
 }
 
 BindingsTable::BindingsTable(size_t sizeTuple) {
+    uniqueElements.max_load_factor(0.75);
     nPosToCopy = sizeTuple;
     if (nPosToCopy > 0) {
         rawBindings = new RawBindings((uint8_t) sizeTuple);
@@ -57,6 +59,7 @@ BindingsTable::BindingsTable(size_t sizeTuple) {
 }
 
 BindingsTable::BindingsTable(uint8_t npc, std::vector<int> pc) {
+    uniqueElements.max_load_factor(0.75);
     this->nPosToCopy = npc;
     if (nPosToCopy > 0) {
         this->posToCopy = new size_t[nPosToCopy];
@@ -204,6 +207,9 @@ TupleTable *BindingsTable::projectAndFilter(const Literal &l, const std::vector<
         }
     }
     TupleTable *output = new TupleTable(nvars);
+#if DEBUG
+    bool warn_done = false;
+#endif
     for (size_t i = 0; i < uniqueElements.size(); ++i) {
         Term_t *row = rawBindings->getOffset(i * nPosToCopy);
         bool ok = true;
@@ -215,14 +221,19 @@ TupleTable *BindingsTable::projectAndFilter(const Literal &l, const std::vector<
         }
 
         //check the variables
-        if (ok && posToFilter != NULL) {
-#if DEBUG
-            BOOST_LOG_TRIVIAL(debug) << "Performing linear search (bindingsTable::projectAndFilter). Perhaps this should be optimized";
-#endif
+        if (ok && posToFilter != NULL && posToFilter->size() != 0) {
             ok = false;
             const size_t sizePosToFilter = posToFilter->size();
             const size_t sizeValuesToFilter = valuesToFilter->size();
             uint8_t copyPosToFilter[sizePosToFilter];
+
+#if DEBUG
+	    if (! warn_done) {
+		BOOST_LOG_TRIVIAL(debug) << "Performing linear search (bindingsTable::projectAndFilter). Perhaps this should be optimized";
+		BOOST_LOG_TRIVIAL(debug) << "size = " << sizeValuesToFilter / sizePosToFilter;
+		warn_done = true;
+	    }
+#endif
             for (uint8_t m = 0; m < sizePosToFilter; ++m) {
                 copyPosToFilter[m] = posToFilter->at(m);
             }
@@ -273,6 +284,9 @@ TupleTable *BindingsTable::filter(const Literal &l, const std::vector<uint8_t> *
     }
 
     TupleTable *output = new TupleTable(nPosToCopy);
+#if DEBUG
+    bool warn_done = false;
+#endif
     for (size_t i = 0; i < uniqueElements.size(); ++i) {
         Term_t *row = rawBindings->getOffset(i * nPosToCopy);
 
@@ -284,13 +298,19 @@ TupleTable *BindingsTable::filter(const Literal &l, const std::vector<uint8_t> *
             }
         }
 
-        if (ok && posToFilter != NULL) {
+        if (ok && posToFilter != NULL && posToFilter->size() != 0) {
             if (filterSet != NULL) {
                 ok = filterSet->find(row[posToFilter->at(0)]) != filterSet->end();
             } else {
                 //linear search
-                BOOST_LOG_TRIVIAL(warning) << "Performing linear search (bindingsTable::asTupleTable). Perhaps this should be optimized";
                 ok = false;
+#if DEBUG
+		if (! warn_done) {
+		    BOOST_LOG_TRIVIAL(debug) << "Performing linear search (bindingsTable::asTupleTable). Perhaps this should be optimized";
+		    BOOST_LOG_TRIVIAL(debug) << "size = " << valuesToFilter->size() / posToFilter->size();
+		    warn_done = true;
+		}
+#endif
                 const uint8_t sizePosToFilter = (uint8_t) posToFilter->size();
                 for (size_t j = 0; j < valuesToFilter->size() && !ok; j += sizePosToFilter) {
                     bool okRow = true;
@@ -402,6 +422,17 @@ void BindingsTable::print() {
         cout << endl;
     }
 }
+
+#ifdef DEBUG
+void BindingsTable::statistics() {
+    /*
+    size_t nbuckets = uniqueElements.bucket_count();
+    for (size_t i = 0; i < nbuckets; i++) {
+	BOOST_LOG_TRIVIAL(debug) << "Size bucket " << i << ": " << uniqueElements.bucket_size(i);
+    }
+    */
+}
+#endif
 
 BindingsTable::~BindingsTable() {
     if (posToCopy != NULL)

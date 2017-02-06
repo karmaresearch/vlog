@@ -5,6 +5,9 @@
 #include <vlog/concepts.h>
 #include <vlog/fcinttable.h>
 
+#include <boost/thread/shared_mutex.hpp>
+#include <boost/thread/mutex.hpp>
+
 #include <inttypes.h>
 #include <string>
 #include <unordered_map>
@@ -32,11 +35,14 @@ struct FCBlock {
     FCBlock(size_t iteration, std::shared_ptr<const FCInternalTable> table, Literal query, const RuleExecutionDetails *rule,
             const uint8_t ruleExecOrder, bool isCompleted) : iteration(iteration),
         table(table), query(query), rule(rule), ruleExecOrder(ruleExecOrder), isCompleted(isCompleted) {
+        BOOST_LOG_TRIVIAL(debug) << "FCBlock " << this << ": table = " << table << ", iteration = " << iteration;
     }
 
+    /* Commented out, this does not assign! --Ceriel
     FCBlock operator=(const FCBlock &other) {
         return FCBlock(other.iteration, other.table, other.query, other.rule, other.ruleExecOrder, other.isCompleted);
     }
+    */
 };
 
 struct FCCacheBlock {
@@ -46,12 +52,16 @@ struct FCCacheBlock {
 
 class FCIterator {
 private:
-    const size_t ntables;
-
+    size_t ntables;
     std::vector<FCBlock>::const_iterator itr, end;
 public:
     FCIterator() : ntables(0) {
         itr = end;
+    }
+
+    FCIterator(const FCIterator &other) : ntables(other.ntables),
+        itr(other.itr),
+        end(other.end) {
     }
 
     FCIterator(std::vector<FCBlock>::const_iterator itr,
@@ -83,12 +93,17 @@ private:
     FCCache cache;
     std::string getSignature(const Literal &literal);
 
-    void removeBlock(const size_t iteration);
-public:
-    FCTable(const uint8_t sizeRow);
+    boost::shared_mutex *mutex;
+    boost::mutex cache_mutex;
 
-    std::shared_ptr<const FCTable> filter(const Literal &literal) {
-        return filter(literal, 0, NULL);
+    void removeBlock(const size_t iteration);
+
+    //boost::shared_mutex *getMutex() const;
+public:
+    FCTable(boost::shared_mutex *mutex, const uint8_t sizeRow);
+
+    std::shared_ptr<const FCTable> filter(const Literal &literal, int nthreads) {
+        return filter(literal, 0, NULL, nthreads);
     }
 
     size_t getMaxIteration() const {
@@ -109,7 +124,7 @@ public:
 
 
     std::shared_ptr<const FCTable> filter(const Literal &literal,
-                                          const size_t minIteration, TableFilterer *filterer);
+                                          const size_t minIteration, TableFilterer *filterer, int nthreads);
 
     FCIterator read(const size_t mincount) const;
 
@@ -138,13 +153,14 @@ public:
 
     std::shared_ptr<const Segment> retainFrom(
         std::shared_ptr<const Segment> t,
-        const bool dupl) const;
+        const bool dupl,
+        int nthreads) const;
 
     void addBlock(FCBlock block);
 
     bool add(std::shared_ptr<const FCInternalTable> t, const Literal &literal, const RuleExecutionDetails *detailsRule,
              const uint8_t ruleExecOrder,
-             const size_t iteration, const bool isCompleted);
+             const size_t iteration, const bool isCompleted, int nthreads);
 
     ~FCTable();
 };

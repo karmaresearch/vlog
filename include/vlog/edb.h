@@ -11,7 +11,7 @@
 #include <vlog/edbiterator.h>
 #include <vlog/edbconf.h>
 
-#include <tridentcompr/utils/factory.h>
+#include <kognac/factory.h>
 
 #include <vector>
 #include <map>
@@ -78,7 +78,7 @@ private:
     Factory<EDBMemIterator> memItrFactory;
     IndexedTupleTable *tmpRelations[MAX_NPREDS];
 
-    void addTridentTable(const EDBConf::Table &tableConf);
+    void addTridentTable(const EDBConf::Table &tableConf, bool multithreaded);
 
 #ifdef MYSQL
     void addMySQLTable(const EDBConf::Table &tableConf);
@@ -91,11 +91,11 @@ private:
 #endif
 
 public:
-    EDBLayer(EDBConf &conf) {
+    EDBLayer(EDBConf &conf, bool multithreaded) {
         const std::vector<EDBConf::Table> tables = conf.getTables();
         for (const auto &table : tables) {
             if (table.type == "Trident") {
-                addTridentTable(table);
+                addTridentTable(table, multithreaded);
 #ifdef MYSQL
             } else if (table.type == "MySQL") {
                 addMySQLTable(table);
@@ -130,6 +130,16 @@ public:
         return predDictionary;
     }
 
+    PredId_t getFirstEDBPredicate() {
+        if (!dbPredicates.empty()) {
+            auto p = dbPredicates.begin();
+            return p->first;
+        } else {
+            BOOST_LOG_TRIVIAL(error) << "There is no EDB Predicate!";
+            throw 10;
+        }
+    }
+
     bool checkValueInTmpRelation(const uint8_t relId,
                                  const uint8_t posInRelation,
                                  const Term_t value) const;
@@ -138,16 +148,18 @@ public:
         return tmpRelations[pred.getId()]->getNTuples();
     }
 
+    bool supportsCheckIn(const Literal &l);
+
     std::vector<std::shared_ptr<Column>> checkNewIn(const Literal &l1,
                                       std::vector<uint8_t> &posInL1,
                                       const Literal &l2,
-                                      std::vector<uint8_t> posInL2);
+                                      std::vector<uint8_t> &posInL2);
 
     std::vector<std::shared_ptr<Column>> checkNewIn(
                                           std::vector <
                                           std::shared_ptr<Column >> &checkValues,
                                           const Literal &l2,
-                                          std::vector<uint8_t> posInL2);
+                                          std::vector<uint8_t> &posInL2);
 
     std::shared_ptr<Column> checkIn(
         std::vector<Term_t> &values,
@@ -179,6 +191,22 @@ public:
     bool getDictText(const uint64_t id, char *text);
 
     Predicate getDBPredicate(int idx);
+
+    std::shared_ptr<EDBTable> getEDBTable(PredId_t id) {
+        if (dbPredicates.count(id)) {
+            return dbPredicates.find(id)->second.manager;
+        } else {
+            return std::shared_ptr<EDBTable>();
+        }
+    }
+
+    string getTypeEDBPredicate(PredId_t id) {
+        if (dbPredicates.count(id)) {
+            return dbPredicates.find(id)->second.type;
+        } else {
+            return "";
+        }
+    }
 
     uint64_t getNTerms();
 

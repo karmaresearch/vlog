@@ -6,7 +6,7 @@
 
 #include <vector>
 #include <algorithm>
-#include <sparsehash/dense_hash_set>
+#include <google/dense_hash_set>
 
 typedef google::dense_hash_set<Term_t, std::hash<Term_t>, std::equal_to<Term_t>> GoogleSet;
 
@@ -70,7 +70,26 @@ public:
         }
     }
 
+    size_t size(uint8_t colid) {
+	if (colid == 0) {
+	    if (setColumn1 == NULL) {
+		if (sizeTuple == 1) {
+		    setColumn1 = fillSet(*singleColumn);
+		} else {
+                    setColumn1 = fillSet(*twoColumn1, 0);
+		}
+	    }
+	    return setColumn1->size();
+	} else {
+	    if (setColumn2 == NULL) {
+		setColumn2 = fillSet(*twoColumn1, 1);
+	    }
+	    return setColumn2->size();
+	}
+    }
+
     bool exists(const Term_t value) {
+	assert(sizeTuple == 1);
         if (setColumn1 == NULL) {
             setColumn1 = fillSet(*singleColumn);
         }
@@ -97,7 +116,7 @@ public:
                 }*/
             } else {
                 if (setColumn2 == NULL) {
-                    setColumn2 = fillSet(*twoColumn2, 1);
+                    setColumn2 = fillSet(*twoColumn1, 1);
                 }
                 return setColumn2->find(value) != setColumn2->end();
 

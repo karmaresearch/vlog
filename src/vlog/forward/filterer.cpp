@@ -209,18 +209,34 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs(
     }
 
     map<Term_t, std::vector<Term_t>> mapSubstitutions;
-    FCInternalTableItr *itr = currentResults->getIterator();
-    while (itr->hasNext()) {
-        itr->next();
-        const Term_t vLit = itr->getCurrentValue(posLiteral[0].first);
-        if (!mapSubstitutions.count(vLit)) {
-            mapSubstitutions.insert(std::make_pair(vLit,
-                                                   std::vector<Term_t>()));
-        }
-        const Term_t vHead = itr->getCurrentValue(posHead[0].second);
-        mapSubstitutions[vLit].push_back(vHead);
+    std::shared_ptr<Column> vLitCol = currentResults->getColumn(posLiteral[0].first);
+    std::shared_ptr<Column> vHeadCol = currentResults->getColumn(posHead[0].second);
+    if (vLitCol->isBackedByVector() && vHeadCol->isBackedByVector()) {
+	const std::vector<Term_t> *vLitVec = &vLitCol->getVectorRef();
+	const std::vector<Term_t> *vHeadVec = &vHeadCol->getVectorRef();
+
+	for (size_t i = 0; i < vLitVec->size(); i++) {
+	    const Term_t vLit = (*vLitVec)[i];
+	    if (!mapSubstitutions.count(vLit)) {
+		mapSubstitutions.insert(std::make_pair(vLit,
+						       std::vector<Term_t>()));
+	    }
+	    mapSubstitutions[vLit].push_back((*vHeadVec)[i]);
+	}
+    } else {
+	FCInternalTableItr *itr = currentResults->getIterator();
+	while (itr->hasNext()) {
+	    itr->next();
+	    const Term_t vLit = itr->getCurrentValue(posLiteral[0].first);
+	    if (!mapSubstitutions.count(vLit)) {
+		mapSubstitutions.insert(std::make_pair(vLit,
+						       std::vector<Term_t>()));
+	    }
+	    const Term_t vHead = itr->getCurrentValue(posHead[0].second);
+	    mapSubstitutions[vLit].push_back(vHead);
+	}
+	currentResults->releaseIterator(itr);
     }
-    currentResults->releaseIterator(itr);
     // finished creating the map
 
     // std::vector<uint8_t> posVarsInHead = outputQuery.getPosVars();

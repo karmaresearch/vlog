@@ -4,6 +4,8 @@
 #include <vlog/concepts.h>
 #include <vlog/edb.h>
 #include <vlog/fctable.h>
+#include <vlog/ruleexecplan.h>
+#include <vlog/ruleexecdetails.h>
 #include <trident/model/table.h>
 
 #include <boost/chrono.hpp>
@@ -12,95 +14,14 @@
 
 namespace timens = boost::chrono;
 
-struct RuleExecutionPlan {
+struct StatIteration {
+    size_t iteration;
+    const Rule *rule;
+    double time;
+    bool derived;
 
-    std::vector<const Literal*> plan;
-    std::vector<std::pair<size_t, size_t>> ranges;
-
-    //This variable tells whether the last literal shares some values with the
-    //head. This allows us to group the input to avoid duplicates.
-    bool lastLiteralSharesWithHead;
-    std::vector<uint8_t> lastSorting; //If the previous var is set, this
-    //container tells which variables we should sort on.
-
-    //These three variables record whether we can use the values of the last
-    //IDB literal to collect tuples to filter out duplicates. If the last literal
-    //is more generic than the head, then the position of the constants allow us to
-    //filter it
-    bool lastLiteralSubsumesHead;
-    std::vector<Term_t> lastLiteralValueConstsInHead;
-    std::vector<uint8_t> lastLiteralPosConstsInHead;
-
-    //This variable is used to check whether we can filter out entries in the hashmap.
-    //It is used if the rule might trigger derivation that is equal to the last literal
-    bool filterLastHashMap;
-
-    //Check if we can apply filtering HashMap. See comment above
-    void checkIfFilteringHashMapIsPossible(const Literal &head);
-
-    //The two functions above were written for a full materialization. As TODO
-    //I need to remove them and replace them with the datastructurs below. They
-    //do the roughly the same thing
-    struct MatchVariables {
-        uint8_t posLiteralInOrder;
-        std::vector<std::pair<uint8_t, uint8_t>> matches;
-    };
-    std::vector<MatchVariables> matches;
-
-    //When I execute the joins, the following variables contain the size of the
-    //intermediate tuples,
-    //and all the positions to join and copy the results
-    std::vector<uint8_t> sizeOutputRelation;
-    std::vector<std::vector<std::pair<uint8_t, uint8_t>>> joinCoordinates;
-    std::vector<std::vector<std::pair<uint8_t, uint8_t>>> posFromFirst;
-    std::vector<std::vector<std::pair<uint8_t, uint8_t>>> posFromSecond;
-
-    void calculateJoinsCoordinates(const Literal &headLiteral);
-
-    RuleExecutionPlan reorder(std::vector<uint8_t> &order,
-                              const Literal &headLiteral) const;
-
-    bool hasCartesian();
-};
-
-struct RuleExecutionDetails {
-    const Rule rule;
-    const size_t ruleid;
-    std::vector<Literal> bodyLiterals;
-    uint32_t lastExecution = 0;
-
-    bool failedBecauseEmpty = false;
-    const Literal *atomFailure = NULL;
-
-    uint8_t nIDBs = 0;
-    std::vector<RuleExecutionPlan> orderExecutions;
-
-    std::vector<uint8_t> posEDBVarsInHead;
-    std::vector<std::vector<std::pair<uint8_t, uint8_t>>> occEDBVarsInHead;
-    std::vector<std::pair<uint8_t,
-        std::vector<std::pair<uint8_t, uint8_t>>>> edbLiteralPerHeadVars;
-
-    RuleExecutionDetails(Rule rule, size_t ruleid) : rule(rule), ruleid(ruleid) {}
-
-    void createExecutionPlans();
-
-    void calculateNVarsInHeadFromEDB();
-
-    static void checkWhetherEDBsRedundantHead(RuleExecutionPlan &plan, const Literal &head);
-
-    static void checkFilteringStrategy(RuleExecutionPlan &outputPlan, const Literal &lastLiteral, const Literal &head);
-
-private:
-
-    void rearrangeLiterals(std::vector<const Literal*> &vector, const size_t idx);
-
-    void groupLiteralsBySharedVariables(std::vector<uint8_t> &startVars,
-                                        std::vector<const Literal *> &set, std::vector<const Literal*> &leftelements);
-
-    void extractAllEDBPatterns(std::vector<const Literal*> &output, const std::vector<Literal> &input);
-
-    RuleExecutionDetails operator=(const RuleExecutionDetails &other) {
-        return RuleExecutionDetails(other.rule, other.ruleid);
+    bool operator <(const StatIteration &it) const {
+        return time > it.time;
     }
 };
 
@@ -123,34 +44,26 @@ typedef std::unordered_map<std::string, FCTable*> EDBCache;
 class ResultJoinProcessor;
 class SemiNaiver {
 private:
-    std::vector<RuleExecutionDetails> ruleset;
     std::vector<RuleExecutionDetails> edbRuleset;
-    std::vector<FCBlock> listDerivations;
-
-    std::vector<StatsRule> statsRuleExecution;
-
-    EDBLayer &layer;
-    Program *program;
     bool opt_intersect;
     bool opt_filtering;
+    bool multithreaded;
+
     boost::chrono::system_clock::time_point startTime;
+    bool running;
 
-    FCTable *predicatesTables[MAX_NPREDS];
+    std::vector<FCBlock> listDerivations;
+    std::vector<StatsRule> statsRuleExecution;
 
-    size_t iteration;
+
+#ifdef WEBINTERFACE
     long statsLastIteration;
     string currentRule;
     PredId_t currentPredicate;
-    bool running;
+    string allRules;
+#endif
 
-    bool executeRule(RuleExecutionDetails &ruleDetails,
-                     const uint32_t iteration);
-
-    FCIterator getTableFromEDBLayer(const Literal & literal);
-
-    size_t estimateCardTable(const Literal &literal, const size_t minIteration,
-                             const size_t maxIteration);
-
+private:
     FCIterator getTableFromIDBLayer(const Literal & literal, const size_t minIteration, TableFilterer *filter);
 
     FCIterator getTableFromIDBLayer(const Literal & literal, const size_t minIteration,
@@ -183,9 +96,39 @@ private:
 
     //int getRuleID(const RuleExecutionDetails *rule);
 
+    size_t estimateCardTable(const Literal &literal,
+                             const size_t minIteration,
+                             const size_t maxIteration);
+
+protected:
+    FCTable *predicatesTables[MAX_NPREDS];
+    EDBLayer &layer;
+    Program *program;
+    std::vector<RuleExecutionDetails> ruleset;
+    size_t iteration;
+    int nthreads;
+
+    bool executeRule(RuleExecutionDetails &ruleDetails,
+                     const uint32_t iteration,
+                     std::vector<ResultJoinProcessor*> *finalResultContainer);
+
+    virtual FCIterator getTableFromEDBLayer(const Literal & literal);
+
+    virtual long getNLastDerivationsFromList();
+
+    virtual void saveDerivationIntoDerivationList(FCTable *endTable);
+
+    virtual void saveStatistics(StatsRule &stats);
+
+    virtual FCTable *getTable(const PredId_t pred, const uint8_t card);
+
+    virtual void executeUntilSaturation(std::vector<StatIteration> &costRules);
+
 public:
     SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
-               Program *program, bool opt_intersect, bool opt_filtering);
+               Program *program, bool opt_intersect,
+               bool opt_filtering, bool multithreaded,
+               int nthreads, bool shuffleRules);
 
     void run() {
         run(0, 1);
@@ -209,18 +152,22 @@ public:
         return getTable(literal, minIteration, maxIteration, NULL);
     }
 
+    FCIterator getTable(const PredId_t predid);
+
+    size_t getSizeTable(const PredId_t predid) const;
+
     std::vector<FCBlock> &getDerivationsSoFar() {
         return listDerivations;
     }
+
+    void createGraphRuleDependency(std::vector<int> &nodes,
+                                   std::vector<std::pair<int, int>> &edges);
 
     Program *getProgram() {
         return program;
     }
 
     void addDataToIDBRelation(const Predicate pred, FCBlock block);
-
-    FCIterator getTable(const Literal &literal, const size_t minIteration,
-                        const size_t maxIteration, TableFilterer *filter);
 
     EDBLayer &getEDBLayer() {
         return layer;
@@ -229,11 +176,14 @@ public:
     size_t estimateCardinality(const Literal &literal, const size_t min,
                                const size_t max);
 
-    ~SemiNaiver();
+    virtual ~SemiNaiver();
 
     static std::pair<uint8_t, uint8_t> removePosConstants(
         std::pair<uint8_t, uint8_t> columns,
         const Literal &literal);
+
+    virtual FCIterator getTable(const Literal &literal, const size_t minIteration,
+                                const size_t maxIteration, TableFilterer *filter);
 
     //Statistics methods
 
@@ -241,6 +191,7 @@ public:
 
     size_t getCurrentIteration();
 
+#ifdef WEBINTERFACE
     string getCurrentRule();
 
     bool isRunning();
@@ -250,6 +201,7 @@ public:
     std::vector<StatsRule> getOutputNewIterations();
 
     string getListAllRulesForJSONSerialization();
+#endif
 
     boost::chrono::system_clock::time_point getStartingTimeMs() {
         return startTime;

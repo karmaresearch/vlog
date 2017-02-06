@@ -85,6 +85,42 @@ public:
         }
         return output;
     }
+
+    bool operator==(const VTuple &other) const {
+	if (sizetuple == other.sizetuple) {
+	    if (terms == other.terms) {
+		return true;
+	    }
+	    for (int i = 0; i < sizetuple; i++) {
+		if (terms[i].getId() != other.terms[i].getId()) {
+		    return false;
+		}
+		if (terms[i].getId() == 0) {
+		    if (terms[i].getValue() != other.terms[i].getValue()) {
+			return false;
+		    }
+		}
+	    }
+	    return true;
+	}
+	return false;
+    }
+};
+
+struct hash_VTuple {
+    size_t operator()(const VTuple &v) const {
+	size_t hash = 0;
+	int sz = v.getSize();
+	for (int i = 0; i < sz; i++) {
+	    VTerm term = v.get(i);
+	    if (term.isVariable()) {
+		hash = (hash + (324723947 + term.getId())) ^93485734985;
+	    } else {
+		hash = (hash + (324723947 + term.getValue())) ^93485734985;
+	    }
+	}
+	return hash;
+    }
 };
 
 class Predicate {
@@ -251,7 +287,9 @@ public:
 
     Rule(const Literal head, std::vector<Literal> body) : head(head),
         body(body),
-        _isRecursive(checkRecursion(head, body)) {}
+        _isRecursive(checkRecursion(head, body)) {
+	    checkRule();
+    }
 
     Rule createAdornment(uint8_t headAdornment);
 
@@ -299,6 +337,8 @@ public:
         }
         return i;
     }
+    
+    void checkRule() const;
 
     std::string tostring(Program *program, EDBLayer *db) const;
 
@@ -306,11 +346,14 @@ public:
 
     std::string tostring() const;
 
+    Rule normalizeVars() const;
+
     ~Rule() {
     }
 
+    /* How can you have an assignment operator when the fields are const? --Ceriel */
     Rule operator=(const Rule &other) {
-        return Rule(head, body);
+        return Rule(other.head, other.body);
     }
 };
 
@@ -337,6 +380,8 @@ public:
     Literal parseLiteral(std::string literal);
 
     void readFromFile(std::string pathFile);
+
+    void readFromString(std::string rules);
 
     Term_t getIDVar(std::string var);
 

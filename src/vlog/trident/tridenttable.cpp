@@ -1,50 +1,43 @@
 #include <vlog/trident/tridenttable.h>
 
-//#include <trident/iterators/arrayitr.h>
 #include <trident/sparql/sparqloperators.h>
-#include <trident/binarytables/binarytable.h>
+#include <trident/binarytables/newcolumntable.h>
 
 void antiJoinOneColumn(int posJoin1, int posJoin2,
-                       BinaryTable *pitr1, BinaryTable *pitr2,
+                       NewColumnTable *pitr1, NewColumnTable *pitr2,
                        std::shared_ptr<ColumnWriter> col) {
+    SeqColumnWriter cw(col.get());
     if (posJoin1 == 1) {
         if (posJoin2 == 2) {
-            SeqColumnWriter cw(col.get());
             pitr1->columnNotIn(1, pitr2, 2, &cw);
         } else { //posJoin2 == 1
-            SeqColumnWriter cw(col.get());
             pitr1->columnNotIn(1, pitr2, 1, &cw);
 
         }
     } else {
         if (posJoin2 == 2) {
-            SeqColumnWriter cw(col.get());
             pitr1->columnNotIn(2, pitr2, 2, &cw);
-
         } else {
-            SeqColumnWriter cw(col.get());
             pitr1->columnNotIn(2, pitr2, 1, &cw);
         }
     }
 }
 
-void antiJoinTwoColumns(BinaryTable *pitr1, BinaryTable *pitr2,
+void antiJoinTwoColumns(NewColumnTable *pitr1, NewColumnTable *pitr2,
                         std::shared_ptr<ColumnWriter> col1,
                         std::shared_ptr<ColumnWriter> col2) {
 
     bool more = false;
-    // if (pitr1->has_next() && pitr2->has_next()) {
-        // pitr1->next_pair();
-        // pitr2->next_pair();
-	// Initialization of BinaryTable iterators already includes next_pair call.
-	// Note that this also means that we cannot detect presence/absence of a first value.
+    if (pitr1->hasNext() && pitr2->hasNext()) {
+        pitr1->next();
+        pitr2->next();
         while (true) {
             if (pitr1->getValue1() == pitr2->getValue1() &&
                     pitr1->getValue2() == pitr2->getValue2()) {
-                if (pitr1->has_next()) {
-                    pitr1->next_pair();
-                    if (pitr2->has_next()) {
-                        pitr2->next_pair();
+                if (pitr1->hasNext()) {
+                    pitr1->next();
+                    if (pitr2->hasNext()) {
+                        pitr2->next();
                     } else {
                         more = true;
                         break;
@@ -59,13 +52,13 @@ void antiJoinTwoColumns(BinaryTable *pitr1, BinaryTable *pitr2,
                 col1->add(pitr1->getValue1());
                 col2->add(pitr1->getValue2());
 
-                if (pitr1->has_next())
-                    pitr1->next_pair();
+                if (pitr1->hasNext())
+                    pitr1->next();
                 else
                     break;
             } else {
-                if (pitr2->has_next())
-                    pitr2->next_pair();
+                if (pitr2->hasNext())
+                    pitr2->next();
                 else {
                     more = true;
                     break;
@@ -76,20 +69,20 @@ void antiJoinTwoColumns(BinaryTable *pitr1, BinaryTable *pitr2,
         if (more) {
             col1->add(pitr1->getValue1());
             col2->add(pitr1->getValue2());
-            while (pitr1->has_next()) {
-                pitr1->next_pair();
+            while (pitr1->hasNext()) {
+                pitr1->next();
                 col1->add(pitr1->getValue1());
                 col2->add(pitr1->getValue2());
             }
         }
-    // }
+    }
 }
 
 std::vector<std::shared_ptr<Column>> TridentTable::performAntiJoin(
                                       const Literal &l1,
                                       std::vector<uint8_t> &pos1,
                                       const Literal &l2,
-                                      std::vector<uint8_t> &pos2) {
+std::vector<uint8_t> &pos2) {
 
     TridentTupleItr itr1, itr2;
 
@@ -100,14 +93,13 @@ std::vector<std::shared_ptr<Column>> TridentTable::performAntiJoin(
     if (pos1.size() == 2) {
         fieldToSort.push_back(l1.getPosVars()[pos1[1]]);
     }
-    itr1.init(q, &t1, &fieldToSort, true);
-
+    itr1.init(q, &t1, &fieldToSort, true, multithreaded ? &mutex : NULL);
     VTuple t2 = l2.getTuple();
     fieldToSort.clear();
     fieldToSort.push_back(l2.getPosVars()[pos2[0]]);
     if (pos2.size() == 2)
         fieldToSort.push_back(l2.getPosVars()[pos2[1]]);
-    itr2.init(q, &t2, &fieldToSort, true);
+    itr2.init(q, &t2, &fieldToSort, true, multithreaded ? &mutex : NULL);
 
     //Output
     std::vector<std::shared_ptr<ColumnWriter>> cols;
@@ -129,20 +121,20 @@ std::vector<std::shared_ptr<Column>> TridentTable::performAntiJoin(
         //Join on one column
         if (l1.getNVars() == 1) {
             if (l2.getNVars() == 1) {
-                antiJoinOneColumn(2, 2, (BinaryTable*) pitr1, (BinaryTable*) pitr2, cols[0]);
+                antiJoinOneColumn(2, 2, (NewColumnTable*) pitr1, (NewColumnTable*) pitr2, cols[0]);
             } else {
-                antiJoinOneColumn(2, 1, (BinaryTable*) pitr1, (BinaryTable*) pitr2, cols[0]);
+                antiJoinOneColumn(2, 1, (NewColumnTable*) pitr1, (NewColumnTable*) pitr2, cols[0]);
             }
         } else {
             if (l2.getNVars() == 1) {
-                antiJoinOneColumn(1, 2, (BinaryTable*) pitr1, (BinaryTable*) pitr2, cols[0]);
+                antiJoinOneColumn(1, 2, (NewColumnTable*) pitr1, (NewColumnTable*) pitr2, cols[0]);
             } else {
-                antiJoinOneColumn(1, 1, (BinaryTable*) pitr1, (BinaryTable*) pitr2, cols[0]);
+                antiJoinOneColumn(1, 1, (NewColumnTable*) pitr1, (NewColumnTable*) pitr2, cols[0]);
             }
         }
     } else {
         //Join on two columns
-        antiJoinTwoColumns((BinaryTable*) pitr1, (BinaryTable*) pitr2, cols[0], cols[1]);
+        antiJoinTwoColumns((NewColumnTable*) pitr1, (NewColumnTable*) pitr2, cols[0], cols[1]);
     }
 
     std::vector<std::shared_ptr<Column>> output;
@@ -156,7 +148,7 @@ std::vector<std::shared_ptr<Column>> TridentTable::performAntiJoin(
                                       std::vector <
                                       std::shared_ptr<Column >> &valuesToCheck,
                                       const Literal &l,
-                                      std::vector<uint8_t> &pos) {
+std::vector<uint8_t> &pos) {
 
     VTuple t = l.getTuple();
     assert(l.getNVars() < l.getTupleSize());
@@ -165,7 +157,7 @@ std::vector<std::shared_ptr<Column>> TridentTable::performAntiJoin(
     if (pos.size() == 2)
         fieldToSort.push_back(l.getPosVars()[pos[1]]);
     TridentTupleItr itr;
-    itr.init(q, &t, &fieldToSort, true);
+    itr.init(q, &t, &fieldToSort, true, multithreaded ? &mutex : NULL);
 
     //Output
     std::vector<std::shared_ptr<ColumnWriter>> cols;
@@ -176,7 +168,7 @@ std::vector<std::shared_ptr<Column>> TridentTable::performAntiJoin(
     //Do the antijoin
     if (valuesToCheck.size() == 1) {
         PairItr *pitrO = itr.getPhysicalIterator();
-        BinaryTable *pitr = (BinaryTable*) pitrO;
+        NewColumnTable *pitr = (NewColumnTable*) pitrO;
         //size_t idx = 0;
         const bool firstCol = pos[0] == 1 || (pos[0] == 0 && l.getNVars() == 2);
         std::shared_ptr<Column> valuesToCh = valuesToCheck[0];
@@ -188,13 +180,11 @@ std::vector<std::shared_ptr<Column>> TridentTable::performAntiJoin(
         }
         Term_t prevV2 = (Term_t) - 1;
         Term_t v2 = valuesToChReader->next();
-        // if (pitr->has_next()) {
-            if (firstCol)
-                pitr->ignoreSecondColumn();
+        if (firstCol)
+            pitr->ignoreSecondColumn();
 
-            // pitr->next_pair();
-	    // Initialization of BinaryTable iterators already includes next_pair call.
-	    // Note that this also means that we cannot detect presence/absence of a first value.
+        if (pitr->hasNext()) {
+            pitr->next();
 
             while (true) {
                 const Term_t v1 = firstCol ? pitr->getValue1() : pitr->getValue2();
@@ -224,14 +214,14 @@ std::vector<std::shared_ptr<Column>> TridentTable::performAntiJoin(
                     }
 
                     //Move also the other one
-                    if (pitr->has_next()) {
-                        pitr->next_pair();
+                    if (pitr->hasNext()) {
+                        pitr->next();
                     } else {
                         break;
                     }
                 } else if (v1 < v2) {
-                    if (pitr->has_next())
-                        pitr->next_pair();
+                    if (pitr->hasNext())
+                        pitr->next();
                     else
                         break;
                 } else {
@@ -260,7 +250,7 @@ std::vector<std::shared_ptr<Column>> TridentTable::performAntiJoin(
                     }
                 }
             }
-        // }
+        }
 
         if (v2 != (Term_t) - 1) {
             cols[0]->add(v2);
@@ -275,10 +265,10 @@ std::vector<std::shared_ptr<Column>> TridentTable::performAntiJoin(
         }
     } else { //nfields == 2
         PairItr *pitrO = itr.getPhysicalIterator();
-        BinaryTable *pitr = (BinaryTable*) pitrO;
+        NewColumnTable *pitr = (NewColumnTable*) pitrO;
         //size_t idx = 0;
         //const size_t sizeToCheck = valuesToCheck[0]->size();
-	//
+        //
 
         std::unique_ptr<ColumnReader> valuesToCheck1 = valuesToCheck[0]->getReader();
         std::unique_ptr<ColumnReader> valuesToCheck2 = valuesToCheck[1]->getReader();
@@ -288,10 +278,8 @@ std::vector<std::shared_ptr<Column>> TridentTable::performAntiJoin(
 
         Term_t cv1 = (Term_t) - 1;
         Term_t cv2 = (Term_t) - 1;
-	// if (pitr->has_next()) {
-            // pitr->next_pair();
-	    // Initialization of BinaryTable iterators already includes next_pair call.
-	    // Note that this also means that we cannot detect presence/absence of a first value.
+        if (pitr->hasNext()) {
+            pitr->next();
             if (!valuesToCheck1->hasNext())
                 throw 10;
             cv1 = valuesToCheck1->next();
@@ -307,8 +295,8 @@ std::vector<std::shared_ptr<Column>> TridentTable::performAntiJoin(
                 if (v1 == cv1 && v2 == cv2) {
                     prevcv1 = cv1;
                     prevcv2 = cv2;
-                    if (pitr->has_next()) {
-                        pitr->next_pair();
+                    if (pitr->hasNext()) {
+                        pitr->next();
                         if (!valuesToCheck1->hasNext()) {
                             cv1 = (Term_t) - 1;
                             break;
@@ -323,8 +311,8 @@ std::vector<std::shared_ptr<Column>> TridentTable::performAntiJoin(
                         break;
                     }
                 } else if (v1 < cv1 || (v1 == cv1 && v2 < cv2)) {
-                    if (pitr->has_next())
-                        pitr->next_pair();
+                    if (pitr->hasNext())
+                        pitr->next();
                     else
                         break;
                 } else {
@@ -347,8 +335,7 @@ std::vector<std::shared_ptr<Column>> TridentTable::performAntiJoin(
                     }
                 }
             }
-        // }
-
+        }
 
         if (cv1 != (Term_t) - 1) {
             if (cv1 != prevcv1 || cv2 != prevcv2) {
@@ -382,9 +369,9 @@ std::vector<std::shared_ptr<Column>> TridentTable::performAntiJoin(
 void TridentTable::getQueryFromEDBRelation0(QSQQuery *query,
         TupleTable *outputTable) {
     //No join to perform. Simply execute the query using TupleKBIterator
-    TridentTupleItr itr;
     VTuple tuple = query->getLiteral()->getTuple();
-    itr.init(q, &tuple, NULL);
+    TridentTupleItr itr;
+    itr.init(q, &tuple, NULL, multithreaded ? &mutex : NULL);
     uint64_t row[3];
     uint8_t *pos = query->getPosToCopy();
     const uint8_t npos = query->getNPosToCopy();
@@ -450,14 +437,21 @@ void TridentTable::getQueryFromEDBRelation3(QSQQuery *query,
             itr != map.end(); ++itr) {
         std::vector<std::pair<uint64_t, uint64_t>> *pairs = itr->second;
         std::sort(pairs->begin(), pairs->end());
+        if (multithreaded) {
+            mutex.lock();
+        }
         ArrayItr *firstItr = q->getArrayIterator();
-        firstItr->init(pairs, -1, -1);
+        std::shared_ptr<std::vector<std::pair<uint64_t, uint64_t>>> spairs = std::shared_ptr<std::vector<std::pair<uint64_t, uint64_t>>>(pairs);
+        firstItr->init(spairs, -1, -1);
         firstItr->setKey(itr->first);
         p2.predicate(itr->first);
 
         std::shared_ptr<NestedJoinPlan> plan(new NestedJoinPlan(p2, q,
                                              posToCopy, joins, posVarsToReturn));
         NestedMergeJoinItr join(q, plan, firstItr, outputTable, LONG_MAX);
+        if (multithreaded) {
+            mutex.unlock();
+        }
         if (join.hasNext()) {
             //Calling hasNext() of NWayJoin should populate the entire outputTable
             if (outputTable->getNRows() == 0) {
@@ -466,7 +460,7 @@ void TridentTable::getQueryFromEDBRelation3(QSQQuery *query,
         } else {
             assert(outputTable->getNRows() == 0);
         }
-        delete pairs;
+        //delete pairs;
     }
 }
 
@@ -476,6 +470,7 @@ void TridentTable::getQueryFromEDBRelation12(QSQQuery *query,
         std::vector<uint8_t> *posToFilter,
         std::vector<Term_t> *valuesToFilter) {
     int sizePosToFilter = posToFilter->size();
+
     std::vector<std::pair<uint64_t, uint64_t>> pairs;
 
     bool sorted = true;
@@ -486,13 +481,13 @@ void TridentTable::getQueryFromEDBRelation12(QSQQuery *query,
         itr++;
         for (;
                 itr != valuesToFilter->end(); ++itr) {
-            if (sorted && *itr < prevEl) {
+            if (*itr < prevEl) {
                 sorted = false;
                 pairs.push_back(std::make_pair(0, *itr));
             } else if (*itr > prevEl) {
-                prevEl = *itr;
                 pairs.push_back(std::make_pair(0, *itr));
             }
+            prevEl = *itr;
         }
     } else {
         uint64_t preV1 = valuesToFilter->at(0);
@@ -555,6 +550,10 @@ void TridentTable::getQueryFromEDBRelation12(QSQQuery *query,
                               joins, posToCopy/*, timeout*/);
 }
 
+void dummydeleter(std::vector<std::pair<uint64_t, uint64_t>> *t) {
+    //Do nothing. The object will be deleted later on
+}
+
 // Local
 void TridentTable::getQueryFromEDBRelation12(VTerm s, VTerm p, VTerm o,
         TupleTable *outputTable,
@@ -562,13 +561,9 @@ void TridentTable::getQueryFromEDBRelation12(VTerm s, VTerm p, VTerm o,
         std::vector<std::pair<uint64_t, uint64_t>> *pairs,
         std::vector<int> &posVarsToReturn,
         std::vector<std::pair<int, int>> &joins,
-        std::vector<std::vector<int>> &posToCopy/*,
-        Timeout *timeout*/) {
+        std::vector<std::vector<int>> &posToCopy) {
     //Sort pairs
-    //RAISE_IF_EXPIRED(timeout);
     std::sort(pairs->begin(), pairs->end());
-    ArrayItr *firstItr = q->getArrayIterator();
-    firstItr->init(pairs, -1, -1);
 
     Pattern p2;
     int sizePosToFilter = posToFilter->size();
@@ -606,12 +601,22 @@ void TridentTable::getQueryFromEDBRelation12(VTerm s, VTerm p, VTerm o,
     } else {
         p2.object(o.getValue());
     }
-    //RAISE_IF_EXPIRED(timeout);
+    if (multithreaded) {
+        mutex.lock();
+    }
+    ArrayItr *firstItr = q->getArrayIterator();
+    std::shared_ptr<std::vector<std::pair<uint64_t, uint64_t>>> spairs =
+        std::shared_ptr <
+        std::vector<std::pair<uint64_t, uint64_t> >> (pairs, dummydeleter);
+    firstItr->init(spairs, -1, -1);
     std::shared_ptr<NestedJoinPlan> plan(new NestedJoinPlan(p2, q, posToCopy,
                                          joins, posVarsToReturn));
 
     //execute the plan and copy the results in the table
     NestedMergeJoinItr join(q, plan, firstItr, outputTable, LONG_MAX);
+    if (multithreaded) {
+        mutex.unlock();
+    }
     if (join.hasNext()) {
         //Calling hasNext() of NWayJoin should populate the entire outputTable
         if (outputTable->getNRows() == 0) {
@@ -634,45 +639,49 @@ std::shared_ptr<Column> TridentTable::checkIn(
         throw 10;
     }
 
+    //Output
+    std::unique_ptr<ColumnWriter> col(new ColumnWriter());
+
     //Prepare the iterators
     VTuple t = l.getTuple();
     std::vector<uint8_t> fieldToSort;
     fieldToSort.push_back(l.getPosVars()[posInL]);
     TridentTupleItr itr1;
-    itr1.init(q, &t, &fieldToSort, true);
-
-    //Output
-    std::unique_ptr<ColumnWriter> col(new ColumnWriter());
+    itr1.init(q, &t, &fieldToSort, true, multithreaded ? &mutex : NULL);
     PairItr *pitrO = itr1.getPhysicalIterator();
-    BinaryTable *pitr = (BinaryTable*)pitrO;
+
+    NewColumnTable *pitr = (NewColumnTable*)pitrO;
     size_t idx1 = 0;
     const bool firstCol = l.getNVars() == 2;
     sizeOutput = 0;
-    while (true) {
-        const Term_t v1 = values[idx1];
-        const Term_t v2 =  firstCol ? pitr->getValue1() : pitr->getValue2();
-        if (v1 < v2) {
-            idx1++;
-            if (idx1 == values.size()) {
-                break;
-            }
-        } else if (v1 > v2) {
-            if (pitr->has_next()) {
-                pitr->next_pair();
+    if (pitr->hasNext()) {
+        pitr->next();
+        while (true) {
+            const Term_t v1 = values[idx1];
+            const Term_t v2 =  firstCol ? pitr->getValue1() : pitr->getValue2();
+            if (v1 < v2) {
+                idx1++;
+                if (idx1 == values.size()) {
+                    break;
+                }
+            } else if (v1 > v2) {
+                if (pitr->hasNext()) {
+                    pitr->next();
+                } else {
+                    break;
+                }
             } else {
-                break;
-            }
-        } else {
-            col->add(v1);
-            sizeOutput++;
-            idx1++;
-            if (idx1 == values.size()) {
-                break;
-            }
-            if (pitr->has_next()) {
-                pitr->next_pair();
-            } else {
-                break;
+                col->add(v1);
+                sizeOutput++;
+                idx1++;
+                if (idx1 == values.size()) {
+                    break;
+                }
+                if (pitr->hasNext()) {
+                    pitr->next();
+                } else {
+                    break;
+                }
             }
         }
     }
@@ -681,9 +690,9 @@ std::shared_ptr<Column> TridentTable::checkIn(
 }
 
 std::vector<std::shared_ptr<Column>> TridentTable::checkNewIn(const Literal &l1,
-                                     std::vector<uint8_t> &posInL1,
-                                     const Literal &l2,
-                                     std::vector<uint8_t> posInL2) {
+                                  std::vector<uint8_t> &posInL1,
+                                  const Literal &l2,
+std::vector<uint8_t> &posInL2) {
     return performAntiJoin(l1, posInL1, l2, posInL2);
 }
 
@@ -691,7 +700,7 @@ std::vector<std::shared_ptr<Column>> TridentTable::checkNewIn(
                                       std::vector <
                                       std::shared_ptr<Column >> &valuesToCheck,
                                       const Literal &l,
-                                      std::vector<uint8_t> posInL) {
+std::vector<uint8_t> &posInL) {
     return performAntiJoin(valuesToCheck, l, posInL);
 }
 
@@ -716,10 +725,17 @@ size_t TridentTable::getCardinality(const Literal &query) {
     } else {
         o = t.getValue();
     }
+    if (multithreaded) {
+        mutex.lock();
+    }
     size_t result = q->getCard(s, p, o);
+    if (multithreaded) {
+        mutex.unlock();
+    }
     if (query.getNUniqueVars() < query.getNVars()) {
         result = result / 10;   // ???
     }
+    // BOOST_LOG_TRIVIAL(debug) << "getCardinality, query = " << query.tostring(NULL, NULL) << ", result = " << result;
     return result;
 }
 
@@ -745,10 +761,17 @@ size_t TridentTable::estimateCardinality(const Literal &query) {
     } else {
         o = t.getValue();
     }
+    if (multithreaded) {
+        mutex.lock();
+    }
     size_t result = q->getCard(s, p, o);
+    if (multithreaded) {
+        mutex.unlock();
+    }
     if (query.getNUniqueVars() < query.getNVars()) {
         result = result / 10;   // ???
     }
+    // BOOST_LOG_TRIVIAL(debug) << "EstimateCardinality, query = " << query.tostring(NULL, NULL) << ", result = " << result;
     return result;
 }
 
@@ -791,12 +814,30 @@ bool TridentTable::isEmpty(const Literal &query,
         }
     }
 
-    return q->isEmpty(s, p, o);
+    if (multithreaded) {
+        mutex.lock();
+    }
+    bool retval = q->isEmpty(s, p, o);
+    if (multithreaded) {
+        mutex.unlock();
+    }
+    /*
+    BOOST_LOG_TRIVIAL(debug) << "isEmpty, query = " << query.tostring(NULL, NULL)
+                             << "posToFilter, s, p, o = " << (posToFilter != NULL) << ", " << s << ", " << p << ", " << o
+                             << ", result = " << retval;
+    */
+    return retval;
 }
 
 void TridentTable::releaseIterator(EDBIterator * itr) {
     ((TridentIterator*)itr)->clear();
+    if (multithreaded) {
+        mutex.lock();
+    }
     kbItrFactory.release((TridentIterator*)itr);
+    if (multithreaded) {
+        mutex.unlock();
+    }
 }
 
 size_t TridentTable::getCardinalityColumn(const Literal &query,
@@ -821,10 +862,15 @@ size_t TridentTable::getCardinalityColumn(const Literal &query,
     } else {
         o = t.getValue();
     }
-    size_t result = q->getCard(s, p, o, posColumn);
-    if (query.getNUniqueVars() < query.getNVars()) {
-        result = result / 10;   // ???
+    if (multithreaded) {
+        mutex.lock();
     }
+    size_t result = q->getCard(s, p, o, posColumn);
+    if (multithreaded) {
+        mutex.unlock();
+    }
+    // BOOST_LOG_TRIVIAL(debug) << "getCardinalityColumn, query = " << query.tostring(NULL, NULL)
+    //                          << ", posColumn = " << (int) posColumn << ", result = " << result;
     return result;
 }
 
@@ -845,26 +891,36 @@ void TridentTable::query(QSQQuery *query, TupleTable *outputTable,
         getQueryFromEDBRelation3(query, outputTable,
                                  valuesToFilter);
     }
+    // BOOST_LOG_TRIVIAL(debug) << "query, query = " << query->tostring()
+    //                          << ", positionsToFilter = " << (posToFilter != NULL && posToFilter->size() > 0)
+    //                          << ", result size = " << outputTable->getNRows();
+}
+
+TridentIterator *TridentTable::getTridentIter() {
+    if (multithreaded) {
+        mutex.lock();
+    }
+    TridentIterator *retval = kbItrFactory.get();
+    if (multithreaded) {
+        mutex.unlock();
+    }
+    return retval;
 }
 
 EDBIterator *TridentTable::getIterator(const Literal &query) {
     const Literal *literal = &query;
-#if DEBUG
-    BOOST_LOG_TRIVIAL(debug) << "Get query " << literal->tostring(NULL, NULL);
-#endif
-    TridentIterator *itr = kbItrFactory.get();
-    itr->init(query.getPredicate().getId(), q, *literal);
+    // BOOST_LOG_TRIVIAL(debug) << "Get iterator for query " << literal->tostring(NULL, NULL);
+    TridentIterator *itr = getTridentIter();
+    itr->init(query.getPredicate().getId(), q, *literal, multithreaded ? &mutex : NULL);
     return itr;
 }
 
 EDBIterator *TridentTable::getSortedIterator(const Literal &query,
         const std::vector<uint8_t> &fields) {
     const Literal *literal = &query;
-#if DEBUG
-    BOOST_LOG_TRIVIAL(debug) << "Get query " << literal->tostring(NULL, NULL);
-#endif
-    TridentIterator *itr = kbItrFactory.get();
-    itr->init(query.getPredicate().getId(), q, *literal, fields);
+    // BOOST_LOG_TRIVIAL(debug) << "Get sorted iterator for query " << literal->tostring(NULL, NULL);
+    TridentIterator *itr = getTridentIter();
+    itr->init(query.getPredicate().getId(), q, *literal, fields, multithreaded ? &mutex : NULL);
     return itr;
 }
 

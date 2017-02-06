@@ -1,3 +1,5 @@
+scripts*
+/external
 /makefile.platform
 /cscope*
 .ycm*

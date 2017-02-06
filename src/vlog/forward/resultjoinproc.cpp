@@ -21,17 +21,19 @@ void copyFromArray(Term_t *dest, const Term_t *source, const uint8_t n, const in
 
 InterTableJoinProcessor::InterTableJoinProcessor(const uint8_t rowsize,
         std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
-        std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond) :
+        std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
+        int nthreads) :
     ResultJoinProcessor(rowsize, (uint8_t) posFromFirst.size(), (uint8_t) posFromSecond.size(),
                         (posFromFirst.size() > 0) ?  & (posFromFirst[0]) : NULL,
-                        posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL) {
-    //Create a hashtable count of 100K elements to filter out duplicates
+                        posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads) {
     currentSegmentSize = MAX_NSEGMENTS;
     segments = new std::shared_ptr<SegmentInserter>[currentSegmentSize];
     for (uint32_t i = 0; i < currentSegmentSize; ++i) {
         segments[i] = std::shared_ptr<SegmentInserter>(new SegmentInserter(rowsize));
 
     }
+
+    //Create a hashtable count of 100K elements to filter out duplicates
     //hashcount = new std::pair<size_t, size_t>[SIZE_HASHCOUNT];
     //memset(hashcount, 0, sizeof(std::pair<size_t, size_t>)*SIZE_HASHCOUNT);
 }
@@ -61,7 +63,36 @@ void InterTableJoinProcessor::processResults(const int blockid, const Term_t *fi
     }*/
 
     //Add the row
-    processResults(blockid, unique);
+    processResults(blockid, unique, NULL);
+}
+
+void InterTableJoinProcessor::processResults(std::vector<int> &blockid, Term_t *p,
+        std::vector<bool> &unique, boost::mutex *m) {
+
+    int newBufsize = currentSegmentSize;
+    for (int j = 0; j < blockid.size(); j++) {
+        if (blockid[j] > newBufsize) {
+            newBufsize = blockid[j];
+        }
+    }
+    enlargeArray(newBufsize);
+    for (int j = 0; j < blockid.size(); j++) {
+        for (uint8_t i = 0; i < nCopyFromFirst; ++i) {
+            row[posFromFirst[i].first] = *p;
+            p++;
+        }
+        for (uint8_t i = 0; i < nCopyFromSecond; ++i) {
+            row[posFromSecond[i].first] = *p;
+            p++;
+        }
+
+        //Add the row
+#if USE_DUPLICATE_DETECTION
+        processResults(blockid[j], unique[j], m);
+#else
+        segments[blockid[j]]->addRow(row, rowsize);
+#endif
+    }
 }
 
 void InterTableJoinProcessor::processResultsAtPos(const int blockid, const uint8_t pos,
@@ -95,7 +126,35 @@ void InterTableJoinProcessor::processResults(const int blockid, FCInternalTableI
     }*/
 
     //Add the row
-    processResults(blockid, unique);
+    processResults(blockid, unique, NULL);
+}
+
+void InterTableJoinProcessor::processResults(const int blockid,
+        const std::vector<const std::vector<Term_t> *> &vectors1, size_t i1,
+        const std::vector<const std::vector<Term_t> *> &vectors2, size_t i2,
+        const bool unique) {
+    for (int i = 0; i < nCopyFromFirst; i++) {
+        row[posFromFirst[i].first] = (*vectors1[posFromFirst[i].second])[i1];
+    }
+    for (int i = 0; i < nCopyFromSecond; i++) {
+        row[posFromSecond[i].first] = (*vectors2[posFromSecond[i].second])[i2];
+    }
+    /*//Calculate hashcode from the two arrays.
+    size_t hashcode = Hashes::hashArray(row, rowsize);
+    size_t idx = hashcode % SIZE_HASHCOUNT;
+    if (hashcount[idx].first == hashcode) {
+        if (eq(row, hashcount[idx].second)) {
+            return;
+        } else {
+            hashcount[idx].second = segment->getNRows();
+        }
+    } else {
+        hashcount[idx].first = hashcode;
+        hashcount[idx].second = segment->getNRows();
+    }*/
+
+    //Add the row
+    processResults(blockid, unique, NULL);
 }
 
 /*void InterTableJoinProcessor::processResults(const int blockid, const Segment *first,
@@ -110,9 +169,7 @@ void InterTableJoinProcessor::processResults(const int blockid, FCInternalTableI
 
     //Add the row
     enlargeArray(blockid);
-    for (uint32_t i = 0; i < rowsize; ++i) {
-        segments[blockid]->addAt(i, row[i]);
-    }
+    segments[blockid]->addRow(row, rowsize);
 }*/
 
 void InterTableJoinProcessor::addColumns(const int blockid,
@@ -122,6 +179,9 @@ void InterTableJoinProcessor::addColumns(const int blockid,
     for (uint8_t i = 0; i < rowsize; ++i) {
         segments[blockid]->addColumn(i, columns[i], sorted);
     }
+#if DEBUG
+    checkSizes();
+#endif
 }
 
 void InterTableJoinProcessor::addColumn(const int blockid,
@@ -134,6 +194,14 @@ void InterTableJoinProcessor::addColumn(const int blockid,
 
 bool InterTableJoinProcessor::isBlockEmpty(const int blockId, const bool unique) const {
     return segments[blockId] == NULL || segments[blockId]->isEmpty();
+}
+
+bool InterTableJoinProcessor::isEmpty() const {
+    for (int i = 0; i < currentSegmentSize; ++i) {
+        if (segments[i] != NULL && !segments[i]->isEmpty())
+            return false;
+    }
+    return true;
 }
 
 uint32_t InterTableJoinProcessor::getRowsInBlock(const int blockId, const bool unique) const {
@@ -153,9 +221,10 @@ void InterTableJoinProcessor::consolidate(const bool isFinished) {
                                                         segments[i]->getSegment()));
             } else {
                 table = ((InmemoryFCInternalTable*)table.get())->merge(
-                            segments[i]->getSegment());
+                            segments[i]->getSegment(), nthreads);
             }
             uint8_t rs = table->getRowSize();
+            assert(rs == rowsize);
             segments[i] = std::shared_ptr<SegmentInserter>(
                               new SegmentInserter(rs));
         }
@@ -167,8 +236,8 @@ std::shared_ptr<const FCInternalTable> InterTableJoinProcessor::getTable() {
     return table;
 }
 
-void InterTableJoinProcessor::processResults(const int blockid, const bool unique) {
 #if USE_DUPLICATE_DETECTION
+void InterTableJoinProcessor::processResults(const int blockid, const bool unique, boost::mutex *m) {
     if (! unique && rowsHash == NULL && rowCount == TMPT_THRESHOLD) {
         BOOST_LOG_TRIVIAL(debug) << "Threshold reached in IntertableJoinProcessor; creating rowsHash; rowCount = " << rowCount
                                  << ", rowsize = " << (int) rowsize;
@@ -207,23 +276,36 @@ void InterTableJoinProcessor::processResults(const int blockid, const bool uniqu
         if (rowCount > (64 * 1000 * 1000) && ((float) rowsHash->size()) / rowCount > .9) {
             delete rowsHash;
             rowsHash = NULL;
-        }
-#if DEBUG
-        else if (rowsHash->size() % 100000 == 0) {
+        } else if (rowsHash->size() % 100000 == 0) {
             BOOST_LOG_TRIVIAL(debug) << "rowCount = " << (rowCount + 1) << ", hash size = " << rowsHash->size();
         }
-#endif /* DEBUG */
     }
     rowCount++;
-#endif /* USE_DUPLICATE_DETECTION */
     enlargeArray(blockid);
-    for (uint8_t i = 0; i < rowsize; ++i) {
-        segments[blockid]->addAt(i, row[i]);
-    }
+    segments[blockid]->addRow(row, rowsize);
 }
+#endif /* USE_DUPLICATE_DETECTION */
 
 InterTableJoinProcessor::~InterTableJoinProcessor() {
     delete[] segments;
+}
+
+void FinalTableJoinProcessor::processResults(std::vector<int> &blockid, Term_t *p,
+        std::vector<bool> &unique, boost::mutex *m) {
+
+    for (int j = 0; j < blockid.size(); j++) {
+        for (uint8_t i = 0; i < nCopyFromFirst; ++i) {
+            row[posFromFirst[i].first] = *p;
+            p++;
+        }
+        for (uint8_t i = 0; i < nCopyFromSecond; ++i) {
+            row[posFromSecond[i].first] = *p;
+            p++;
+        }
+
+        //Add the row
+        processResults(blockid[j], unique[j], m);
+    }
 }
 
 FinalTableJoinProcessor::FinalTableJoinProcessor(
@@ -233,18 +315,22 @@ FinalTableJoinProcessor::FinalTableJoinProcessor(
     FCTable *table, Literal &head,
     const RuleExecutionDetails *ruleDetails,
     const uint8_t ruleExecOrder,
-    const size_t iteration) :
+    const size_t iteration,
+    const bool addToEndTable,
+    const int nthreads) :
     ResultJoinProcessor(table->getSizeRow(),
                         (uint8_t) posFromFirst.size(),
                         (uint8_t) posFromSecond.size(),
                         posFromFirst.size() > 0 ? & (posFromFirst[0]) : NULL,
-                        posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL),
+                        posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads),
     listDerivations(listDerivations),
     t(table),
     literal(head),
     ruleDetails(ruleDetails),
     ruleExecOrder(ruleExecOrder),
-    iteration(iteration) {
+    iteration(iteration),
+    addToEndTable(addToEndTable),
+    newDerivation(false) {
 
     for (int i = 0; i < head.getTupleSize(); ++i) {
         VTerm t = head.getTermAtPos(i);
@@ -302,7 +388,7 @@ void FinalTableJoinProcessor::enlargeBuffers(const int newsize) {
 void FinalTableJoinProcessor::processResults(const int blockid, const Term_t *first,
         FCInternalTableItr *second, const bool unique) {
     copyRawRow(first, second);
-    processResults(blockid, unique);
+    processResults(blockid, unique, NULL);
 }
 
 void FinalTableJoinProcessor::processResults(const int blockid, FCInternalTableItr *first,
@@ -314,7 +400,20 @@ void FinalTableJoinProcessor::processResults(const int blockid, FCInternalTableI
         row[posFromSecond[i].first] = second->getCurrentValue(posFromSecond[i].second);
     }
 
-    processResults(blockid, unique);
+    processResults(blockid, unique, NULL);
+}
+
+void FinalTableJoinProcessor::processResults(const int blockid,
+        const std::vector<const std::vector<Term_t> *> &vectors1, size_t i1,
+        const std::vector<const std::vector<Term_t> *> &vectors2, size_t i2,
+        const bool unique) {
+    for (int i = 0; i < nCopyFromFirst; i++) {
+        row[posFromFirst[i].first] = (*vectors1[posFromFirst[i].second])[i1];
+    }
+    for (int i = 0; i < nCopyFromSecond; i++) {
+        row[posFromSecond[i].first] = (*vectors2[posFromSecond[i].second])[i2];
+    }
+    processResults(blockid, unique, NULL);
 }
 
 void FinalTableJoinProcessor::processResultsAtPos(const int blockid, const uint8_t pos,
@@ -339,6 +438,16 @@ bool FinalTableJoinProcessor::isBlockEmpty(const int blockId, const bool unique)
     } else {
         return utmpt[blockId] == NULL || utmpt[blockId]->isEmpty();
     }
+}
+
+bool FinalTableJoinProcessor::isEmpty() const {
+    for (int i = 0; i < nbuffers; ++i) {
+        if (utmpt[i] != NULL && !utmpt[i]->isEmpty())
+            return false;
+        if (tmpt[i] != NULL && !tmpt[i]->isEmpty())
+            return false;
+    }
+    return true;
 }
 
 uint32_t FinalTableJoinProcessor::getRowsInBlock(const int blockId,
@@ -366,6 +475,9 @@ void FinalTableJoinProcessor::addColumns(const int blockid,
         }
         utmpt[blockid]->addColumns(columns, sorted, false);
     }
+#if DEBUG
+    checkSizes();
+#endif
 }
 
 void FinalTableJoinProcessor::addColumns(const int blockid,
@@ -481,6 +593,9 @@ void FinalTableJoinProcessor::addColumns(const int blockid,
 
         tmpt[blockid]->addColumns(c, sorted, lastInsert);
     }
+#if DEBUG
+    checkSizes();
+#endif
 }
 
 void FinalTableJoinProcessor::addColumn(const int blockid,
@@ -500,7 +615,8 @@ void FinalTableJoinProcessor::addColumn(const int blockid,
     }
 }
 
-void FinalTableJoinProcessor::processResults(const int blockid, const bool unique) {
+#if USE_DUPLICATE_DETECTION
+void FinalTableJoinProcessor::processResults(const int blockid, const bool unique, boost::mutex *m) {
     enlargeBuffers(blockid + 1);
 
     if (!unique) {
@@ -508,7 +624,6 @@ void FinalTableJoinProcessor::processResults(const int blockid, const bool uniqu
             tmpt[blockid] = new SegmentInserter(rowsize);
         }
 
-#if USE_DUPLICATE_DETECTION
         rowCount++;
         if (rowsHash != NULL) {
             std::vector<Term_t> hashRow(rowsize);
@@ -530,11 +645,9 @@ void FinalTableJoinProcessor::processResults(const int blockid, const bool uniqu
             }
 #endif
         }
-#endif
 
         tmpt[blockid]->addRow(row);
 
-#if USE_DUPLICATE_DETECTION
         if (rowsHash == NULL && rowCount == TMPT_THRESHOLD) {
             BOOST_LOG_TRIVIAL(debug)
                     << "Threshold reached in FinaltableJoinProcessor; creating rowsHash; rowCount = "
@@ -562,36 +675,14 @@ void FinalTableJoinProcessor::processResults(const int blockid, const bool uniqu
                 }
             }
             itr->clear();
-#else
-        if (tmpt[blockid]->getNRows() > TMPT_THRESHOLD) {
-            if (tmptseg[blockid] != NULL && tmptseg[blockid]->getNRows() > tmpt[blockid]->getNRows()) {
-                // Only start sorting and merging if it is large enough.
-                return;
-            }
-            BOOST_LOG_TRIVIAL(debug) << "tmpt size is " << tmpt[blockid]->getNRows() << ". SortAndUnique ...";
-            std::shared_ptr<const Segment> seg = tmpt[blockid]->
-                                                 getSortedAndUniqueSegment();
-            BOOST_LOG_TRIVIAL(debug) << "resulting segment has size " << seg->getNRows();
-            if (tmptseg[blockid] == NULL) {
-                tmptseg[blockid] = seg;
-            } else {
-                BOOST_LOG_TRIVIAL(debug) << "Merging with tmptseg, size = " << tmptseg[blockid]->getNRows();
-                std::vector<std::shared_ptr<const Segment>> segmentsToMerge;
-                segmentsToMerge.push_back(seg);
-                segmentsToMerge.push_back(tmptseg[blockid]);
-                tmptseg[blockid] = SegmentInserter::merge(segmentsToMerge);
-            }
-#endif
             delete tmpt[blockid];
             tmpt[blockid] = new SegmentInserter(rowsize);
-#if USE_DUPLICATE_DETECTION
             for (HashSet::iterator itr = rowsHash->begin(); itr != rowsHash->end(); itr++) {
                 for (uint8_t i = 0; i < rowsize; i++) {
                     row[i] = (*itr)[i];
                 }
                 tmpt[blockid]->addRow(row);
             }
-#endif
         }
     } else {
         if (utmpt[blockid] == NULL) {
@@ -600,6 +691,37 @@ void FinalTableJoinProcessor::processResults(const int blockid, const bool uniqu
         utmpt[blockid]->addRow(row);
     }
 }
+
+#else
+void FinalTableJoinProcessor::mergeTmpt(const int blockid, const bool unique, boost::mutex *m) {
+    if (tmptseg[blockid] != NULL && tmptseg[blockid]->getNRows() > tmpt[blockid]->getNRows()) {
+        // Only start sorting and merging if it is large enough.
+        return;
+    }
+    BOOST_LOG_TRIVIAL(debug) << "tmpt size is " << tmpt[blockid]->getNRows() << ". SortAndUnique ...";
+    SegmentInserter *toSort = tmpt[blockid];
+    tmpt[blockid] = new SegmentInserter(rowsize);
+    std::shared_ptr<const Segment> seg;
+    if (m != NULL) {
+        m->unlock();
+        seg = toSort->getSortedAndUniqueSegment();
+        m->lock();
+    } else {
+        seg = toSort->getSortedAndUniqueSegment(nthreads);
+    }
+    BOOST_LOG_TRIVIAL(debug) << "resulting segment has size " << seg->getNRows();
+    if (tmptseg[blockid] == NULL) {
+        tmptseg[blockid] = seg;
+    } else {
+        BOOST_LOG_TRIVIAL(debug) << "Merging with tmptseg, size = " << tmptseg[blockid]->getNRows();
+        std::vector<std::shared_ptr<const Segment>> segmentsToMerge;
+        segmentsToMerge.push_back(seg);
+        segmentsToMerge.push_back(tmptseg[blockid]);
+        tmptseg[blockid] = SegmentInserter::merge(segmentsToMerge);
+    }
+    delete toSort;
+}
+#endif
 
 void FinalTableJoinProcessor::copyRawRow(const Term_t *first,
         const Term_t* second) {
@@ -621,17 +743,114 @@ void FinalTableJoinProcessor::copyRawRow(const Term_t *first,
     }
 }
 
-void FinalTableJoinProcessor::consolidate(const bool isFinished) {
+void FinalTableJoinProcessor::consolidateSegment(std::shared_ptr<const Segment> seg) {
+    std::shared_ptr<const FCInternalTable> ptrTable(
+        new InmemoryFCInternalTable(rowsize,
+                                    iteration,
+                                    true,
+                                    seg));
+    t->add(ptrTable, literal, ruleDetails, ruleExecOrder,
+           iteration, true, nthreads);
+}
+
+void FinalTableJoinProcessor::consolidate(const bool isFinished,
+        const bool forceCheck) {
+    if (!addToEndTable) {
+        //do nothing. We'll consolidate later on.
+        return;
+    }
+
     if (utmpt != NULL) {
         for (int i = 0; i < nbuffers; ++i) {
             if (utmpt[i] != NULL && !utmpt[i]->isEmpty()) {
-                if (!utmpt[i]->isSorted()) {
-                    std::shared_ptr<const Segment> sortedSegment = utmpt[i]->getSegment()->sortBy(NULL);
-                    std::shared_ptr<const FCInternalTable> ptrTable(new InmemoryFCInternalTable(rowsize, iteration, true, sortedSegment));
-                    t->add(ptrTable, literal, ruleDetails, ruleExecOrder, iteration, isFinished);
+                BOOST_LOG_TRIVIAL(debug) << "consolidate: i = " << i << ", utmpt[i] = " << utmpt[i];
+                if (forceCheck) {
+                    //Even though this data should be original, I still check to make sure there are no duplicates
+                    std::shared_ptr<const Segment> seg;
+                    if (!utmpt[i]->isSorted()) {
+                        seg = utmpt[i]->getSegment()->sortBy(NULL);
+                    } else {
+                        seg = utmpt[i]->getSegment();
+                    }
+                    seg = t->retainFrom(seg, false, nthreads);
+                    if (!seg->isEmpty()) {
+                        std::shared_ptr<const FCInternalTable> ptrTable(
+                            new InmemoryFCInternalTable(rowsize,
+                                                        iteration,
+                                                        true,
+                                                        seg));
+                        t->add(ptrTable, literal, ruleDetails, ruleExecOrder,
+                               iteration, isFinished, nthreads);
+#if 0
+			char buffer[16384];
+			FCInternalTableItr *test = ptrTable->getIterator();
+			int ncols = test->getNColumns();
+			while (test->hasNext()) {
+			    test->next();
+			    std::string s = "";
+			    for (int i = 0; i < ncols; i++) {
+				Term_t t = test->getCurrentValue(i);
+				if (i > 0) {
+				    s += ", ";
+				}
+				s += std::to_string(t);
+			    }
+			    BOOST_LOG_TRIVIAL(debug) << "Tuple: <" << s << ">";
+			}
+			ptrTable->releaseIterator(test);
+#endif
+                    }
+
                 } else {
-                    std::shared_ptr<const FCInternalTable> ptrTable(new InmemoryFCInternalTable(rowsize, iteration, true, utmpt[i]->getSegment()));
-                    t->add(ptrTable, literal, ruleDetails, ruleExecOrder, iteration, isFinished);
+                    if (!utmpt[i]->isSorted()) {
+                        std::shared_ptr<const Segment> sortedSegment;
+                        if (nthreads == -1)
+                            sortedSegment = utmpt[i]->getSegment()->sortBy(NULL);
+                        else
+                            sortedSegment = utmpt[i]->getSegment()->sortBy(NULL, nthreads, false);
+
+                        std::shared_ptr<const FCInternalTable> ptrTable(new InmemoryFCInternalTable(rowsize, iteration, true, sortedSegment));
+#if 0
+			char buffer[16384];
+			FCInternalTableItr *test = ptrTable->getIterator();
+			int ncols = test->getNColumns();
+			while (test->hasNext()) {
+			    test->next();
+			    std::string s = "";
+			    for (int i = 0; i < ncols; i++) {
+				Term_t t = test->getCurrentValue(i);
+				if (i > 0) {
+				    s += ", ";
+				}
+				s += std::to_string(t);
+			    }
+			    BOOST_LOG_TRIVIAL(debug) << "Tuple: <" << s << ">";
+			}
+			ptrTable->releaseIterator(test);
+#endif
+                        t->add(ptrTable, literal, ruleDetails, ruleExecOrder, iteration, isFinished, nthreads);
+                    } else {
+                        std::shared_ptr<const FCInternalTable> ptrTable(new InmemoryFCInternalTable(rowsize, iteration, true, utmpt[i]->getSegment()));
+#if 0
+			char buffer[16384];
+			FCInternalTableItr *test = ptrTable->getIterator();
+			int ncols = test->getNColumns();
+			while (test->hasNext()) {
+			    test->next();
+			    std::string s = "";
+			    for (int i = 0; i < ncols; i++) {
+				Term_t t = test->getCurrentValue(i);
+				if (i > 0) {
+				    s += ", ";
+				}
+				s += std::to_string(t);
+			    }
+			    BOOST_LOG_TRIVIAL(debug) << "Tuple: <" << s << ">";
+			}
+			ptrTable->releaseIterator(test);
+#endif
+                        t->add(ptrTable, literal, ruleDetails, ruleExecOrder, iteration, isFinished, nthreads);
+                    }
                 }
 
                 delete utmpt[i];
@@ -646,8 +865,11 @@ void FinalTableJoinProcessor::consolidate(const bool isFinished) {
 //        BOOST_LOG_TRIVIAL(debug) << "Rule produced " << tmpt->getNRows() << " possibly duplicated derivations";
 
 //                boost::chrono::system_clock::time_point startS = boost::chrono::system_clock::now();
-                std::shared_ptr<const Segment> seg = tmpt[i]->
-                                                     getSortedAndUniqueSegment();
+                BOOST_LOG_TRIVIAL(debug) << "consolidate: i = " << i << ", tmpt[i] = " << tmpt[i] << ", tmptseg[i] = " << tmptseg[i];
+                std::shared_ptr<const Segment> seg;
+		BOOST_LOG_TRIVIAL(debug) << "getSortedAndUnique ...";
+                seg = tmpt[i]->getSortedAndUniqueSegment(nthreads);
+		BOOST_LOG_TRIVIAL(debug) << "getSortedAndUnique done";
                 if (tmptseg[i] != NULL) {
                     std::vector<std::shared_ptr<const Segment>> segmentsToMerge;
                     segmentsToMerge.push_back(seg);
@@ -670,7 +892,7 @@ void FinalTableJoinProcessor::consolidate(const bool isFinished) {
                 }*/
 
                 //Remove all data already existing
-                seg = t->retainFrom(seg, false);
+                seg = t->retainFrom(seg, false, nthreads);
 
                 if (!seg->isEmpty()) {
                     std::shared_ptr<const FCInternalTable> ptrTable(
@@ -679,8 +901,28 @@ void FinalTableJoinProcessor::consolidate(const bool isFinished) {
                                                     true,
                                                     seg));
 
+
+#if 0
+		    char buffer[16384];
+		    FCInternalTableItr *test = ptrTable->getIterator();
+		    int ncols = test->getNColumns();
+		    while (test->hasNext()) {
+			test->next();
+			std::string s = "";
+			for (int i = 0; i < ncols; i++) {
+			    Term_t t = test->getCurrentValue(i);
+			    if (i > 0) {
+				s += ", ";
+			    }
+			    s += std::to_string(t);
+			}
+			BOOST_LOG_TRIVIAL(debug) << "Tuple: <" << s << ">";
+		    }
+		    ptrTable->releaseIterator(test);
+#endif
                     t->add(ptrTable, literal, ruleDetails, ruleExecOrder,
-                           iteration, isFinished);
+                           iteration, isFinished, nthreads);
+
                 }
 
                 delete tmpt[i];
@@ -689,8 +931,14 @@ void FinalTableJoinProcessor::consolidate(const bool isFinished) {
         }
     }
 
+    if (!t->isEmpty(iteration))
+        newDerivation = true;
+
+#ifdef WEBINTERFACE
     //Add the block just created to the global list of derivations
     if (!t->isEmpty()) {
+        //This method is not existing...
+        //FCBlock &block = t->getLastBlock_nolock();
         FCBlock &block = t->getLastBlock();
         if (block.iteration == iteration) {
             if (isFinished && !block.isCompleted)
@@ -702,6 +950,33 @@ void FinalTableJoinProcessor::consolidate(const bool isFinished) {
             }
         }
     }
+#endif
+}
+
+std::vector<std::shared_ptr<const Segment>> FinalTableJoinProcessor::getAllSegments() {
+    std::vector<std::shared_ptr<const Segment>> out;
+    if (tmpt != NULL) {
+        for (int i = 0; i < nbuffers; ++i) {
+            if (tmpt[i] != NULL && !tmpt[i]->isEmpty())
+                out.push_back(tmpt[i]->getSortedAndUniqueSegment(nthreads));
+        }
+    }
+    //boost::chrono::system_clock::time_point startS = boost::chrono::system_clock::now();
+    if (utmpt != NULL) {
+        for (int i = 0; i < nbuffers; ++i) {
+            if (utmpt[i] != NULL && !utmpt[i]->isEmpty())
+                out.push_back(utmpt[i]->getSegment()->sortBy(NULL, nthreads, false));
+        }
+    }
+    if (tmptseg != NULL) {
+        for (int i = 0; i < nbuffers; ++i) {
+            if (tmptseg[i] != NULL && !tmptseg[i]->isEmpty())
+                out.push_back(tmptseg[i]->sortBy(NULL, nthreads, false));
+        }
+    }
+    //boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - startS;
+    //BOOST_LOG_TRIVIAL(warning) << "---Time other " << sec.count() * 1000;
+    return out;
 }
 
 FinalTableJoinProcessor::~FinalTableJoinProcessor() {

@@ -5,7 +5,7 @@
 #include <vlog/concepts.h>
 #include <vlog/consts.h>
 
-#include <mapi.h>
+#include <monetdb/mapi.h>
 
 class MAPIIterator : public EDBIterator {
 private:
@@ -39,8 +39,6 @@ public:
     void clear();
 
     void skipDuplicatedFirstColumn();
-
-    void moveTo(const uint8_t fieldId, const Term_t t);
 
     PredId_t getPredicateID() {
         return predid;

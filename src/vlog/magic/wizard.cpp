@@ -1,6 +1,7 @@
 #include <vlog/wizard.h>
 
 #include <unordered_set>
+#include <boost/log/trivial.hpp>
 
 std::shared_ptr<Program> Wizard::getAdornedProgram(Literal &query, Program &program) {
 
@@ -111,14 +112,18 @@ std::shared_ptr<Program> Wizard::doMagic(const Literal &query,
             newBody.push_back(*itrBody);
         }
         assert(newBody.size() > 0);
-        newRules.push_back(Rule(head, newBody));
+	Rule r(head, newBody);
+	// BOOST_LOG_TRIVIAL(debug) << "Adding rule " << r.tostring();
+        newRules.push_back(r.normalizeVars());
     }
 
     //Second pass: create an additional rule for each IDB in the rules body
     std::vector<Rule> additionalRules;
+    std::vector<std::string> additionalRulesStrings;
     for (std::vector<Rule>::iterator itr = newRules.begin(); itr != newRules.end();
             itr++) {
         int npreds = itr->getNIDBPredicates();
+	BOOST_LOG_TRIVIAL(debug) << "Processing rule " << itr->tostring();
         assert(npreds > 0);
         if (npreds > 1) { //1 is the one we added in the first step.
             for (int i = 1; i < npreds; ++i) {
@@ -144,7 +149,23 @@ std::shared_ptr<Program> Wizard::doMagic(const Literal &query,
                         newBody[0].getPredicate().getType() == newHead.getPredicate().getType() &&
                         newBody[0].getPredicate().getAdorment() == newHead.getPredicate().getAdorment()) {
                 } else {
-                    additionalRules.push_back(Rule(newHead, newBody));
+		    Rule r(newHead, newBody);
+		    Rule normalized_r(r.normalizeVars());
+		    std::string s = normalized_r.tostring();
+		    bool found = false;
+		    for (auto itr : additionalRulesStrings) {
+			if (itr == s) {
+			    found = true;
+			    break;
+			}
+		    }
+		    if (! found) {
+			additionalRules.push_back(normalized_r);
+			additionalRulesStrings.push_back(s);
+		    } else {
+			BOOST_LOG_TRIVIAL(debug) << "Not adding duplicate rule " << s;
+		    }
+		    // BOOST_LOG_TRIVIAL(debug) << "Adding rule " << r.tostring();
                 }
 
             }

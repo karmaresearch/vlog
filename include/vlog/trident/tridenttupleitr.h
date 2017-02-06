@@ -4,18 +4,22 @@
 #include <trident/iterators/tupleiterators.h>
 #include <trident/iterators/pairitr.h>
 
+#include <boost/thread/mutex.hpp>
+
 class VTuple;
 class Querier;
 class TridentTupleItr : public TupleIterator {
 private:
+    boost::mutex *mutex;
     Querier *querier;
     PairItr *physIterator;
     int idx;
-    int *invPerm;
+    // int *invPerm;
 
-    bool onlyVars;
+    // bool onlyVars;
     uint8_t varsPos[3];
     uint8_t sizeTuple;
+    int nvars;
 
     std::vector<std::pair<uint8_t, uint8_t>> equalFields;
 
@@ -32,13 +36,8 @@ public:
         return physIterator;
     }
 
-    void moveToClosestFirstTerm(const uint64_t t) {
-        physIterator->gotoFirstTerm(t);
-        nextProcessed = false;
-    }
-
-    void moveToClosestSecondTerm(const uint64_t t) {
-        physIterator->gotoSecondTerm(t);
+    void move(const uint64_t t1, const uint64_t t2) {
+        physIterator->moveto(t1, t2);
         nextProcessed = false;
     }
 
@@ -47,12 +46,12 @@ public:
     }
 
     void init(Querier *querier, const VTuple *literal,
-              const std::vector<uint8_t> *fieldsToSort) {
-        init(querier, literal, fieldsToSort, false);
+              const std::vector<uint8_t> *fieldsToSort, boost::mutex *mutex) {
+        init(querier, literal, fieldsToSort, false, mutex);
     }
 
     void init(Querier *querier, const VTuple *literal,
-              const std::vector<uint8_t> *fieldsToSort, bool onlyVars);
+              const std::vector<uint8_t> *fieldsToSort, bool onlyVars, boost::mutex *mutex);
 
     bool hasNext();
 
@@ -61,6 +60,12 @@ public:
     size_t getTupleSize();
 
     uint64_t getElementAt(const int pos);   // No Term_t: overrides method in trident
+
+    const char* getUnderlyingArray(uint8_t column);
+
+    size_t getCardinality();
+
+    std::pair<uint8_t, std::pair<uint8_t, uint8_t>> getSizeElemUnderlyingArray(uint8_t column);
 
     ~TridentTupleItr();
 

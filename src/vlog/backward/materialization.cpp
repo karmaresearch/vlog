@@ -6,6 +6,7 @@
 #include <trident/model/table.h>
 
 #include <boost/thread.hpp>
+#include <boost/tokenizer.hpp>
 
 #include <fstream>
 #include <string>
@@ -25,6 +26,15 @@ void Materialization::loadLiteralsFromFile(Program &p, std::string filePath) {
         prematerializedLiterals.push_back(l);
     }
     stream.close();
+}
+
+void Materialization::loadLiteralsFromString(Program &p, std::string queries) {
+    boost::char_separator<char> sep("\n");
+    boost::tokenizer<boost::char_separator<char>> tokens(queries, sep);
+    for (const auto& t : tokens) {
+        Literal l = p.parseLiteral(t);
+        prematerializedLiterals.push_back(l);
+    }
 }
 
 bool atomSorterCriterion(const std::pair<Literal, int> *el1,
@@ -150,7 +160,7 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
         Program *p,
         QSQQuery *q,
         TupleTable **output,
-        long timeoutSeconds) {
+        long timeoutMicros) {
     //Create a pipe between the two processes
     int pipeID[2];
     pipe(pipeID);
@@ -159,15 +169,15 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
 
     int status;
     if (pid == (pid_t) 0) { //Child
-        QSQR qsqr(*kb, p);
+        QSQR *qsqr = new QSQR(*kb, p);
         myPipe = &pipeID[0];
         // if (signal(SIGALRM, alrmHandler) == SIG_ERR) {
         // Could not set alarm signal handler
         // exit(1);
         // }
-        BOOST_LOG_TRIVIAL(debug) << "Installed alarm signal handler; Now setting alarm over " << timeoutSeconds << " usec";
-        ualarm((useconds_t)timeoutSeconds, (useconds_t)timeoutSeconds); //Wait one second
-        TupleTable *tmpTable = qsqr.evaluateQuery(QSQR_EVAL, q, NULL, NULL, true);
+        BOOST_LOG_TRIVIAL(debug) << "Installed alarm signal handler; Now setting alarm over " << timeoutMicros << " usec";
+        ualarm((useconds_t)timeoutMicros, (useconds_t)timeoutMicros); //Wait one second
+        TupleTable *tmpTable = qsqr->evaluateQuery(QSQR_EVAL, q, NULL, NULL, true);
         //After the query is computed, I don't care anymore of the alarm
         signal(SIGALRM, SIG_IGN);
 
@@ -190,6 +200,7 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
             write(pipeID[1], buffer, 8 * rowSize);
         }
         close(pipeID[1]);
+	delete qsqr;
 
         exit(EXIT_SUCCESS);
     } else if (pid < (pid_t)0) {
@@ -237,21 +248,22 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
 
 bool Materialization::execMatQuery(Literal &l, bool timeout, EDBLayer &kb,
                                    Program &p, int &predIdx,
-                                   long timeoutSeconds) {
+                                   long timeoutMicros) {
     bool failed = false;
     QSQQuery q(l);
     BOOST_LOG_TRIVIAL(debug) << "Getting query " << l.tostring(&p, &kb);
     timens::system_clock::time_point start = timens::system_clock::now();
     TupleTable *output = NULL;
 
-    if (!timeout || timeoutSeconds == 0) {
-        QSQR qsqr(kb, &p);
-        output = qsqr.evaluateQuery(QSQR_EVAL, &q, NULL, NULL,
-                                    true);
+    if (!timeout || timeoutMicros == 0) {
+        QSQR *qsqr = new QSQR(kb, &p);
+        output = qsqr->evaluateQuery(QSQR_EVAL, &q, NULL, NULL,
+                                     true);
+        delete qsqr;
     } else {
         failed = !evaluateQueryThreadedVersion(&kb, &p, &q,
                                                &output,
-                                               timeoutSeconds);
+                                               timeoutMicros);
     }
 
     boost::chrono::duration<double> sec =
@@ -296,62 +308,62 @@ bool Materialization::execMatQuery(Literal &l, bool timeout, EDBLayer &kb,
 }
 
 void Materialization::getAndStorePrematerialization(EDBLayer & kb, Program & p,
-        bool timeout, long timeoutSeconds) {
+        bool timeout, long timeoutMicros) {
     int predIdx = 0;
     std::vector<Literal> failedQueries;
     int successQueries = 0;
     // try {
-        for (std::vector<Literal>::iterator itr =  prematerializedLiterals.begin();
-                itr != prematerializedLiterals.end(); ++itr) {
-            bool failed = execMatQuery(*itr, timeout, kb, p, predIdx, timeoutSeconds);
+    for (std::vector<Literal>::iterator itr =  prematerializedLiterals.begin();
+            itr != prematerializedLiterals.end(); ++itr) {
+        bool failed = execMatQuery(*itr, timeout, kb, p, predIdx, timeoutMicros);
+        if (!failed) {
+            rewriteLiteralInProgram(*itr, edbLiterals.back(), kb, p);
+            successQueries++;
+        } else {
+            failedQueries.push_back(*itr);
+        }
+    }
+
+    while (repeatPrematerialization && failedQueries.size() > 0) {
+        BOOST_LOG_TRIVIAL(debug) <<
+                                 "Try to rerun " << failedQueries.size() <<
+                                 " queries";
+        bool success = false;
+        std::vector<Literal> newFailedQueries;
+        for (auto &el : failedQueries) {
+            bool failed = execMatQuery(el, timeout, kb, p, predIdx,
+                                       timeoutMicros);
             if (!failed) {
-                rewriteLiteralInProgram(*itr, edbLiterals.back(), kb, p);
-                successQueries++;
+                rewriteLiteralInProgram(el, edbLiterals.back(), kb, p);
+                success = true;
             } else {
-                failedQueries.push_back(*itr);
+                newFailedQueries.push_back(el);
             }
         }
+        if (!success) {
+            break;
+        } else {
+            failedQueries.clear();
+            for (auto &l : newFailedQueries)
+                failedQueries.push_back(l);
+        }
+    }
+    if (timeout) {
+        BOOST_LOG_TRIVIAL(debug) << "Failed Queries: " << failedQueries.size()
+                                 << " Preprocessed Queries: "
+                                 << successQueries;
+    }
 
-        while (repeatPrematerialization && failedQueries.size() > 0) {
-            BOOST_LOG_TRIVIAL(debug) <<
-                                     "Try to rerun " << failedQueries.size() <<
-                                     " queries";
-            bool success = false;
-            std::vector<Literal> newFailedQueries;
-            for (auto &el : failedQueries) {
-                bool failed = execMatQuery(el, timeout, kb, p, predIdx,
-                                           timeoutSeconds);
-                if (!failed) {
-                    rewriteLiteralInProgram(el, edbLiterals.back(), kb, p);
-                    success = true;
-                } else {
-                    newFailedQueries.push_back(el);
-                }
-            }
-            if (!success) {
-                break;
-            } else {
-                failedQueries.clear();
-                for (auto &l : newFailedQueries)
-                    failedQueries.push_back(l);
-            }
-        }
-        if (timeout) {
-            BOOST_LOG_TRIVIAL(debug) << "Failed Queries: " << failedQueries.size()
-                                     << " Preprocessed Queries: "
-                                     << successQueries;
-        }
-
-        for (auto &rule : p.getAllRules()) {
-            BOOST_LOG_TRIVIAL(debug) << "Rule: " << rule.tostring(&p, &kb);
-        }
+    for (auto &rule : p.getAllRules()) {
+        BOOST_LOG_TRIVIAL(debug) << "Rule: " << rule.tostring(&p, &kb);
+    }
     // } catch (int v) {
-      //   if (v == OUT_OF_PREDICATES) {
-        //     BOOST_LOG_TRIVIAL(debug) << "Aborted prematerialization, out of predicates";
-       //  } else {
-        //     throw v;
-       //  }
-   //  }
+    //   if (v == OUT_OF_PREDICATES) {
+    //     BOOST_LOG_TRIVIAL(debug) << "Aborted prematerialization, out of predicates";
+    //  } else {
+    //     throw v;
+    //  }
+    //  }
 }
 
 void Materialization::rewriteLiteralInProgram(Literal & prematLiteral, Literal & rewrittenLiteral, EDBLayer & kb, Program & p) {
@@ -426,4 +438,11 @@ void Materialization::rewriteLiteralInProgram(Literal & prematLiteral, Literal &
             p.getAllRulesByPredicate(prematLiteral.getPredicate().getId())->push_back(r);
         }
     }
+#if DEBUG
+    BOOST_LOG_TRIVIAL(debug) << "rewritten program:";
+    std::vector<Rule> newRules = p.getAllRules();
+    for (std::vector<Rule>::iterator itr = newRules.begin(); itr != newRules.end(); ++itr) {
+        BOOST_LOG_TRIVIAL(debug) << itr->tostring(&p, &kb);
+    }
+#endif
 }

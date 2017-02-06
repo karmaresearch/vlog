@@ -5,8 +5,15 @@
 
 #include <trident/model/table.h>
 
-FCTable::FCTable(const uint8_t sizeRow) : sizeRow(sizeRow) {
+// Note: When running multithreaded, mutex != NULL.
+
+FCTable::FCTable(boost::shared_mutex *mutex, const uint8_t sizeRow) :
+    sizeRow(sizeRow), mutex(mutex) {
 }
+
+/*boost::shared_mutex *FCTable::getMutex() const {
+    return mutex;
+}*/
 
 std::string FCTable::getSignature(const Literal &literal) {
     std::string out = "";
@@ -30,36 +37,37 @@ std::string FCTable::getSignature(const Literal &literal) {
 }
 
 FCIterator FCTable::read(const size_t iteration) const {
+    FCIterator i;
+
     std::vector<FCBlock>::const_iterator itr = blocks.begin();
     while (itr != blocks.end() && itr->iteration < iteration) {
         itr++;
     }
-    //long t = 0;
     if (itr != blocks.end()) {
-        //t = totalRows - itr->nTuplesSoFar;
-        return FCIterator(itr, blocks.end());
+        i = FCIterator(itr, blocks.end());
     } else {
-        return FCIterator();
+        i = FCIterator();
     }
+
+    return i;
 }
 
 FCIterator FCTable::read(const size_t mincount, const size_t maxcount) const {
+    FCIterator i;
     std::vector<FCBlock>::const_iterator itr = blocks.begin();
     while (itr != blocks.end() && itr->iteration < mincount) {
         itr++;
     }
-    //long t = 0;
     if (itr != blocks.end()) {
-        //t = totalRows - itr->nTuplesSoFar;
-        //Determine the max count
         std::vector<FCBlock>::const_iterator endrange = itr + 1;
-        while (endrange != blocks.end() && endrange->iteration < maxcount) {
+        while (endrange != blocks.end() && endrange->iteration <= maxcount) {
             endrange++;
         }
-        return FCIterator(itr, endrange);
+        i = FCIterator(itr, endrange);
     } else {
-        return FCIterator();
+        i = FCIterator();
     }
+    return i;
 }
 
 FCBlock &FCTable::getLastBlock() {
@@ -79,22 +87,17 @@ size_t FCTable::estimateCardinality(const Literal &literal, const size_t min, co
             nconstants++;
         }
     }
-
     size_t estimation = 0;
     while (!itr.isEmpty()) {
-        //if (nconstants == 0) {
-        //    estimation += itr.getCurrentTable()->getNRows();
-        //} else {
         estimation += itr.getCurrentTable()->estimateNRows(
                           nconstants, posConstants,
                           valueConstants);
-        //}
         itr.moveNextCount();
     }
     return estimation;
 }
 
-std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal, const size_t minIteration, TableFilterer *filterer) {
+std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal, const size_t minIteration, TableFilterer *filterer, int nthreads) {
     bool shouldFilter = literal.getNUniqueVars() < literal.getTupleSize();
 
     if (shouldFilter) {
@@ -102,6 +105,13 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal, const siz
         std::vector<FCBlock>::iterator itr = blocks.begin();
         std::string signature = getSignature(literal);
         BOOST_LOG_TRIVIAL(trace) << "FCTable::filter: literal = " << literal.tostring() << ", signature = " << signature;
+
+        if (mutex != NULL) {
+            // We need a separate lock for the cache. We cannot promote the mutex to an exclusive
+            // lock here, since that leads to deadlocks.
+            cache_mutex.lock();
+        }
+
         FCCache::iterator cacheItr = cache.find(signature);
         if (cacheItr != cache.end()) {
             BOOST_LOG_TRIVIAL(trace) << "Found in cache ...";
@@ -115,11 +125,14 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal, const siz
                 }
             } else {
                 BOOST_LOG_TRIVIAL(trace) << "returned";
+                if (mutex != NULL) {
+                    cache_mutex.unlock();
+                }
                 return output;
             }
         } else {
             BOOST_LOG_TRIVIAL(trace) << "not in cache";
-            output = std::shared_ptr<FCTable>(new FCTable(literal.getNVars()));
+            output = std::shared_ptr<FCTable>(new FCTable(mutex, literal.getNVars()));
         }
 
         //Scan all tables to check whether there are tuples we can add in the table
@@ -178,11 +191,12 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal, const siz
                                          posConstantsToFilter,
                                          valuesConstantsToFilter,
                                          nRepeatedVars,
-                                         repeatedVars);
+                                         repeatedVars,
+                                         nthreads);
 
                 if (filteredTable != NULL) {
                     BOOST_LOG_TRIVIAL(trace) << "Adding to output the literal " << literal.tostring() << " with iteration " << itr->iteration;
-                    output->add(filteredTable, literal, itr->rule, itr->ruleExecOrder, itr->iteration, true);
+                    output->add(filteredTable, literal, itr->rule, itr->ruleExecOrder, itr->iteration, true, nthreads);
                 }
             }
             itr++;
@@ -199,7 +213,9 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal, const siz
             b.end = blocks[blocks.size() - 1].iteration;
             cache.insert(std::make_pair(signature, b));
         }
-
+        if (mutex != NULL) {
+            cache_mutex.unlock();
+        }
         return output;
     } else {
         throw 10;
@@ -219,16 +235,6 @@ size_t FCTable::estimateCardInRange(const size_t mincount, const size_t maxcount
     return output;
 }
 
-/*size_t FCTable::getNRows(size_t count) const {
-    size_t output = 0;
-    for (std::vector<FCBlock>::const_iterator itr = blocks.begin(); itr != blocks.end(); ++itr) {
-        if (itr->iteration >= count) {
-            output += itr->table->getNRows();
-        }
-    }
-    return output;
-}*/
-
 bool FCTable::isEmpty() const {
     return blocks.size() == 0;
 }
@@ -236,8 +242,9 @@ bool FCTable::isEmpty() const {
 bool FCTable::isEmpty(size_t count) const {
     for (std::vector<FCBlock>::const_iterator itr = blocks.begin(); itr != blocks.end(); ++itr) {
         if (itr->iteration >= count) {
-            if (!itr->table->isEmpty())
+            if (!itr->table->isEmpty()) {
                 return false;
+            }
         }
     }
     return true;
@@ -245,40 +252,71 @@ bool FCTable::isEmpty(size_t count) const {
 
 std::shared_ptr<const Segment> FCTable::retainFrom(
     std::shared_ptr<const Segment> t,
-    const bool dupl) const {
+    const bool dupl,
+    int nthreads) const {
     bool passed = false;
 
-    //BOOST_LOG_TRIVIAL(debug) << "b-seg.ncolumns=" << (int)t->getNColumns();
+    size_t sz = 0;
+
+    boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+
     for (std::vector<FCBlock>::const_iterator itr = blocks.cbegin();
             itr != blocks.cend();
             ++itr) {
-        t = SegmentInserter::retain(t, itr->table, dupl);
+	sz += itr->table->getNRows();
+    }
+    BOOST_LOG_TRIVIAL(debug) << "retainFrom: t.size() = " << t->getNRows() << ", blocks.size() = " << blocks.size() << ", sz = " << sz;
+    for (std::vector<FCBlock>::const_iterator itr = blocks.cbegin();
+            itr != blocks.cend();
+            ++itr) {
+        t = SegmentInserter::retain(t, itr->table, dupl, nthreads);
+	BOOST_LOG_TRIVIAL(debug) << "after retain: t.size() = " << t->getNRows() << ", table size was " << itr->table->getNRows();
         passed = true;
     }
 
     if (!passed && dupl) {
         //I still need to filter the segment.
-        t = SegmentInserter::retain(t, NULL, dupl);
+        t = SegmentInserter::retain(t, NULL, dupl, nthreads);
     }
-    //BOOST_LOG_TRIVIAL(debug) << "a-seg.ncolumns=" << (int)t->getNColumns();
+    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
+    BOOST_LOG_TRIVIAL(debug) << "Time retainFrom = " << sec.count() * 1000;
 
     return t;
 }
 
-bool FCTable::add(std::shared_ptr<const FCInternalTable> t, const Literal &literal, const RuleExecutionDetails *rule,
+bool FCTable::add(std::shared_ptr<const FCInternalTable> t,
+                  const Literal &literal,
+                  const RuleExecutionDetails *rule,
                   const uint8_t ruleExecOrder,
-                  const size_t iteration, const bool isCompleted) {
+                  const size_t iteration, const bool isCompleted,
+                  int nthreads) {
     assert(t->getRowSize() == this->getSizeRow());
     if (t->isEmpty()) {
         return false;
     }
 
-    if (blocks.size() > 0) {
-        size_t lastItr = blocks[blocks.size() - 1].iteration;
-        assert(lastItr <= iteration);
+    size_t sz = blocks.size();
+    if (sz > 0) {
+        size_t lastItr = blocks[sz - 1].iteration;
+        if (mutex != NULL) {
+            // Find correct block
+            while (sz > 0) {
+                if (lastItr != iteration) {
+                    sz--;
+                    if (sz > 0) {
+                        lastItr = blocks[sz - 1].iteration;
+                    }
+                } else {
+                    break;
+                }
+            }
+        } else {
+            assert(lastItr <= iteration);
+        }
+
         if (lastItr == iteration) {
-            FCBlock *lastBlock = &blocks[blocks.size() - 1];
-            lastBlock->table = lastBlock->table->merge(t);
+            FCBlock *lastBlock = &blocks[sz - 1];
+            lastBlock->table = lastBlock->table->merge(t, nthreads);
 
             //Invalidate possible subtables which contain partial results
             for (FCCache::iterator itr = cache.begin(); itr != cache.end(); ++itr) {
@@ -287,7 +325,6 @@ bool FCTable::add(std::shared_ptr<const FCInternalTable> t, const Literal &liter
                     itr->second.table->removeBlock(lastItr);
                 }
             }
-
             return false;
         }
     }
@@ -312,26 +349,25 @@ void FCTable::removeBlock(const size_t iteration) {
     if (blocks.size() > 0 && blocks.back().iteration == iteration) {
         blocks.pop_back();
     }
-    //assert(cache.size() == 0); //If false, then I also need to remove the block from the cache elements and update the "end" count
 }
 
 size_t FCTable::getNRows(const size_t iteration) const {
+    size_t out = 0;
     for (std::vector<FCBlock>::const_iterator itr = blocks.begin(); itr != blocks.end(); ++itr) {
         if (itr->iteration == iteration) {
-            return itr->table->getNRows();
-        } else if (itr->iteration > iteration) {
-            return 0;
+            out = itr->table->getNRows();
+            break;
+        } else if (mutex != NULL && itr->iteration > iteration) {
+            break;
         }
     }
-    return 0;
+    return out;
 }
 
 size_t FCTable::getNAllRows() const {
     size_t output = 0;
     for (std::vector<FCBlock>::const_iterator itr = blocks.begin(); itr != blocks.end(); ++itr) {
-#if DEBUG
         BOOST_LOG_TRIVIAL(debug) << "getNAllRows: block of " << itr->table->getNRows() << ", from iteration " << itr->iteration;
-#endif
         output += itr->table->getNRows();
     }
     return output;
@@ -356,6 +392,7 @@ std::shared_ptr<const FCInternalTable> FCIterator::getCurrentTable() const {
 }
 
 const FCBlock *FCIterator::getCurrentBlock() const {
+    BOOST_LOG_TRIVIAL(debug) << "getCurrentBlock: FCIterator = " << this << ", table = " << itr->table << ", iteration = " << itr->iteration;
     return &(*itr);
 }
 

@@ -8,12 +8,13 @@
 
 #include "term.h"
 
-struct eqstr {
+struct vlog_eqstr {
     bool operator()(const std::string &v1, const std::string &v2) const {
         return v1.compare(v2) == 0;
     }
 };
-typedef google::dense_hash_map<const std::string, Term_t, std::hash<std::string>, eqstr> SimpleHashmap;
+typedef google::dense_hash_map<const std::string,
+        Term_t, std::hash<std::string>, vlog_eqstr> SimpleHashmap;
 typedef google::dense_hash_map<Term_t, const std::string> SimpleInverseHashMap;
 
 class Dictionary {
@@ -54,6 +55,9 @@ public:
 
     std::string getRawValue(const Term_t id) {
         SimpleInverseHashMap::iterator itr = inverseMap.find(id);
+        if (itr == inverseMap.end()) {
+            return std::string("");
+        }
         return itr->second;
     }
 

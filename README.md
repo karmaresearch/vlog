@@ -1,45 +1,37 @@
-### Vlog
+# VLog
 
-This is Vlog, an experimental column-oriented Datalog engine.
+## Installation instructions
 
-Please read the INSTALL file for compilation instructions.
+In order to compile VLog, first you need trident. 
 
-### Usage Instructions
+```
+git clone https://github.com/jrbn/trident.git
+```
 
-The "example" directory contains scripts to simplify usage. There are two
-steps: loading and materialization.
+should get it. Then, go to the trident directory and follow the README instructions there.
+It will also require you to install some other packages.
 
-The dataset must first be loaded into the EDB layer. This can be accomplished
-using the "load" command of Vlog.
-From the "example" directory:
+Next, you also need curl. On Ubuntu/Debian,
 
-    ../vlog load -i ttl -o indexDir
+```
+sudo apt-get install libcurl3-openssl-dev
+```
 
-will create a directory "indexDir" with an index for the dataset in the
-"ttl" directory (which, in this case, is a small 1 university LUBM dataset).
+should do the trick. On OSX, the necessary files are present in Xcode.
+Next,
 
-To materialize this dataset with for instance the LUBM1\_LE rules,
-first an EDB layer configuration file "edb.conf" needs to be created, with the
-following content:
+```
+make
+```
 
-EDB0\_predname=TE  
-EDB0\_type=Trident  
-EDB0\_param0=indexDir  
+should compile everything. If you want to create a debug version of the program, run
 
-This specifies that the EDB predicate name is "TE", that the EDB layer name = "Trident",
-and that the dataset can be found in the directory "indexDir".
+```
+make DEBUG=1
+```
 
-Then, the materialization can be created with the following command:
+instead.
 
-    ../vlog mat -e edb.conf --rules dlog/LUBM1_LE.dlog
+## License
 
-The result can be stored on disk by adding the flags:
-
-    --storemat materialization_lubm1 --decompressmat 1
-
-which will create a directory "materialization\_lubm1 with the result of the
-instantiation.
-
-### TODO
-
-Describe usage of MySQL, MonetDB, ODBC layers.
+Vlog is released under the Apache 2 license.

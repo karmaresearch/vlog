@@ -103,14 +103,14 @@ body {
 }
 
 #wrapper {
-	width:922px;
+	width:1024px;
 	margin:0px auto 0px auto;
 }
 
 #header {
 	/*color:#333333;*/
     color: #FFFF00;
-	width:902px;
+	width:1024px;
 	height:70px;
 	background-image:initial;
 	background-repeat-x:initial;
@@ -124,7 +124,7 @@ body {
 	background-clip:initial;
 	background-color:#ABBEBE;
 	margin:10px 0px 0px 0px;
-	padding:10px;
+	padding:0px;
 	font-family:Arial, Helvetica, sans-serif;
 	font-size:28px;
 }
@@ -172,7 +172,7 @@ body {
 }
 
 #footer {
-	width:902px;
+	width:1024px;
 	clear:both;
 	color:#333333;
 	background-image:initial;
@@ -205,3 +205,130 @@ body {
 	background-color:#000000;
 }
 
+.block {
+    margin-top: 10px;
+    margin-bottom: 30px;
+}
+
+#setupdatalog {
+    width: 1024px;
+    margin-right: 0px;
+}
+
+#rulebox {
+    width: 650px;
+}
+
+#premat {
+    width: 650px;
+}
+
+#querybox {
+    width: 1024px;
+}
+
+#detailsprogramblock {
+    margin-top: 10px;
+    margin-bottom: 30px;
+    border-size: 1;
+}
+
+#sparqlbox {
+    clear: both;
+}
+
+.tsparql {
+	margin:0px;padding:0px;
+	width:100%;
+	box-shadow: 10px 10px 5px #888888;
+	border:1px solid #000000;
+	
+	-moz-border-radius-bottomleft:0px;
+	-webkit-border-bottom-left-radius:0px;
+	border-bottom-left-radius:0px;
+	
+	-moz-border-radius-bottomright:0px;
+	-webkit-border-bottom-right-radius:0px;
+	border-bottom-right-radius:0px;
+	
+	-moz-border-radius-topright:0px;
+	-webkit-border-top-right-radius:0px;
+	border-top-right-radius:0px;
+	
+	-moz-border-radius-topleft:0px;
+	-webkit-border-top-left-radius:0px;
+	border-top-left-radius:0px;
+}.tsparql table{
+    border-collapse: collapse;
+        border-spacing: 0;
+	width:100%;
+	height:100%;
+	margin:0px;padding:0px;
+}.tsparql tr:last-child td:last-child {
+	-moz-border-radius-bottomright:0px;
+	-webkit-border-bottom-right-radius:0px;
+	border-bottom-right-radius:0px;
+}
+.tsparql table tr:first-child td:first-child {
+	-moz-border-radius-topleft:0px;
+	-webkit-border-top-left-radius:0px;
+	border-top-left-radius:0px;
+}
+.tsparql table tr:first-child td:last-child {
+	-moz-border-radius-topright:0px;
+	-webkit-border-top-right-radius:0px;
+	border-top-right-radius:0px;
+}.tsparql tr:last-child td:first-child{
+	-moz-border-radius-bottomleft:0px;
+	-webkit-border-bottom-left-radius:0px;
+	border-bottom-left-radius:0px;
+}.tsparql tr:hover td{
+	
+}
+.tsparql tr:nth-child(odd){ background-color:#e5e5e5; }
+.tsparql tr:nth-child(even)    { background-color:#ffffff; }.tsparql td{
+	vertical-align:middle;
+	
+	
+	border:1px solid #000000;
+	border-width:0px 1px 1px 0px;
+	text-align:left;
+	padding:7px;
+	font-size:14px;
+	font-family:Arial;
+	font-weight:normal;
+	color:#000000;
+}.tsparql tr:last-child td{
+	border-width:0px 1px 0px 0px;
+}.tsparql tr td:last-child{
+	border-width:0px 0px 1px 0px;
+}.tsparql tr:last-child td:last-child{
+	border-width:0px 0px 0px 0px;
+}
+.tsparql tr:first-child td{
+		background:-o-linear-gradient(bottom, #999999 5%, #999999 100%);	background:-webkit-gradient( linear, left top, left bottom, color-stop(0.05, #999999), color-stop(1, #999999) );
+	background:-moz-linear-gradient( center top, #999999 5%, #999999 100% );
+	filter:progid:DXImageTransform.Microsoft.gradient(startColorstr="#999999", endColorstr="#999999");	background: -o-linear-gradient(top,#999999,999999);
+
+	background-color:#999999;
+	border:0px solid #000000;
+	text-align:center;
+	border-width:0px 0px 1px 1px;
+	font-size:14px;
+	font-family:Arial;
+	font-weight:bold;
+	color:#ffffff;
+}
+.tsparql tr:first-child:hover td{
+	background:-o-linear-gradient(bottom, #999999 5%, #999999 100%);	background:-webkit-gradient( linear, left top, left bottom, color-stop(0.05, #999999), color-stop(1, #999999) );
+	background:-moz-linear-gradient( center top, #999999 5%, #999999 100% );
+	filter:progid:DXImageTransform.Microsoft.gradient(startColorstr="#999999", endColorstr="#999999");	background: -o-linear-gradient(top,#999999,999999);
+
+	background-color:#999999;
+}
+.tsparql tr:first-child td:first-child{
+	border-width:0px 0px 1px 0px;
+}
+.tsparql tr:first-child td:last-child{
+	border-width:0px 0px 1px 1px;
+}

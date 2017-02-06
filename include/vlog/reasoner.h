@@ -30,28 +30,50 @@ private:
                                     EDBLayer &layer, Program &program, DictMgmt *dict,
                                     bool returnOnlyVars);*/
 
-    FCBlock getBlockFromQuery(Literal constantsQuery, Literal &boundQuery, std::vector<uint8_t> *posJoins,
-                              std::vector<Term_t> *possibleValuesJoins);
-public:
-
-    Reasoner(const uint64_t threshold) : threshold(threshold) {}
+    FCBlock getBlockFromQuery(Literal constantsQuery, Literal &boundQuery,
+                                     std::vector<uint8_t> *posJoins,
+                                     std::vector<Term_t> *possibleValuesJoins);
 
     ReasoningMode chooseMostEfficientAlgo(Literal &query,
                                           EDBLayer &layer, Program &program,
                                           std::vector<uint8_t> *posBindings,
                                           std::vector<Term_t> *valueBindings);
 
-    static TupleIterator *getTopDownIterator(Literal &query,
-                                      std::vector<uint8_t> * posJoins,
-                                      std::vector<Term_t> *possibleValuesJoins,
-                                      EDBLayer &layer, Program &program,
-                                      bool returnOnlyVars);
+    TupleIterator *getTopDownIterator(Literal &query,
+            std::vector<uint8_t> * posJoins,
+            std::vector<Term_t> *possibleValuesJoins,
+            EDBLayer &layer, Program &program,
+            bool returnOnlyVars,
+            std::vector<uint8_t> *sortByFields);
+
+    TupleIterator *getIncrReasoningIterator(Literal &query,
+            std::vector<uint8_t> * posJoins,
+            std::vector<Term_t> *possibleValuesJoins,
+            EDBLayer &layer, Program &program,
+            bool returnOnlyVars,
+            std::vector<uint8_t> *sortByFields);
 
     TupleIterator *getMagicIterator(Literal &query,
-                                    std::vector<uint8_t> * posJoins,
-                                    std::vector<Term_t> *possibleValuesJoins,
-                                    EDBLayer &layer, Program &program,
-                                    bool returnOnlyVars);
+                                           std::vector<uint8_t> * posJoins,
+                                           std::vector<Term_t> *possibleValuesJoins,
+                                           EDBLayer &layer, Program &program,
+                                           bool returnOnlyVars,
+                                           std::vector<uint8_t> *sortByFields);
+
+public:
+
+    Reasoner(const uint64_t threshold) : threshold(threshold) {}
+
+    size_t estimate(Literal &query, std::vector<uint8_t> *posBindings,
+                    std::vector<Term_t> *valueBindings, EDBLayer &layer,
+                    Program &program);
+
+    TupleIterator *getIterator(Literal &query,
+                                           std::vector<uint8_t> * posJoins,
+                                           std::vector<Term_t> *possibleValuesJoins,
+                                           EDBLayer &layer, Program &program,
+                                           bool returnOnlyVars,
+                                           std::vector<uint8_t> *sortByFields);
 
     /*
     TupleIterator *getIncrReasoningIterator(Pattern *pattern,
@@ -62,15 +84,13 @@ public:
                                             bool returnOnlyVars);
     */
 
-    size_t estimate(Literal &query, std::vector<uint8_t> *posBindings,
-                  std::vector<Term_t> *valueBindings, EDBLayer &layer,
-                  Program &);
-
     static std::shared_ptr<SemiNaiver> fullMaterialization(EDBLayer &layer,
-            Program *p, bool opt_intersect, bool opt_filtering);
+            Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
+            int nthreads, int interRuleThreads, bool shuffleRules);
 
     static std::shared_ptr<SemiNaiver> getSemiNaiver(EDBLayer &layer,
-        Program *p, bool opt_intersect, bool opt_filtering);
+            Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
+            int nthreads, int interRuleThreads, bool shuffleRules);
 
     //static int materializationOrOnDemand(const uint64_t matThreshold, std::vector<std::shared_ptr<SPARQLOperator>> &patterns);
 

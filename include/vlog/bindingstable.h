@@ -6,6 +6,7 @@
 
 #include <unordered_set>
 #include <functional>
+#include <boost/functional/hash.hpp>
 
 struct BindingsRow {
     uint8_t size;
@@ -20,13 +21,35 @@ struct BindingsRow {
 
 struct hash_BindingsRow {
     size_t operator()(const BindingsRow &x) const {
+	size_t hash = 0;
+        for (uint8_t i = 0; i < x.size; ++i) {
+	    hash = (hash + (324723947 + x.row[i])) ^93485734985;
+	}
+	return hash;
+	/*
         uint64_t h = 0;
         std::hash<uint64_t> hashf;
         for (uint8_t i = 0; i < x.size; ++i) {
-            h = (h << 5) ^ ((h & 0xf800000000000000) >> 59);
-            h = h ^ x.row[i];
+	    h = (h << 16) ^ ((h & 0xffff000000000000) >> 48);
+	    h = h ^ x.row[i];
+	}
+	return hashf(h);
+	*/
+	/*
+	size_t v = 0;
+        for (uint8_t i = 0; i < x.size; ++i) {
+	    boost::hash_combine(v, (uint32_t) x.row[i]);
         }
-        return hashf(h);
+        return v;
+	*/
+	/*
+        std::hash<uint64_t> hashf;
+	size_t h = 0;
+        for (uint8_t i = 0; i < x.size; ++i) {
+	    h += hashf(x.row[i]);
+	}
+	return h;
+	*/
     }
 };
 
@@ -161,6 +184,9 @@ public:
     Term_t const *getTuple(size_t idx);
 
     void clear();
+#ifdef DEBUG
+    void statistics();
+#endif
 
     ~BindingsTable();
 };

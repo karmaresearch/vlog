@@ -128,11 +128,6 @@ MySQLIterator::MySQLIterator(sql::Connection *con, string sqlQuery,
     hasNextChecked = true;
 }
 
-void MySQLIterator::moveTo(const uint8_t fieldId, const Term_t t) {
-    // TODO?
-    throw 10;
-}
-
 bool MySQLIterator::hasNext() {
     if (hasNextChecked) {
 	return hasNextValue;

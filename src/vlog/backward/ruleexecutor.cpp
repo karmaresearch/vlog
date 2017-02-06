@@ -6,15 +6,11 @@
 #include <trident/model/table.h>
 
 RuleExecutor::RuleExecutor(Rule &rule, uint8_t headAdornment
-#ifdef LINEAGE
                            , Program *program,
-                           DictMgmt *dict
-#endif
+                           EDBLayer &layer
                           ) :
     adornedRule(rule.createAdornment(headAdornment))
-#ifdef LINEAGE
-    , program(program), dict(dict)
-#endif
+    , program(program), layer(layer)
 {
     calculateJoinsSizeIntermediateRelations();
 }
@@ -199,19 +195,25 @@ void RuleExecutor::deleteSupplRelations(BindingsTable **supplRelations) {
 bool RuleExecutor::isUnifiable(const Term_t * const value, const size_t sizeTuple,
                                const size_t *posInAdorment, const EDBLayer &layer) {
     //Check with the head of the rule to see whether there is a match
+
+    // BOOST_LOG_TRIVIAL(debug) << "isUnifiable: adornedRule = " << adornedRule.tostring();
     for (size_t i = 0; i < sizeTuple; ++i) {
         size_t pos = posInAdorment[i];
         VTerm t = adornedRule.getHead().getTermAtPos(pos);
         if (!t.isVariable()) {
+            // BOOST_LOG_TRIVIAL(debug) << "isUnifiable: value check: " << t.getValue() << ", " << value[i];
             if (t.getValue() != value[i]) {
+                // BOOST_LOG_TRIVIAL(debug) << "not unifiable";
                 return false;
             }
         } else {
 #ifdef PRUNING_QSQR
             for (std::vector<std::pair<uint8_t, std::pair<uint8_t, uint8_t>>>::iterator itr = headVarsInEDB.begin();
                     itr != headVarsInEDB.end(); ++itr) {
+                // BOOST_LOG_TRIVIAL(debug) << "isUnifiable: pruning check, itr->first = " << (int) itr->first << ", pos = " << (int) pos;
                 if (itr->first == pos && !layer.checkValueInTmpRelation(itr->second.first,
                         itr->second.second, value[i])) {
+                    // BOOST_LOG_TRIVIAL(debug) << "not unifiable";
                     return false;
                 }
             }
@@ -222,14 +224,18 @@ bool RuleExecutor::isUnifiable(const Term_t * const value, const size_t sizeTupl
     //If the head has repeated variables, and these are not instantiated
     //correctly by the tuple, then this is not instantiable.
     if (repeatedBoundVarsInHead.size() != 0) {
+        // BOOST_LOG_TRIVIAL(debug) << "isUnifiable: repeatedbounds check";
         for (size_t i = 0; i < repeatedBoundVarsInHead.size(); ++i) {
             std::pair<int, int> pair = repeatedBoundVarsInHead[i];
+            // BOOST_LOG_TRIVIAL(debug) << "value1 = " << value[pair.first] << ", value2 = " << value[pair.second];
             if (value[pair.first] != value[pair.second]) {
+                // BOOST_LOG_TRIVIAL(debug) << "not unifiable";
                 return false;
             }
         }
     }
 
+    // BOOST_LOG_TRIVIAL(debug) << "unifiable!";
     return true;
 }
 
@@ -367,6 +373,8 @@ void RuleExecutor::evaluateRule(const uint8_t bodyAtom,
 
     Literal l(adornedRule.getBody()[bodyAtom]);
 
+    // BOOST_LOG_TRIVIAL(debug) << "evaluateRule: literal = " << l.tostring(program, &layer);
+
     //Do the computation to produce bindings for the next suppl. relation.
     uint8_t nCurrentJoins = this->njoins[bodyAtom];
     TupleTable *retrievedBindings = NULL;
@@ -397,7 +405,7 @@ void RuleExecutor::evaluateRule(const uint8_t bodyAtom,
             layer.query(&query, retrievedBindings, NULL, NULL);
         }
         //durationEDB += boost::chrono::system_clock::now() - startEDB;
-        //BOOST_LOG_TRIVIAL(debug) << "Retrieved " << retrievedBindings->getNRows();
+        // BOOST_LOG_TRIVIAL(debug) << "EDB, query " << query.tostring() << ", retrieved " << retrievedBindings->getNRows();
     } else {
         //Copy in input the query that we are about to launch
         BindingsTable *table = qsqr->getInputTable(query.getLiteral()->getPredicate());
@@ -437,8 +445,10 @@ void RuleExecutor::evaluateRule(const uint8_t bodyAtom,
         //Call the query if there are new queries
         if (table->getNTuples() > offsetInput) {
             Predicate pred = query.getLiteral()->getPredicate();
-            //qsqr->evaluate(pred, table, offsetInput);
-            //Do not execute it recursevily. Instead, create a new task and exit
+#ifdef RECURSIVE_QSQR
+            qsqr->evaluate(pred, table, offsetInput);
+#else
+            //Do not execute it recursively. Instead, create a new task and exit
             QSQR_Task task(RULE_QUERY, pred);
             task.executor = this;
             task.inputTable = table;
@@ -449,6 +459,7 @@ void RuleExecutor::evaluateRule(const uint8_t bodyAtom,
             qsqr->pushTask(task);
             qsqr->evaluate(pred, table, offsetInput);
             return;
+#endif
         }
 
         //Get previous answers
@@ -495,7 +506,7 @@ void RuleExecutor::evaluateRule(const uint8_t bodyAtom,
 #ifdef LINEAGE
 void RuleExecutor::printLineage(std::vector<LineageInfo> &lineage) {
     for (int i = 0; i < lineage.size(); ++i) {
-        cout << lineage[i].bodyAtomId << " " << lineage[i].nQueries << " " << lineage[i].adornedRule->tostring(program, dict) << endl;
+        cout << lineage[i].bodyAtomId << " " << lineage[i].nQueries << " " << lineage[i].adornedRule->tostring(program, layer) << endl;
         //print the queries
         cout << "              " << lineage[i].offset << " " << (void*) lineage[i].pointerToInput << endl;
         if (lineage[i].nQueries > 0) {
@@ -503,7 +514,7 @@ void RuleExecutor::printLineage(std::vector<LineageInfo> &lineage) {
                 cout << "            ";
                 for (int m = 0; m < lineage[i].sizeQuery; ++m) {
                     char text[256];
-                    dict->getText(lineage[i].queries[m + j * lineage[i].sizeQuery], text);
+                    layer->getDictText(lineage[i].queries[m + j * lineage[i].sizeQuery], text);
                     cout << text << " ";
                 }
                 cout << endl;
@@ -515,7 +526,7 @@ void RuleExecutor::printLineage(std::vector<LineageInfo> &lineage) {
 
 size_t RuleExecutor::estimate(const int depth, BindingsTable * input,/* size_t offsetInput,*/ QSQR * qsqr,
                               EDBLayer &layer) {
-    //BOOST_LOG_TRIVIAL(info) << "Estimating rule " << adornedRule.tostring(NULL,NULL);
+    BOOST_LOG_TRIVIAL(debug) << "Estimating rule " << adornedRule.tostring(NULL,NULL) << ", depth = " << depth;
     size_t output = 0;
     //if (input->getNTuples() > offsetInput) {
     //Get the new tuples. All the tuples that merge with the head of the
@@ -533,23 +544,30 @@ size_t RuleExecutor::estimate(const int depth, BindingsTable * input,/* size_t o
 
     if (supplRelations[0]->getNTuples() > 0) {
         uint8_t bodyAtomIdx = 0;
+	output = 1;
         do {
             //BOOST_LOG_TRIVIAL(info) << "Atom " << (int) bodyAtomIdx;
-
-            if (bodyAtomIdx == 0) {
-                output = estimateRule(depth, bodyAtomIdx++, supplRelations, qsqr, layer);
+	    uint8_t nCurrentJoins = this->njoins[bodyAtomIdx];
+	    size_t r = estimateRule(depth, bodyAtomIdx, supplRelations, qsqr, layer);
+            if (nCurrentJoins != 0) {
+                output = r;
             } else {
-                output *= estimateRule(depth, bodyAtomIdx++, supplRelations, qsqr, layer);
+                output *= r;
             }
-        } while (bodyAtomIdx < adornedRule.getBody().size()
+	    BOOST_LOG_TRIVIAL(debug) << "Atom: " << (int) bodyAtomIdx << ", estimate: " << r << ", output: " << output;
+	    bodyAtomIdx++;
+        } while (output != 0 && bodyAtomIdx < adornedRule.getBody().size()
                  && supplRelations[bodyAtomIdx]->getNTuples() > 0);
+	if (bodyAtomIdx < adornedRule.getBody().size()) {
+	    output = 0;
+	}
 
     }
 
     // Leaked supplRelations. Added line below. --Ceriel
     deleteSupplRelations(supplRelations);
     //}
-    //BOOST_LOG_TRIVIAL(info) << "Result is " << output;
+    BOOST_LOG_TRIVIAL(debug) << "Estimate for rule " << adornedRule.tostring(program,&layer) << ", depth = " << depth << " = " << output;
     return output;
 }
 
@@ -594,7 +612,7 @@ void RuleExecutor::evaluate(BindingsTable * input, size_t offsetInput,
 
 
     //Evaluate the rule
-    /*if (input->getNTuples() > offsetInput) {
+    if (input->getNTuples() > offsetInput) {
         //Get the new tuples. All the tuples that merge with the head of the
         //adorned rule are being copied in the first supplementary relation
         BindingsTable **supplRelations = createSupplRelations();
@@ -609,7 +627,9 @@ void RuleExecutor::evaluate(BindingsTable * input, size_t offsetInput,
             }
         }
 
-        if (supplRelations[0]->getNTuples() > 0) {
+        size_t cnt = supplRelations[0]->getNTuples();
+        if (cnt > 0) {
+#ifdef RECURSIVE_QSQR
             uint8_t bodyAtomIdx = 0;
             do {
                 evaluateRule(bodyAtomIdx++, supplRelations, qsqr, layer);
@@ -624,35 +644,17 @@ void RuleExecutor::evaluate(BindingsTable * input, size_t offsetInput,
 
             copyLastRelInAnswers(qsqr, nTuples, supplRelations,
                                  lastSupplRelation);
-
-        } else {
-            //Delete supplRelations
-        deleteSupplRepations(supplRelations);
-        }
-    }*/
-    if (input->getNTuples() > offsetInput) {
-        BindingsTable **supplRelations = createSupplRelations();
-
-        //Copy all the tuples that are unifiable with the head in the first
-        //supplementary relation.
-        for (size_t i = offsetInput; i < input->getNTuples(); ++i) {
-            const Term_t* tuple = input->getTuple(i);
-            if (isUnifiable(tuple, input->getSizeTuples(),
-                            input->getPosFromAdornment(), layer)) {
-                supplRelations[0]->addTuple(tuple);
-            }
-        }
-
-        if (supplRelations[0]->getNTuples() > 0) {
+#else
             //Create a task to execute
             QSQR_Task task(QSQR_TaskType::RULE);
             task.supplRelations = supplRelations;
-            task.currentRuleIndex = 0;
+            task.currentRuleIndex = 1;
             task.qsqr = qsqr;
             task.layer = &layer;
             task.executor = this;
             qsqr->pushTask(task);
             evaluateRule(0, supplRelations, qsqr, layer);
+#endif
         } else {
             //Delete supplRelations
             deleteSupplRelations(supplRelations);
@@ -660,12 +662,14 @@ void RuleExecutor::evaluate(BindingsTable * input, size_t offsetInput,
     }
 }
 
+#ifndef RECURSIVE_QSQR
 void RuleExecutor::processTask(QSQR_Task *t) {
     QSQR_Task &task = *t;
     switch (task.type) {
-    case RULE:
-        if (task.currentRuleIndex < adornedRule.getBody().size() - 1 && task.
-                supplRelations[task.currentRuleIndex + 1]->getNTuples() > 0) {
+    case RULE: {
+	size_t sz = adornedRule.getBody().size();
+        if (task.currentRuleIndex < sz && task.
+                supplRelations[task.currentRuleIndex]->getNTuples() > 0) {
             QSQR_Task newTask(QSQR_TaskType::RULE);
             newTask.supplRelations = task.supplRelations;
             newTask.currentRuleIndex = task.currentRuleIndex + 1;
@@ -674,18 +678,17 @@ void RuleExecutor::processTask(QSQR_Task *t) {
             newTask.executor = this;
             task.qsqr->pushTask(newTask);
             //Move to the next atom
-            evaluateRule((uint8_t) newTask.currentRuleIndex, newTask.supplRelations,
-                         newTask.qsqr, *newTask.layer);
+            evaluateRule((uint8_t) task.currentRuleIndex, task.supplRelations,
+                         task.qsqr, *task.layer);
         } else {
-            BindingsTable *lastSupplRelation = task.
-                                               supplRelations[adornedRule.
-                                                       getBody().size()];
+            BindingsTable *lastSupplRelation = task.supplRelations[sz];
             size_t nTuples = lastSupplRelation->getNTuples();
             if (nTuples > 10000) {
-                BOOST_LOG_TRIVIAL(warning) << "The last supplRelation contains " << nTuples;
+                BOOST_LOG_TRIVIAL(debug) << "The last supplRelation contains " << nTuples;
             }
             copyLastRelInAnswers(task.qsqr, nTuples, task.supplRelations,
                                  lastSupplRelation);
+        }
         }
         break;
     case RULE_QUERY: {
@@ -751,6 +754,7 @@ void RuleExecutor::processTask(QSQR_Task *t) {
         throw 10;
     }
 }
+#endif
 
 RuleExecutor::~RuleExecutor() {
 }
@@ -778,6 +782,9 @@ void RuleExecutor::join(TupleTable * r1, TupleTable * r2,
     while (true) {
         //Exit condition
         if (indexR1 >= r1->getNRows() || indexR2 >= r2->getNRows()) {
+#ifdef DEBUG
+	    output->statistics();
+#endif
             return;
         }
 
@@ -788,14 +795,14 @@ void RuleExecutor::join(TupleTable * r1, TupleTable * r2,
             size_t startJoin1 = indexR1;
             size_t startJoin2 = indexR2;
             //Find first end
-            size_t tmpIndex = startJoin2;
+            size_t tmpIndex = startJoin2+1;
             while (tmpIndex < r2->getNRows() &&
                     RuleExecutor::cmp(r1->getRow(indexR1), r2->getRow(tmpIndex), j, nj) == 0) {
                 tmpIndex++;
             }
             size_t endJoin2 = tmpIndex;
             //Determine second end
-            tmpIndex = startJoin1;
+            tmpIndex = startJoin1+1;
             while (tmpIndex < r1->getNRows() &&
                     RuleExecutor::cmp(r1->getRow(tmpIndex), r2->getRow(indexR2), j, nj) == 0) {
                 tmpIndex++;

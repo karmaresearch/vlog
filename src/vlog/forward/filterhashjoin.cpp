@@ -149,6 +149,9 @@ inline void FilterHashJoin::doJoin_join(const Term_t *constantValues,
             i++;
         }
     }
+#if DEBUG
+    output->checkSizes();
+#endif
 }
 
 inline void FilterHashJoin::doJoin_cartprod(const Term_t *constantValues,
@@ -199,6 +202,9 @@ inline void FilterHashJoin::doJoin_cartprod(const Term_t *constantValues,
         start += mapRowSize;
         i++;
     }
+#if DEBUG
+    output->checkSizes();
+#endif
 }
 
 void FilterHashJoin::run(const std::vector<FilterHashJoinBlock> &inputTables, const bool cartprod,
@@ -347,7 +353,7 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
 
 
     //Are all variables not involved in the join appearing also in the head? (otherwise I need filtering)
-    uint32_t size = 0; //This function is called when I am sure that the literal has some elements. Therefore, I set 1 as default value
+    size_t size = 0; //This function is called when I am sure that the literal has some elements. Therefore, I set 1 as default value
     uint8_t columnIdx[SIZETUPLE];
     for (uint8_t i = 0; i < nValuesHead; ++i) {
         columnIdx[i] = posValuesHead[i].second;
@@ -362,7 +368,12 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
 
         for (uint8_t i = 0; i < nValuesHead; ++i) {
             columns[posValuesHead[i].first] = c[i];
-            size = columns[posValuesHead[i].first]->size();
+	    size_t sz = c[i]->size();
+	    if (i > 0) {
+		assert(size == sz);
+	    } else {
+		size = sz;
+	    }
         }
 
     } else {
@@ -476,6 +487,7 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
                         new CompressedColumn(row[posValuesHashHead[i].second], size));
             }
 
+	    /*
             if (s != startCarprod) {
                 for (uint8_t i = 0; i < nValuesHead; ++i) {
                     columns[posValuesHead[i].first] = columns[posValuesHead[i].first]; // NOOP??? --Ceriel
@@ -484,16 +496,27 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
                     columns[otherPos[i]] = columns[otherPos[i]]; // NOOP??? --Ceriel
                 }
             }
+	    */
+
+#if DEBUG
+	    for (int i = 0; i < columns.size(); i++) {
+		size_t sz = columns[i]->size();
+		assert(size == sz);
+	    }
+#endif
 
             //Add the columns to the output container
             output->addColumns(i, columns, isDerivationUnique,
                                true);
 
+
             s += mapRowSize;
             i++;
         }
     }
-
+#if DEBUG
+    output->checkSizes();
+#endif
 }
 
 void FilterHashJoin::run_processitr_rowversion(FCInternalTableItr *itr, const bool cartprod,
