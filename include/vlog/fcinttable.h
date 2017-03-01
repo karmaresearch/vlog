@@ -480,12 +480,13 @@ private:
 
     std::shared_ptr<const FCInternalTable> cloneWithIteration(
         const size_t it) const {
-        if (!unmergedSegments.empty())
-            throw 10;
+        // if (!unmergedSegments.empty())
+        //     throw 10;
 
         std::shared_ptr<const FCInternalTable> newtab(
-            new InmemoryFCInternalTable(
-                it, nfields, sorted, this->values));
+	    unmergedSegments.empty() ? 
+		new InmemoryFCInternalTable(it, nfields, sorted, this->values) :
+	    new InmemoryFCInternalTable(nfields, it, sorted, values, unmergedSegments));
         return newtab;
     }
 
