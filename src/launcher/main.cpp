@@ -201,7 +201,7 @@ bool checkParams(po::variables_map &vm, int argc, const char** argv,
 
         } else if (cmd == "mat") {
             string path = vm["rules"].as<string>();
-            if (!fs::exists(path)) {
+            if (path != "" && !fs::exists(path)) {
                 printErrorMsg((string("The rule file '") +
                             path + string("' does not exists")).c_str());
                 return false;

@@ -605,6 +605,11 @@ Program::Program(const uint64_t assignedIds,
 }
 
 void Program::readFromFile(std::string pathFile) {
+    BOOST_LOG_TRIVIAL(info) << "Read program from file " << pathFile;
+    if (pathFile == "") {
+	BOOST_LOG_TRIVIAL(info) << "Using default rule TI(A,B,C) :- TE(A,B,C)";
+	parseRule("TI(A,B,C) :- TE(A,B,C)");
+    } else {
     std::ifstream file(pathFile);
     std::string line;
     while (std::getline(file, line)) {
@@ -614,6 +619,7 @@ void Program::readFromFile(std::string pathFile) {
         }
     }
     BOOST_LOG_TRIVIAL(info) << "New assigned constants: " << additionalConstants.size();
+    }
 }
 
 void Program::readFromString(std::string rules) {
