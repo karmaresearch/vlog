@@ -396,7 +396,7 @@ void Exporter::generateTridentDiffIndex(string outputdir) {
     string diffdir = Updater::getPathForUpdate(outputdir);
 
     DiffIndex3::createDiffIndex(DiffIndex::TypeUpdate::ADDITION,
-            diffdir, outputdir,
+            diffdir, outputdir + "/_diff",
             all_s, all_p, all_o, false, q, true);
 }
 
