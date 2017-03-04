@@ -398,6 +398,12 @@ void Exporter::generateTridentDiffIndex(string outputdir) {
     DiffIndex3::createDiffIndex(DiffIndex::TypeUpdate::ADDITION,
             diffdir, outputdir + "/_diff",
             all_s, all_p, all_o, false, q, true);
+    //Write the type of file
+    string flagup = diffdir + "/ADD";
+    //write also an additional dictionary (if any) TODO!
+    // writeDict(kb.getDictMgmt(), locationupdate, tmpdict);
+    ofstream ofs(flagup);
+    ofs.close();
 }
 
 void Exporter::generateNTTriples(string outputdir, bool decompress) {
