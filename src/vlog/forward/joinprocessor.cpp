@@ -623,11 +623,12 @@ void JoinExecutor::verificativeJoin(
 
     //BOOST_LOG_TRIVIAL(debug) << "plan.posFromFirst[currentLiteral][0].second = "
 //  << plan.posFromFirst[currentLiteral][0].second
-//  << ", plan.joinCoordinates[currentLiteral][0].second = "
-//       << plan.joinCoordinates[currentLiteral][0].second;
+//  << ", plan.joinCoordinates[currentLiteral][0].first = "
+//       << plan.joinCoordinates[currentLiteral][0].first;
 
+    // If the index of the result in the intermediate is equal to the index of the join in the intermediate...
     if (plan.posFromFirst[currentLiteral][0].second ==
-            plan.joinCoordinates[currentLiteral][0].second &&
+            plan.joinCoordinates[currentLiteral][0].first &&
             plan.sizeOutputRelation[currentLiteral] == 1 &&
             currentLiteral == plan.posFromFirst.size() - 1) { //The last literal checks that this is the last join we execute
         BOOST_LOG_TRIVIAL(debug) << "Verificative join one column same output";
