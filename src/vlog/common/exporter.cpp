@@ -93,19 +93,20 @@ void Exporter::extractTriples(std::vector <uint64_t> &all_s,
 
         bool isFirst = true;
         while (!tableItr.isEmpty()) {
+            std::shared_ptr<const FCInternalTable> intTable = tableItr.getCurrentTable();
+            size_t nrows = intTable->getNRows();
             if (isFirst) {
                 isFirst = false;
                 if (tableItr.getCurrentBlock()->rule->ruleid == it->ruleid) {
                     //Skip the first table since they are all duplicates
+		    BOOST_LOG_TRIVIAL(debug) << "Skipping table of " << nrows << " nrows, iter = " << tableItr.getCurrentIteration();
                     tableItr.moveNextCount();
                     continue;
                 }
             }
 
             ntables++;
-            std::shared_ptr<const FCInternalTable> intTable = tableItr.getCurrentTable();
-            size_t nrows = intTable->getNRows();
-            BOOST_LOG_TRIVIAL(debug) << "Copying table of " << nrows << " nrows";
+            BOOST_LOG_TRIVIAL(debug) << "Copying table of " << nrows << " nrows, iter = " << tableItr.getCurrentIteration();
 
             uint8_t currentPosToCopy = 0;
             for (int i = 0; i < 3; ++i) {
