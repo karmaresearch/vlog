@@ -101,6 +101,9 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal, const siz
     bool shouldFilter = literal.getNUniqueVars() < literal.getTupleSize();
 
     if (shouldFilter) {
+	if (blocks.size() == 0) {
+	    return std::shared_ptr<FCTable>(this);;
+	}
         std::shared_ptr<FCTable> output;
         std::vector<FCBlock>::iterator itr = blocks.begin();
         std::string signature = getSignature(literal);

@@ -34,7 +34,7 @@ public:
 
     Dictionary(uint64_t startingCounter) : counter(startingCounter) {
         map.set_empty_key("");
-        inverseMap.set_empty_key(0);
+        inverseMap.set_empty_key((Term_t) -1);
     }
 
     SimpleHashmap &getMap() {
