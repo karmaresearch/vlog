@@ -24,7 +24,7 @@ Next,
 make TRIDENT=<location of trident>
 ```
 
-should compile everything. If you want to create a debug version of the program, run
+should compile everything (replace <location of trident>). If you want to create a debug version of the program, run
 
 ```
 make DEBUG=1
