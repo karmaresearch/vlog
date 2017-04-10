@@ -35,6 +35,9 @@ bool VLogLayer::lookup(const std::string& text,
 	    case ::Type::ID::Boolean:
 		tp = "http://www.w3.org/2001/XMLSchema#boolean";
 		break;
+	    case ::Type::ID::Date:
+		tp = "http://www.w3.org/2001/XMLSchema#date";
+		break;
 	    default:
 		// TODO?
 		break;
