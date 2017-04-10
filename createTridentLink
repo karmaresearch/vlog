@@ -1,3 +1,4 @@
 #!/bin/sh
+rm -f MyTridentLink
 ln -s "$1" MyTridentLink 2>/dev/null
 echo MyTridentLink
