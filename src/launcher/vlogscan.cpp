@@ -6,10 +6,12 @@ uint64_t VLogScan::getValue1() {
 }
 
 uint64_t VLogScan::getValue2() {
+    assert(aggr != DBLayer::Aggr_t::AGGR_SKIP_2LAST);
     return iterator->getElementAt(value2_index);
 }
 
 uint64_t VLogScan::getValue3() {
+    assert(aggr == DBLayer::Aggr_t::AGGR_NO);
     return iterator->getElementAt(value3_index);
 }
 
@@ -32,6 +34,10 @@ bool VLogScan::first() {
 }
 
 bool VLogScan::first(uint64_t first, bool constrained) {
+    if (aggr == DBLayer::Aggr_t::AGGR_SKIP_2LAST) {
+	// TODO: support this?
+	throw 10;
+    }
     return VLogScan::first(first, constrained, 0, false);
 }
 
@@ -39,7 +45,7 @@ bool VLogScan::first(uint64_t first, bool constrained1, uint64_t second, bool co
     bool resp = VLogScan::first(first, constrained1, second, constrained2, 0, false);
 
     //I must instruct the tupletableitr to exclude the last column
-    if (resp) {
+    if (resp && aggr != DBLayer::Aggr_t::AGGR_NO) {
         ((TupleTableItr*)iterator.get())->skipLastColumn();
     }
     return resp;
