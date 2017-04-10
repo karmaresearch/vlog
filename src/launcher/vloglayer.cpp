@@ -46,7 +46,6 @@ bool VLogLayer::lookup(const std::string& text,
 
     if (resp)
         id = (uint64_t) longId;
-    BOOST_LOG_TRIVIAL(error) << "lookup: text = " << text << ", type = " << type << ", result = " << resp;
     return resp;
 }
 
