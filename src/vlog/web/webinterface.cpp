@@ -209,7 +209,7 @@ void WebInterface::execSPARQLQuery(string sparqlquery,
 
     // Run the optimizer
     PlanGen *plangen = new PlanGen();
-    Plan* plan = plangen->translate(db, *queryGraph.get());
+    Plan* plan = plangen->translate(db, *queryGraph.get(), false);
     // delete plangen;  Commented out, because this also deletes all plans!
     // In particular, it corrupts the current plan.
     // --Ceriel

@@ -477,11 +477,13 @@ void execSPARQLQuery(EDBLayer &edb, po::variables_map &vm) {
     //Parse the rules and create a program
     Program p(edb.getNTerms(), &edb);
     string pathRules = vm["rules"].as<string>();
-    p.readFromFile(pathRules);
-    p.sortRulesByIDBPredicates();
+    if (pathRules != "") {
+	p.readFromFile(pathRules);
+	p.sortRulesByIDBPredicates();
+    }
 
     //Set up the ruleset and perform the pre-materialization if necessary
-    {
+    if (pathRules != "") {
         if (!vm["automat"].empty()) {
             //Automatic prematerialization
             timens::system_clock::time_point start = timens::system_clock::now();
@@ -508,7 +510,26 @@ void execSPARQLQuery(EDBLayer &edb, po::variables_map &vm) {
         }
     }
 
-    VLogLayer db(edb, p, vm["reasoningThreshold"].as<long>(), "TI", "TE");
+    DBLayer *db = NULL;
+    if (pathRules == "") {
+	PredId_t p = edb.getFirstEDBPredicate();
+	string typedb = edb.getTypeEDBPredicate(p);
+	if (typedb == "Trident") {
+	    auto edbTable = edb.getEDBTable(p);
+	    KB *kb = ((TridentTable*)edbTable.get())->getKB();
+	    TridentLayer *tridentlayer = new TridentLayer(*kb);
+	    tridentlayer->disableBifocalSampling();
+	    db = tridentlayer;
+	}
+    }
+    if (db == NULL) {
+	if (pathRules == "") {
+	    // Use default rule
+	    p.readFromFile(pathRules);
+	    p.sortRulesByIDBPredicates();
+	}
+	db = new VLogLayer(edb, p, vm["reasoningThreshold"].as<long>(), "TI", "TE");
+    }
     string queryFileName = vm["query"].as<string>();
     // Parse the query
     std::fstream inFile;
@@ -517,8 +538,9 @@ void execSPARQLQuery(EDBLayer &edb, po::variables_map &vm) {
     strStream << inFile.rdbuf();//read the file
 
     WebInterface::execSPARQLQuery(strStream.str(), vm["explain"].as<bool>(),
-            edb.getNTerms(), db, true, false, NULL, NULL,
+            edb.getNTerms(), *db, true, false, NULL, NULL,
             NULL);
+    delete db;
 
     /*QueryDict queryDict(edb.getNTerms());
       QueryGraph queryGraph;
