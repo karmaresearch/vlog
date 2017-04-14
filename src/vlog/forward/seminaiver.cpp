@@ -311,10 +311,10 @@ void SemiNaiver::executeUntilSaturation(std::vector<StatIteration> &costRules) {
                     response = executeRule(ruleset[currentRule],
                                            iteration,
                                            NULL);
+                    stat.iteration = iteration;
                     ruleset[currentRule].lastExecution = iteration++;
                     sec = boost::chrono::system_clock::now() - start;
                     ++recursiveIterations;
-                    stat.iteration = iteration;
                     stat.rule = &ruleset[currentRule].rule;
                     stat.time = sec.count() * 1000;
                     stat.derived = response;
