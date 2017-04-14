@@ -204,24 +204,25 @@ const uint8_t ncolumns, const uint8_t *columns) {
     //Fields are the fields on which this table should be sorted
     std::vector<uint8_t> presortFields = fields;
     for (uint8_t i = 0; i < ncolumns; ++i) {
+	int columnNo = columns[i];
         std::vector<uint8_t> columnpresort;
         for(int j = 0; j < presortFields.size(); ++j) {
-            if (presortFields[j] != i)
+            if (presortFields[j] != columnNo)
                 columnpresort.push_back(presortFields[j]);
             else
                 break;
         }
 
         output.push_back(std::shared_ptr<Column>(
-                             new EDBColumn(*layer, *query, columns[i], columnpresort, false)));
+                             new EDBColumn(*layer, *query, columnNo, columnpresort, false)));
         //Add it only if it is not there
         bool found = false;
         for(int j = 0; j < presortFields.size() && !found; ++j)
-            if (presortFields[j] == i)
+            if (presortFields[j] == columnNo)
                 found = true;
 
         if (!found) {
-            presortFields.push_back(i);
+            presortFields.push_back(columnNo);
         }
     }
     return output;
