@@ -502,7 +502,7 @@ TupleIterator *Reasoner::getIncrReasoningIterator(Literal &query,
     std::shared_ptr<TupleTable> pFinalTable(outputTable);
 
     //Add sort by if requested
-    if (!sortByFields->empty()) {
+    if (sortByFields != NULL && !sortByFields->empty()) {
         std::shared_ptr<TupleTable> sortTab = std::shared_ptr<TupleTable>(
                 pFinalTable->sortBy(*sortByFields));
         return new TupleTableItr(sortTab);
@@ -615,7 +615,7 @@ TupleIterator *Reasoner::getMagicIterator(Literal &query,
     Literal outputLiteral(magicProgram->getPredicate(inputOutputRelIDs.second), t);
     BOOST_LOG_TRIVIAL(debug) << "outputLiteral = " << outputLiteral.tostring(magicProgram.get(), &edb);
     BOOST_LOG_TRIVIAL(debug) << "returnOnlyVars = " << returnOnlyVars;
-    BOOST_LOG_TRIVIAL(debug) << "sortByFields->empty() = " << sortByFields->empty();
+    BOOST_LOG_TRIVIAL(debug) << "sortByFields->empty() = " << (sortByFields == NULL ? true : sortByFields->empty());
 
     FCIterator itr = naiver->getTable(outputLiteral, 0, (size_t) - 1);
 
@@ -663,7 +663,7 @@ TupleIterator *Reasoner::getMagicIterator(Literal &query,
     std::shared_ptr<TupleTable> pFinalTable(finalTable);
     delete naiver;
 
-    if (!sortByFields->empty()) {
+    if (sortByFields != NULL && !sortByFields->empty()) {
         std::shared_ptr<TupleTable> sortTab = std::shared_ptr<TupleTable>(
                 pFinalTable->sortBy(*sortByFields));
         return new TupleTableItr(sortTab);
@@ -758,7 +758,7 @@ TupleIterator *Reasoner::getTopDownIterator(Literal &query,
     std::shared_ptr<TupleTable> pFinalTable(finalTable);
 
     //Add sort by if requested
-    if (!sortByFields->empty()) {
+    if (sortByFields != NULL && !sortByFields->empty()) {
         std::shared_ptr<TupleTable> sortTab = std::shared_ptr<TupleTable>(
                 pFinalTable->sortBy(*sortByFields));
         return new TupleTableItr(sortTab);

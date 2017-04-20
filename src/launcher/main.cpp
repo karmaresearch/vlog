@@ -81,6 +81,7 @@ void printHelp(const char *programName, po::options_description &desc) {
     cout << "help\t\t produce help message." << endl;
     cout << "mat\t\t perform a full materialization." << endl;
     cout << "query\t\t execute a SPARQL query." << endl;
+    cout << "queryLiteral\t\t execute a Literal query." << endl;
     cout << "server\t\t starts in server mode." << endl;
     cout << "load\t\t load a Trident KB." << endl;
     cout << "lookup\t\t lookup for values in the dictionary." << endl << endl;
@@ -105,7 +106,7 @@ bool checkParams(po::variables_map &vm, int argc, const char** argv,
         cmd = argv[1];
     }
 
-    if (cmd != "help" && cmd != "query" && cmd != "lookup" && cmd != "load"
+    if (cmd != "help" && cmd != "query" && cmd != "lookup" && cmd != "load" && cmd != "queryLiteral"
             && cmd != "mat" && cmd != "rulesgraph" && cmd != "server") {
         printErrorMsg(
                 (string("The command \"") + cmd + string("\" is unknown.")).c_str());
@@ -117,8 +118,8 @@ bool checkParams(po::variables_map &vm, int argc, const char** argv,
         return false;
     } else {
         /*** Check specific parameters ***/
-        if (cmd == "query") {
-            string queryFile = vm["query"].as<string>();
+        if (cmd == "query" || cmd == "queryLiteral") {
+	    string queryFile = vm["query"].as<string>();
             if (queryFile != "" && !fs::exists(queryFile)) {
                 printErrorMsg(
                         (string("The file ") + queryFile
@@ -214,9 +215,9 @@ bool checkParams(po::variables_map &vm, int argc, const char** argv,
 
 bool initParams(int argc, const char** argv, po::variables_map &vm) {
 
-    po::options_description query_options("Options for <query> or <mat>");
+    po::options_description query_options("Options for <query>, <queryLiteral> or <mat>");
     query_options.add_options()("query,q", po::value<string>()->default_value(""),
-            "The path of the file with a SPARQL query. It is REQUIRED with <query>");
+            "The path of the file with a query. It is REQUIRED with <query> or <queryLiteral>");
     query_options.add_options()("rules", po::value<string>()->default_value(""),
             "Activate reasoning during query answering using the rules defined at this path. It is REQUIRED in case the command is <mat>. Default is '' (disabled).");
     query_options.add_options()("reasoningThreshold", po::value<long>()->default_value(1000000),
@@ -635,6 +636,99 @@ cout.rdbuf(strm_buffer);
 }*/
 }
 
+void execLiteralQuery(EDBLayer &edb, po::variables_map &vm) {
+    //Parse the rules and create a program
+    Program p(edb.getNTerms(), &edb);
+    string pathRules = vm["rules"].as<string>();
+    if (pathRules != "") {
+	p.readFromFile(pathRules);
+	p.sortRulesByIDBPredicates();
+    }
+
+    //Set up the ruleset and perform the pre-materialization if necessary
+    if (pathRules != "") {
+        if (!vm["automat"].empty()) {
+            //Automatic prematerialization
+            timens::system_clock::time_point start = timens::system_clock::now();
+            Materialization *mat = new Materialization();
+            mat->guessLiteralsFromRules(p, edb);
+            mat->getAndStorePrematerialization(edb, p, true,
+                    vm["timeoutPremat"].as<int>());
+            delete mat;
+            boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+                - start;
+            BOOST_LOG_TRIVIAL(info) << "Runtime pre-materialization = " <<
+                sec.count() * 1000 << " milliseconds";
+        } else if (vm["premat"].as<string>() != "") {
+            timens::system_clock::time_point start = timens::system_clock::now();
+            Materialization *mat = new Materialization();
+            mat->loadLiteralsFromFile(p, vm["premat"].as<string>());
+            mat->getAndStorePrematerialization(edb, p, false, ~0l);
+            p.sortRulesByIDBPredicates();
+            delete mat;
+            boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+                - start;
+            BOOST_LOG_TRIVIAL(info) << "Runtime pre-materialization = " <<
+                sec.count() * 1000 << " milliseconds";
+        }
+    }
+
+    /*
+    DBLayer *db = NULL;
+    if (pathRules == "") {
+	PredId_t p = edb.getFirstEDBPredicate();
+	string typedb = edb.getTypeEDBPredicate(p);
+	if (typedb == "Trident") {
+	    auto edbTable = edb.getEDBTable(p);
+	    KB *kb = ((TridentTable*)edbTable.get())->getKB();
+	    TridentLayer *tridentlayer = new TridentLayer(*kb);
+	    tridentlayer->disableBifocalSampling();
+	    db = tridentlayer;
+	}
+    }
+    if (db == NULL) {
+	if (pathRules == "") {
+	    // Use default rule
+	    p.readFromFile(pathRules);
+	    p.sortRulesByIDBPredicates();
+	}
+	db = new VLogLayer(edb, p, vm["reasoningThreshold"].as<long>(), "TI", "TE");
+    }
+    */
+
+    string queryFileName = vm["query"].as<string>();
+    // Parse the query
+    std::fstream inFile;
+    inFile.open(queryFileName);//open the input file
+    string query;
+    std::getline(inFile, query);
+    inFile.close();
+    Literal literal = p.parseLiteral(query);
+    Reasoner reasoner(vm["reasoningThreshold"].as<long>());
+    TupleIterator *iter = reasoner.getIterator(literal, NULL, NULL, edb, p, true, NULL);
+    int sz = iter->getTupleSize();
+    while (iter->hasNext()) {
+	iter->next();
+	for (int i = 0; i < sz; i++) {
+	    char supportText[MAX_TERM_SIZE];
+	    uint64_t value = iter->getElementAt(i);
+	    if (!edb.getDictText(value, supportText)) {
+		cerr << "Term " << value << " not found" << endl;
+		cout << value;
+	    } else {
+		if (i != 0) {
+		    cout << ", ";
+		}
+		cout << supportText;
+	    }
+        }
+	cout << endl;
+    }
+
+    delete iter;
+    // delete db;
+}
+
 int main(int argc, const char** argv) {
 
     //Init params
@@ -694,12 +788,16 @@ int main(int argc, const char** argv) {
 
     BOOST_LOG_TRIVIAL(debug) << "sizeof(EDBLayer) = " << sizeof(EDBLayer);
 
-    if (cmd == "query") {
+    if (cmd == "query" || cmd == "queryLiteral") {
         EDBConf conf(edbFile);
         EDBLayer *layer = new EDBLayer(conf, false);
 
         //Execute the query
-        execSPARQLQuery(*layer, vm);
+	if (cmd == "query") {
+	    execSPARQLQuery(*layer, vm);
+	} else {
+	    execLiteralQuery(*layer, vm);
+	}
         delete layer;
     } else if (cmd == "lookup") {
         EDBConf conf(edbFile);
