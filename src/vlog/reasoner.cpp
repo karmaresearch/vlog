@@ -623,7 +623,7 @@ TupleIterator *Reasoner::getMagicIterator(Literal &query,
     if (returnOnlyVars) {
         finalTable = new TupleTable(outputLiteral.getNVars());
     } else {
-        finalTable = new TupleTable(3);
+        finalTable = new TupleTable(query.getTupleSize());
     }
 
     std::vector<uint8_t> posVars = outputLiteral.getPosVars();
@@ -632,12 +632,13 @@ TupleIterator *Reasoner::getMagicIterator(Literal &query,
 	// BOOST_LOG_TRIVIAL(debug) << "table empty? " << table->isEmpty();
         FCInternalTableItr *itrTable = table->getIterator();
 
+	// itrTable contains only variables. 
         if (returnOnlyVars) {
             //const uint8_t rowSize = table->getRowSize();
             while (itrTable->hasNext()) {
                 itrTable->next();
                 for (uint8_t j = 0; j < posVars.size(); ++j) {
-                    finalTable->addValue(itrTable->getCurrentValue(posVars[j]));
+                    finalTable->addValue(itrTable->getCurrentValue(j));
                 }
                 // Not sure about this. Was:
                 // for (uint8_t j = 0; j < rowsize; ++j) {
