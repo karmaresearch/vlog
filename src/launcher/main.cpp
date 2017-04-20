@@ -704,28 +704,65 @@ void execLiteralQuery(EDBLayer &edb, po::variables_map &vm) {
     std::getline(inFile, query);
     inFile.close();
     Literal literal = p.parseLiteral(query);
+    boost::chrono::system_clock::time_point startQ1 = boost::chrono::system_clock::now();
     Reasoner reasoner(vm["reasoningThreshold"].as<long>());
     TupleIterator *iter = reasoner.getIterator(literal, NULL, NULL, edb, p, true, NULL);
     int sz = iter->getTupleSize();
+    long count = 0;
     while (iter->hasNext()) {
 	iter->next();
+	count++;
 	for (int i = 0; i < sz; i++) {
 	    char supportText[MAX_TERM_SIZE];
 	    uint64_t value = iter->getElementAt(i);
+	    if (i != 0) {
+		cout << ", ";
+	    }
 	    if (!edb.getDictText(value, supportText)) {
 		cerr << "Term " << value << " not found" << endl;
 		cout << value;
 	    } else {
-		if (i != 0) {
-		    cout << ", ";
-		}
 		cout << supportText;
 	    }
         }
 	cout << endl;
     }
+    boost::chrono::duration<double> durationQ1 = boost::chrono::system_clock::now() - startQ1;
+    BOOST_LOG_TRIVIAL(info) << "Query runtime = " << (durationQ1.count() * 1000) << " msec, #rows = " << count;
 
     delete iter;
+    int times = vm["repeatQuery"].as<int>();
+    if (times > 0) {
+	// Redirect output
+	ofstream file("/dev/null");
+	streambuf* strm_buffer = cout.rdbuf();
+	cout.rdbuf(file.rdbuf());
+	boost::chrono::system_clock::time_point startQ = boost::chrono::system_clock::now();
+	for (int j = 0; j < times; j++) {
+	    TupleIterator *iter = reasoner.getIterator(literal, NULL, NULL, edb, p, true, NULL);
+	    int sz = iter->getTupleSize();
+	    while (iter->hasNext()) {
+		iter->next();
+		for (int i = 0; i < sz; i++) {
+		    char supportText[MAX_TERM_SIZE];
+		    uint64_t value = iter->getElementAt(i);
+		    if (i != 0) {
+			cout << ", ";
+		    }
+		    if (!edb.getDictText(value, supportText)) {
+			cout << value;
+		    } else {
+			cout << supportText;
+		    }
+		}
+	    }
+	    cout << endl;
+	}
+	boost::chrono::duration<double> durationQ = boost::chrono::system_clock::now() - startQ;
+	//Restore stdout
+	cout.rdbuf(strm_buffer);
+	BOOST_LOG_TRIVIAL(info) << "Repeated query runtime = " << (durationQ.count() / times) * 1000 << " milliseconds";
+    }
     // delete db;
 }
 
