@@ -794,6 +794,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     BOOST_LOG_TRIVIAL(debug) << "Iteration: " << iteration <<
                             " Rule: " << rule.tostring(program, &layer);
 
+
     //Set up timers
     const boost::chrono::system_clock::time_point startRule = timens::system_clock::now();
     boost::chrono::duration<double> durationJoin(0);
@@ -803,6 +804,11 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     //Get table corresponding to the head predicate
     FCTable *endTable = getTable(idHeadPredicate, headLiteral.
                                  getPredicate().getCardinality());
+
+    if (headLiteral.getNVars() == 0 && ! endTable->isEmpty()) {
+	BOOST_LOG_TRIVIAL(debug) << "No variables and endtable not empty, so cannot find new derivations";
+	return false;
+    }
 
     //In case the rule has many IDBs predicates, I calculate several
     //combinations of countings.
@@ -910,8 +916,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                                      " min=" << min << " max=" << max;
 
             if (first) {
-		if (bodyLiteral->getNVars() > 0) {
-		    boost::chrono::system_clock::time_point startFirstA = timens::system_clock::now();
+		boost::chrono::system_clock::time_point startFirstA = timens::system_clock::now();
+		if (lastLiteral || bodyLiteral->getNVars() > 0) {
 		    processRuleFirstAtom(nBodyLiterals, bodyLiteral,
 					 headLiteral, min, max, processedTables,
 					 lastLiteral, endTable,
