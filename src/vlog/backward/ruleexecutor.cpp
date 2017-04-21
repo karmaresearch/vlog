@@ -399,6 +399,12 @@ void RuleExecutor::evaluateRule(const uint8_t bodyAtom,
             std::vector<Term_t> bindings = supplRelations[bodyAtom]->
                                            getUniqueSortedProjection(
                                                posJoinsSupplRel);
+	    // posJoinsLiteral is variable position, so for instance 1 means second variable.
+	    // However, in edb layer, it means position in query, which may also contain constants.
+	    // So, replace by variable positions in query.
+	    for (int i = 0; i < posJoinsLiteral.size(); i++) {
+		posJoinsLiteral[i] = l.getPosVars()[posJoinsLiteral[i]];
+	    }
             layer.query(&query, retrievedBindings,
                         &posJoinsLiteral, &bindings);
         } else {
