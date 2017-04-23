@@ -1,0 +1,4 @@
+TI(X,rdfs:subPropertyOf,Y)
+TI(A,rdfs:subClassOf,B)
+TI(A,rdfs:domain,B)
+TI(A,rdfs:range,B)
