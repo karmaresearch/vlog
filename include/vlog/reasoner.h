@@ -39,12 +39,6 @@ private:
                                           std::vector<uint8_t> *posBindings,
                                           std::vector<Term_t> *valueBindings);
 
-    TupleIterator *getTopDownIterator(Literal &query,
-            std::vector<uint8_t> * posJoins,
-            std::vector<Term_t> *possibleValuesJoins,
-            EDBLayer &layer, Program &program,
-            bool returnOnlyVars,
-            std::vector<uint8_t> *sortByFields);
 
     TupleIterator *getIncrReasoningIterator(Literal &query,
             std::vector<uint8_t> * posJoins,
@@ -52,13 +46,6 @@ private:
             EDBLayer &layer, Program &program,
             bool returnOnlyVars,
             std::vector<uint8_t> *sortByFields);
-
-    TupleIterator *getMagicIterator(Literal &query,
-                                           std::vector<uint8_t> * posJoins,
-                                           std::vector<Term_t> *possibleValuesJoins,
-                                           EDBLayer &layer, Program &program,
-                                           bool returnOnlyVars,
-                                           std::vector<uint8_t> *sortByFields);
 
 public:
 
@@ -75,14 +62,19 @@ public:
                                            bool returnOnlyVars,
                                            std::vector<uint8_t> *sortByFields);
 
-    /*
-    TupleIterator *getIncrReasoningIterator(Pattern *pattern,
-                                            std::vector<uint8_t> * posJoins,
-                                            std::vector<Term_t> *possibleValuesJoins,
-                                            EDBLayer &layer, Program &program,
-                                            DictMgmt *dict,
-                                            bool returnOnlyVars);
-    */
+    TupleIterator *getTopDownIterator(Literal &query,
+            std::vector<uint8_t> * posJoins,
+            std::vector<Term_t> *possibleValuesJoins,
+            EDBLayer &layer, Program &program,
+            bool returnOnlyVars,
+            std::vector<uint8_t> *sortByFields);
+
+    TupleIterator *getMagicIterator(Literal &query,
+                                           std::vector<uint8_t> * posJoins,
+                                           std::vector<Term_t> *possibleValuesJoins,
+                                           EDBLayer &layer, Program &program,
+                                           bool returnOnlyVars,
+                                           std::vector<uint8_t> *sortByFields);
 
     static std::shared_ptr<SemiNaiver> fullMaterialization(EDBLayer &layer,
             Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
