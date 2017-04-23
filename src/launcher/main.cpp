@@ -223,7 +223,9 @@ bool initParams(int argc, const char** argv, po::variables_map &vm) {
     query_options.add_options()("reasoningThreshold", po::value<long>()->default_value(1000000),
             "This parameter sets a threshold to estimate the reasoning cost of a pattern. This cost can be broadly associated to the cardinality of the pattern. It is used to choose either TopDown or Magic evalution. Default is 1000000 (1M).");
     query_options.add_options()("reasoningAlgo", po::value<string>()->default_value(""),
-            "Determines the reasoning algo (only for <queryLiteral>). Possible values are \"qsqr\", \"magic\", \"all\".");
+            "Determines the reasoning algo (only for <queryLiteral>). Possible values are \"qsqr\", \"magic\", \"auto\".");
+    query_options.add_options()("selectionStrategy", po::value<string>()->default_value(""),
+            "Determines the selection strategy (only for <queryLiteral>, when \"auto\" is specified for the reasoningAlgorithm). Possible values are \"cardEst\", ... (to be extended) .");
     query_options.add_options()("matThreshold", po::value<long>()->default_value(10000000),
             "In case reasoning is activated, this parameter sets a threshold above which a full materialization is performed before we execute the query. Default is 10000000 (10M).");
     query_options.add_options()("automat",
@@ -638,17 +640,38 @@ cout.rdbuf(strm_buffer);
 }*/
 }
 
-void runLiteralQuery(EDBLayer &edb, string algo, Program &p, Literal &literal, Reasoner &reasoner, int times) {
+string selectStrategy(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reasoner, po::variables_map &vm) {
+    string strategy = vm["selectionStrategy"].as<string>();
+    if (strategy == "" || strategy == "cardEst") {
+	// Use the original cardinality estimation strategy
+	ReasoningMode mode = reasoner.chooseMostEfficientAlgo(literal, edb, p, NULL, NULL);
+	return mode == TOPDOWN ? "qsqr" : "magic";
+    }
+    // Add strategies here ...
+    throw 10;
+}
+
+void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reasoner, po::variables_map &vm) {
 
     boost::chrono::system_clock::time_point startQ1 = boost::chrono::system_clock::now();
 
+    string algo = vm["reasoningAlgo"].as<string>();
+    int times = vm["repeatQuery"].as<int>();
+
+    if (algo == "auto" || algo == "") {
+	algo = selectStrategy(edb, p, literal, reasoner, vm);
+	BOOST_LOG_TRIVIAL(info) << "Selection strategy determined that we go for " << algo;
+    }
+
     TupleIterator *iter;
+
     if (algo == "magic") {
         iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, true, NULL);
     } else if (algo == "qsqr") {
         iter = reasoner.getTopDownIterator(literal, NULL, NULL, edb, p, true, NULL);
     } else {
-        iter = reasoner.getIterator(literal, NULL, NULL, edb, p, true, NULL);
+        // Unknown value for algo.
+	throw 10;
     }
     int sz = iter->getTupleSize();
     long count = 0;
@@ -757,14 +780,7 @@ void execLiteralQuery(EDBLayer &edb, po::variables_map &vm) {
     }
     Literal literal = p.parseLiteral(query);
     Reasoner reasoner(vm["reasoningThreshold"].as<long>());
-    string algo = vm["reasoningAlgo"].as<string>();
-    int times = vm["repeatQuery"].as<int>();
-    if (algo == "all") {
-        runLiteralQuery(edb, "qsqr", p, literal, reasoner, times);
-        runLiteralQuery(edb, "magic", p, literal, reasoner, times);
-    } else {
-        runLiteralQuery(edb, algo, p, literal, reasoner, times);
-    }
+    runLiteralQuery(edb, p, literal, reasoner, vm);
 }
 
 int main(int argc, const char** argv) {

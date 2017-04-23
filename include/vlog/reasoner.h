@@ -34,11 +34,6 @@ private:
                                      std::vector<uint8_t> *posJoins,
                                      std::vector<Term_t> *possibleValuesJoins);
 
-    ReasoningMode chooseMostEfficientAlgo(Literal &query,
-                                          EDBLayer &layer, Program &program,
-                                          std::vector<uint8_t> *posBindings,
-                                          std::vector<Term_t> *valueBindings);
-
 
     TupleIterator *getIncrReasoningIterator(Literal &query,
             std::vector<uint8_t> * posJoins,
@@ -54,6 +49,11 @@ public:
     size_t estimate(Literal &query, std::vector<uint8_t> *posBindings,
                     std::vector<Term_t> *valueBindings, EDBLayer &layer,
                     Program &program);
+
+    ReasoningMode chooseMostEfficientAlgo(Literal &query,
+                                          EDBLayer &layer, Program &program,
+                                          std::vector<uint8_t> *posBindings,
+                                          std::vector<Term_t> *valueBindings);
 
     TupleIterator *getIterator(Literal &query,
                                            std::vector<uint8_t> * posJoins,
