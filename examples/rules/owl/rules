@@ -1,0 +1,136 @@
+TI(A,B,C) :- TE(A,B,C)
+
+//Lists
+ENDL(N) :- TI(N,rdf:rest,rdf:nil)
+LVI(N,EL) :- TI(N,rdf:first,EL)
+LNI(N,S) :- TI(N,rdf:rest,S)
+
+//Closure lists
+C_LNI(N,N) :- LNI(N,S)
+C_LNI(N,S) :- C_LNI(N,X),LNI(X,S)
+C_LVI(N,S) :- C_LNI(N,X),LVI(X,S)
+
+//Table 4 is omitted
+
+//Table 5
+//prp-dom
+TI(A,rdf:type,B) :- TI(A,P,X),TI(P,rdfs:domain,B)
+//prp-rng
+TI(A,rdf:type,B) :- TI(X,P,A),TI(P,rdfs:range,B)
+//prp-fp
+TI(A,owl:sameAs,B) :- TI(P,rdf:type,owl:FunctionalProperty),TI(X,P,A),TI(X,P,B)
+//prp-ifp
+TI(A,owl:sameAs,B) :- TI(P,rdf:type,owl:InverseFunctionalProperty),TI(A,P,X),TI(B,P,X)
+//prp-symp
+TI(Y,P,X) :- TI(P,rdf:type,owl:SymmetricProperty),TI(X,P,Y)
+//prp-trp
+TI(X,P,Z) :- TI(P,rdf:type,owl:TransitiveProperty),TI(X,P,Y),TI(Y,P,Z)
+//prp-spo1
+TI(A,P,B) :- TI(A,P1,B),TI(P1,rdfs:subPropertyOf,P)
+//prp-spo2
+PCA(LIST,U1,UN1) :- TI(P,owl:propertyChainAxiom,HEAD),C_LNI(HEAD,LIST),ENDL(LIST),LVI(LIST,P),TI(U1,P,UN1)
+PCA(LIST,U1,UN1) :- TI(P,owl:propertyChainAxiom,HEAD),C_LNI(HEAD,LIST),LNI(LIST,NEXT),LVI(LIST,P),TI(U1,P,Y),PCA(NEXT,Y,UN1)
+TI(U1,P,UN1) :- TI(P,owl:propertyChainAxiom,HEAD),PCA(HEAD,U1,UN1)
+//prp-eqp1
+TI(X,P2,Y) :- TI(P1,owl:equivalentProperty,P2),TI(X,P1,Y)
+//prp-eqp2
+TI(X,P1,Y) :- TI(P1,owl:equivalentProperty,P2),TI(X,P2,Y)
+//prp-inv1
+TI(Y,P2,X) :- TI(P1,owl:inverseOf,P2),TI(X,P1,Y)
+//prp-inv2
+TI(Y,P1,X) :- TI(P1,owl:inverseOf,P2),TI(X,P2,Y)
+//prp-key
+HSK(LIST,X,Y) :- TI(C,owl:hasKey,HEAD),C_LNI(HEAD,LIST),ENDL(LIST),LVI(LIST,P),TI(X,P,Z),TI(Y,P,Z)
+HSK(LIST,X,Y) :- TI(C,owl:hasKey,HEAD),C_LNI(HEAD,LIST),LNI(LIST,NEXT),LVI(LIST,P),TI(X,P,Z),TI(Y,P,Z),HSK(NEXT,X,Y)
+TI(X,owl:sameAs,Y) :- TI(C,owl:hasKey,HEAD),TI(X,rdf:type,C),TI(Y,rdf:type,C),HSK(HEAD,X,Y)
+
+//Table 6
+//cls-int1
+//one element
+TI(X,rdf:type,C) :- TI(C,owl:intersectionOf,HEAD),LVI(HEAD,A),ENDL(HEAD),TI(X,rdf:type,A)
+//List with n elements
+INT_L(X,N) :- ENDL(N),LVI(N,V),TI(X,rdf:type,V)
+INT_L(X,N) :- LVI(N,V),TI(X,rdf:type,V),LNI(N,N2),INT_L(X,N2)
+TI(X,rdf:type,C) :- TI(C,owl:intersectionOf,HEAD),LVI(HEAD,A),LNI(HEAD,NEXT),INT_L(X,NEXT),TI(X,rdf:type,A)
+
+//cls-int2
+TI(Y,rdf:type,CX) :- TI(C,owl:intersectionOf,X),TI(Y,rdf:type,C),C_LVI(X,CX)
+//cls-uni
+TI(Y,rdf:type,C) :- TI(C,owl:unionOf,X),C_LVI(X,Z),TI(Y,rdf:type,Z)
+//cls-svf1
+TI(U,rdf:type,X) :- TI(X,owl:someValuesFrom,Y),TI(X,owl:onProperty,P),TI(V,rdf:type,Y),TI(U,P,V)
+//cls-svf2
+TI(U,rdf:type,X) :- TI(X,owl:someValuesFrom,owl:Thing),TI(X,owl:onProperty,P),TI(U,P,V)
+//cls-avf
+TI(V,rdf:type,Y) :- TI(X,owl:allValuesFrom,Y),TI(X,owl:onProperty,P),TI(U,rdf:type,X),TI(U,P,V)
+//cls-hv1
+TI(U,P,Y) :- TI(X,owl:hasValue,Y),TI(X,owl:onProperty,P),TI(U,rdf:type,X)
+//cls-hv2
+TI(U,rdf:type,X) :- TI(X,owl:hasValue,Y),TI(X,owl:onProperty,P),TI(U,P,Y)
+//cls-maxc2
+TI(Y1,owl:sameAs,Y2) :- TI(X,owl:maxCardinality,"1"^^http://www.w3.org/2001/XMLSchema#nonNegativeInteger),TI(X,owl:onProperty,P),TI(U,rdf:type,X),TI(U,P,Y1),TI(U,P,Y2)
+//cls-maxqc3
+TI(Y1,owl:sameAs,Y2) :- TI(X,owl:maxQualifiedCardinality,"1"^^http://www.w3.org/2001/XMLSchema#nonNegativeInteger),TI(X,owl:onProperty,P),TI(X,owl:onClass,C),TI(U,rdf:type,X),TI(U,P,Y1),TI(Y1,rdf:type,C),TI(U,P,Y2),TI(Y2,rdf:type,C)
+//cls-maxqc4
+TI(Y1,owl:sameAs,Y2) :- TI(X,owl:maxQualifiedCardinality,"1"^^http://www.w3.org/2001/XMLSchema#nonNegativeInteger),TI(X,owl:onProperty,P),TI(X,owl:onClass,owl:Thing),TI(U,rdf:type,X),TI(U,P,Y1),TI(U,P,Y2)
+//cls-oo
+TI(Y,rdf:type,C) :- TI(C,owl:oneOf,X),C_LVI(X,Y)
+
+//Table 7
+//cax-sco
+TI(A,rdf:type,C) :- TI(B,rdfs:subClassOf,C),TI(A,rdf:type,B)
+//cax-eqc1
+TI(X,rdf:type,C2) :- TI(C1,owl:equivalentClass,C2),TI(X,rdf:type,C1)
+//cax-eqc2
+TI(X,rdf:type,C1) :- TI(C1,owl:equivalentClass,C2),TI(X,rdf:type,C2)
+
+//Table 8 is omitted
+
+//Table 9
+//scm-cls
+TI(C,rdfs:subClassOf,C) :- TI(C,rdf:type,owl:Class)
+TI(C,rdfs:subClassOf,C) :- TI(C,owl:equivalentClass,C)
+TI(C,rdfs:subClassOf,C) :- TI(C,rdfs:subClassOf,owl:Thing)
+TI(C,rdfs:subClassOf,C) :- TI(owl:Nothing,rdfs:subClassOf,C)
+//scm-sco
+TI(A,rdfs:subClassOf,C) :- TI(A,rdfs:subClassOf,B),TI(B,rdfs:subClassOf,C)
+//scm-eqc1
+TI(C1,rdfs:subClassOf,C2) :- TI(C1,owl:equivalentClass,C2)
+TI(C2,rdfs:subClassOf,C1) :- TI(C1,owl:equivalentClass,C2)
+//scm-eqc2
+TI(C1,owl:equivalentClass,C2) :- TI(C1,rdfs:subClassOf,C2),TI(C2,rdfs:subClassOf,C1)
+//scm-op
+TI(P,rdfs:subPropertyOf,P) :- TI(P,rdf:type,owl:ObjectProperty)
+TI(P,owl:equivalentProperty,P) :- TI(P,rdf:type,owl:ObjectProperty)
+//scm-dp
+TI(P,rdfs:subPropertyOf,P) :- TI(P,rdf:type,owl:DatatypeProperty)
+TI(P,owl:equivalentProperty,P) :- TI(P,rdf:type,owl:DatatypeProperty)
+//scm-spo
+TI(A,rdfs:subPropertyOf,C) :- TI(A,rdfs:subPropertyOf,B),TI(B,rdfs:subPropertyOf,C)
+//scm-eqp1
+TI(P1,rdfs:subPropertyOf,P2) :- TI(P1,owl:equivalentProperty,P2)
+TI(P2,rdfs:subPropertyOf,P1) :- TI(P1,owl:equivalentProperty,P2)
+//scm-eqp2
+TI(P1,owl:equivalentProperty,P2) :- TI(P1,rdfs:subPropertyOf,P2),TI(P2,rdfs:subPropertyOf,P1)
+//scm-dom1
+TI(P,rdfs:domain,C2) :- TI(P,rdfs:domain,C1),TI(C1,rdfs:subClassOf,C2)
+//scm-dom2
+TI(P1,rdfs:domain,C) :- TI(P2,rdfs:domain,C),TI(P1,rdfs:subPropertyOf,P2)
+//scm-rng1
+TI(P,rdfs:range,C2) :- TI(P,rdfs:range,C1),TI(C1,rdfs:subClassOf,C2)
+//scm-rng2
+TI(P1,rdfs:range,C) :- TI(P2,rdfs:range,C),TI(P1,rdfs:subPropertyOf,P2)
+//scm-hv
+TI(C1,rdfs:subClassOf,C2) :- TI(C1,owl:hasValue,I),TI(C1,owl:onProperty,P1),TI(C2,owl:hasValue,I),TI(C2,owl:onProperty,P2),TI(P1,rdfs:subPropertyOf,P2)
+//scm-svf1
+TI(C1,rdfs:subClassOf,C2) :- TI(C1,owl:someValuesFrom,Y1),TI(C1,owl:onProperty,P),TI(C2,owl:onProperty,P),TI(C2,owl:someValuesFrom,Y2),TI(Y1,rdfs:subClassOf,Y2)
+//scm-svf2
+TI(C1,rdfs:subClassOf,C2) :- TI(C1,owl:someValuesFrom,Y),TI(C1,owl:onProperty,P1),TI(C2,owl:someValuesFrom,Y),TI(C2,owl:onProperty,P2),TI(P1,rdfs:subPropertyOf,P2)
+//scm-avf1
+TI(C1,rdfs:subClassOf,C2) :- TI(C1,owl:allValuesFrom,Y1),TI(C1,owl:onProperty,P),TI(C2,owl:onProperty,P),TI(C2,owl:allValuesFrom,Y2),TI(Y1,rdfs:subClassOf,Y2)
+//scm-avf2
+TI(C2,rdfs:subClassOf,C1) :- TI(C1,owl:allValuesFrom,Y),TI(C1,owl:onProperty,P1),TI(C2,owl:allValuesFrom,Y),TI(C2,owl:onProperty,P2),TI(P1,rdfs:subPropertyOf,P2)
+//scm-int
+TI(C,rdfs:subClassOf,CX) :- TI(C,owl:intersectionOf,X),C_LVI(X,CX)
+//scm-uni
+TI(CX,rdfs:subClassOf,C) :- TI(C,owl:unionOf,X),C_LVI(X,CX)

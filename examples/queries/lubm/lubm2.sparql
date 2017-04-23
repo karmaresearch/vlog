@@ -1,0 +1,12 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX lubm: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+
+SELECT ?x ?y ?z
+WHERE {
+  ?x rdf:type lubm:GraduateStudent .
+  ?y rdf:type lubm:University .  
+  ?z rdf:type lubm:Department .
+  ?x lubm:memberOf ?z .
+  ?z lubm:subOrganizationOf ?y .
+  ?x lubm:undergraduateDegreeFrom ?y .
+}
