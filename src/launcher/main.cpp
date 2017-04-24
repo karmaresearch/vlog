@@ -658,6 +658,9 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
     string algo = vm["reasoningAlgo"].as<string>();
     int times = vm["repeatQuery"].as<int>();
 
+    int nVars = literal.getNVars();
+    bool onlyVars = nVars > 0;
+
     if (algo == "auto" || algo == "") {
 	algo = selectStrategy(edb, p, literal, reasoner, vm);
 	BOOST_LOG_TRIVIAL(info) << "Selection strategy determined that we go for " << algo;
@@ -666,32 +669,37 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
     TupleIterator *iter;
 
     if (algo == "magic") {
-        iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, true, NULL);
+        iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
     } else if (algo == "qsqr") {
-        iter = reasoner.getTopDownIterator(literal, NULL, NULL, edb, p, true, NULL);
+        iter = reasoner.getTopDownIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
     } else {
         // Unknown value for algo.
 	throw 10;
     }
-    int sz = iter->getTupleSize();
     long count = 0;
-    while (iter->hasNext()) {
-        iter->next();
-        count++;
-        for (int i = 0; i < sz; i++) {
-            char supportText[MAX_TERM_SIZE];
-            uint64_t value = iter->getElementAt(i);
-            if (i != 0) {
-                cout << ", ";
-            }
-            if (!edb.getDictText(value, supportText)) {
-                cerr << "Term " << value << " not found" << endl;
-                cout << value;
-            } else {
-                cout << supportText;
-            }
-        }
-        cout << endl;
+    int sz = iter->getTupleSize();
+    if (nVars == 0) {
+	cout << (iter->hasNext() ? "TRUE" : "FALSE") << endl;
+	count = (iter->hasNext() ? 1 : 0);
+    } else {
+	while (iter->hasNext()) {
+	    iter->next();
+	    count++;
+	    for (int i = 0; i < sz; i++) {
+		char supportText[MAX_TERM_SIZE];
+		uint64_t value = iter->getElementAt(i);
+		if (i != 0) {
+		    cout << " ";
+		}
+		if (!edb.getDictText(value, supportText)) {
+		    cerr << "Term " << value << " not found" << endl;
+		    cout << value;
+		} else {
+		    cout << supportText;
+		}
+	    }
+	    cout << endl;
+	}
     }
     boost::chrono::duration<double> durationQ1 = boost::chrono::system_clock::now() - startQ1;
     BOOST_LOG_TRIVIAL(info) << "Algo = " << algo << ", query runtime = " << (durationQ1.count() * 1000) << " msec, #rows = " << count;
