@@ -82,6 +82,23 @@ bool TableFilterer::isEligibleForPartialSubs(
     if (bodyLiterals.size() > 2) {
         return false;
     }
+    if (bodyLiterals.size() == 2) {
+	// Check the join: may have only one join position.
+	int count = 0;
+	std::vector<uint8_t> v1 = bodyLiterals[0].getAllVars();
+	std::vector<uint8_t> v2 = bodyLiterals[1].getAllVars();
+	for (int i = 0; i < v1.size(); i++) {
+	    for (int j = 0; j < v2.size(); j++) {
+		if (v1[i] == v2[j]) {
+		    count++;
+		    if (count > 1) {
+			return false;
+		    }
+		    break;
+		}
+	    }
+	}
+    }
 
     // One body literal must match the head of the rule at hand
     bool foundRecursive = false;
