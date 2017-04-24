@@ -648,6 +648,7 @@ string selectStrategy(EDBLayer &edb, Program &p, Literal &literal, Reasoner &rea
 	return mode == TOPDOWN ? "qsqr" : "magic";
     }
     // Add strategies here ...
+    BOOST_LOG_TRIVIAL(error) << "Unrecognized selection strategy: " << strategy;
     throw 10;
 }
 
@@ -673,7 +674,7 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
     } else if (algo == "qsqr") {
         iter = reasoner.getTopDownIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
     } else {
-        // Unknown value for algo.
+	BOOST_LOG_TRIVIAL(error) << "Unregocnized reasoning algorithm: " << algo;
 	throw 10;
     }
     long count = 0;
