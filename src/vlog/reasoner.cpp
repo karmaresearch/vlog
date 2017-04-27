@@ -679,6 +679,93 @@ TupleIterator *Reasoner::getMagicIterator(Literal &query,
     }
 }
 
+TupleIterator *Reasoner::getMaterializationIterator(Literal &query,
+        std::vector<uint8_t> *posJoins,
+	std::vector<Term_t> *possibleValuesJoins,
+	EDBLayer &edb, Program &program, bool returnOnlyVars,
+	std::vector<uint8_t> *sortByFields) {
+
+    Predicate pred = query.getPredicate();
+    VTuple tuple = query.getTuple();
+    if (pred.getType() == EDB) {
+	BOOST_LOG_TRIVIAL(info) << "Using edb for " << query.tostring(&program, &edb);
+	return Reasoner::getEDBIterator(query, posJoins, possibleValuesJoins, edb,
+				returnOnlyVars, sortByFields);
+    }
+
+    if (posJoins != NULL) {
+	BOOST_LOG_TRIVIAL(info) << "getMaterializationIterator with joins not implemented yet";
+	throw 10;
+    }
+    
+    // Run materialization
+   SemiNaiver *sn = new SemiNaiver(program.getAllRules(),
+		      edb, &program, true, true,
+		      false, -1, false);
+
+    sn->run();
+
+    //To use if the flag returnOnlyVars is set to false
+    uint64_t outputTuple[3];    // Used in trident method, so no Term_t
+    uint8_t nPosToCopy = 0;
+    uint8_t posToCopy[3];
+    for (int j = 0; j < query.getTupleSize(); ++j) {
+	if (!query.getTermAtPos(j).isVariable()) {
+	    outputTuple[j] = query.getTermAtPos(j).getValue();
+	} else {
+	    posToCopy[nPosToCopy++] = j;
+	}
+    }
+
+    FCIterator tableIt = sn->getTable(pred.getId());
+
+    TupleTable *finalTable;
+    if (returnOnlyVars) {
+	finalTable = new TupleTable(query.getNVars());
+    } else {
+	finalTable = new TupleTable(query.getTupleSize());
+    }
+    while (! tableIt.isEmpty()) {
+	std::shared_ptr<const FCInternalTable> table = tableIt.getCurrentTable();
+	FCInternalTableItr *itrTable = table->getIterator();
+	while (itrTable->hasNext()) {
+	    itrTable->next();
+	    bool copy = true;
+	    for (int i = 0; i < tuple.getSize(); i++) {
+		if (! tuple.get(i).isVariable()) {
+		    if (itrTable->getCurrentValue(i) != tuple.get(i).getValue()) {
+			copy = false;
+			break;
+		    }
+		}
+	    }
+	    if (! copy) {
+		continue;
+	    }
+	    for (int i = 0; i < tuple.getSize(); i++) {
+		if (! returnOnlyVars || tuple.get(i).isVariable()) {
+		    finalTable->addValue(itrTable->getCurrentValue(i));
+		}
+	    }
+
+	}
+	table->releaseIterator(itrTable);
+	tableIt.moveNextCount();
+    }
+
+    std::shared_ptr<TupleTable> pFinalTable(finalTable);
+    delete sn;
+
+    if (sortByFields != NULL && !sortByFields->empty()) {
+        std::shared_ptr<TupleTable> sortTab = std::shared_ptr<TupleTable>(
+                pFinalTable->sortBy(*sortByFields));
+        return new TupleTableItr(sortTab);
+
+    } else {
+        return new TupleTableItr(pFinalTable);
+    }
+}
+
 ReasoningMode Reasoner::chooseMostEfficientAlgo(Literal &query,
         EDBLayer &layer, Program &program,
         std::vector<uint8_t> *posBindings,

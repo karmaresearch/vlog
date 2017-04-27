@@ -682,6 +682,8 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
         iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
     } else if (algo == "qsqr") {
         iter = reasoner.getTopDownIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
+    } else if (algo == "mat") {
+        iter = reasoner.getMaterializationIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
     } else {
 	BOOST_LOG_TRIVIAL(error) << "Unrecognized reasoning algorithm: " << algo;
 	throw 10;
