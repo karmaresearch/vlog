@@ -662,19 +662,27 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
     int nVars = literal.getNVars();
     bool onlyVars = nVars > 0;
 
-    if (algo == "auto" || algo == "") {
+    if (literal.getPredicate().getType() != EDB && (algo == "auto" || algo == "")) {
 	algo = selectStrategy(edb, p, literal, reasoner, vm);
 	BOOST_LOG_TRIVIAL(info) << "Selection strategy determined that we go for " << algo;
     }
 
     TupleIterator *iter;
 
-    if (algo == "magic") {
+    if (literal.getPredicate().getType() == EDB) {
+	QSQQuery qsqquery(literal);
+	BOOST_LOG_TRIVIAL(info) << "Running EDB query, setting algo to edb";
+	algo = "edb";
+	TupleTable *table = new TupleTable(nVars);
+	edb.query(&qsqquery, table, NULL, NULL);
+	std::shared_ptr<TupleTable> ptable = std::shared_ptr<TupleTable>(table);
+	iter = new TupleTableItr(ptable);
+    } else if (algo == "magic") {
         iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
     } else if (algo == "qsqr") {
         iter = reasoner.getTopDownIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
     } else {
-	BOOST_LOG_TRIVIAL(error) << "Unregocnized reasoning algorithm: " << algo;
+	BOOST_LOG_TRIVIAL(error) << "Unrecognized reasoning algorithm: " << algo;
 	throw 10;
     }
     long count = 0;
