@@ -662,21 +662,22 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
     int nVars = literal.getNVars();
     bool onlyVars = nVars > 0;
 
-    if (literal.getPredicate().getType() != EDB && (algo == "auto" || algo == "")) {
+    if (literal.getPredicate().getType() == EDB) {
+	if (algo != "edb") {
+	    BOOST_LOG_TRIVIAL(info) << "Overriding strategy, setting it to edb";
+	    algo = "edb";
+	}
+    }
+
+    if (algo == "auto" || algo == "") {
 	algo = selectStrategy(edb, p, literal, reasoner, vm);
 	BOOST_LOG_TRIVIAL(info) << "Selection strategy determined that we go for " << algo;
     }
 
     TupleIterator *iter;
 
-    if (literal.getPredicate().getType() == EDB) {
-	QSQQuery qsqquery(literal);
-	BOOST_LOG_TRIVIAL(info) << "Running EDB query, setting algo to edb";
-	algo = "edb";
-	TupleTable *table = new TupleTable(nVars);
-	edb.query(&qsqquery, table, NULL, NULL);
-	std::shared_ptr<TupleTable> ptable = std::shared_ptr<TupleTable>(table);
-	iter = new TupleTableItr(ptable);
+    if (algo == "edb") {
+        iter = reasoner.getEDBIterator(literal, NULL, NULL, edb, onlyVars, NULL);
     } else if (algo == "magic") {
         iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
     } else if (algo == "qsqr") {

@@ -302,6 +302,11 @@ TupleIterator *Reasoner::getIterator(Literal &query,
 	}
 	*/
     }
+    if (query.getPredicate().getType() == EDB) {
+	BOOST_LOG_TRIVIAL(info) << "Using edb for " << query.tostring(&program, &edb);
+	return Reasoner::getEDBIterator(query, posJoins, possibleValuesJoins, edb,
+				    returnOnlyVars, sortByFields);
+    }
     if (posJoins == NULL || posJoins->size() < query.getNVars() || returnOnlyVars || posJoins->size() > 1) {
 	ReasoningMode mode = chooseMostEfficientAlgo(query, edb, program, posJoins, possibleValuesJoins);
 	if (mode == MAGIC) {
@@ -724,6 +729,26 @@ ReasoningMode Reasoner::chooseMostEfficientAlgo(Literal &query,
                              " with magic or QSQR. Estimated cost: " <<
                              cost << " threshold for QSQ-R is " << threshold;
     return mode;
+}
+
+TupleIterator *Reasoner::getEDBIterator(Literal &query,
+        std::vector<uint8_t> *posJoins,
+        std::vector<Term_t> *possibleValuesJoins,
+        EDBLayer &edb, bool returnOnlyVars,
+        std::vector<uint8_t> *sortByFields) {
+    QSQQuery qsqquery(query);
+    int nVars = query.getNVars();
+    TupleTable *table = new TupleTable(returnOnlyVars ? nVars : 3);
+    edb.query(&qsqquery, table, posJoins, possibleValuesJoins);
+    std::shared_ptr<TupleTable> ptable = std::shared_ptr<TupleTable>(table);
+    //Add sort by if requested
+    if (sortByFields != NULL && !sortByFields->empty()) {
+        std::shared_ptr<TupleTable> sortTab = std::shared_ptr<TupleTable>(
+                ptable->sortBy(*sortByFields));
+        return new TupleTableItr(sortTab);
+    } else {
+        return new TupleTableItr(ptable);
+    }
 }
 
 TupleIterator *Reasoner::getTopDownIterator(Literal &query,

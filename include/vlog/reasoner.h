@@ -69,6 +69,13 @@ public:
             bool returnOnlyVars,
             std::vector<uint8_t> *sortByFields);
 
+    TupleIterator *getEDBIterator(Literal &query,
+            std::vector<uint8_t> * posJoins,
+            std::vector<Term_t> *possibleValuesJoins,
+            EDBLayer &layer,
+            bool returnOnlyVars,
+            std::vector<uint8_t> *sortByFields);
+
     TupleIterator *getMagicIterator(Literal &query,
                                            std::vector<uint8_t> * posJoins,
                                            std::vector<Term_t> *possibleValuesJoins,
