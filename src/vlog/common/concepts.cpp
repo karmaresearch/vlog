@@ -727,7 +727,10 @@ Literal Program::parseLiteral(std::string l) {
     if (cardPredicates.find(predid) == cardPredicates.end()) {
         cardPredicates.insert(make_pair(predid, t.size()));
     } else {
-        assert(cardPredicates.find(predid)->second == t.size());
+	if (cardPredicates.find(predid)->second != t.size()) {
+	    BOOST_LOG_TRIVIAL(info) << "Wrong size in predicate: should be " << (int) cardPredicates.find(predid)->second;
+	    throw 10;
+	}
     }
     Predicate pred(predid, Predicate::calculateAdornment(t1), Predicate::isEDB(predicate) ? EDB : IDB, (uint8_t) t.size());
 

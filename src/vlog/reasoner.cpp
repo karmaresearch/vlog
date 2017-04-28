@@ -825,9 +825,29 @@ TupleIterator *Reasoner::getEDBIterator(Literal &query,
         std::vector<uint8_t> *sortByFields) {
     QSQQuery qsqquery(query);
     int nVars = query.getNVars();
-    TupleTable *table = new TupleTable(returnOnlyVars ? nVars : 3);
+    TupleTable *table = new TupleTable(nVars);
     edb.query(&qsqquery, table, posJoins, possibleValuesJoins);
     std::shared_ptr<TupleTable> ptable = std::shared_ptr<TupleTable>(table);
+    if (! returnOnlyVars && nVars != 3) {
+	VTuple v = query.getTuple();
+	TupleTable *newTable = new TupleTable(3);
+	TupleIterator *itr = new TupleTableItr(ptable);
+	while (itr->hasNext()) {
+	    itr->next();
+	    uint64_t row[3];
+	    int cnt = 0;
+	    for (int i = 0; i < 3; i++) {
+		if (v.get(i).isVariable()) {
+		    row[i] = itr->getElementAt(cnt);
+		    cnt++;
+		} else {
+		    row[i] = v.get(i).getValue();
+		}
+	    }
+	    newTable->addRow(row);
+	}
+	ptable = std::shared_ptr<TupleTable>(newTable);
+    }
     //Add sort by if requested
     if (sortByFields != NULL && !sortByFields->empty()) {
         std::shared_ptr<TupleTable> sortTab = std::shared_ptr<TupleTable>(
