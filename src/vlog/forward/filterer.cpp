@@ -110,9 +110,12 @@ bool TableFilterer::isEligibleForPartialSubs(
         if (!foundRecursive && el.getPredicate().getId() == headRule.getPredicate().getId()) {
             long estimate = naiver->estimateCardinality(el, 0, block->iteration);
             if (estimate < 30000000) { //I must be quick to query...
-                foundRecursive = true;
+		foundRecursive = true;
                 idxRecursive = i;
-            }
+            } else {
+		// Recursive but too large
+		return false;
+	    }
         }
         if (!foundSmall && el.getPredicate().getId() != headRule.getPredicate().getId()) {
             //Check if the size is small
@@ -122,7 +125,7 @@ bool TableFilterer::isEligibleForPartialSubs(
                 idxSmall = i;
             } else {
                 EDBLayer &layer = naiver->getEDBLayer();
-                BOOST_LOG_TRIVIAL(info) << "Card of " << el.tostring(naiver->getProgram(), &layer) << estimate << "<- too large";
+                BOOST_LOG_TRIVIAL(debug) << "Card of " << el.tostring(naiver->getProgram(), &layer) << estimate << "<- too large";
             }
         }
         i++;
