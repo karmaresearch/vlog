@@ -82,6 +82,23 @@ bool TableFilterer::isEligibleForPartialSubs(
     if (bodyLiterals.size() > 2) {
         return false;
     }
+    if (bodyLiterals.size() == 2) {
+	// Check the join: may have only one join position.
+	int count = 0;
+	std::vector<uint8_t> v1 = bodyLiterals[0].getAllVars();
+	std::vector<uint8_t> v2 = bodyLiterals[1].getAllVars();
+	for (int i = 0; i < v1.size(); i++) {
+	    for (int j = 0; j < v2.size(); j++) {
+		if (v1[i] == v2[j]) {
+		    count++;
+		    if (count > 1) {
+			return false;
+		    }
+		    break;
+		}
+	    }
+	}
+    }
 
     // One body literal must match the head of the rule at hand
     bool foundRecursive = false;
@@ -93,9 +110,12 @@ bool TableFilterer::isEligibleForPartialSubs(
         if (!foundRecursive && el.getPredicate().getId() == headRule.getPredicate().getId()) {
             long estimate = naiver->estimateCardinality(el, 0, block->iteration);
             if (estimate < 30000000) { //I must be quick to query...
-                foundRecursive = true;
+		foundRecursive = true;
                 idxRecursive = i;
-            }
+            } else {
+		// Recursive but too large
+		return false;
+	    }
         }
         if (!foundSmall && el.getPredicate().getId() != headRule.getPredicate().getId()) {
             //Check if the size is small
@@ -105,7 +125,7 @@ bool TableFilterer::isEligibleForPartialSubs(
                 idxSmall = i;
             } else {
                 EDBLayer &layer = naiver->getEDBLayer();
-                BOOST_LOG_TRIVIAL(info) << "Card of " << el.tostring(naiver->getProgram(), &layer) << estimate << "<- too large";
+                BOOST_LOG_TRIVIAL(debug) << "Card of " << el.tostring(naiver->getProgram(), &layer) << estimate << "<- too large";
             }
         }
         i++;

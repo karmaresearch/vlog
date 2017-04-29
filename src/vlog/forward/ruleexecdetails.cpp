@@ -227,6 +227,11 @@ void RuleExecutionDetails::checkWhetherEDBsRedundantHead(RuleExecutionPlan &p, c
     //Check whether some EDBs can lead to redundant derivation
     for (int i = 0; i < p.plan.size(); ++i) {
         const Literal *literal = p.plan[i];
+	// Should this not check if literal is an EDB?
+	// Otherwise, I don't understand why this method has the name it has. --Ceriel
+	if (literal->getPredicate().getType() != EDB) {
+	    continue;
+	}
 
         std::vector<uint8_t> edbVars = literal->getAllVars();
         //Get all IDBs with the same predicate

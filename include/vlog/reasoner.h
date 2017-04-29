@@ -34,11 +34,6 @@ private:
                                      std::vector<uint8_t> *posJoins,
                                      std::vector<Term_t> *possibleValuesJoins);
 
-    ReasoningMode chooseMostEfficientAlgo(Literal &query,
-                                          EDBLayer &layer, Program &program,
-                                          std::vector<uint8_t> *posBindings,
-                                          std::vector<Term_t> *valueBindings);
-
 
     TupleIterator *getIncrReasoningIterator(Literal &query,
             std::vector<uint8_t> * posJoins,
@@ -55,6 +50,11 @@ public:
                     std::vector<Term_t> *valueBindings, EDBLayer &layer,
                     Program &program);
 
+    ReasoningMode chooseMostEfficientAlgo(Literal &query,
+                                          EDBLayer &layer, Program &program,
+                                          std::vector<uint8_t> *posBindings,
+                                          std::vector<Term_t> *valueBindings);
+
     TupleIterator *getIterator(Literal &query,
                                            std::vector<uint8_t> * posJoins,
                                            std::vector<Term_t> *possibleValuesJoins,
@@ -66,6 +66,20 @@ public:
             std::vector<uint8_t> * posJoins,
             std::vector<Term_t> *possibleValuesJoins,
             EDBLayer &layer, Program &program,
+            bool returnOnlyVars,
+            std::vector<uint8_t> *sortByFields);
+
+    TupleIterator *getMaterializationIterator(Literal &query,
+            std::vector<uint8_t> * posJoins,
+            std::vector<Term_t> *possibleValuesJoins,
+            EDBLayer &layer, Program &program,
+            bool returnOnlyVars,
+            std::vector<uint8_t> *sortByFields);
+
+    TupleIterator *getEDBIterator(Literal &query,
+            std::vector<uint8_t> * posJoins,
+            std::vector<Term_t> *possibleValuesJoins,
+            EDBLayer &layer,
             bool returnOnlyVars,
             std::vector<uint8_t> *sortByFields);
 
