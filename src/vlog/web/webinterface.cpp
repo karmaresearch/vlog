@@ -110,7 +110,7 @@ void WebInterface::Server::acceptHandler(const boost::system::error_code &err) {
     }
 }
 
-string _getValueParam(string req, string param) {
+static string _getValueParam(string req, string param) {
     int pos = req.find(param);
     if (pos == string::npos) {
         return "";
@@ -239,7 +239,8 @@ void WebInterface::execSPARQLQuery(string sparqlquery,
         ResultsPrinter *p = (ResultsPrinter*) operatorTree;
         p->setSilent(!printstdout);
         if (jsonoutput) {
-            p->setJSONOutput(jsonresults);
+	    std::vector<std::string> jsonvars;
+            p->setJSONOutput(jsonresults, jsonvars);
         }
 
         boost::chrono::system_clock::time_point startQ = boost::chrono::system_clock::now();
