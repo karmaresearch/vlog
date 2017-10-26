@@ -937,7 +937,6 @@ int main(int argc, const char** argv) {
             p.sample = sample;
             p.sampleRate = sampleRate;
             p.thresholdSkipTable = thresholdSkipTable;
-            p.logPtr = NULL;
             p.remoteLocation = "";
             p.limitSpace = 0;
             p.graphTransformation = "";
@@ -984,7 +983,6 @@ int main(int argc, const char** argv) {
             p.sample = sample;
             p.sampleRate = sampleRate;
             p.thresholdSkipTable = thresholdSkipTable;
-            p.logPtr = NULL;
             p.remoteLocation = "";
             p.limitSpace = 0;
             p.graphTransformation = "";

@@ -8,6 +8,7 @@
 #include <vlog/ruleexecdetails.h>
 #include <trident/model/table.h>
 
+#include <boost/log/trivial.hpp>
 #include <boost/chrono.hpp>
 #include <vector>
 #include <unordered_map>

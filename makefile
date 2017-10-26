@@ -5,33 +5,36 @@ OUTPUTDIR = .
 # To enable ODBC we must add the parameter ODBC=1
 # To enable MAPI we must add the parameter MAPI=1
 
+TRIDENT_LIB=../trident/build
+
 CPLUS = g++
 CC = gcc
 
 uname_S := $(shell uname -s)
 
 ifeq ($(uname_S), Darwin)
-# OSX-dependent stuff
-MTSUFF = -mt
+	# OSX-dependent stuff
+	MTSUFF = -mt
 
-CLIBS = \
-	-L/usr/local/lib -Wl,-install_name,/usr/local/lib
+CLIBS = -L$(MYTRIDENT)/build \
+		-L/usr/local/lib -Wl,-install_name,/usr/local/lib
 endif
 ifeq ($(uname_S), Linux)
-# Linux-dependent stuff
-MTSUFF = # -mt
+	# Linux-dependent stuff
+	MTSUFF = # -mt
 
 CLIBS = \
-	-L/usr/local/lib -Wl,-rpath,/usr/local/lib \
-	-fopenmp
+		-L/usr/local/lib -Wl,-rpath,/usr/local/lib -L$(MYTRIDENT)/build \
+		-fopenmp
 endif
 
 LDFLAGS= \
-	 -llz4 -lcurl \
-	 -lboost_filesystem -lboost_system -lboost_chrono \
-	 -lboost_thread$(MTSUFF) -lboost_log$(MTSUFF) \
-	 -lboost_log_setup$(MTSUFF) \
-	 -lboost_program_options -lboost_iostreams
+		 -ltrident-core -ltrident-sparql \
+		 -llz4 -lcurl \
+		 -lboost_filesystem -lboost_system -lboost_chrono \
+		 -lboost_thread$(MTSUFF) -lboost_log$(MTSUFF) \
+		 -lboost_log_setup$(MTSUFF) \
+		 -lboost_program_options -lboost_iostreams
 
 # where is trident? Default below, but can be overriden on the commandline.
 TRIDENT = ../trident
@@ -48,13 +51,8 @@ KOGNAC = $(MYTRIDENT)/build/kognac
 CPPFLAGS=-Iinclude
 CPPFLAGS+= -I$(MYTRIDENT)/include
 CPPFLAGS+= -I$(MYTRIDENT)/include/layers
+CPPFLAGS+= -I$(MYTRIDENT)/rdf3x/include
 CPPFLAGS+= -I$(KOGNAC)/include
-#This one is to resolve the dependencies within RDF3X
-CPPFLAGS+= -I$(RDF3X)/include
-#This one is to resolve the dependencies within snap
-CPPFLAGS+= -I$(MYTRIDENT)/include/snap
-CPPFLAGS+= -I$(MYTRIDENT)/snap
-CPPFLAGS+= -I$(MYTRIDENT)/snap/glib-core
 CPPFLAGS+= -isystem /usr/local/include
 #Take sparsehash from trident
 CPPFLAGS+= -I$(TRIDENT)/build/kognac/external/sparsehash/src
@@ -67,48 +65,35 @@ CPPFLAGS += -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1 -DWEBINTERFACE=1
 SRCDIR=src
 
 SRC_FILES = \
-	    $(wildcard $(SRCDIR)/vlog/*.cpp) \
-	    $(wildcard $(SRCDIR)/vlog/common/*.cpp) \
-	    $(wildcard $(SRCDIR)/vlog/backward/*.cpp) \
-	    $(wildcard $(SRCDIR)/vlog/forward/*.cpp) \
-	    $(wildcard $(SRCDIR)/vlog/magic/*.cpp) \
-	    $(wildcard $(SRCDIR)/vlog/web/*.cpp) \
-	    $(wildcard $(SRCDIR)/vlog/trident/*.cpp)
+			$(wildcard $(SRCDIR)/vlog/*.cpp) \
+			$(wildcard $(SRCDIR)/vlog/common/*.cpp) \
+			$(wildcard $(SRCDIR)/vlog/backward/*.cpp) \
+			$(wildcard $(SRCDIR)/vlog/forward/*.cpp) \
+			$(wildcard $(SRCDIR)/vlog/magic/*.cpp) \
+			$(wildcard $(SRCDIR)/vlog/web/*.cpp) \
+			$(wildcard $(SRCDIR)/vlog/trident/*.cpp)
 
 #Add also the launcher with the main() file. This file depends on RDF3X (for querying)
 SRC_FILES+= $(wildcard $(SRCDIR)/launcher/*.cpp)
 
 ifeq ($(MYSQL),1)
-    SRC_FILES+=$(wildcard $(SRCDIR)/vlog/mysql/*.cpp)
-    CPPFLAGS+=-DMYSQL
+	SRC_FILES+=$(wildcard $(SRCDIR)/vlog/mysql/*.cpp)
+	CPPFLAGS+=-DMYSQL
 endif
 
 
 ifeq ($(ODBC),1)
-    SRC_FILES+=$(wildcard $(SRCDIR)/vlog/odbc/*.cpp)
-    CPPFLAGS+=-DODBC
+	SRC_FILES+=$(wildcard $(SRCDIR)/vlog/odbc/*.cpp)
+	CPPFLAGS+=-DODBC
 endif
 
 ifeq ($(MAPI),1)
-    SRC_FILES+=$(wildcard $(SRCDIR)/vlog/mapi/*.cpp)
-    CPPFLAGS+=-DMAPI
+	SRC_FILES+=$(wildcard $(SRCDIR)/vlog/mapi/*.cpp)
+	CPPFLAGS+=-DMAPI
 endif
 
-# Compile also all files in the external directory using the same compiler flags so far
-EXT_FILES = \
-	    $(wildcard $(MYTRIDENT)/src/layers/TridentLayer.cpp) \
-	    $(wildcard $(MYTRIDENT)/src/trident/*.cpp) \
-	    $(wildcard $(MYTRIDENT)/src/trident/**/*.cpp) \
-	    $(wildcard $(MYTRIDENT)/src/trident/**/**/*.cpp) \
-	    $(wildcard $(KOGNAC)/src/kognac/*.cpp) \
-	    $(wildcard $(KOGNAC)/src/kognac/**/*.cpp) \
-	    $(wildcard $(KOGNAC)/src/kognac/**/**/*.cpp) \
-	    $(wildcard $(RDF3X)/src/*.cpp) \
-	    $(wildcard $(RDF3X)/src/**/*.cpp) \
-	    $(wildcard $(RDF3X)/src/**/**/*.cpp) 
-
 SNAP_FILES = \
-	    $(MYTRIDENT)/snap/snap-core/Snap.cpp
+			 $(MYTRIDENT)/snap/snap-core/Snap.cpp
 
 RELEASEFLAGS = -O3 -DNDEBUG=1 -gdwarf-2
 DEBUGFLAGS = -O0 -g -gdwarf-2 -Wall -Wno-sign-compare -DDEBUG=1
@@ -117,39 +102,39 @@ CPPFLAGS += -DBOOST_LOG_DYN_LINK
 CFLAGS += -DBOOST_LOG_DYN_LINK
 
 ifeq ($(DEBUG),1)
-    CPPFLAGS+=$(DEBUGFLAGS)
-    CFLAGS+=$(DEBUGFLAGS)
-    VLOG=$(PRGNAME_DEBUG)
-    BUILDDIR=$(BUILDDIR_DEBUG)
+	CPPFLAGS+=$(DEBUGFLAGS)
+	CFLAGS+=$(DEBUGFLAGS)
+	VLOG=$(PRGNAME_DEBUG)
+	BUILDDIR=$(BUILDDIR_DEBUG)
 else
-    CPPFLAGS+=$(RELEASEFLAGS)
-    CFLAGS+=$(RELEASEFLAGS)
-    VLOG=$(PRGNAME_RELEASE)
-    BUILDDIR=$(BUILDDIR_RELEASE)
+	CPPFLAGS+=$(RELEASEFLAGS)
+	CFLAGS+=$(RELEASEFLAGS)
+	VLOG=$(PRGNAME_RELEASE)
+	BUILDDIR=$(BUILDDIR_RELEASE)
 endif
 
 #MySQL integration
 ifeq ($(MYSQL),1)
-    LDFLAGS += -lmysqlcppconn
+	LDFLAGS += -lmysqlcppconn
 endif
 
 #ODBC integration
 ifeq ($(ODBC),1)
-    LDFLAGS += -lodbc
+	LDFLAGS += -lodbc
 endif
 
 #MAPI integration
 ifeq ($(ODBC),1)
-    LDFLAGS += -lmapi
+	LDFLAGS += -lmapi
 endif
 
 #Add link to Intel TBB library
 LDFLAGS += -ltbb # -ltbbmalloc_proxy
 
 OFILES = \
-	 $(subst $(SRCDIR),$(BUILDDIR),$(SRC_FILES:.cpp=.o)) \
-	 $(subst $(MYTRIDENT),$(BUILDDIR)/trident,$(EXT_FILES:.cpp=.o)) \
-	 $(SNAP_FILES:.cpp=.o)
+		 $(subst $(SRCDIR),$(BUILDDIR),$(SRC_FILES:.cpp=.o)) \
+		 $(subst $(MYTRIDENT),$(BUILDDIR)/trident,$(EXT_FILES:.cpp=.o)) \
+		 $(SNAP_FILES:.cpp=.o)
 
 PRGNAME_RELEASE=$(OUTPUTDIR)/vlog
 BUILDDIR_RELEASE=$(OUTPUTDIR)/build
@@ -164,22 +149,14 @@ $(MYTRIDENT):	$(TRIDENT)
 	echo $(MYTRIDENT)
 
 init:
-	@mkdir -p $(BUILDDIR)	
-
-# $(BUILDDIR)/trident/%Snap.o: $(MYTRIDENT)/%Snap.cpp
-# 	@cp $(SNAP_FILES:.cpp=.o)
-# 	$(CPLUS) -DNDEBUG -std=c++11 -DNOMP $< -o $@ 
-
-$(BUILDDIR)/trident/%.o: $(MYTRIDENT)/%.cpp
-	@mkdir -p `dirname $@`
-	$(CPLUS) $(CPPFLAGS) $< -o $@ 
+	@mkdir -p $(BUILDDIR)
 
 # pull in dependency info for *existing* .o files
 -include $(OFILES:.o=.d)
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.cpp
 	@mkdir -p `dirname $@`
-	$(CPLUS) $(CPPFLAGS) $< -o $@ 
+	$(CPLUS) $(CPPFLAGS) $< -o $@
 
 .PHONY: oclean
 oclean:

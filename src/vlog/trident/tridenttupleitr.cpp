@@ -5,6 +5,8 @@
 #include <trident/kb/querier.h>
 #include <trident/iterators/pairitr.h>
 
+#include <boost/log/trivial.hpp>
+
 TridentTupleItr::TridentTupleItr() {}
 
 void TridentTupleItr::init(Querier *querier, const VTuple *t,

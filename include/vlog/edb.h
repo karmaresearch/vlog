@@ -13,6 +13,8 @@
 
 #include <kognac/factory.h>
 
+#include <boost/log/trivial.hpp>
+
 #include <vector>
 #include <map>
 

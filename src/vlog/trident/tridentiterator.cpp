@@ -2,6 +2,8 @@
 #include <trident/iterators/pairitr.h>
 #include <trident/binarytables/newcolumntable.h>
 
+#include <boost/log/trivial.hpp>
+
 void TridentIterator::init(PredId_t id, Querier * q, const Literal & literal, boost::mutex *mutex) {
     predid = id;
     VTuple tuple = literal.getTuple();

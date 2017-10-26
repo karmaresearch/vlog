@@ -11,6 +11,7 @@
 #include <layers/TridentLayer.hpp>
 
 #include <trident/kb/kb.h>
+#include <trident/utils/json.h>
 
 #include <dblayer.hpp>
 #include <cts/infra/QueryGraph.hpp>
@@ -23,8 +24,6 @@
 #include <boost/bind.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
 
 #include <map>
 
@@ -126,9 +125,9 @@ public:
                                 DBLayer &db,
                                 bool printstdout,
                                 bool jsonoutput,
-                                boost::property_tree::ptree *jsonvars,
-                                boost::property_tree::ptree *jsonresults,
-                                boost::property_tree::ptree *jsonstats);
+                                JSON *jsonvars,
+                                JSON *jsonresults,
+                                JSON *jsonstats);
 };
 #endif
 #endif
