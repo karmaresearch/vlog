@@ -119,7 +119,7 @@ void QSQR::createRules(Predicate &pred) {
 
     if (rules[pred.getId()][pred.getAdorment()] == NULL) {
         std::vector<Rule> *r = program->getAllRulesByPredicate(pred.getId());
-        // BOOST_LOG_TRIVIAL(debug) << "createRules for predicate " << pred.getId() << ", adornment = " << pred.getAdorment() << ", r->size = " << r->size();
+        // LOG(DEBUGL) << "createRules for predicate " << pred.getId() << ", adornment = " << pred.getAdorment() << ", r->size = " << r->size();
         rules[pred.getId()][pred.getAdorment()] =
             new RuleExecutor*[r->size()];
         int m = 0;
@@ -154,7 +154,7 @@ size_t QSQR::estimate(int depth, Predicate &pred, BindingsTable *inputTable/*, s
 		bool found = false;
 		for (int i = 0; i < outputs.size(); i++) {
 		    if (outputs[i] == r) {
-			BOOST_LOG_TRIVIAL(debug) << "Ignoring " << r << " results";
+			LOG(DEBUGL) << "Ignoring " << r << " results";
 			// Assume it is the same answer ...
 			found = true;
 			break;
@@ -194,7 +194,7 @@ void QSQR::evaluate(Predicate &pred, BindingsTable *inputTable,
         shouldRepeat = newTotalAnswers > totalAnswers;
         totalAnswers = newTotalAnswers;
     } while (repeat && shouldRepeat);
-    // BOOST_LOG_TRIVIAL(debug) << "QSQR: finished execution of query";
+    // LOG(DEBUGL) << "QSQR: finished execution of query";
 #else
     createRules(pred);
     size_t sz = program->getAllRulesByPredicate(pred.getId())->size();
@@ -226,7 +226,7 @@ void QSQR::processTask(QSQR_Task &task) {
 	    newTask.repeat = task.repeat;
 	    newTask.totalAnswers = task.totalAnswers;
 	    pushTask(newTask);
-            // BOOST_LOG_TRIVIAL(debug) << "pushed new task QUERY, totalAnswers = " << newTask.totalAnswers;
+            // LOG(DEBUGL) << "pushed new task QUERY, totalAnswers = " << newTask.totalAnswers;
             RuleExecutor *exec = rules[task.pred.getId()]
                                  [task.pred.getAdorment()][task.currentRuleIndex];
             exec->evaluate(task.inputTable, task.offsetInput, this, layer);
@@ -242,7 +242,7 @@ void QSQR::processTask(QSQR_Task &task) {
 		//newTask.shouldRepeat = false;
 		newTask.totalAnswers = newAnswers;
 		pushTask(newTask);
-                // BOOST_LOG_TRIVIAL(debug) << "pushed new task QUERY(0), totalAnswers = " << newTask.totalAnswers;
+                // LOG(DEBUGL) << "pushed new task QUERY(0), totalAnswers = " << newTask.totalAnswers;
                 RuleExecutor *exec = rules[task.pred.getId()]
                                      [task.pred.getAdorment()][0];
                 exec->evaluate(task.inputTable, task.offsetInput, this, layer);
@@ -325,7 +325,7 @@ TupleTable *QSQR::evaluateQuery(int evaluateOrEstimate, QSQQuery *query,
                     //evaluate in this case is not recursive. Process the tasks
                     //until the queue is empty
                     while (tasks.size() > 0) {
-                        // BOOST_LOG_TRIVIAL(debug) << "Task size=" << tasks.size();
+                        // LOG(DEBUGL) << "Task size=" << tasks.size();
                         QSQR_Task task = tasks.back();
                         tasks.pop_back();
                         processTask(task);
@@ -352,7 +352,7 @@ TupleTable *QSQR::evaluateQuery(int evaluateOrEstimate, QSQQuery *query,
                     //evaluate in this case is not recursive. Process the tasks
                     //until the queue is empty
                     while (tasks.size() > 0) {
-                        //BOOST_LOG_TRIVIAL(debug) << "Task size=" << tasks.size();
+                        //LOG(DEBUGL) << "Task size=" << tasks.size();
                         QSQR_Task task = tasks.back();
                         tasks.pop_back();
                         processTask(task);

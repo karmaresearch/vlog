@@ -1,9 +1,9 @@
 #include <vlog/ruleexecplan.h>
 #include <vlog/ruleexecdetails.h>
 
-#include <set>
+#include <kognac/logs.h>
 
-#include <boost/log/trivial.hpp>
+#include <set>
 
 void RuleExecutionPlan::checkIfFilteringHashMapIsPossible(const Literal &head) {
     //2 conditions: the last literal shares the same variables as the head in the same position and has the same constants
@@ -76,7 +76,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const Literal &headLiteral) {
                 if (headTerm.isVariable()) {
                     for (uint8_t m = 0; m < existingVariables.size(); ++m) {
                         if (existingVariables[m] == headTerm.getId()) {
-                            // BOOST_LOG_TRIVIAL(debug) << "Adding [" << (int) headPos << ", " << (int) m << "] to pf";
+                            // LOG(DEBUGL) << "Adding [" << (int) headPos << ", " << (int) m << "] to pf";
                             pf.push_back(make_pair(headPos, m));
                             break;
                         }
@@ -108,9 +108,9 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const Literal &headLiteral) {
 
                 if (isVarNeeded) {
                     // Maps from the new position to the old.
-                    // BOOST_LOG_TRIVIAL(debug) << "Adding [" << (int) newExistingVariables.size() << ", " << (int) j << "] to pf";
+                    // LOG(DEBUGL) << "Adding [" << (int) newExistingVariables.size() << ", " << (int) j << "] to pf";
                     pf.push_back(make_pair(newExistingVariables.size(), j));
-                    // BOOST_LOG_TRIVIAL(debug) << "Adding variable " << (int) existingVariables[j];
+                    // LOG(DEBUGL) << "Adding variable " << (int) existingVariables[j];
                     newExistingVariables.push_back(existingVariables[j]);
                 }
             }
@@ -121,7 +121,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const Literal &headLiteral) {
         uint8_t litVars = 0;
         std::set<uint8_t> varSoFar; //This set is used to avoid that repeated
         //variables in the literal produce multiple copies in the head
-        // BOOST_LOG_TRIVIAL(debug) << "currentLiteral = " << currentLiteral->tostring(NULL, NULL);
+        // LOG(DEBUGL) << "currentLiteral = " << currentLiteral->tostring(NULL, NULL);
         for (uint8_t x = 0; x < currentLiteral->getTupleSize(); ++x) {
             const VTerm t = currentLiteral->getTermAtPos(x);
             if (t.isVariable()) {
@@ -135,7 +135,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const Literal &headLiteral) {
                     }
                 }
 
-                // BOOST_LOG_TRIVIAL(debug) <<  "Considering variable " << (int) t.getId() << ", litVars = " << (int) litVars << ", found = " << found;
+                // LOG(DEBUGL) <<  "Considering variable " << (int) t.getId() << ", litVars = " << (int) litVars << ", found = " << found;
                 if (found) {
                     jc.push_back(std::make_pair(j, litVars));
                 } else {
@@ -176,7 +176,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const Literal &headLiteral) {
                                 const VTerm headTerm = headLiteral.getTermAtPos(headPos);
                                 if (headTerm.isVariable() && headTerm.getId() == t.getId()
                                         && !varSoFar.count(t.getId())) {
-                                    // BOOST_LOG_TRIVIAL(debug) << "Adding [" << (int) headPos << ", " << (int) litVars << "] to ps";
+                                    // LOG(DEBUGL) << "Adding [" << (int) headPos << ", " << (int) litVars << "] to ps";
                                     ps.push_back(make_pair(headPos, litVars));
                                 }
                             }
@@ -193,10 +193,10 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const Literal &headLiteral) {
                             }
 
                             if (isNew) {
-                                // BOOST_LOG_TRIVIAL(debug) << "Adding [" << (int) newExistingVariables.size() << ", " << (int) litVars << "] to ps";
+                                // LOG(DEBUGL) << "Adding [" << (int) newExistingVariables.size() << ", " << (int) litVars << "] to ps";
                                 ps.push_back(make_pair(newExistingVariables.size(), litVars));
                                 newExistingVariables.push_back(t.getId());
-                                // BOOST_LOG_TRIVIAL(debug) << "Adding new variable " << (int) t.getId();
+                                // LOG(DEBUGL) << "Adding new variable " << (int) t.getId();
                             }
                         }
                     }
@@ -215,14 +215,14 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const Literal &headLiteral) {
         joinCoordinates.push_back(jc);
         posFromFirst.push_back(pf);
         posFromSecond.push_back(ps);
-        // BOOST_LOG_TRIVIAL(debug) << "Pushing pf, ps";
+        // LOG(DEBUGL) << "Pushing pf, ps";
     }
 
 }
 
 bool RuleExecutionPlan::hasCartesian() {
     for (int i = 1; i < joinCoordinates.size(); i++) {
-        BOOST_LOG_TRIVIAL(debug) << "joinCoordinates[" << i << "]: size = " << joinCoordinates[i].size();
+        LOG(DEBUGL) << "joinCoordinates[" << i << "]: size = " << joinCoordinates[i].size();
         if (joinCoordinates[i].size() == 0) {
             return true;
         }

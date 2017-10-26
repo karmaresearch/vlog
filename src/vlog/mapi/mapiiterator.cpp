@@ -82,7 +82,7 @@ MAPIIterator::MAPIIterator(Mapi con, string tableName,
 	posFirstVar = -1;
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SQL query: " << sqlQuery;
+    LOG(DEBUGL) << "SQL query: " << sqlQuery;
 
     handle = MAPITable::doquery(con, sqlQuery);
 
@@ -118,7 +118,7 @@ MAPIIterator::MAPIIterator(Mapi con, string sqlQuery,
 	posFirstVar = -1;
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SQL query: " << sqlQuery;
+    LOG(DEBUGL) << "SQL query: " << sqlQuery;
 
     handle = MAPITable::doquery(con, sqlQuery);
 
@@ -154,16 +154,16 @@ bool MAPIIterator::hasNext() {
 	hasNextValue = stop;
     }
     hasNextChecked = true;
-    // BOOST_LOG_TRIVIAL(debug) << "MAPIIterator::hasNext(): skipDuplicatedFirst = " << skipDuplicatedFirst << ", returns " << hasNextValue;
+    // LOG(DEBUGL) << "MAPIIterator::hasNext(): skipDuplicatedFirst = " << skipDuplicatedFirst << ", returns " << hasNextValue;
     return hasNextValue;
 }
 
 void MAPIIterator::next() {
     if (! hasNextChecked) {
-	BOOST_LOG_TRIVIAL(error) << "MAPIIterator::next called without hasNext check";
+	LOG(ERRORL) << "MAPIIterator::next called without hasNext check";
 	throw 10;
     }
-    // BOOST_LOG_TRIVIAL(debug) << "MAPIIterator::next()";
+    // LOG(DEBUGL) << "MAPIIterator::next()";
     if (isFirst) {
 	isFirst = false;
     }
@@ -188,7 +188,7 @@ void MAPIIterator::skipDuplicatedFirstColumn() {
 }
 
 Term_t MAPIIterator::getElementAt(const uint8_t p) {
-    // BOOST_LOG_TRIVIAL(debug) << "MAPIIterator::getElementAt()";
+    // LOG(DEBUGL) << "MAPIIterator::getElementAt()";
     return values[p];
 }
 

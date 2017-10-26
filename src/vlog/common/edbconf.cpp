@@ -1,5 +1,7 @@
 #include <vlog/edbconf.h>
 
+#include <kognac/logs.h>
+
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/log/trivial.hpp>
@@ -16,7 +18,7 @@ void EDBConf::parse(string f) {
             //Read the ID of the edb
             std::size_t found = line.find("_");
             if (found == string::npos) {
-                BOOST_LOG_TRIVIAL(error) << "Malformed line in edb.conf file: " << line;
+                LOG(ERRORL) << "Malformed line in edb.conf file: " << line;
                 throw 10;
             }
 
@@ -46,7 +48,7 @@ void EDBConf::parse(string f) {
                 table.params[paramid] = line.substr(idxAss + 1);
             } else {
                 //I don't know what it is. Throw error.
-                BOOST_LOG_TRIVIAL(error) << "Malformed line in edb.conf file: " << line;
+                LOG(ERRORL) << "Malformed line in edb.conf file: " << line;
                 throw 10;
             }
         }
@@ -59,7 +61,7 @@ void EDBConf::parse(string f) {
         for (const auto p : table.params) {
             params += p + " ";
         }
-        BOOST_LOG_TRIVIAL(debug) << details << " " << params;
+        LOG(DEBUGL) << details << " " << params;
     }
 #endif
 }

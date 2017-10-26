@@ -8,12 +8,8 @@
 #include <vlog/ruleexecdetails.h>
 #include <trident/model/table.h>
 
-#include <boost/log/trivial.hpp>
-#include <boost/chrono.hpp>
 #include <vector>
 #include <unordered_map>
-
-namespace timens = boost::chrono;
 
 struct StatIteration {
     size_t iteration;
@@ -50,7 +46,7 @@ private:
     bool opt_filtering;
     bool multithreaded;
 
-    boost::chrono::system_clock::time_point startTime;
+    std::chrono::system_clock::time_point startTime;
     bool running;
 
     std::vector<FCBlock> listDerivations;
@@ -204,7 +200,7 @@ public:
     string getListAllRulesForJSONSerialization();
 #endif
 
-    boost::chrono::system_clock::time_point getStartingTimeMs() {
+    std::chrono::system_clock::time_point getStartingTimeMs() {
         return startTime;
     }
 

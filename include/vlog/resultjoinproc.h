@@ -57,7 +57,7 @@ protected:
 #endif
 
 private:
-    virtual void processResults(const int blockid, const bool unique, boost::mutex *m) = 0;
+    virtual void processResults(const int blockid, const bool unique, std::mutex *m) = 0;
 
 public:
 
@@ -91,7 +91,7 @@ public:
                                 const std::vector<const std::vector<Term_t> *> &vectors2, size_t i2,
                                 const bool unique) = 0;
 
-    virtual void processResults(std::vector<int> &blockid, Term_t *p, std::vector<bool> &unique, boost::mutex *m) = 0;
+    virtual void processResults(std::vector<int> &blockid, Term_t *p, std::vector<bool> &unique, std::mutex *m) = 0;
 
     virtual void processResults(const int blockid, FCInternalTableItr *first,
                                 FCInternalTableItr* second, const bool unique) = 0;
@@ -183,12 +183,12 @@ private:
     }
 
 #if USE_DUPLICATE_DETECTION
-    void processResults(const int blockid, const bool unique, boost::mutex *m);
+    void processResults(const int blockid, const bool unique, std::mutex *m);
 #else
-    void processResults(const int blockid, const bool unique, boost::mutex *m) {
+    void processResults(const int blockid, const bool unique, std::mutex *m) {
         enlargeArray(blockid);
         if (rowsize == 0) {
-            BOOST_LOG_TRIVIAL(debug) << "Added empty row!";
+            LOG(DEBUGL) << "Added empty row!";
         }
         segments[blockid]->addRow(row, rowsize);
     }
@@ -209,7 +209,7 @@ public:
                             std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
                             const int nthreads);
 
-    void processResults(std::vector<int> &blockid, Term_t *p, std::vector<bool> &unique, boost::mutex *m);
+    void processResults(std::vector<int> &blockid, Term_t *p, std::vector<bool> &unique, std::mutex *m);
 
     void processResults(const int blockid, const Term_t *first,
                         FCInternalTableItr* second, const bool unique);
@@ -286,11 +286,11 @@ private:
     void copyRawRow(const Term_t *first, FCInternalTableItr* second);
 
 #if USE_DUPLICATE_DETECTION
-    void processResults(const int blockid, const bool unique, boost::mutex *m);
+    void processResults(const int blockid, const bool unique, std::mutex *m);
 #else
-    void mergeTmpt(const int blockid, const bool unique, boost::mutex *m);
+    void mergeTmpt(const int blockid, const bool unique, std::mutex *m);
 
-    void processResults(const int blockid, const bool unique, boost::mutex *m) {
+    void processResults(const int blockid, const bool unique, std::mutex *m) {
         enlargeBuffers(blockid + 1);
         if (!unique) {
             if (tmpt[blockid] == NULL) {
@@ -370,7 +370,7 @@ public:
 
     bool isEmpty() const;
 
-    void processResults(std::vector<int> &blockid, Term_t *p, std::vector<bool> &unique, boost::mutex *m);
+    void processResults(std::vector<int> &blockid, Term_t *p, std::vector<bool> &unique, std::mutex *m);
 
     void processResults(const int blockid, const Term_t *first,
                         FCInternalTableItr* second, const bool unique);

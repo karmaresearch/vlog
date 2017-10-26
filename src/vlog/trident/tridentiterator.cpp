@@ -4,7 +4,7 @@
 
 #include <boost/log/trivial.hpp>
 
-void TridentIterator::init(PredId_t id, Querier * q, const Literal & literal, boost::mutex *mutex) {
+void TridentIterator::init(PredId_t id, Querier * q, const Literal & literal, std::mutex *mutex) {
     predid = id;
     VTuple tuple = literal.getTuple();
     kbItr.init(q, &tuple, NULL
@@ -13,7 +13,7 @@ void TridentIterator::init(PredId_t id, Querier * q, const Literal & literal, bo
     duplicatedFirstColumn = false;
 }
 
-void TridentIterator::init(PredId_t id, Querier * q, const Literal & literal, const std::vector<uint8_t> &fields, boost::mutex *mutex) {
+void TridentIterator::init(PredId_t id, Querier * q, const Literal & literal, const std::vector<uint8_t> &fields, std::mutex *mutex) {
     predid = id;
     this->nfields = literal.getNVars();
     VTuple tuple = literal.getTuple();

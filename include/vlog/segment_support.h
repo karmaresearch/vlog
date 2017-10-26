@@ -1,7 +1,5 @@
 #include <vlog/column.h>
 
-#include <boost/thread.hpp>
-
 #include <vector>
 #include <memory>
 
@@ -36,7 +34,7 @@ struct CreateColumns2 {
             out2[i] = v2[idxs[i]];
         }
 
-        //BOOST_LOG_TRIVIAL(warning) << "Created columns from " << r.begin() << " " << r.end();
+        //LOG(WARNL) << "Created columns from " << r.begin() << " " << r.end();
         /*m.lock();
         out1.push_back(std::make_pair(r.begin(), sortedColumnsInserters[0].getColumn()));
         out2.push_back(std::make_pair(r.begin(), sortedColumnsInserters[1].getColumn()));
@@ -69,14 +67,14 @@ struct CreateColumnsNoDupl2 {
     const Term_t *v2;
     std::vector<std::pair<size_t, std::vector<Term_t>>> &ranges1;
     std::vector<std::pair<size_t, std::vector<Term_t>>> &ranges2;
-    boost::mutex &m;
+    std::mutex &m;
 
     CreateColumnsNoDupl2(const std::vector<size_t> &idxs,
                         const Term_t *v1,
                         const Term_t *v2,
                         std::vector<std::pair<size_t, std::vector<Term_t>>> &ranges1,
                         std::vector<std::pair<size_t, std::vector<Term_t>>> &ranges2,
-                        boost::mutex &m) :
+                        std::mutex &m) :
         idxs(idxs), v1(v1), v2(v2),
         ranges1(ranges1), ranges2(ranges2), m(m) {
     }

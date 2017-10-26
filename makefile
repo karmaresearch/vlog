@@ -16,7 +16,7 @@ ifeq ($(uname_S), Darwin)
 	# OSX-dependent stuff
 	MTSUFF = -mt
 
-CLIBS = -L$(MYTRIDENT)/build \
+CLIBS = -L$(MYTRIDENT)/build -L$(MYTRIDENT)/build/kognac \
 		-L/usr/local/lib -Wl,-install_name,/usr/local/lib
 endif
 ifeq ($(uname_S), Linux)
@@ -29,11 +29,9 @@ CLIBS = \
 endif
 
 LDFLAGS= \
-		 -ltrident-core -ltrident-sparql \
+		 -lkognac-log -ltrident-core -ltrident-sparql \
 		 -llz4 -lcurl \
-		 -lboost_filesystem -lboost_system -lboost_chrono \
-		 -lboost_thread$(MTSUFF) -lboost_log$(MTSUFF) \
-		 -lboost_log_setup$(MTSUFF) \
+		 -lboost_filesystem -lboost_system \
 		 -lboost_program_options -lboost_iostreams
 
 # where is trident? Default below, but can be overriden on the commandline.
@@ -58,7 +56,7 @@ CPPFLAGS+= -isystem /usr/local/include
 CPPFLAGS+= -I$(TRIDENT)/build/kognac/external/sparsehash/src
 
 #Other flags
-CPPFLAGS += -c -MD -MF $(patsubst %.o,%.d,$@) -std=c++11
+CPPFLAGS += -c -MD -MF $(patsubst %.o,%.d,$@) -std=c++1z
 
 CPPFLAGS += -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1 -DWEBINTERFACE=1
 
@@ -97,9 +95,6 @@ SNAP_FILES = \
 
 RELEASEFLAGS = -O3 -DNDEBUG=1 -gdwarf-2
 DEBUGFLAGS = -O0 -g -gdwarf-2 -Wall -Wno-sign-compare -DDEBUG=1
-
-CPPFLAGS += -DBOOST_LOG_DYN_LINK
-CFLAGS += -DBOOST_LOG_DYN_LINK
 
 ifeq ($(DEBUG),1)
 	CPPFLAGS+=$(DEBUGFLAGS)

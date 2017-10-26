@@ -25,7 +25,7 @@ void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithread
     const string pn = tableConf.predname;
     const string kbpath = tableConf.params[0];
     if (!boost::filesystem::exists(kbpath) || !boost::filesystem::exists(kbpath + "/p0")) {
-        BOOST_LOG_TRIVIAL(error) << "The KB at " << kbpath << " does not exist. Check the edb.conf file.";
+        LOG(ERRORL) << "The KB at " << kbpath << " does not exist. Check the edb.conf file.";
         throw 10;
     }
     infot.id = (PredId_t) predDictionary.getOrAdd(pn);
@@ -33,7 +33,7 @@ void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithread
     infot.type = tableConf.type;
     infot.manager = std::shared_ptr<EDBTable>(new TridentTable(kbpath, multithreaded));
     dbPredicates.insert(make_pair(infot.id, infot));
-    BOOST_LOG_TRIVIAL(debug) << "Inserted " << pn << " with number " << infot.id;
+    LOG(DEBUGL) << "Inserted " << pn << " with number " << infot.id;
 }
 
 #ifdef MYSQL
@@ -85,7 +85,7 @@ void EDBLayer::query(QSQQuery *query, TupleTable *outputTable,
 
 
     if (dbPredicates.count(predid)) {
-	// BOOST_LOG_TRIVIAL(debug) << "EDB: go into manager, posToFilter size = " << (posToFilter == NULL ? 0 : posToFilter->size())
+	// LOG(DEBUGL) << "EDB: go into manager, posToFilter size = " << (posToFilter == NULL ? 0 : posToFilter->size())
 	//     << ", valuesToFilter size = " << (valuesToFilter == NULL ? 0 : valuesToFilter->size());
         auto el = dbPredicates.find(predid);
         el->second.manager->query(query, outputTable, posToFilter, valuesToFilter);
@@ -94,9 +94,9 @@ void EDBLayer::query(QSQQuery *query, TupleTable *outputTable,
         uint8_t size = rel->getSizeTuple();
 
 	/*
-	BOOST_LOG_TRIVIAL(debug) << "Query = " << query->tostring();
+	LOG(DEBUGL) << "Query = " << query->tostring();
 	if (posToFilter != NULL) {
-	    BOOST_LOG_TRIVIAL(debug) << "posToFilter.size() = " << posToFilter->size();
+	    LOG(DEBUGL) << "posToFilter.size() = " << posToFilter->size();
 	}
 	*/
         switch (size) {
@@ -306,11 +306,11 @@ void EDBLayer::query(QSQQuery *query, TupleTable *outputTable,
             break;
         }
         default:
-            BOOST_LOG_TRIVIAL(error) << "This should not happen";
+            LOG(ERRORL) << "This should not happen";
             throw 10;
         }
     }
-    // BOOST_LOG_TRIVIAL(debug) << "result size = " << outputTable->getNRows();
+    // LOG(DEBUGL) << "result size = " << outputTable->getNRows();
 }
 
 EDBIterator *EDBLayer::getIterator(const Literal &query) {
@@ -333,7 +333,7 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
         if (c2)
             vc2 = literal->getTermAtPos(1).getValue();
 
-	// BOOST_LOG_TRIVIAL(debug) << "getIterator, equalFields = " << equalFields << ", c1 = " << c1 << ", c2 = " << c2 << ", size = " << size;
+	// LOG(DEBUGL) << "getIterator, equalFields = " << equalFields << ", c1 = " << c1 << ", c2 = " << c2 << ", size = " << size;
         EDBMemIterator *itr;
         switch (size) {
         case 1:
@@ -373,9 +373,9 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
 
         IndexedTupleTable *rel = tmpRelations[predid];
         uint8_t size = rel->getSizeTuple();
-	// BOOST_LOG_TRIVIAL(debug) << "getSortedIterator, equalFields = " << equalFields << ", c1 = " << c1 << ", c2 = " << c2 << ", size = " << (int) size << ", fields.size() = " << fields.size();
+	// LOG(DEBUGL) << "getSortedIterator, equalFields = " << equalFields << ", c1 = " << c1 << ", c2 = " << c2 << ", size = " << (int) size << ", fields.size() = " << fields.size();
 	for (int i = 0; i < fields.size(); i++) {
-	    // BOOST_LOG_TRIVIAL(debug) << "fields[" << i << "] = " << (int) fields[i];
+	    // LOG(DEBUGL) << "fields[" << i << "] = " << (int) fields[i];
 	}
         EDBMemIterator *itr;
         switch (size) {
@@ -478,7 +478,7 @@ size_t EDBLayer::estimateCardinality(const Literal &query) {
         return p->second.manager->estimateCardinality(query);
     } else {
         // if (literal->getNVars() != literal->getTupleSize()) {
-        //     BOOST_LOG_TRIVIAL(debug) << "Estimate is not very precise";
+        //     LOG(DEBUGL) << "Estimate is not very precise";
         // }
         IndexedTupleTable *rel = tmpRelations[predid];
         return rel->getNTuples();
@@ -497,7 +497,7 @@ bool EDBLayer::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
         assert(literal->getTupleSize() <= 2);
 	/*
 	if (posToFilter != NULL) {
-	    BOOST_LOG_TRIVIAL(debug) << "isEmpty literal = " << literal->tostring()
+	    LOG(DEBUGL) << "isEmpty literal = " << literal->tostring()
 		<< ", posToFilter->size() = " << posToFilter->size() 
 		<< ", valuesToFilter->size() = " << valuesToFilter->size();
 	}
@@ -559,7 +559,7 @@ bool EDBLayer::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
                 else
                     return  true;
             } else {
-                BOOST_LOG_TRIVIAL(error) << "Not supported";
+                LOG(ERRORL) << "Not supported";
                 throw 10;
             }
         }
@@ -596,7 +596,7 @@ std::vector<std::shared_ptr<Column>>  EDBLayer::checkNewIn(
                                       const Literal &l,
 std::vector<uint8_t> &posInL) {
     if (!dbPredicates.count(l.getPredicate().getId())) {
-        BOOST_LOG_TRIVIAL(error) << "Not supported";
+        LOG(ERRORL) << "Not supported";
         throw 10;
     }
     auto p = dbPredicates.find(l.getPredicate().getId());
@@ -609,7 +609,7 @@ std::vector<std::shared_ptr<Column>> EDBLayer::checkNewIn(const Literal &l1,
 std::vector<uint8_t> &posInL2) {
     if (l1.getPredicate().getId() != l2.getPredicate().getId() ||
             !dbPredicates.count(l1.getPredicate().getId())) {
-        BOOST_LOG_TRIVIAL(error) << "Not supported";
+        LOG(ERRORL) << "Not supported";
         throw 10;
     }
     auto p = dbPredicates.find(l1.getPredicate().getId());
@@ -626,7 +626,7 @@ std::shared_ptr<Column> EDBLayer::checkIn(
     uint8_t posInL,
     size_t &sizeOutput) {
     if (!dbPredicates.count(l.getPredicate().getId())) {
-        BOOST_LOG_TRIVIAL(error) << "Not supported: literal = " << l.tostring();
+        LOG(ERRORL) << "Not supported: literal = " << l.tostring();
         throw 10;
     }
     auto p = dbPredicates.find(l.getPredicate().getId());
@@ -748,7 +748,7 @@ void EDBMemIterator::init2(PredId_t id, const bool defaultSorting, std::vector<s
 void EDBMemIterator::skipDuplicatedFirstColumn() {
     if (isIgnoreAllowed)
         ignoreSecondColumn = true;
-    // BOOST_LOG_TRIVIAL(debug) << "isIgnoreAllowed = " << isIgnoreAllowed << ", ignoreSecondColumn = " << ignoreSecondColumn;
+    // LOG(DEBUGL) << "isIgnoreAllowed = " << isIgnoreAllowed << ", ignoreSecondColumn = " << ignoreSecondColumn;
 }
 
 bool EDBMemIterator::hasNext() {

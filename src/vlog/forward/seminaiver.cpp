@@ -36,7 +36,7 @@ void SemiNaiver::createGraphRuleDependency(std::vector<int> &nodes,
                 // Only add "interesting" rules: ones that have an IDB predicate in the RHS.
                 nodes.push_back(i);
                 definedBy[pred].push_back(i);
-                BOOST_LOG_TRIVIAL(info) << " Rule " << i << ": " << ri.tostring(program, &layer);
+                LOG(INFOL) << " Rule " << i << ": " << ri.tostring(program, &layer);
                 break;
             }
         }
@@ -88,7 +88,7 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
     TableFilterer::setOptIntersect(opt_intersect);
     memset(predicatesTables, 0, sizeof(TupleTable*)*MAX_NPREDS);
 
-    BOOST_LOG_TRIVIAL(debug) << "Running SemiNaiver, opt_intersect = " << opt_intersect << ", opt_filtering = " << opt_filtering << ", multithreading = " << multithreaded << ", shuffle = " << shuffle;
+    LOG(DEBUGL) << "Running SemiNaiver, opt_intersect = " << opt_intersect << ", opt_filtering = " << opt_filtering << ", multithreading = " << multithreaded << ", shuffle = " << shuffle;
 
     int ruleid = 0;
     for (std::vector<Rule>::iterator itr = ruleset.begin(); itr != ruleset.end();
@@ -162,13 +162,13 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
 	    std::unordered_set<int> blocked;
 	    std::vector<int> newOrder;
 	    while (newOrder.size() < this->ruleset.size()) {
-		BOOST_LOG_TRIVIAL(debug) << "New round";
+		LOG(DEBUGL) << "New round";
 		int count = 0;
 		for (int i = 0; i < this->ruleset.size(); i++) {
 		    auto search = blocked.find(newDetails[i]);
 		    if (search == blocked.end()) {
 			// This rule is currently not blocked yet, so we add it to the group.
-			BOOST_LOG_TRIVIAL(debug) << "Adding rule " << newDetails[i];
+			LOG(DEBUGL) << "Adding rule " << newDetails[i];
 			newOrder.push_back(newDetails[i]);
 			// Add the rules that cannot be executed concurrently to the blocked rules.
 			blocked.insert(excludes[newDetails[i]].begin(), excludes[newDetails[i]].end());
@@ -198,7 +198,7 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
 void SemiNaiver::run(size_t lastExecution, size_t it) {
     running = true;
     iteration = it;
-    startTime = boost::chrono::system_clock::now();
+    startTime = std::chrono::system_clock::now();
 #ifdef WEBINTERFACE
     statsLastIteration = -1;
     allRules = "";
@@ -208,12 +208,12 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
 
     //Prepare for the execution
 #if DEBUG
-    boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
-    BOOST_LOG_TRIVIAL(debug) << "Optimizing ruleset...";
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+    LOG(DEBUGL) << "Optimizing ruleset...";
 #endif
     for (std::vector<RuleExecutionDetails>::iterator itr = ruleset.begin(); itr != ruleset.end();
             ++itr) {
-        BOOST_LOG_TRIVIAL(debug) << "Optimizing rule " << itr->rule.tostring(NULL, NULL);
+        LOG(DEBUGL) << "Optimizing rule " << itr->rule.tostring(NULL, NULL);
         itr->createExecutionPlans();
         itr->calculateNVarsInHeadFromEDB();
         itr->lastExecution = lastExecution;
@@ -223,7 +223,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
             for (int j = 0; j < itr->orderExecutions[i].plan.size(); ++j) {
                 plan += string(" ") + itr->orderExecutions[i].plan[j]->tostring(program, &layer);
             }
-            BOOST_LOG_TRIVIAL(debug) << "-->" << plan;
+            LOG(DEBUGL) << "-->" << plan;
         }
     }
     for (std::vector<RuleExecutionDetails>::iterator itr = edbRuleset.begin(); itr != edbRuleset.end();
@@ -231,21 +231,21 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
         itr->createExecutionPlans();
     }
 #if DEBUG
-    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    BOOST_LOG_TRIVIAL(debug) << "Runtime ruleset optimization ms = " << sec.count() * 1000;
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    LOG(DEBUGL) << "Runtime ruleset optimization ms = " << sec.count() * 1000;
 
-    start = boost::chrono::system_clock::now();
+    start = std::chrono::system_clock::now();
 #endif
     for (int i = 0; i < edbRuleset.size(); ++i) {
         executeRule(edbRuleset[i], iteration, NULL);
         iteration++;
     }
 #if DEBUG
-    sec = boost::chrono::system_clock::now() - start;
-    BOOST_LOG_TRIVIAL(debug) << "Runtime EDB rules ms = " << sec.count() * 1000;
+    sec = std::chrono::system_clock::now() - start;
+    LOG(DEBUGL) << "Runtime EDB rules ms = " << sec.count() * 1000;
 #endif
     for (auto el : ruleset)
-        BOOST_LOG_TRIVIAL(debug) << el.rule.tostring(program, &layer);
+        LOG(DEBUGL) << el.rule.tostring(program, &layer);
 
     //Used for statistics
     std::vector<StatIteration> costRules;
@@ -254,7 +254,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
         executeUntilSaturation(costRules);
     }
     running = false;
-    BOOST_LOG_TRIVIAL(info) << "Finished process. Iterations=" << iteration;
+    LOG(INFOL) << "Finished process. Iterations=" << iteration;
 
     //DEBUGGING CODE -- needed to see which rules cost the most
     //Sort the iteration costs
@@ -263,7 +263,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
     double sum = 0;
     double sum10 = 0;
     for (auto &el : costRules) {
-        BOOST_LOG_TRIVIAL(debug) << "Cost iteration " << el.iteration << " " <<
+        LOG(DEBUGL) << "Cost iteration " << el.iteration << " " <<
                                 el.time;
         i++;
         if (i >= 20)
@@ -273,7 +273,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
         if (i <= 10)
             sum10 += el.time;
     }
-    BOOST_LOG_TRIVIAL(debug) << "Sum first 20 rules: " << sum
+    LOG(DEBUGL) << "Sum first 20 rules: " << sum
                             << " first 10:" << sum10;
 }
 
@@ -284,14 +284,14 @@ void SemiNaiver::executeUntilSaturation(std::vector<StatIteration> &costRules) {
     size_t nRulesOnePass = 0;
     size_t lastIteration = 0;
 
-    boost::chrono::system_clock::time_point round_start = timens::system_clock::now();
+    std::chrono::system_clock::time_point round_start = std::chrono::system_clock::now();
     do {
-        //BOOST_LOG_TRIVIAL(info) << "Iteration " << iteration;
-        boost::chrono::system_clock::time_point start = timens::system_clock::now();
+        //LOG(INFOL) << "Iteration " << iteration;
+        std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         bool response = executeRule(ruleset[currentRule],
                                     iteration,
                                     NULL);
-        boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
+        std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
         StatIteration stat;
         stat.iteration = iteration;
         stat.rule = &ruleset[currentRule].rule;
@@ -305,27 +305,27 @@ void SemiNaiver::executeUntilSaturation(std::vector<StatIteration> &costRules) {
                 //Is the rule recursive? Go until saturation...
                 int recursiveIterations = 0;
                 do {
-                    // BOOST_LOG_TRIVIAL(info) << "Iteration " << iteration;
-                    start = timens::system_clock::now();
+                    // LOG(INFOL) << "Iteration " << iteration;
+                    start = std::chrono::system_clock::now();
                     recursiveIterations++;
                     response = executeRule(ruleset[currentRule],
                                            iteration,
                                            NULL);
                     stat.iteration = iteration;
                     ruleset[currentRule].lastExecution = iteration++;
-                    sec = boost::chrono::system_clock::now() - start;
+                    sec = std::chrono::system_clock::now() - start;
                     ++recursiveIterations;
                     stat.rule = &ruleset[currentRule].rule;
                     stat.time = sec.count() * 1000;
                     stat.derived = response;
                     costRules.push_back(stat);
                     /*if (++recursiveIterations % 10 == 0) {
-                        BOOST_LOG_TRIVIAL(info) << "Saturating rule " <<
+                        LOG(INFOL) << "Saturating rule " <<
                                                 ruleset[currentRule].rule.tostring(program, dict) <<
                                                 " " << recursiveIterations;
                     }*/
                 } while (response);
-                BOOST_LOG_TRIVIAL(debug) << "Rules " <<
+                LOG(DEBUGL) << "Rules " <<
                                          ruleset[currentRule].rule.tostring(program, &layer) <<
                                          "  required " << recursiveIterations << " to saturate";
             }
@@ -340,12 +340,12 @@ void SemiNaiver::executeUntilSaturation(std::vector<StatIteration> &costRules) {
         currentRule = (currentRule + 1) % ruleset.size();
 
         if (currentRule == 0) {
-            boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - round_start;
-            BOOST_LOG_TRIVIAL(debug) << "--Time round " << sec.count() * 1000 << " " << iteration;
-            round_start = timens::system_clock::now();
+            std::chrono::duration<double> sec = std::chrono::system_clock::now() - round_start;
+            LOG(DEBUGL) << "--Time round " << sec.count() * 1000 << " " << iteration;
+            round_start = std::chrono::system_clock::now();
 #ifdef DEBUG
             //CODE FOR Statistics
-            BOOST_LOG_TRIVIAL(info) << "Finish pass over the rules. Step=" << iteration << ". RulesWithDerivation=" <<
+            LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". RulesWithDerivation=" <<
                                     nRulesOnePass << " out of " << ruleset.size() << " Derivations so far " << countAllIDBs();
             nRulesOnePass = 0;
 
@@ -363,7 +363,7 @@ void SemiNaiver::executeUntilSaturation(std::vector<StatIteration> &costRules) {
                     n++;
                 }
             }
-            BOOST_LOG_TRIVIAL(debug) << "Rules with the highest cost\n\n" << out;
+            LOG(DEBUGL) << "Rules with the highest cost\n\n" << out;
             lastIteration = iteration;
             //END CODE STATISTICS
 #endif
@@ -423,7 +423,7 @@ bool _sortCards(const std::pair<uint8_t, size_t> &v1, const std::pair<uint8_t, s
 
 void SemiNaiver::addDataToIDBRelation(const Predicate pred,
                                       FCBlock block) {
-    BOOST_LOG_TRIVIAL(trace) << "Adding block to " << (int) pred.getId();
+    LOG(DEBUGL) << "Adding block to " << (int) pred.getId();
     FCTable *table = getTable(pred.getId(), pred.getCardinality());
     table->addBlock(block);
 }
@@ -447,7 +447,7 @@ bool SemiNaiver::checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
             max = ruleDetails.lastExecution - 1;
 
         cards.push_back(estimateCardTable(*plan.plan[i], min, max));
-        BOOST_LOG_TRIVIAL(debug) << "Estimation of the atom " <<
+        LOG(DEBUGL) << "Estimation of the atom " <<
                                  plan.plan[i]->tostring(program, &layer) <<
                                  " is " << cards.back() << " in the range " <<
                                  min << " " << max;
@@ -592,7 +592,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
                                    bodyLiteral->getNUniqueVars() && (! lastLiteral || endTable->isEmpty());
         while (!literalItr.isEmpty()) {
             std::shared_ptr<const FCInternalTable> table = literalItr.getCurrentTable();
-            BOOST_LOG_TRIVIAL(debug) << "Creating iterator";
+            LOG(DEBUGL) << "Creating iterator";
             FCInternalTableItr *interitr = table->getIterator();
             std::pair<uint8_t, uint8_t> *fv = NULL;
             std::pair<uint8_t, uint8_t> psColumnsToFilter;
@@ -610,7 +610,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
                 size_t sz = vectors[0]->size();
                 int chunksz = (sz + nthreads - 1) / nthreads;
                 if (nthreads > 1 && chunksz > 1024) {
-                    boost::mutex m;
+                    std::mutex m;
                     std::vector<Output *> outputs;
                     for (int i = 0; i < nthreads; i++) {
                         outputs.push_back(new Output(joinOutput, &m));
@@ -663,7 +663,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
                                                interitr, uniqueResults);
                 }
             }
-            BOOST_LOG_TRIVIAL(debug) << "Releasing iterator";
+            LOG(DEBUGL) << "Releasing iterator";
             table->releaseIterator(interitr);
             literalItr.moveNextCount();
         }
@@ -676,7 +676,7 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
 //Reorder the atoms in terms of cardinality.
     std::vector<std::pair<uint8_t, size_t>> positionCards;
     for (uint8_t i = 0; i < cards.size(); ++i) {
-        BOOST_LOG_TRIVIAL(debug) << "Atom " << (int) i << " has card " << cards[i];
+        LOG(DEBUGL) << "Atom " << (int) i << " has card " << cards[i];
         positionCards.push_back(std::make_pair(i, cards[i]));
     }
     sort(positionCards.begin(), positionCards.end(), _sortCards);
@@ -706,7 +706,7 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
     std::vector<uint8_t> vars = plan.plan[
                                     positionCards[0].first]
                                 ->getAllVars();
-    // BOOST_LOG_TRIVIAL(debug) << "Added vars of " << plan.plan[positionCards[0].first]->tostring(NULL, NULL);
+    // LOG(DEBUGL) << "Added vars of " << plan.plan[positionCards[0].first]->tostring(NULL, NULL);
     positionCards.erase(positionCards.begin());
 
     while (positionCards.size() > 0) {
@@ -714,7 +714,7 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
 	int saved = -1;
 	int savedNShared = 0;
         for (int i = 0; i < positionCards.size(); ++i) {
-            // BOOST_LOG_TRIVIAL(debug) << "Checking vars of " << plan.plan[positionCards[i].first]->tostring(NULL, NULL);
+            // LOG(DEBUGL) << "Checking vars of " << plan.plan[positionCards[i].first]->tostring(NULL, NULL);
 	    int shared = plan.plan[positionCards[i].first]->getSharedVars(vars).size();
 	    if (shared > savedNShared) {
 		savedNShared = shared;
@@ -722,13 +722,13 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
 	    }
 	}
 	if (saved < 0) {
-            // BOOST_LOG_TRIVIAL(debug) << "No shared var found";
+            // LOG(DEBUGL) << "No shared var found";
 	    break;
 	}
 	adaptedPosCards.push_back(positionCards[saved]);
 	std::vector<uint8_t> newvars = plan.plan[positionCards[saved].first]->getAllVars();
 	std::copy(newvars.begin(), newvars.end(), std::back_inserter(vars));
-	// BOOST_LOG_TRIVIAL(debug) << "Added vars of " << plan.plan[positionCards[0].first]->tostring(NULL, NULL);
+	// LOG(DEBUGL) << "Added vars of " << plan.plan[positionCards[0].first]->tostring(NULL, NULL);
 	positionCards.erase(positionCards.begin() + saved);
     }
 
@@ -748,7 +748,7 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
     if (toReorder) {
         std::vector<uint8_t> orderLiterals;
         for (int i = 0; i < adaptedPosCards.size(); ++i) {
-            BOOST_LOG_TRIVIAL(debug) << "Reordered plan is " << (int)adaptedPosCards[i].first;
+            LOG(DEBUGL) << "Reordered plan is " << (int)adaptedPosCards[i].first;
             orderLiterals.push_back(adaptedPosCards[i].first);
         }
         plan = plan.reorder(orderLiterals, headLiteral);
@@ -791,22 +791,22 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     currentPredicate = idHeadPredicate;
 #endif
 
-    BOOST_LOG_TRIVIAL(debug) << "Iteration: " << iteration <<
+    LOG(DEBUGL) << "Iteration: " << iteration <<
                             " Rule: " << rule.tostring(program, &layer);
 
 
     //Set up timers
-    const boost::chrono::system_clock::time_point startRule = timens::system_clock::now();
-    boost::chrono::duration<double> durationJoin(0);
-    boost::chrono::duration<double> durationConsolidation(0);
-    boost::chrono::duration<double> durationFirstAtom(0);
+    const std::chrono::system_clock::time_point startRule = std::chrono::system_clock::now();
+    std::chrono::duration<double> durationJoin(0);
+    std::chrono::duration<double> durationConsolidation(0);
+    std::chrono::duration<double> durationFirstAtom(0);
 
     //Get table corresponding to the head predicate
     FCTable *endTable = getTable(idHeadPredicate, headLiteral.
                                  getPredicate().getCardinality());
 
     if (headLiteral.getNVars() == 0 && ! endTable->isEmpty()) {
-	BOOST_LOG_TRIVIAL(debug) << "No variables and endtable not empty, so cannot find new derivations";
+	LOG(DEBUGL) << "No variables and endtable not empty, so cannot find new derivations";
 	return false;
     }
 
@@ -825,11 +825,11 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     const Literal *atomFail = ruleDetails.atomFailure;
     ruleDetails.failedBecauseEmpty = false;
 
-    BOOST_LOG_TRIVIAL(debug) << "orderExecutions.size() = " << orderExecutions->size();
+    LOG(DEBUGL) << "orderExecutions.size() = " << orderExecutions->size();
 
     for (; orderExecution < orderExecutions->size() &&
             (ruleDetails.lastExecution > 0 || orderExecution == 0); ++orderExecution) {
-        BOOST_LOG_TRIVIAL(debug) << "orderExecution: " << orderExecution;
+        LOG(DEBUGL) << "orderExecution: " << orderExecution;
 
         //Auxiliary relations to perform the joins
         std::vector<size_t> cards;
@@ -840,7 +840,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         bool isOneRelEmpty = checkIfAtomsAreEmpty(ruleDetails, plan,
                              headLiteral, cards);
         if (isOneRelEmpty) {
-            BOOST_LOG_TRIVIAL(debug) << "Aborting this combination";
+            LOG(DEBUGL) << "Aborting this combination";
             continue;
         }
 
@@ -849,7 +849,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 
         if (plan.hasCartesian()) {
             //Jacopo for Ceriel: We cannot skip combinations of executions. If the plan has a cartesian product, then either we choose another order or we must execute the plan
-            //BOOST_LOG_TRIVIAL(warning) << "Skipping plan that has a cartesian product";
+            //LOG(WARNL) << "Skipping plan that has a cartesian product";
             //continue;
         }
 
@@ -860,7 +860,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 ++itr) {
             listLiterals += (*itr)->tostring(program, &layer);
         }
-        BOOST_LOG_TRIVIAL(debug) << listLiterals;
+        LOG(DEBUGL) << listLiterals;
 //#endif
 
         /*******************************************************************/
@@ -912,11 +912,11 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 min = ruleDetails.lastExecution;
             if (max == 1)
                 max = ruleDetails.lastExecution - 1;
-            BOOST_LOG_TRIVIAL(debug) << "Evaluating atom " << optimalOrderIdx << " " << bodyLiteral->tostring() <<
+            LOG(DEBUGL) << "Evaluating atom " << optimalOrderIdx << " " << bodyLiteral->tostring() <<
                                      " min=" << min << " max=" << max;
 
             if (first) {
-		boost::chrono::system_clock::time_point startFirstA = timens::system_clock::now();
+		std::chrono::system_clock::time_point startFirstA = std::chrono::system_clock::now();
 		if (lastLiteral || bodyLiteral->getNVars() > 0) {
 		    processRuleFirstAtom(nBodyLiterals, bodyLiteral,
 					 headLiteral, min, max, processedTables,
@@ -925,12 +925,12 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 					 orderExecution,
 					 filterValueVars,
 					 joinOutput);
-		    durationFirstAtom += boost::chrono::system_clock::now() - startFirstA;
+		    durationFirstAtom += std::chrono::system_clock::now() - startFirstA;
 		    first = false;
 		}
             } else {
                 //Perform the join
-                boost::chrono::system_clock::time_point start = timens::system_clock::now();
+                std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
                 JoinExecutor::join(this, currentResults.get(),
                                    lastLiteral ? &headLiteral : NULL,
                                    *bodyLiteral, min, max, filterValueVars,
@@ -938,19 +938,19 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                                    lastLiteral, ruleDetails, plan, processedTables,
                                    optimalOrderIdx,
                                    nthreads);
-                boost::chrono::duration<double> d =
-                    boost::chrono::system_clock::now() - start;
-                BOOST_LOG_TRIVIAL(debug) << "Time join: " << d.count() * 1000;
+                std::chrono::duration<double> d =
+                    std::chrono::system_clock::now() - start;
+                LOG(DEBUGL) << "Time join: " << d.count() * 1000;
                 durationJoin += d;
             }
 
             //Clean up possible duplicates
-            boost::chrono::system_clock::time_point startC =
-                timens::system_clock::now();
+            std::chrono::system_clock::time_point startC =
+                std::chrono::system_clock::now();
 	    if (! first) {
 		joinOutput->consolidate(true);
-		boost::chrono::duration<double> d =
-		    boost::chrono::system_clock::now() - startC;
+		std::chrono::duration<double> d =
+		    std::chrono::system_clock::now() - startC;
 		durationConsolidation += d;
 	    }
 
@@ -960,10 +960,10 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 currentResults = ((InterTableJoinProcessor*)joinOutput)->getTable();
 #if 0
 		if (currentResults == NULL) {
-		    BOOST_LOG_TRIVIAL(debug) << "NULL currentResults";
+		    LOG(DEBUGL) << "NULL currentResults";
 		} else {
 		    char buffer[16384];
-		    BOOST_LOG_TRIVIAL(debug) << "Current results:";
+		    LOG(DEBUGL) << "Current results:";
 		    FCInternalTableItr *test = currentResults->getIterator();
 		    int ncols = test->getNColumns();
 		    while (test->hasNext()) {
@@ -984,7 +984,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 				s += str;
 			    }
 			}
-			BOOST_LOG_TRIVIAL(debug) << "Tuple: <" << s << ">";
+			LOG(DEBUGL) << "Tuple: <" << s << ">";
 		    }
 		    currentResults->releaseIterator(test);
 		}
@@ -1003,7 +1003,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 
             if (!lastLiteral && ! first && (currentResults == NULL ||
                                  currentResults->isEmpty())) {
-                BOOST_LOG_TRIVIAL(debug) << "The evaluation of atom " <<
+                LOG(DEBUGL) << "The evaluation of atom " <<
                                          (optimalOrderIdx - 1) << " returned no result";
                 //If the range was 0 to MAX_INT, then also other combinations
                 //will never fire anything
@@ -1019,8 +1019,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 
     const bool prodDer = !endTable->isEmpty(iteration);
 
-    boost::chrono::duration<double> totalDuration =
-        boost::chrono::system_clock::now() - startRule;
+    std::chrono::duration<double> totalDuration =
+        std::chrono::system_clock::now() - startRule;
     double td = totalDuration.count() * 1000;
 
 #ifdef WEBINTERFACE
@@ -1049,7 +1049,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     }
 
     if (prodDer) {
-        BOOST_LOG_TRIVIAL(debug) << "Iteration " << iteration << ". Rule derived new tuples. Combinations " << orderExecution << ", Processed IDB Tables=" <<
+        LOG(DEBUGL) << "Iteration " << iteration << ". Rule derived new tuples. Combinations " << orderExecution << ", Processed IDB Tables=" <<
                                 processedTables << ", Total runtime " << stream.str()
                                 << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
                                 durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
@@ -1079,7 +1079,7 @@ while (!itr.isEmpty()) {
 #endif
 
     } else {
-        BOOST_LOG_TRIVIAL(debug) << "Iteration " << iteration << ". Rule derived NO new tuples. Combinations " << orderExecution << ", Processed IDB Tables=" <<
+        LOG(DEBUGL) << "Iteration " << iteration << ". Rule derived NO new tuples. Combinations " << orderExecution << ", Processed IDB Tables=" <<
                                 processedTables << ", Total runtime " << stream.str()
                                 << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
                                 durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
@@ -1129,11 +1129,11 @@ size_t SemiNaiver::estimateCardTable(const Literal &literal,
 FCIterator SemiNaiver::getTableFromIDBLayer(const Literal &literal, const size_t minIteration, TableFilterer *filter) {
 
     PredId_t id = literal.getPredicate().getId();
-    BOOST_LOG_TRIVIAL(debug) << "SemiNaiver::getTableFromIDBLayer: id = " << (int) id
+    LOG(DEBUGL) << "SemiNaiver::getTableFromIDBLayer: id = " << (int) id
                              << ", minIter = " << minIteration << ", literal=" << literal.tostring(NULL, NULL);
     FCTable *table = predicatesTables[id];
     if (table == NULL || table->isEmpty() || table->getMaxIteration() < minIteration) {
-        BOOST_LOG_TRIVIAL(trace) << "Return empty iterator";
+        LOG(DEBUGL) << "Return empty iterator";
         return FCIterator();
     } else {
         return table->filter(literal, minIteration, filter, nthreads)->read(minIteration);
@@ -1143,11 +1143,11 @@ FCIterator SemiNaiver::getTableFromIDBLayer(const Literal &literal, const size_t
 FCIterator SemiNaiver::getTableFromIDBLayer(const Literal &literal, const size_t minIteration,
         const size_t maxIteration, TableFilterer *filter) {
     PredId_t id = literal.getPredicate().getId();
-    BOOST_LOG_TRIVIAL(debug) << "SemiNaiver::getTableFromIDBLayer: id = " << (int) id
+    LOG(DEBUGL) << "SemiNaiver::getTableFromIDBLayer: id = " << (int) id
                              << ", minIter = " << minIteration << ", maxIteration = " << maxIteration << ", literal=" << literal.tostring(NULL, NULL);
     FCTable *table = predicatesTables[id];
     if (table == NULL || table->isEmpty() || table->getMaxIteration() < minIteration) {
-        BOOST_LOG_TRIVIAL(trace) << "Return empty iterator";
+        LOG(DEBUGL) << "Return empty iterator";
         return FCIterator();
     } else {
         if (literal.getNUniqueVars() < literal.getTupleSize()) {
@@ -1195,7 +1195,7 @@ FCIterator SemiNaiver::getTableFromEDBLayer(const Literal & literal) {
 FCIterator SemiNaiver::getTable(const Literal & literal,
                                 const size_t min, const size_t max, TableFilterer *filter) {
     //BEGIN -- Get the table that correspond to the current literal
-    //boost::chrono::system_clock::time_point start = timens::system_clock::now();
+    //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     if (literal.getPredicate().getType() == EDB) {
         return getTableFromEDBLayer(literal);
     } else {
@@ -1212,8 +1212,8 @@ FCIterator SemiNaiver::getTable(const Literal & literal,
         currentIDBpred++;*/
         return getTableFromIDBLayer(literal, min, max, filter);
     }
-    //boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    //BOOST_LOG_TRIVIAL(debug) << "Runtime retrieving literal ms = " << sec.count() * 1000;
+    //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    //LOG(DEBUGL) << "Runtime retrieving literal ms = " << sec.count() * 1000;
     //END -- Get the table that correspond to the literal
 
 }
@@ -1290,7 +1290,7 @@ void SemiNaiver::printCountAllIDBs() {
                 long count = predicatesTables[i]->getNAllRows();
                 if (count > 0) {
                     string predname = program->getPredicateName(i);
-                    BOOST_LOG_TRIVIAL(debug) << "Cardinality of " <<
+                    LOG(DEBUGL) << "Cardinality of " <<
                                              predname << ": " << count;
                 } else {
                     emptyRel++;
@@ -1299,8 +1299,8 @@ void SemiNaiver::printCountAllIDBs() {
             }
         }
     }
-    BOOST_LOG_TRIVIAL(debug) << "Predicates without derivation: " << emptyRel;
-    BOOST_LOG_TRIVIAL(info) << "Total # derivations: " << c;
+    LOG(DEBUGL) << "Predicates without derivation: " << emptyRel;
+    LOG(INFOL) << "Total # derivations: " << c;
 }
 
 std::pair<uint8_t, uint8_t> SemiNaiver::removePosConstants(
@@ -1409,7 +1409,7 @@ bool SemiNaiver::isRunning() {
         return edbRuleset.size() + rule - begin;
     }
 
-    BOOST_LOG_TRIVIAL(error) << "I cannot recognize the rule and hence cannot give it an ID";
-    BOOST_LOG_TRIVIAL(error) << "Rule: " << rule->rule.tostring(program, &layer);
+    LOG(ERRORL) << "I cannot recognize the rule and hence cannot give it an ID";
+    LOG(ERRORL) << "Rule: " << rule->rule.tostring(program, &layer);
     throw 10;
 }*/

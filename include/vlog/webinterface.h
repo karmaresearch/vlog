@@ -23,7 +23,6 @@
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/bind.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/thread.hpp>
 
 #include <map>
 
@@ -42,7 +41,7 @@ protected:
 private:
     std::shared_ptr<SemiNaiver> sn;
     string dirhtmlfiles;
-    boost::thread t;
+    std::thread t;
     string cmdArgs;
 
     boost::asio::io_service io;

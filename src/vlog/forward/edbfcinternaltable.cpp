@@ -24,9 +24,9 @@ size_t EDBFCInternalTable::getNRows() const {
 
 bool EDBFCInternalTable::isEmpty() const {
     const Literal l = *query.getLiteral();
-    // BOOST_LOG_TRIVIAL(debug) << "isEmpty: literal = " << l.tostring(NULL, layer);
+    // LOG(DEBUGL) << "isEmpty: literal = " << l.tostring(NULL, layer);
     bool retval = layer->isEmpty(l, NULL, NULL);
-    // BOOST_LOG_TRIVIAL(debug) << "isEmpty(): " << retval;
+    // LOG(DEBUGL) << "isEmpty(): " << retval;
     return retval;
 }
 
@@ -111,7 +111,7 @@ std::shared_ptr<const FCInternalTable> EDBFCInternalTable::filter(
     }
     const Literal newLiteral(query.getLiteral()->getPredicate(), t);
 
-    // BOOST_LOG_TRIVIAL(debug) << "EDBFCInternalTable";
+    // LOG(DEBUGL) << "EDBFCInternalTable";
 
     FCInternalTable *filteredTable = new EDBFCInternalTable(iteration,
             newLiteral, layer);
@@ -160,9 +160,9 @@ void EDBFCInternalTableItr::init(const size_t iteration,
     this->nfields = nfields;
     this->layer = layer;
     this->query = query;
-    // BOOST_LOG_TRIVIAL(debug) << "EDB iter: nfields = " << (int) this->nfields;
+    // LOG(DEBUGL) << "EDB iter: nfields = " << (int) this->nfields;
     for (int i = 0; i < nfields; ++i) {
-        // BOOST_LOG_TRIVIAL(debug) << "EDB iter: posfields[" << i << "] = " << (int) posFields[i];
+        // LOG(DEBUGL) << "EDB iter: posfields[" << i << "] = " << (int) posFields[i];
         this->posFields[i] = posFields[i];
     }
     compiled = false;

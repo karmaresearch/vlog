@@ -1,5 +1,7 @@
 #include <vlog/wizard.h>
 
+#include <kognac/logs.h>
+
 #include <unordered_set>
 #include <boost/log/trivial.hpp>
 
@@ -74,12 +76,12 @@ Literal Wizard::getMagicRelation(const bool hasPriority, std::shared_ptr<Program
     assert(j == tupleSize);
 
     const PredId_t newpredid = newProgram->getPredicateID(newPred, tupleSize);
-    //BOOST_LOG_TRIVIAL(debug) << "Assigning ID " << (int) newpredid << " to rel " << newPred;
+    //LOG(DEBUGL) << "Assigning ID " << (int) newpredid << " to rel " << newPred;
     uint8_t type = IDB;
     if (hasPriority)
         type += 2; //This activates the magic flag in the predicate
     return Literal(Predicate(newpredid, adornmentNewPred, type,
-                             tupleSize), newTuple);
+                tupleSize), newTuple);
 }
 
 std::shared_ptr<Program> Wizard::doMagic(const Literal &query,
@@ -112,8 +114,8 @@ std::shared_ptr<Program> Wizard::doMagic(const Literal &query,
             newBody.push_back(*itrBody);
         }
         assert(newBody.size() > 0);
-	Rule r(head, newBody);
-	// BOOST_LOG_TRIVIAL(debug) << "Adding rule " << r.tostring();
+        Rule r(head, newBody);
+        // LOG(DEBUGL) << "Adding rule " << r.tostring();
         newRules.push_back(r.normalizeVars());
     }
 
@@ -123,7 +125,7 @@ std::shared_ptr<Program> Wizard::doMagic(const Literal &query,
     for (std::vector<Rule>::iterator itr = newRules.begin(); itr != newRules.end();
             itr++) {
         int npreds = itr->getNIDBPredicates();
-	BOOST_LOG_TRIVIAL(debug) << "Processing rule " << itr->tostring();
+        LOG(DEBUGL) << "Processing rule " << itr->tostring();
         assert(npreds > 0);
         if (npreds > 1) { //1 is the one we added in the first step.
             for (int i = 1; i < npreds; ++i) {
@@ -149,23 +151,23 @@ std::shared_ptr<Program> Wizard::doMagic(const Literal &query,
                         newBody[0].getPredicate().getType() == newHead.getPredicate().getType() &&
                         newBody[0].getPredicate().getAdorment() == newHead.getPredicate().getAdorment()) {
                 } else {
-		    Rule r(newHead, newBody);
-		    Rule normalized_r(r.normalizeVars());
-		    std::string s = normalized_r.tostring();
-		    bool found = false;
-		    for (auto itr : additionalRulesStrings) {
-			if (itr == s) {
-			    found = true;
-			    break;
-			}
-		    }
-		    if (! found) {
-			additionalRules.push_back(normalized_r);
-			additionalRulesStrings.push_back(s);
-		    } else {
-			BOOST_LOG_TRIVIAL(debug) << "Not adding duplicate rule " << s;
-		    }
-		    // BOOST_LOG_TRIVIAL(debug) << "Adding rule " << r.tostring();
+                    Rule r(newHead, newBody);
+                    Rule normalized_r(r.normalizeVars());
+                    std::string s = normalized_r.tostring();
+                    bool found = false;
+                    for (auto itr : additionalRulesStrings) {
+                        if (itr == s) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (! found) {
+                        additionalRules.push_back(normalized_r);
+                        additionalRulesStrings.push_back(s);
+                    } else {
+                        LOG(DEBUGL) << "Not adding duplicate rule " << s;
+                    }
+                    // LOG(DEBUGL) << "Adding rule " << r.tostring();
                 }
 
             }

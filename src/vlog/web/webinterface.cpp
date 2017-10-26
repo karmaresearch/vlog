@@ -68,24 +68,24 @@ void WebInterface::startThread(string address, string port) {
 }
 
 void WebInterface::start(string address, string port) {
-    t = boost::thread(&WebInterface::startThread, this, address, port);
+    t = std::thread(&WebInterface::startThread, this, address, port);
 }
 
 void WebInterface::stop() {
-    BOOST_LOG_TRIVIAL(info) << "Stopping server ...";
+    LOG(INFOL) << "Stopping server ...";
     while (isActive) {
         std::this_thread::sleep_for(chrono::milliseconds(100));
     }
     acceptor.cancel();
     acceptor.close();
     io.stop();
-    BOOST_LOG_TRIVIAL(info) << "Done";
+    LOG(INFOL) << "Done";
 }
 
 long WebInterface::getDurationExecMs() {
-    boost::chrono::system_clock::time_point start = sn->getStartingTimeMs();
-    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    return boost::chrono::duration_cast<boost::chrono::milliseconds>(sec).count();
+    std::chrono::system_clock::time_point start = sn->getStartingTimeMs();
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    return std::chrono::duration_cast<std::chrono::milliseconds>(sec).count();
 }
 
 void WebInterface::connect() {
@@ -180,13 +180,13 @@ void WebInterface::execSPARQLQuery(string sparqlquery,
         std::unique_ptr<SPARQLLexer>(new SPARQLLexer(sparqlquery));
     std::unique_ptr<SPARQLParser> parser = std::unique_ptr<SPARQLParser>(
             new SPARQLParser(*lexer.get()));
-    boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     parseQuery(parsingOk, *parser.get(), *queryGraph.get(), *queryDict.get(), db);
     if (!parsingOk) {
-        boost::chrono::duration<double> duration = boost::chrono::system_clock::now() - start;
-        BOOST_LOG_TRIVIAL(info) << "Runtime query: 0ms.";
-        BOOST_LOG_TRIVIAL(info) << "Runtime total: " << duration.count() * 1000 << "ms.";
-        BOOST_LOG_TRIVIAL(info) << "# rows = 0";
+        std::chrono::duration<double> duration = std::chrono::system_clock::now() - start;
+        LOG(INFOL) << "Runtime query: 0ms.";
+        LOG(INFOL) << "Runtime total: " << duration.count() * 1000 << "ms.";
+        LOG(INFOL) << "# rows = 0";
         return;
     }
 
@@ -237,14 +237,14 @@ void WebInterface::execSPARQLQuery(string sparqlquery,
             p->setJSONOutput(jsonresults, jsonvars);
         }
 
-        boost::chrono::system_clock::time_point startQ = boost::chrono::system_clock::now();
+        std::chrono::system_clock::time_point startQ = std::chrono::system_clock::now();
         if (operatorTree->first()) {
             while (operatorTree->next());
         }
-        boost::chrono::duration<double> durationQ = boost::chrono::system_clock::now() - startQ;
-        boost::chrono::duration<double> duration = boost::chrono::system_clock::now() - start;
-        BOOST_LOG_TRIVIAL(info) << "Runtime query: " << durationQ.count() * 1000 << "ms.";
-        BOOST_LOG_TRIVIAL(info) << "Runtime total: " << duration.count() * 1000 << "ms.";
+        std::chrono::duration<double> durationQ = std::chrono::system_clock::now() - startQ;
+        std::chrono::duration<double> duration = std::chrono::system_clock::now() - start;
+        LOG(INFOL) << "Runtime query: " << durationQ.count() * 1000 << "ms.";
+        LOG(INFOL) << "Runtime total: " << duration.count() * 1000 << "ms.";
         if (jsonstats) {
             jsonstats->put("runtime", to_string(durationQ.count()));
             jsonstats->put("nresults", to_string(p->getPrintedRows()));
@@ -252,7 +252,7 @@ void WebInterface::execSPARQLQuery(string sparqlquery,
         }
         if (printstdout) {
             long nElements = p->getPrintedRows();
-            BOOST_LOG_TRIVIAL(info) << "# rows = " << nElements;
+            LOG(INFOL) << "# rows = " << nElements;
         }
         delete operatorTree;
     }
@@ -315,7 +315,7 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             JSON stats;
             bool jsonoutput = printresults == string("true");
             if (inter->program) {
-                BOOST_LOG_TRIVIAL(info) << "Answering the SPARQL query with VLog ...";
+                LOG(INFOL) << "Answering the SPARQL query with VLog ...";
                 WebInterface::execSPARQLQuery(sparqlquery,
                         false,
                         inter->edb->getNTerms(),
@@ -326,7 +326,7 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
                         &bindings,
                         &stats);
             } else {
-                BOOST_LOG_TRIVIAL(info) << "Answering the SPARQL query with Trident ...";
+                LOG(INFOL) << "Answering the SPARQL query with Trident ...";
                 WebInterface::execSPARQLQuery(sparqlquery,
                         false,
                         inter->edb->getNTerms(),
@@ -387,7 +387,7 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             }
             curl_easy_cleanup(curl);
 
-            BOOST_LOG_TRIVIAL(info) << "Setting up the KB with the given rules ...";
+            LOG(INFOL) << "Setting up the KB with the given rules ...";
 
             //Cleanup and install the EDB layer
             EDBConf conf(inter->edbFile);
@@ -402,27 +402,27 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             //Set up the ruleset and perform the pre-materialization if necessary
             if (sauto != "") {
                 //Automatic prematerialization
-                timens::system_clock::time_point start = timens::system_clock::now();
+                std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
                 Materialization *mat = new Materialization();
                 mat->guessLiteralsFromRules(*inter->program, *inter->edb.get());
                 mat->getAndStorePrematerialization(*inter->edb.get(),
                         *inter->program,
                         true, automatThreshold);
                 delete mat;
-                boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+                std::chrono::duration<double> sec = std::chrono::system_clock::now()
                     - start;
-                BOOST_LOG_TRIVIAL(info) << "Runtime pre-materialization = " <<
+                LOG(INFOL) << "Runtime pre-materialization = " <<
                     sec.count() * 1000 << " milliseconds";
             } else if (spremat != "") {
-                timens::system_clock::time_point start = timens::system_clock::now();
+                std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
                 Materialization *mat = new Materialization();
                 mat->loadLiteralsFromString(*inter->program, spremat);
                 mat->getAndStorePrematerialization(*inter->edb.get(), *inter->program, false, ~0l);
                 inter->program->sortRulesByIDBPredicates();
                 delete mat;
-                boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+                std::chrono::duration<double> sec = std::chrono::system_clock::now()
                     - start;
-                BOOST_LOG_TRIVIAL(info) << "Runtime pre-materialization = " <<
+                LOG(INFOL) << "Runtime pre-materialization = " <<
                     sec.count() * 1000 << " milliseconds";
             }
 
@@ -609,7 +609,7 @@ string WebInterface::getPage(string f) {
     string pathfile = dirhtmlfiles + "/" + f;
     if (boost::filesystem::exists(boost::filesystem::path(pathfile))) {
         //Read the content of the file
-        BOOST_LOG_TRIVIAL(debug) << "Reading the content of " << pathfile;
+        LOG(DEBUGL) << "Reading the content of " << pathfile;
         ifstream ifs(pathfile);
         stringstream sstr;
         sstr << ifs.rdbuf();

@@ -12,7 +12,7 @@ bool TableFilterer::opt_intersection;
 bool TableFilterer::intersection(const Literal &currentQuery,
                                  const FCBlock &block) {
     if (!getOptIntersect()) {
-        BOOST_LOG_TRIVIAL(debug) << "intersection disabled";
+        LOG(DEBUGL) << "intersection disabled";
         return true;
     }
     Substitution subs[SIZETUPLE];
@@ -43,7 +43,7 @@ bool TableFilterer::producedDerivationInPreviousSteps(
         if (lit.getPredicate().getType() == IDB) {
             const Literal subsChild = lit.substitutes(subs, nsubs);
             if (subsChild == outputQuery) {
-                //BOOST_LOG_TRIVIAL(info) << "SIMPLEPRUNING ok";
+                //LOG(INFOL) << "SIMPLEPRUNING ok";
                 return true;
             }
 
@@ -60,7 +60,7 @@ bool TableFilterer::isEligibleForPartialSubs(
     const int nPosFromSecond) {
 
     if (! naiver->opt_filter()) {
-        BOOST_LOG_TRIVIAL(debug) << "isEligibleForPartialSubs disabled";
+        LOG(DEBUGL) << "isEligibleForPartialSubs disabled";
         return false;
     }
 
@@ -68,7 +68,7 @@ bool TableFilterer::isEligibleForPartialSubs(
     if ((currentResults != NULL && currentResults->getNRows() > 10000000) ||
             nPosFromFirst != 1  || nPosFromSecond == 0) {
         //if (currentResults->getNRows() > 10000000)
-        //    BOOST_LOG_TRIVIAL(warning) << "Current results too large: " << currentResults->getNRows();
+        //    LOG(WARNL) << "Current results too large: " << currentResults->getNRows();
         return false;
     }
 
@@ -125,7 +125,7 @@ bool TableFilterer::isEligibleForPartialSubs(
                 idxSmall = i;
             } else {
                 EDBLayer &layer = naiver->getEDBLayer();
-                BOOST_LOG_TRIVIAL(debug) << "Card of " << el.tostring(naiver->getProgram(), &layer) << estimate << "<- too large";
+                LOG(DEBUGL) << "Card of " << el.tostring(naiver->getProgram(), &layer) << estimate << "<- too large";
             }
         }
         i++;
@@ -136,7 +136,7 @@ bool TableFilterer::isEligibleForPartialSubs(
         if (rule.getNIDBPredicates() == 1 && bodyLiterals.size() == 1 &&
                 headRule.getPredicate().getId() ==
                 rule.getHead().getPredicate().getId()) {
-            //BOOST_LOG_TRIVIAL(info) << "THE RULE OF THE block is linear. Try to look at the child...";
+            //LOG(INFOL) << "THE RULE OF THE block is linear. Try to look at the child...";
             //Get the last block (before the iteration) of the child predicate
 
             //Check if the rule is recursive. If so, then we can use the block,
@@ -155,13 +155,13 @@ bool TableFilterer::isEligibleForPartialSubs(
             }
 
             if (childBlocks.empty()) {
-                BOOST_LOG_TRIVIAL(info) << "The child predicate is empty. Let it go";
+                LOG(INFOL) << "The child predicate is empty. Let it go";
                 return false;
             }
 
             //Is the rule in that block recursive?
             if (childBlocks.back()->rule->rule.isRecursive()) {
-                //BOOST_LOG_TRIVIAL(info) << "THE LAST BLOCK in the prev predicate is recursive!";
+                //LOG(INFOL) << "THE LAST BLOCK in the prev predicate is recursive!";
                 //Ok now check the previous block (if any). I must be sure
                 //that the block occurred before the previous execution of this
                 //rule (if any).
@@ -169,7 +169,7 @@ bool TableFilterer::isEligibleForPartialSubs(
                 if (childBlocks.size() > 1) {
                     prevIteration = childBlocks[childBlocks.size() - 2]->iteration;
                 }
-                ///BOOST_LOG_TRIVIAL(info) << "THE PREV ITERATION IS " <<
+                ///LOG(INFOL) << "THE PREV ITERATION IS " <<
                 //                        prevIteration <<
                 //                        "The block prev iteration was " <<
                 //                        block->rule->lastExecution;
@@ -180,15 +180,15 @@ bool TableFilterer::isEligibleForPartialSubs(
                     // satisfies the eligibility criteria.
                     bool resp = isEligibleForPartialSubs(childBlocks.back(),
                                                          bodyLiterals[0], NULL, 1, 1);
-                    //BOOST_LOG_TRIVIAL(info) << "Here I would have returned " << resp;
+                    //LOG(INFOL) << "Here I would have returned " << resp;
                     return resp;
                 } else {
-                    //BOOST_LOG_TRIVIAL(info) << "No matching with the intervals";
+                    //LOG(INFOL) << "No matching with the intervals";
                     return false;
                 }
 
             } else {
-                //BOOST_LOG_TRIVIAL(info) << "I was looking at the child predicate, but the last rule was not recursive";
+                //LOG(INFOL) << "I was looking at the child predicate, but the last rule was not recursive";
                 return false;
             }
         } else {
@@ -196,7 +196,7 @@ bool TableFilterer::isEligibleForPartialSubs(
         }
     }
 
-//BOOST_LOG_TRIVIAL(info) << "TODERIVE=" << headRule.tostring(naiver->getProgram(), naiver->getDict()) << " rule=" << rule.tostring(naiver->getProgram(), naiver->getDict()) << "recursive=" << foundRecursive << " small=" << foundSmall;
+//LOG(INFOL) << "TODERIVE=" << headRule.tostring(naiver->getProgram(), naiver->getDict()) << " rule=" << rule.tostring(naiver->getProgram(), naiver->getDict()) << "recursive=" << foundRecursive << " small=" << foundSmall;
 
 //Check if the small literal shares variables with the recursive literal
     if (foundSmall) {
@@ -205,7 +205,7 @@ bool TableFilterer::isEligibleForPartialSubs(
             return false;
     }
 
-    //BOOST_LOG_TRIVIAL(info) << "True!";
+    //LOG(INFOL) << "True!";
 
     return true;
 }

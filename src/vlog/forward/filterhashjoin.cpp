@@ -33,10 +33,10 @@ FilterHashJoin::FilterHashJoin(ResultJoinProcessor *output,
     }
 #if DEBUG
     for (int i = 0; i < nValuesHead; ++i) {
-        BOOST_LOG_TRIVIAL(debug) << "posValuesHead[" << i << "] = [" << (int) posValuesHead[i].first << ", " << (int) posValuesHead[i].second << "]";
+        LOG(DEBUGL) << "posValuesHead[" << i << "] = [" << (int) posValuesHead[i].first << ", " << (int) posValuesHead[i].second << "]";
     }
     for (int i = 0; i < nValuesHashHead; ++i) {
-        BOOST_LOG_TRIVIAL(debug) << "posValuesHashHead[" << i << "] = [" << (int) posValuesHashHead[i].first << ", " << (int) posValuesHashHead[i].second << "]";
+        LOG(DEBUGL) << "posValuesHashHead[" << i << "] = [" << (int) posValuesHashHead[i].first << ", " << (int) posValuesHashHead[i].second << "]";
     }
 #endif
     std::sort(posValuesHeadRowEdition.begin(), posValuesHeadRowEdition.end());
@@ -215,7 +215,7 @@ void FilterHashJoin::run(const std::vector<FilterHashJoinBlock> &inputTables, co
 
     std::vector<uint8_t> posToSort = ps;
 
-    BOOST_LOG_TRIVIAL(debug) << "FilterHashJoin::run: start = " << startCarprod << ", end = " << endCartprod;
+    LOG(DEBUGL) << "FilterHashJoin::run: start = " << startCarprod << ", end = " << endCartprod;
     //Calculate the correct offset of the variables to retrieve the existing bindings
     uint8_t posOtherVariables[SIZETUPLE];
     uint8_t nconstants = 0; //I need to remove constants when I calculate the positions on the last literal
@@ -319,18 +319,18 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
         bool found = false;
         for (uint8_t j = 0; j < nValuesHashHead && !found; ++j) {
             if (posValuesHashHead[j].first == i) {
-                // BOOST_LOG_TRIVIAL(debug) << "Found HashHead " << (int) j << " at position " << (int) i << ", second = " << (int) posValuesHashHead[j].second;
+                // LOG(DEBUGL) << "Found HashHead " << (int) j << " at position " << (int) i << ", second = " << (int) posValuesHashHead[j].second;
                 found = true;
             }
         }
         for (uint8_t j = 0; j < nValuesHead && !found; ++j) {
             if (posValuesHead[j].first == i) {
-                // BOOST_LOG_TRIVIAL(debug) << "Found Head " << (int) j << " at position " << (int) i << ", second = " << (int) posValuesHashHead[j].second;
+                // LOG(DEBUGL) << "Found Head " << (int) j << " at position " << (int) i << ", second = " << (int) posValuesHashHead[j].second;
                 found = true;
             }
         }
         if (!found) {
-            // BOOST_LOG_TRIVIAL(debug) << "OtherPos " << (int) pos << " at position " << (int) i;
+            // LOG(DEBUGL) << "OtherPos " << (int) pos << " at position " << (int) i;
             otherPos[pos++] = i;
         }
     }
@@ -360,7 +360,7 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
     }
     std::vector<std::shared_ptr<Column>> c = itr->getColumn(nValuesHead, columnIdx);
 
-    BOOST_LOG_TRIVIAL(debug) << "literal->getNVars() = " << (int) literal->getNVars();
+    LOG(DEBUGL) << "literal->getNVars() = " << (int) literal->getNVars();
     if (nValuesHead == literal->getNVars() &&
             nValuesHead > 0 &&
             valueColumnsToFilter == NULL &&
@@ -466,9 +466,9 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
         }
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "startCarprod = " << startCarprod << ", mapRowSize = " << (int) mapRowSize
+    LOG(DEBUGL) << "startCarprod = " << startCarprod << ", mapRowSize = " << (int) mapRowSize
                              << ", endCartprod = " << endCartprod << ", size = " << size << ", pos = " << (int) pos;
-    BOOST_LOG_TRIVIAL(debug) << "nValuesHead = " << (int) nValuesHead << ", nValuesHashHead = " << (int) nValuesHashHead;
+    LOG(DEBUGL) << "nValuesHead = " << (int) nValuesHead << ", nValuesHashHead = " << (int) nValuesHashHead;
     if (size > 0) {
         //Add other constants
         const Term_t *row = output->getRawRow();
@@ -550,13 +550,13 @@ void FilterHashJoin::run_processitr_rowversion(FCInternalTableItr *itr, const bo
 
         if (valueColumnsToFilter != NULL
                 && itr->getCurrentValue(posToFilter) == valueToFilter) {
-            BOOST_LOG_TRIVIAL(debug) << "Avoid to consider the value "
+            LOG(DEBUGL) << "Avoid to consider the value "
                                      << valueToFilter << " of column " << (int) posToFilter;
             continue;
         }
         if (columnsToFilterOut != NULL
                 && itr->getCurrentValue(c1) == itr->getCurrentValue(c2)) {
-            BOOST_LOG_TRIVIAL(debug) << "The columns " << c1 << " and " << c2
+            LOG(DEBUGL) << "The columns " << c1 << " and " << c2
                                      << " are equivalent " << itr->getCurrentValue(c1);
             continue;
         }

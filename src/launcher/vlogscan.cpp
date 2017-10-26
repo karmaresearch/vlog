@@ -23,7 +23,7 @@ uint64_t VLogScan::getCount() {
 bool VLogScan::next() {
     if (iterator->hasNext()) {
         iterator->next();
-        // BOOST_LOG_TRIVIAL(debug) << "Iterator = " << iterator.get() << ", value3 = " << getValue3();
+        // LOG(DEBUGL) << "Iterator = " << iterator.get() << ", value3 = " << getValue3();
         return true;
     }
     return false;
@@ -62,8 +62,8 @@ bool VLogScan::first(uint64_t first, bool constrained1, uint64_t second, bool co
     if (hint != NULL) {
 	keys = hint->getKeys(&bitset);
 	if (keys != NULL) {
-	    BOOST_LOG_TRIVIAL(debug) << "I have some keys: size = " << keys->size() << ", bitset = " << bitset;
-	    BOOST_LOG_TRIVIAL(debug) << "Literal = " << query.tostring();
+	    LOG(DEBUGL) << "I have some keys: size = " << keys->size() << ", bitset = " << bitset;
+	    LOG(DEBUGL) << "Literal = " << query.tostring();
 	    // Assumes a single join variable.
 	    keypos = new std::vector<uint8_t>();
 	    uint8_t varNo = 0;
@@ -73,7 +73,7 @@ bool VLogScan::first(uint64_t first, bool constrained1, uint64_t second, bool co
 		if (t.isVariable()) {
 		    if (bitset & flag) {
 			keypos->push_back(varNo);
-			BOOST_LOG_TRIVIAL(debug) << "Variable number = " << (int) varNo;
+			LOG(DEBUGL) << "Variable number = " << (int) varNo;
 			break;
 		    }
 		    varNo++;
@@ -148,7 +148,7 @@ bool VLogScan::first(uint64_t first, bool constrained1, uint64_t second, bool co
 Literal VLogScan::getLiteral(DBLayer::DataOrder order, uint64_t first,
                              bool constrained1, uint64_t second, bool constrained2,
                              uint64_t third, bool constrained3) {
-    BOOST_LOG_TRIVIAL(debug) << "getLiteral: first = " << first << ", second = " << second << ", third = " << third;
+    LOG(DEBUGL) << "getLiteral: first = " << first << ", second = " << second << ", third = " << third;
 
     VTerm terms[3];
     uint8_t vardidx = 1;

@@ -5,7 +5,6 @@
 
 #include <kognac/consts.h>
 
-#include <boost/log/trivial.hpp>
 #include <boost/tokenizer.hpp>
 
 #include <cctype>
@@ -460,9 +459,9 @@ void Rule::checkRule() const {
 	    }
 	}
     }
-    BOOST_LOG_TRIVIAL(debug) << "Rule " << this->tostring() << " has " << varCount << " variables";
+    LOG(DEBUGL) << "Rule " << this->tostring() << " has " << varCount << " variables";
     if (varCount > MAX_ROWSIZE) {
-	BOOST_LOG_TRIVIAL(error) << "MAX_ROWSIZE needs to be set to at least " << varCount << "!";
+	LOG(ERRORL) << "MAX_ROWSIZE needs to be set to at least " << varCount << "!";
 	abort();
     }
 }
@@ -499,7 +498,7 @@ Rule Rule::normalizeVars() const {
 	subs.push_back(Substitution(vars[i], VTerm(i+1, 0)));
     }
     Literal newHead = head.substitutes(&subs[0], subs.size());
-    BOOST_LOG_TRIVIAL(debug) << "head = " << head.tostring() << ", newHead = " << newHead.tostring();
+    LOG(DEBUGL) << "head = " << head.tostring() << ", newHead = " << newHead.tostring();
     std::vector<Literal> newBody;
     for (std::vector<Literal>::const_iterator itr = body.cbegin(); itr != body.cend();
             ++itr) {
@@ -605,20 +604,20 @@ Program::Program(const uint64_t assignedIds,
 }
 
 void Program::readFromFile(std::string pathFile) {
-    BOOST_LOG_TRIVIAL(info) << "Read program from file " << pathFile;
+    LOG(INFOL) << "Read program from file " << pathFile;
     if (pathFile == "") {
-	BOOST_LOG_TRIVIAL(info) << "Using default rule TI(A,B,C) :- TE(A,B,C)";
+	LOG(INFOL) << "Using default rule TI(A,B,C) :- TE(A,B,C)";
 	parseRule("TI(A,B,C) :- TE(A,B,C)");
     } else {
     std::ifstream file(pathFile);
     std::string line;
     while (std::getline(file, line)) {
         if (line != "" && line.substr(0, 2) != "//") {
-            BOOST_LOG_TRIVIAL(trace) << "Parsing rule " << line;
+            LOG(DEBUGL) << "Parsing rule " << line;
             parseRule(line);
         }
     }
-    BOOST_LOG_TRIVIAL(info) << "New assigned constants: " << additionalConstants.size();
+    LOG(INFOL) << "New assigned constants: " << additionalConstants.size();
     }
 }
 
@@ -627,11 +626,11 @@ void Program::readFromString(std::string rules) {
     boost::tokenizer<boost::char_separator<char>> tokens(rules, sep);
     for (const auto &rule : tokens) {
         if (rule != "" && rule .substr(0, 2) != "//") {
-            BOOST_LOG_TRIVIAL(trace) << "Parsing rule " << rule;
+            LOG(DEBUGL) << "Parsing rule " << rule;
             parseRule(rule);
         }
     }
-    BOOST_LOG_TRIVIAL(info) << "New assigned constants: " << additionalConstants.size();
+    LOG(INFOL) << "New assigned constants: " << additionalConstants.size();
 }
 
 std::string Program::compressRDFOWLConstants(std::string input) {
@@ -728,7 +727,7 @@ Literal Program::parseLiteral(std::string l) {
         cardPredicates.insert(make_pair(predid, t.size()));
     } else {
 	if (cardPredicates.find(predid)->second != t.size()) {
-	    BOOST_LOG_TRIVIAL(info) << "Wrong size in predicate: should be " << (int) cardPredicates.find(predid)->second;
+	    LOG(INFOL) << "Wrong size in predicate: should be " << (int) cardPredicates.find(predid)->second;
 	    throw 10;
 	}
     }
@@ -741,7 +740,7 @@ Literal Program::parseLiteral(std::string l) {
 PredId_t Program::getPredicateID(std::string & p, const uint8_t card) {
     PredId_t predid = (PredId_t) dictPredicates.getOrAdd(p);
     if (predid >= MAX_NPREDS) {
-        BOOST_LOG_TRIVIAL(debug) << "Too many predicates";
+        LOG(DEBUGL) << "Too many predicates";
         throw OUT_OF_PREDICATES;
     }
     //add the cardinality associated to this predicate
@@ -847,7 +846,7 @@ void Program::parseRule(std::string rule) {
         rules[lHead.getPredicate().getId()].push_back(Rule(lHead, lBody));
 
     } catch (int e) {
-        BOOST_LOG_TRIVIAL(error) << "Failed in parsing rule " << rule;
+        LOG(ERRORL) << "Failed in parsing rule " << rule;
     }
 }
 

@@ -124,11 +124,11 @@ void MAPITable::query(QSQQuery *query, TupleTable *outputTable,
 	    }
 	    sqlCreateTable += ")";
 	    sqlCreateTable += ")";
-	    BOOST_LOG_TRIVIAL(debug) << "SQL create temp table: " << sqlCreateTable;
+	    LOG(DEBUGL) << "SQL create temp table: " << sqlCreateTable;
 	    update(con, sqlCreateTable);
 
 	    // Insert values into table
-	    BOOST_LOG_TRIVIAL(debug) << "START TRANSACTION";
+	    LOG(DEBUGL) << "START TRANSACTION";
 	    update(con, "START TRANSACTION");
 
 	    for (std::vector<Term_t>::iterator itr = valuesToFilter->begin();
@@ -139,11 +139,11 @@ void MAPITable::query(QSQQuery *query, TupleTable *outputTable,
 		    addition += pref + to_string(*itr);
 		}
 		addition += ")";
-		BOOST_LOG_TRIVIAL(debug) << "SQL insert into temp table: " << addition;
+		LOG(DEBUGL) << "SQL insert into temp table: " << addition;
 		update(con, addition);
 	    }
 
-	    BOOST_LOG_TRIVIAL(debug) << "COMMIT";
+	    LOG(DEBUGL) << "COMMIT";
 	    update(con, "COMMIT");
 	    
 	    /*
@@ -155,7 +155,7 @@ void MAPITable::query(QSQQuery *query, TupleTable *outputTable,
 		sqlCreateTable += "x" + to_string(i);
 	    }
 	    sqlCreateTable += ")";
-	    BOOST_LOG_TRIVIAL(debug) << "alter table: add primary key: " << sqlCreateTable;
+	    LOG(DEBUGL) << "alter table: add primary key: " << sqlCreateTable;
 	    update(con, sqlCreateTable);
 	    */
 
@@ -205,10 +205,10 @@ void MAPITable::query(QSQQuery *query, TupleTable *outputTable,
     }
     iter->clear();
     delete iter;
-    BOOST_LOG_TRIVIAL(debug) << "query gave " << count << " results";
+    LOG(DEBUGL) << "query gave " << count << " results";
 
     if (valuesToFilter != NULL && valuesToFilter->size() > TEMP_TABLE_THRESHOLD) {
-	BOOST_LOG_TRIVIAL(debug) << "DROP TABLE temp";
+	LOG(DEBUGL) << "DROP TABLE temp";
 	update(con, "DROP TABLE temp");
     }
 }
@@ -221,7 +221,7 @@ size_t MAPITable::getCardinality(const Literal &q) {
         query += " WHERE " + cond;
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SQL Query: " << query;
+    LOG(DEBUGL) << "SQL Query: " << query;
 
     MapiHdl handle = doquery(con, query);
     mapi_fetch_row(handle);
@@ -242,7 +242,7 @@ size_t MAPITable::getCardinalityColumn(const Literal &q, uint8_t posColumn) {
         query += " WHERE " + cond;
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SQL Query: " << query;
+    LOG(DEBUGL) << "SQL Query: " << query;
     MapiHdl handle = doquery(con, query);
     mapi_fetch_row(handle);
     char *res = mapi_fetch_field(handle, 0);
@@ -275,7 +275,7 @@ bool MAPITable::isEmpty(const Literal &q, std::vector<uint8_t> *posToFilter,
 	query += " WHERE " + cond;
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SQL Query: " << query;
+    LOG(DEBUGL) << "SQL Query: " << query;
 
     MapiHdl handle = doquery(con, query);
     mapi_fetch_row(handle);

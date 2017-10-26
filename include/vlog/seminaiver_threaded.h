@@ -3,8 +3,8 @@
 
 #include <vlog/seminaiver.h>
 
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/tss.hpp>
+#include <mutex>
+#include <thread>
 
 struct SemiNaiver_Threadlocal {
     std::vector<FCBlock> listDerivations;
@@ -13,99 +13,99 @@ struct SemiNaiver_Threadlocal {
 };
 
 class StatusRuleExecution_ThreadSafe {
-private:
-    //Internal data structures
+    private:
+        //Internal data structures
 
-    //Hold all rules to execution
-    boost::mutex mutexRules;
-    int rulecount;
-    const int nrules;
+        //Hold all rules to execution
+        std::mutex mutexRules;
+        int rulecount;
+        const int nrules;
 
-    std::vector<ResultJoinProcessor*> tmpderivations;
+        std::vector<ResultJoinProcessor*> tmpderivations;
 
-public:
+    public:
 
-    StatusRuleExecution_ThreadSafe(const int nrules);
+        StatusRuleExecution_ThreadSafe(const int nrules);
 
-    int getRuleIDToExecute();
+        int getRuleIDToExecute();
 
-    void registerDerivations(ResultJoinProcessor *res);
+        void registerDerivations(ResultJoinProcessor *res);
 
-    std::vector<ResultJoinProcessor*> &getTmpDerivations() {
-        return  tmpderivations;
-    }
+        std::vector<ResultJoinProcessor*> &getTmpDerivations() {
+            return  tmpderivations;
+        }
 };
 
 class SemiNaiverThreaded: public SemiNaiver {
 
-private:
-    //const int nthreads;
-    boost::thread_specific_ptr<SemiNaiver_Threadlocal> thread_data;
+    private:
+        //const int nthreads;
+        //TODO This variable is only visible to the thread
+        std::shared_ptr<SemiNaiver_Threadlocal> thread_data;
 
-    bool marked[MAX_NPREDS];
-    bool newMarked[MAX_NPREDS];
+        bool marked[MAX_NPREDS];
+        bool newMarked[MAX_NPREDS];
 
-    /*** VARIOUS MUTEXES */
-    boost::mutex mutexInsert;
-    boost::mutex mutexIteration;
-    boost::mutex mutexGetTable;
-    boost::mutex mutexStatistics;
-    boost::mutex mutexListDer;
-    //boost::mutex mutexGetIterator;
-    const int interRuleThreads;
+        /*** VARIOUS MUTEXES */
+        std::mutex mutexInsert;
+        std::mutex mutexIteration;
+        std::mutex mutexGetTable;
+        std::mutex mutexStatistics;
+        std::mutex mutexListDer;
+        const int interRuleThreads;
 
-    //Create one mutex per table
-    boost::shared_mutex mutexes[MAX_NPREDS];
+        //Create one mutex per table
+        std::shared_mutex mutexes[MAX_NPREDS];
 
-    size_t getAtomicIteration() {
-        boost::mutex::scoped_lock lock(mutexIteration);
-        return iteration++;
-    }
+        size_t getAtomicIteration() {
+            std::lock_guard<std::mutex> lock(mutexIteration);
+            return iteration++;
+        }
 
-    bool doGlobalConsolidation(StatusRuleExecution_ThreadSafe &data);
+        bool doGlobalConsolidation(StatusRuleExecution_ThreadSafe &data);
 
-    bool tryLock(std::vector<PredId_t> &predicates, PredId_t idHeadPredicate);
+        bool tryLock(std::vector<PredId_t> &predicates, PredId_t idHeadPredicate);
 
-    void lock(std::vector<PredId_t> &predicates, PredId_t idHeadPredicate);
+        void lock(std::vector<PredId_t> &predicates, PredId_t idHeadPredicate);
 
-    void unlock(std::vector<PredId_t> &predicates, PredId_t idHeadPredicate);
+        void unlock(std::vector<PredId_t> &predicates, PredId_t idHeadPredicate);
 
-public:
-    SemiNaiverThreaded(std::vector<Rule> ruleset,
-                       EDBLayer &layer,
-                       Program *program,
-                       bool opt_intersect,
-                       bool opt_filtering,
-                       bool shuffleRules,
-                       const int nthreads,
-		       const int interRuleThreads) : SemiNaiver(ruleset, layer,
-                                   program, opt_intersect, opt_filtering, true,
-                                   nthreads, shuffleRules),
-        interRuleThreads(interRuleThreads) {
+    public:
+        SemiNaiverThreaded(std::vector<Rule> ruleset,
+                EDBLayer &layer,
+                Program *program,
+                bool opt_intersect,
+                bool opt_filtering,
+                bool shuffleRules,
+                const int nthreads,
+                const int interRuleThreads) : SemiNaiver(ruleset, layer,
+                    program, opt_intersect, opt_filtering, true,
+                    nthreads, shuffleRules),
+                interRuleThreads(interRuleThreads) {
 
-	// Marks for parallel version
-	for (int i = 0; i < MAX_NPREDS; i++) {
-	    marked[i] = true;
-	    newMarked[i] = false;
-	}
-    }
+                    // Marks for parallel version
+                    for (int i = 0; i < MAX_NPREDS; i++) {
+                        marked[i] = true;
+                        newMarked[i] = false;
+                    }
+                }
 
-protected:
-    long getNLastDerivationsFromList();
+    protected:
+        long getNLastDerivationsFromList();
 
-    void saveDerivationIntoDerivationList(FCTable *endTable);
+        void saveDerivationIntoDerivationList(FCTable *endTable);
 
-    void saveStatistics(StatsRule &stats);
+        void saveStatistics(StatsRule &stats);
 
-    FCTable *getTable(const PredId_t pred, const uint8_t card);
+        FCTable *getTable(const PredId_t pred, const uint8_t card);
 
-    FCIterator getTableFromEDBLayer(const Literal & literal);
+        FCIterator getTableFromEDBLayer(const Literal & literal);
 
-    void runThread(StatusRuleExecution_ThreadSafe *status,
-                   std::vector<StatIteration> *costRules,
-                   size_t lastExec);
+        void runThread(StatusRuleExecution_ThreadSafe *status,
+                std::vector<StatIteration> *costRules,
+                size_t lastExec);
 
-    void executeUntilSaturation(std::vector<StatIteration> &costRules);
+        void executeUntilSaturation(std::vector<StatIteration> &costRules);
 };
 
 #endif

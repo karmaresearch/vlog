@@ -27,8 +27,6 @@
 #include <rts/operator/ResultsPrinter.hpp>
 
 //Boost
-#include <boost/chrono.hpp>
-#include <boost/log/trivial.hpp>
 #include <boost/log/utility/setup/console.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/expressions.hpp>
@@ -37,7 +35,6 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/program_options.hpp>
-// #include <boost/sort/spreadsort/integer_sort.hpp>
 
 //TBB
 // Don't use global_control, to allow for older TBB versions.
@@ -53,27 +50,8 @@
 #include <thread>
 
 using namespace std;
-namespace timens = boost::chrono;
-namespace logging = boost::log;
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
-
-void initLogging(logging::trivial::severity_level level) {
-    logging::add_common_attributes();
-    logging::add_console_log(std::cerr,
-            logging::keywords::format =
-            (logging::expressions::stream << "["
-             << logging::expressions::attr <
-             boost::log::attributes::current_thread_id::value_type > (
-                 "ThreadID") << " "
-             << logging::expressions::format_date_time <
-             boost::posix_time::ptime > ("TimeStamp",
-                 "%H:%M:%S") << " - "
-             << logging::trivial::severity << "] "
-             << logging::expressions::smessage));
-    boost::shared_ptr<logging::core> core = logging::core::get();
-    core->set_filter(logging::trivial::severity >= level);
-}
 
 void printHelp(const char *programName, po::options_description &desc) {
     cout << "Usage: " << programName << " <command> [options]" << endl << endl;
@@ -291,8 +269,8 @@ bool initParams(int argc, const char** argv, po::variables_map &vm) {
 
     po::options_description cmdline_options("Parameters");
     cmdline_options.add(query_options).add(lookup_options).add(load_options);
-    cmdline_options.add_options()("logLevel,l", po::value<logging::trivial::severity_level>(),
-            "Set the log level (accepted values: trace, debug, info, warning, error, fatal). Default is info.");
+    //cmdline_options.add_options()("logLevel,l", po::value<logging::trivial::severity_level>(),
+    //        "Set the log level (accepted values: trace, debug, info, warning, error, fatal). Default is info.");
 
     cmdline_options.add_options()("edb,e", po::value<string>()->default_value("default"),
             "Path to the edb conf file. Default is 'edb.conf' in the same directory as the exec file.");
@@ -337,7 +315,7 @@ string flattenAllArgs(int argc,
 }
 
 void writeRuleDependencyGraph(EDBLayer &db, string pathRules, string filegraph) {
-    BOOST_LOG_TRIVIAL(info) << " Write the graph file to " << filegraph;
+    LOG(INFOL) << " Write the graph file to " << filegraph;
     Program p(db.getNTerms(), &db);
     p.readFromFile(pathRules);
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(db,
@@ -369,7 +347,7 @@ void startServer(int argc,
                 flattenAllArgs(argc, argv),
                 vm["edb"].as<string>()));
     webint->start("0.0.0.0", to_string(port));
-    BOOST_LOG_TRIVIAL(info) << "Server is launched at 0.0.0.0:" << to_string(port);
+    LOG(INFOL) << "Server is launched at 0.0.0.0:" << to_string(port);
     webint->join();
 }
 
@@ -387,23 +365,23 @@ void launchFullMat(int argc,
     {
         if (!vm["automat"].empty()) {
             //Automatic prematerialization
-            timens::system_clock::time_point start = timens::system_clock::now();
+            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
             Materialization mat;
             mat.guessLiteralsFromRules(p, db);
             mat.getAndStorePrematerialization(db, p, true,
                     vm["timeoutPremat"].as<int>());
-            boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+            std::chrono::duration<double> sec = std::chrono::system_clock::now()
                 - start;
-            BOOST_LOG_TRIVIAL(info) << "Runtime pre-materialization = " <<
+            LOG(INFOL) << "Runtime pre-materialization = " <<
                 sec.count() * 1000 << " milliseconds";
         } else if (vm["premat"].as<string>() != "") {
-            timens::system_clock::time_point start = timens::system_clock::now();
+            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
             Materialization mat;
             mat.loadLiteralsFromFile(p, vm["premat"].as<string>());
             mat.getAndStorePrematerialization(db, p, false, ~0l);
-            boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+            std::chrono::duration<double> sec = std::chrono::system_clock::now()
                 - start;
-            BOOST_LOG_TRIVIAL(info) << "Runtime pre-materialization = " <<
+            LOG(INFOL) << "Runtime pre-materialization = " <<
                 sec.count() * 1000 << " milliseconds";
         }
 
@@ -438,15 +416,15 @@ void launchFullMat(int argc,
         }
 #endif
 
-        BOOST_LOG_TRIVIAL(info) << "Starting full materialization";
-        timens::system_clock::time_point start = timens::system_clock::now();
+        LOG(INFOL) << "Starting full materialization";
+        std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         sn->run();
-        boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-        BOOST_LOG_TRIVIAL(info) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
+        std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+        LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
         sn->printCountAllIDBs();
 
         if (vm["storemat_path"].as<string>() != "") {
-            timens::system_clock::time_point start = timens::system_clock::now();
+            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
             Exporter exp(sn);
 
@@ -459,19 +437,19 @@ void launchFullMat(int argc,
             } else if (vm["storemat_format"].as<string>() == "nt") {
                 exp.generateNTTriples(vm["storemat_path"].as<string>(), vm["decompressmat"].as<bool>());
             } else {
-                BOOST_LOG_TRIVIAL(error) << "Option 'storemat_format' not recognized";
+                LOG(ERRORL) << "Option 'storemat_format' not recognized";
                 throw 10;
             }
 
-            boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-            BOOST_LOG_TRIVIAL(info) << "Time to index and store the materialization on disk = " << sec.count() << " seconds";
+            std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+            LOG(INFOL) << "Time to index and store the materialization on disk = " << sec.count() << " seconds";
         }
 #ifdef WEBINTERFACE
         if (webint) {
             //Sleep for max 1 second, to allow the fetching of the last statistics
-            BOOST_LOG_TRIVIAL(info) << "Sleeping for one second to allow the web interface to get the last stats ...";
+            LOG(INFOL) << "Sleeping for one second to allow the web interface to get the last stats ...";
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            BOOST_LOG_TRIVIAL(info) << "Done.";
+            LOG(INFOL) << "Done.";
             webint->stop();
         }
 #endif
@@ -491,26 +469,26 @@ void execSPARQLQuery(EDBLayer &edb, po::variables_map &vm) {
     if (pathRules != "") {
         if (!vm["automat"].empty()) {
             //Automatic prematerialization
-            timens::system_clock::time_point start = timens::system_clock::now();
+            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
             Materialization *mat = new Materialization();
             mat->guessLiteralsFromRules(p, edb);
             mat->getAndStorePrematerialization(edb, p, true,
                     vm["timeoutPremat"].as<int>());
             delete mat;
-            boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+            std::chrono::duration<double> sec = std::chrono::system_clock::now()
                 - start;
-            BOOST_LOG_TRIVIAL(info) << "Runtime pre-materialization = " <<
+            LOG(INFOL) << "Runtime pre-materialization = " <<
                 sec.count() * 1000 << " milliseconds";
         } else if (vm["premat"].as<string>() != "") {
-            timens::system_clock::time_point start = timens::system_clock::now();
+            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
             Materialization *mat = new Materialization();
             mat->loadLiteralsFromFile(p, vm["premat"].as<string>());
             mat->getAndStorePrematerialization(edb, p, false, ~0l);
             p.sortRulesByIDBPredicates();
             delete mat;
-            boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+            std::chrono::duration<double> sec = std::chrono::system_clock::now()
                 - start;
-            BOOST_LOG_TRIVIAL(info) << "Runtime pre-materialization = " <<
+            LOG(INFOL) << "Runtime pre-materialization = " <<
                 sec.count() * 1000 << " milliseconds";
         }
     }
@@ -553,13 +531,13 @@ void execSPARQLQuery(EDBLayer &edb, po::variables_map &vm) {
 
       SPARQLLexer lexer(strStream.str());
       SPARQLParser parser(lexer);
-      boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+      std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
       parseQuery(parsingOk, parser, queryGraph, queryDict, db);
       if (!parsingOk) {
-      boost::chrono::duration<double> duration = boost::chrono::system_clock::now() - start;
-      BOOST_LOG_TRIVIAL(info) << "Runtime query: 0ms.";
-      BOOST_LOG_TRIVIAL(info) << "Runtime total: " << duration.count() * 1000 << "ms.";
-      BOOST_LOG_TRIVIAL(info) << "# rows = 0";
+      std::chrono::duration<double> duration = std::chrono::system_clock::now() - start;
+      LOG(INFOL) << "Runtime query: 0ms.";
+      LOG(INFOL) << "Runtime total: " << duration.count() * 1000 << "ms.";
+      LOG(INFOL) << "# rows = 0";
       return;
       }
 
@@ -592,17 +570,17 @@ void execSPARQLQuery(EDBLayer &edb, po::variables_map &vm) {
 DebugPlanPrinter out(runtime, false);
 operatorTree->print(out);
 #endif
-boost::chrono::system_clock::time_point startQ = boost::chrono::system_clock::now();
+std::chrono::system_clock::time_point startQ = std::chrono::system_clock::now();
 if (operatorTree->first()) {
 while (operatorTree->next());
 }
-boost::chrono::duration<double> durationQ = boost::chrono::system_clock::now() - startQ;
-boost::chrono::duration<double> duration = boost::chrono::system_clock::now() - start;
-BOOST_LOG_TRIVIAL(info) << "Runtime query: " << durationQ.count() * 1000 << "ms.";
-BOOST_LOG_TRIVIAL(info) << "Runtime total: " << duration.count() * 1000 << "ms.";
+std::chrono::duration<double> durationQ = std::chrono::system_clock::now() - startQ;
+std::chrono::duration<double> duration = std::chrono::system_clock::now() - start;
+LOG(INFOL) << "Runtime query: " << durationQ.count() * 1000 << "ms.";
+LOG(INFOL) << "Runtime total: " << duration.count() * 1000 << "ms.";
 ResultsPrinter *p = (ResultsPrinter*) operatorTree;
 long nElements = p->getPrintedRows();
-BOOST_LOG_TRIVIAL(info) << "# rows = " << nElements;
+LOG(INFOL) << "# rows = " << nElements;
 
 delete plangen;
 delete operatorTree;
@@ -619,20 +597,20 @@ if (times > 0) {
     Plan* plan = plangen->translate(db, queryGraph);
     Runtime runtime(db, NULL, &queryDict);
     operatorTree = CodeGen().translate(runtime, queryGraph, plan, false);
-    startQ = boost::chrono::system_clock::now();
+    startQ = std::chrono::system_clock::now();
     if (operatorTree->first()) {
         while (operatorTree->next());
     }
-    durationQ += boost::chrono::system_clock::now() - startQ;
+    durationQ += std::chrono::system_clock::now() - startQ;
     p = (ResultsPrinter*) operatorTree;
     long n1 = p->getPrintedRows();
     if (n1 != nElements) {
-        BOOST_LOG_TRIVIAL(error) << "Number of records (" << n1 << ") is not the same. This should not happen...";
+        LOG(ERRORL) << "Number of records (" << n1 << ") is not the same. This should not happen...";
     }
     delete plangen;
     delete operatorTree;
 }
-BOOST_LOG_TRIVIAL(info) << "Repeated query runtime = " << (durationQ.count() / times) * 1000
+LOG(INFOL) << "Repeated query runtime = " << (durationQ.count() / times) * 1000
 << " milliseconds";
 //Restore stdout
 cout.rdbuf(strm_buffer);
@@ -643,18 +621,18 @@ cout.rdbuf(strm_buffer);
 string selectStrategy(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reasoner, po::variables_map &vm) {
     string strategy = vm["selectionStrategy"].as<string>();
     if (strategy == "" || strategy == "cardEst") {
-	// Use the original cardinality estimation strategy
-	ReasoningMode mode = reasoner.chooseMostEfficientAlgo(literal, edb, p, NULL, NULL);
-	return mode == TOPDOWN ? "qsqr" : "magic";
+        // Use the original cardinality estimation strategy
+        ReasoningMode mode = reasoner.chooseMostEfficientAlgo(literal, edb, p, NULL, NULL);
+        return mode == TOPDOWN ? "qsqr" : "magic";
     }
     // Add strategies here ...
-    BOOST_LOG_TRIVIAL(error) << "Unrecognized selection strategy: " << strategy;
+    LOG(ERRORL) << "Unrecognized selection strategy: " << strategy;
     throw 10;
 }
 
 void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reasoner, po::variables_map &vm) {
 
-    boost::chrono::system_clock::time_point startQ1 = boost::chrono::system_clock::now();
+    std::chrono::system_clock::time_point startQ1 = std::chrono::system_clock::now();
 
     string algo = vm["reasoningAlgo"].as<string>();
     int times = vm["repeatQuery"].as<int>();
@@ -663,15 +641,15 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
     bool onlyVars = nVars > 0;
 
     if (literal.getPredicate().getType() == EDB) {
-	if (algo != "edb") {
-	    BOOST_LOG_TRIVIAL(info) << "Overriding strategy, setting it to edb";
-	    algo = "edb";
-	}
+        if (algo != "edb") {
+            LOG(INFOL) << "Overriding strategy, setting it to edb";
+            algo = "edb";
+        }
     }
 
     if (algo == "auto" || algo == "") {
-	algo = selectStrategy(edb, p, literal, reasoner, vm);
-	BOOST_LOG_TRIVIAL(info) << "Selection strategy determined that we go for " << algo;
+        algo = selectStrategy(edb, p, literal, reasoner, vm);
+        LOG(INFOL) << "Selection strategy determined that we go for " << algo;
     }
 
     TupleIterator *iter;
@@ -685,36 +663,36 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
     } else if (algo == "mat") {
         iter = reasoner.getMaterializationIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
     } else {
-	BOOST_LOG_TRIVIAL(error) << "Unrecognized reasoning algorithm: " << algo;
-	throw 10;
+        LOG(ERRORL) << "Unrecognized reasoning algorithm: " << algo;
+        throw 10;
     }
     long count = 0;
     int sz = iter->getTupleSize();
     if (nVars == 0) {
-	cout << (iter->hasNext() ? "TRUE" : "FALSE") << endl;
-	count = (iter->hasNext() ? 1 : 0);
+        cout << (iter->hasNext() ? "TRUE" : "FALSE") << endl;
+        count = (iter->hasNext() ? 1 : 0);
     } else {
-	while (iter->hasNext()) {
-	    iter->next();
-	    count++;
-	    for (int i = 0; i < sz; i++) {
-		char supportText[MAX_TERM_SIZE];
-		uint64_t value = iter->getElementAt(i);
-		if (i != 0) {
-		    cout << " ";
-		}
-		if (!edb.getDictText(value, supportText)) {
-		    cerr << "Term " << value << " not found" << endl;
-		    cout << value;
-		} else {
-		    cout << supportText;
-		}
-	    }
-	    cout << endl;
-	}
+        while (iter->hasNext()) {
+            iter->next();
+            count++;
+            for (int i = 0; i < sz; i++) {
+                char supportText[MAX_TERM_SIZE];
+                uint64_t value = iter->getElementAt(i);
+                if (i != 0) {
+                    cout << " ";
+                }
+                if (!edb.getDictText(value, supportText)) {
+                    cerr << "Term " << value << " not found" << endl;
+                    cout << value;
+                } else {
+                    cout << supportText;
+                }
+            }
+            cout << endl;
+        }
     }
-    boost::chrono::duration<double> durationQ1 = boost::chrono::system_clock::now() - startQ1;
-    BOOST_LOG_TRIVIAL(info) << "Algo = " << algo << ", query runtime = " << (durationQ1.count() * 1000) << " msec, #rows = " << count;
+    std::chrono::duration<double> durationQ1 = std::chrono::system_clock::now() - startQ1;
+    LOG(INFOL) << "Algo = " << algo << ", query runtime = " << (durationQ1.count() * 1000) << " msec, #rows = " << count;
 
     delete iter;
     if (times > 0) {
@@ -722,7 +700,7 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
         ofstream file("/dev/null");
         streambuf* strm_buffer = cout.rdbuf();
         cout.rdbuf(file.rdbuf());
-        boost::chrono::system_clock::time_point startQ = boost::chrono::system_clock::now();
+        std::chrono::system_clock::time_point startQ = std::chrono::system_clock::now();
         for (int j = 0; j < times; j++) {
             TupleIterator *iter = reasoner.getIterator(literal, NULL, NULL, edb, p, true, NULL);
             int sz = iter->getTupleSize();
@@ -743,10 +721,10 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
             }
             cout << endl;
         }
-        boost::chrono::duration<double> durationQ = boost::chrono::system_clock::now() - startQ;
+        std::chrono::duration<double> durationQ = std::chrono::system_clock::now() - startQ;
         //Restore stdout
         cout.rdbuf(strm_buffer);
-        BOOST_LOG_TRIVIAL(info) << "Algo = " << algo << ", repeated query runtime = " << (durationQ.count() / times) * 1000 << " milliseconds";
+        LOG(INFOL) << "Algo = " << algo << ", repeated query runtime = " << (durationQ.count() / times) * 1000 << " milliseconds";
     }
 }
 
@@ -763,26 +741,26 @@ void execLiteralQuery(EDBLayer &edb, po::variables_map &vm) {
     if (pathRules != "") {
         if (!vm["automat"].empty()) {
             //Automatic prematerialization
-            timens::system_clock::time_point start = timens::system_clock::now();
+            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
             Materialization *mat = new Materialization();
             mat->guessLiteralsFromRules(p, edb);
             mat->getAndStorePrematerialization(edb, p, true,
                     vm["timeoutPremat"].as<int>());
             delete mat;
-            boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+            std::chrono::duration<double> sec = std::chrono::system_clock::now()
                 - start;
-            BOOST_LOG_TRIVIAL(info) << "Runtime pre-materialization = " <<
+            LOG(INFOL) << "Runtime pre-materialization = " <<
                 sec.count() * 1000 << " milliseconds";
         } else if (vm["premat"].as<string>() != "") {
-            timens::system_clock::time_point start = timens::system_clock::now();
+            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
             Materialization *mat = new Materialization();
             mat->loadLiteralsFromFile(p, vm["premat"].as<string>());
             mat->getAndStorePrematerialization(edb, p, false, ~0l);
             p.sortRulesByIDBPredicates();
             delete mat;
-            boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+            std::chrono::duration<double> sec = std::chrono::system_clock::now()
                 - start;
-            BOOST_LOG_TRIVIAL(info) << "Runtime pre-materialization = " <<
+            LOG(INFOL) << "Runtime pre-materialization = " <<
                 sec.count() * 1000 << " milliseconds";
         }
     }
@@ -814,11 +792,11 @@ int main(int argc, const char** argv) {
     //full_path = fs::system_complete(fs::path( argv[0]));
 
     //Init logging system
-    logging::trivial::severity_level level =
-        vm.count("logLevel") ?
-        vm["logLevel"].as<logging::trivial::severity_level>() :
-        logging::trivial::info;
-    initLogging(level);
+    //logging::trivial::severity_level level =
+    //    vm.count("logLevel") ?
+    //    vm["logLevel"].as<logging::trivial::severity_level>() :
+    //    logging::trivial::info;
+    //initLogging(level);
 
     string cmd = string(argv[1]);
 
@@ -858,9 +836,9 @@ int main(int argc, const char** argv) {
         std::this_thread::sleep_for(std::chrono::milliseconds(seconds * 1000));
     }
 
-    timens::system_clock::time_point start = timens::system_clock::now();
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
-    BOOST_LOG_TRIVIAL(debug) << "sizeof(EDBLayer) = " << sizeof(EDBLayer);
+    LOG(DEBUGL) << "sizeof(EDBLayer) = " << sizeof(EDBLayer);
 
     if (cmd == "query" || cmd == "queryLiteral") {
         EDBConf conf(edbFile);
@@ -911,7 +889,7 @@ int main(int argc, const char** argv) {
         if (vm.count("comprinput")) {
             string comprinput = vm["comprinput"].as<string>();
             string comprdict = vm["comprdict"].as<string>();
-            BOOST_LOG_TRIVIAL(info) << "Creating the KB from " << comprinput << "/" << comprdict;
+            LOG(INFOL) << "Creating the KB from " << comprinput << "/" << comprdict;
 
             ParamsLoad p;
             p.inputformat = "rdf";
@@ -956,7 +934,7 @@ int main(int argc, const char** argv) {
               sample, sampleRate, thresholdSkipTable, NULL, "", 0, "");*/
 
         } else {
-            BOOST_LOG_TRIVIAL(info) << "Creating the KB from " << vm["input"].as<string>();
+            LOG(INFOL) << "Creating the KB from " << vm["input"].as<string>();
 
 
             ParamsLoad p;
@@ -1007,10 +985,10 @@ int main(int argc, const char** argv) {
     } else if (cmd == "server") {
         startServer(argc, argv, full_path.string(), vm);
     }
-    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    BOOST_LOG_TRIVIAL(info) << "Runtime = " << sec.count() * 1000 << " milliseconds";
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    LOG(INFOL) << "Runtime = " << sec.count() * 1000 << " milliseconds";
 
     //Print other stats
-    BOOST_LOG_TRIVIAL(info) << "Max memory used: " << Utils::get_max_mem() << " MB";
+    LOG(INFOL) << "Max memory used: " << Utils::get_max_mem() << " MB";
     return EXIT_SUCCESS;
 }

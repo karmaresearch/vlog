@@ -5,12 +5,11 @@
 #include <vlog/concepts.h>
 #include <vlog/fcinttable.h>
 
-#include <boost/thread/shared_mutex.hpp>
-#include <boost/thread/mutex.hpp>
-
 #include <inttypes.h>
 #include <string>
 #include <unordered_map>
+#include <mutex>
+#include <shared_mutex>
 
 struct RuleExecutionDetails;
 class FCTable;
@@ -35,7 +34,7 @@ struct FCBlock {
     FCBlock(size_t iteration, std::shared_ptr<const FCInternalTable> table, Literal query, const RuleExecutionDetails *rule,
             const uint8_t ruleExecOrder, bool isCompleted) : iteration(iteration),
         table(table), query(query), rule(rule), ruleExecOrder(ruleExecOrder), isCompleted(isCompleted) {
-        BOOST_LOG_TRIVIAL(debug) << "FCBlock " << this << ": table = " << table << ", iteration = " << iteration;
+        //LOG(DEBUGL) << "FCBlock " << this << ": table = " << table << ", iteration = " << iteration;
     }
 
     /* Commented out, this does not assign! --Ceriel
@@ -93,14 +92,14 @@ private:
     FCCache cache;
     std::string getSignature(const Literal &literal);
 
-    boost::shared_mutex *mutex;
-    boost::mutex cache_mutex;
+    std::shared_mutex *mutex;
+    std::mutex cache_mutex;
 
     void removeBlock(const size_t iteration);
 
     //boost::shared_mutex *getMutex() const;
 public:
-    FCTable(boost::shared_mutex *mutex, const uint8_t sizeRow);
+    FCTable(std::shared_mutex *mutex, const uint8_t sizeRow);
 
     std::shared_ptr<const FCTable> filter(const Literal &literal, int nthreads) {
         return filter(literal, 0, NULL, nthreads);

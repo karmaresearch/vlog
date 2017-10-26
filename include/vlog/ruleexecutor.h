@@ -5,8 +5,6 @@
 #include <vlog/edb.h>
 #include <vlog/qsqr.h>
 
-#include <boost/chrono.hpp>
-
 class BindingsTable;
 class QSQR;
 class DictMgmt;
@@ -33,10 +31,6 @@ struct LineageInfo {
 class RuleExecutor {
 private:
     Rule adornedRule;
-
-//    boost::chrono::system_clock::time_point startEvaluation;
-//    boost::chrono::duration<double> durationRecursion;
-//    boost::chrono::duration<double> durationEDB;
 
     Program *program;
     EDBLayer &layer;

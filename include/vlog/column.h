@@ -441,7 +441,7 @@ public:
     bool isIn(const Term_t t) const {
 	/*
         if (values.size() > 100) {
-            BOOST_LOG_TRIVIAL(warning) << "InmemoryColumn::isIn(): Performance problem. Linear search on array of " << values.size() << " elements";
+            LOG(WARNL) << "InmemoryColumn::isIn(): Performance problem. Linear search on array of " << values.size() << " elements";
         }
         for(size_t i = 0; i < values.size(); ++i) {
             if (values[i] == t)
