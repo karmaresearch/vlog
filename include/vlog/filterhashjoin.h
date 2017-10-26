@@ -5,7 +5,6 @@
 #include <vlog/joinprocessor.h>
 
 #include <vector>
-#include <boost/functional/hash.hpp>
 
 struct FilterHashJoinBlock {
     const FCInternalTable *table;

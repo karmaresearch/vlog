@@ -19,7 +19,6 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/filesystem.hpp>
 
 #include <curl/curl.h>
 
@@ -607,7 +606,7 @@ string WebInterface::getPage(string f) {
 
     //Read the file (if any) and return it to the user
     string pathfile = dirhtmlfiles + "/" + f;
-    if (boost::filesystem::exists(boost::filesystem::path(pathfile))) {
+    if (Utils::exists(pathfile)) {
         //Read the content of the file
         LOG(DEBUGL) << "Reading the content of " << pathfile;
         ifstream ifs(pathfile);

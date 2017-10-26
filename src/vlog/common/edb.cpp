@@ -14,9 +14,6 @@
 #include <vlog/mapi/mapitable.h>
 #endif
 
-#include <boost/log/trivial.hpp>
-#include <boost/filesystem.hpp>
-
 #include <unordered_map>
 #include <climits>
 
@@ -24,7 +21,7 @@ void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithread
     EDBInfoTable infot;
     const string pn = tableConf.predname;
     const string kbpath = tableConf.params[0];
-    if (!boost::filesystem::exists(kbpath) || !boost::filesystem::exists(kbpath + "/p0")) {
+    if (!Utils::exists(kbpath) || !Utils::exists(kbpath + "/p0")) {
         LOG(ERRORL) << "The KB at " << kbpath << " does not exist. Check the edb.conf file.";
         throw 10;
     }
@@ -79,235 +76,235 @@ void EDBLayer::addMAPITable(const EDBConf::Table &tableConf) {
 #endif
 
 void EDBLayer::query(QSQQuery *query, TupleTable *outputTable,
-                     std::vector<uint8_t> *posToFilter,
-                     std::vector<Term_t> *valuesToFilter) {
+        std::vector<uint8_t> *posToFilter,
+        std::vector<Term_t> *valuesToFilter) {
     PredId_t predid = query->getLiteral()->getPredicate().getId();
 
 
     if (dbPredicates.count(predid)) {
-	// LOG(DEBUGL) << "EDB: go into manager, posToFilter size = " << (posToFilter == NULL ? 0 : posToFilter->size())
-	//     << ", valuesToFilter size = " << (valuesToFilter == NULL ? 0 : valuesToFilter->size());
+        // LOG(DEBUGL) << "EDB: go into manager, posToFilter size = " << (posToFilter == NULL ? 0 : posToFilter->size())
+        //     << ", valuesToFilter size = " << (valuesToFilter == NULL ? 0 : valuesToFilter->size());
         auto el = dbPredicates.find(predid);
         el->second.manager->query(query, outputTable, posToFilter, valuesToFilter);
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
         uint8_t size = rel->getSizeTuple();
 
-	/*
-	LOG(DEBUGL) << "Query = " << query->tostring();
-	if (posToFilter != NULL) {
-	    LOG(DEBUGL) << "posToFilter.size() = " << posToFilter->size();
-	}
-	*/
+        /*
+           LOG(DEBUGL) << "Query = " << query->tostring();
+           if (posToFilter != NULL) {
+           LOG(DEBUGL) << "posToFilter.size() = " << posToFilter->size();
+           }
+           */
         switch (size) {
-        case 1: {
-            uint64_t row[1];
-            if (posToFilter != NULL) {
-                assert(posToFilter->size() == 1 &&
-                       posToFilter->at(0) == (uint8_t) 0);
-                for (std::vector<Term_t>::iterator
-                        itr = valuesToFilter->begin();
-                        itr != valuesToFilter->end(); ++itr) {
-                    if (rel->exists(*itr)) {
-                        row[0] = *itr;
-                        outputTable->addRow(row);
-                    }
-                }
-            } else {
-                //Copy all values
-                for (std::vector <Term_t>::iterator itr = rel->getSingleColumn()->begin();
-                        itr != rel->getSingleColumn()->end(); ++itr) {
-                    row[0] = *itr;
-                    outputTable->addRow(row);
-                }
-            }
-            break;
-        }
-        case 2: {
-            const uint8_t nRepeatedVars = query->getNRepeatedVars();
-            uint64_t row[2];
-            if (posToFilter == NULL || posToFilter->size() == 0) {
-                for (std::vector<std::pair<Term_t, Term_t>>::iterator
-                        itr = rel->getTwoColumn1()->begin();
-                        itr != rel->getTwoColumn1()->end(); ++itr) {
-                    bool valid = true;
-		    row[0] = itr->first;
-		    row[1] = itr->second;
-                    if (nRepeatedVars > 0) {
-                        for (uint8_t i = 0; i < nRepeatedVars; ++i) {
-                            std::pair<uint8_t, uint8_t> rp = query->getRepeatedVar(i);
-                            if (row[rp.first] != row[rp.second]) {
-                                valid = false;
-                                break;
+            case 1: {
+                        uint64_t row[1];
+                        if (posToFilter != NULL) {
+                            assert(posToFilter->size() == 1 &&
+                                    posToFilter->at(0) == (uint8_t) 0);
+                            for (std::vector<Term_t>::iterator
+                                    itr = valuesToFilter->begin();
+                                    itr != valuesToFilter->end(); ++itr) {
+                                if (rel->exists(*itr)) {
+                                    row[0] = *itr;
+                                    outputTable->addRow(row);
+                                }
+                            }
+                        } else {
+                            //Copy all values
+                            for (std::vector <Term_t>::iterator itr = rel->getSingleColumn()->begin();
+                                    itr != rel->getSingleColumn()->end(); ++itr) {
+                                row[0] = *itr;
+                                outputTable->addRow(row);
                             }
                         }
+                        break;
                     }
-                    if (valid) {
-                        outputTable->addRow(row);
-                    }
-                }
-            } else if (posToFilter->size() == 1) {
-		std::vector<Term_t> filterValues;
-		std::vector<Term_t>::iterator itr2 = valuesToFilter->begin();
-		bool sorted = true;
-		if (itr2 < valuesToFilter->end()) {
-		    Term_t prev = (Term_t) *itr2;
-		    filterValues.push_back(prev);
-		    itr2++;
-		    while (itr2 != valuesToFilter->end()) {
-			if (*itr2 < prev) {
-			    sorted = false;
-			    filterValues.push_back(*itr2);
-			} else if (*itr2 > prev) {
-			    filterValues.push_back(*itr2);
-			}
-			prev = *itr2;
-			itr2++;
-		    }
-		}
-		if (! sorted) {
-		    std::sort(filterValues.begin(), filterValues.end());
-		}
-                std::vector<std::pair<Term_t, Term_t>> *pairs;
-                bool inverted = posToFilter->at(0) != 0;
-                if (!inverted) {
-                    pairs = rel->getTwoColumn1();
-                    std::vector<std::pair<Term_t, Term_t>>::iterator itr1 = pairs->begin();
-                    std::vector<Term_t>::iterator itr2 = filterValues.begin();
-                    while (itr1 != pairs->end() && itr2 != filterValues.end()) {
-                        while (itr1 != pairs->end() && itr1->first < *itr2) {
-                            itr1++;
-                        }
-                        if (itr1 == pairs->end())
-                            continue;
+            case 2: {
+                        const uint8_t nRepeatedVars = query->getNRepeatedVars();
+                        uint64_t row[2];
+                        if (posToFilter == NULL || posToFilter->size() == 0) {
+                            for (std::vector<std::pair<Term_t, Term_t>>::iterator
+                                    itr = rel->getTwoColumn1()->begin();
+                                    itr != rel->getTwoColumn1()->end(); ++itr) {
+                                bool valid = true;
+                                row[0] = itr->first;
+                                row[1] = itr->second;
+                                if (nRepeatedVars > 0) {
+                                    for (uint8_t i = 0; i < nRepeatedVars; ++i) {
+                                        std::pair<uint8_t, uint8_t> rp = query->getRepeatedVar(i);
+                                        if (row[rp.first] != row[rp.second]) {
+                                            valid = false;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (valid) {
+                                    outputTable->addRow(row);
+                                }
+                            }
+                        } else if (posToFilter->size() == 1) {
+                            std::vector<Term_t> filterValues;
+                            std::vector<Term_t>::iterator itr2 = valuesToFilter->begin();
+                            bool sorted = true;
+                            if (itr2 < valuesToFilter->end()) {
+                                Term_t prev = (Term_t) *itr2;
+                                filterValues.push_back(prev);
+                                itr2++;
+                                while (itr2 != valuesToFilter->end()) {
+                                    if (*itr2 < prev) {
+                                        sorted = false;
+                                        filterValues.push_back(*itr2);
+                                    } else if (*itr2 > prev) {
+                                        filterValues.push_back(*itr2);
+                                    }
+                                    prev = *itr2;
+                                    itr2++;
+                                }
+                            }
+                            if (! sorted) {
+                                std::sort(filterValues.begin(), filterValues.end());
+                            }
+                            std::vector<std::pair<Term_t, Term_t>> *pairs;
+                            bool inverted = posToFilter->at(0) != 0;
+                            if (!inverted) {
+                                pairs = rel->getTwoColumn1();
+                                std::vector<std::pair<Term_t, Term_t>>::iterator itr1 = pairs->begin();
+                                std::vector<Term_t>::iterator itr2 = filterValues.begin();
+                                while (itr1 != pairs->end() && itr2 != filterValues.end()) {
+                                    while (itr1 != pairs->end() && itr1->first < *itr2) {
+                                        itr1++;
+                                    }
+                                    if (itr1 == pairs->end())
+                                        continue;
 
-                        while (itr2 != filterValues.end() && itr1->first > *itr2) {
-                            itr2++;
-                        }
-                        if (itr1 != pairs->end() && itr2 != filterValues.end()) {
-			    if (itr1->first == *itr2) {
-				bool valid = true;
-				row[0] = itr1->first;
-				row[1] = itr1->second;
-				if (nRepeatedVars > 0) {
-				    for (uint8_t i = 0; i < nRepeatedVars; ++i) {
-					std::pair<uint8_t, uint8_t> rp = query->getRepeatedVar(i);
-					if (row[rp.first] != row[rp.second]) {
-					    valid = false;
-					    break;
-					}
-				    }
-				}
+                                    while (itr2 != filterValues.end() && itr1->first > *itr2) {
+                                        itr2++;
+                                    }
+                                    if (itr1 != pairs->end() && itr2 != filterValues.end()) {
+                                        if (itr1->first == *itr2) {
+                                            bool valid = true;
+                                            row[0] = itr1->first;
+                                            row[1] = itr1->second;
+                                            if (nRepeatedVars > 0) {
+                                                for (uint8_t i = 0; i < nRepeatedVars; ++i) {
+                                                    std::pair<uint8_t, uint8_t> rp = query->getRepeatedVar(i);
+                                                    if (row[rp.first] != row[rp.second]) {
+                                                        valid = false;
+                                                        break;
+                                                    }
+                                                }
+                                            }
 
-				if (valid) {
-				    outputTable->addRow(row);
-				}
-			    }
-			    itr1++;
-                        }
-                    }
-                } else {
-                    pairs = rel->getTwoColumn2();
-                    std::vector<std::pair<Term_t, Term_t>>::iterator itr1 = pairs->begin();
-                    std::vector<Term_t>::iterator itr2 = filterValues.begin();
-                    while (itr1 != pairs->end() && itr2 != filterValues.end()) {
-                        while (itr1 != pairs->end() && itr1->second < *itr2) {
-                            itr1++;
-                        }
-                        if (itr1 == pairs->end())
-                            continue;
+                                            if (valid) {
+                                                outputTable->addRow(row);
+                                            }
+                                        }
+                                        itr1++;
+                                    }
+                                }
+                            } else {
+                                pairs = rel->getTwoColumn2();
+                                std::vector<std::pair<Term_t, Term_t>>::iterator itr1 = pairs->begin();
+                                std::vector<Term_t>::iterator itr2 = filterValues.begin();
+                                while (itr1 != pairs->end() && itr2 != filterValues.end()) {
+                                    while (itr1 != pairs->end() && itr1->second < *itr2) {
+                                        itr1++;
+                                    }
+                                    if (itr1 == pairs->end())
+                                        continue;
 
-                        while (itr2 != filterValues.end() && itr1->second > *itr2) {
-                            itr2++;
-                        }
-                        if (itr1 != pairs->end() && itr2 != filterValues.end()) {
-			    if (itr1->second == *itr2) {
-				bool valid = true;
-				row[0] = itr1->first;
-				row[1] = itr1->second;
-				if (nRepeatedVars > 0) {
-				    for (uint8_t i = 0; i < nRepeatedVars; ++i) {
-					std::pair<uint8_t, uint8_t> rp = query->getRepeatedVar(i);
-					if (row[rp.first] != row[rp.second]) {
-					    valid = false;
-					    break;
-					}
-				    }
-				}
+                                    while (itr2 != filterValues.end() && itr1->second > *itr2) {
+                                        itr2++;
+                                    }
+                                    if (itr1 != pairs->end() && itr2 != filterValues.end()) {
+                                        if (itr1->second == *itr2) {
+                                            bool valid = true;
+                                            row[0] = itr1->first;
+                                            row[1] = itr1->second;
+                                            if (nRepeatedVars > 0) {
+                                                for (uint8_t i = 0; i < nRepeatedVars; ++i) {
+                                                    std::pair<uint8_t, uint8_t> rp = query->getRepeatedVar(i);
+                                                    if (row[rp.first] != row[rp.second]) {
+                                                        valid = false;
+                                                        break;
+                                                    }
+                                                }
+                                            }
 
-				if (valid) {
-				    outputTable->addRow(row);
-				}
-			    }
-			    itr1++;
-                        }
-                    }
-                }
-            } else {
-                //posToFilter==2
-		std::vector<std::pair<Term_t, Term_t>> filterValues;
-		std::vector<Term_t>::iterator itr2 = valuesToFilter->begin();
-		bool sorted = true;
-		if (itr2 < valuesToFilter->end()) {
-		    Term_t prev1 = *itr2;
-		    itr2++;
-		    Term_t prev2 = *itr2;
-		    itr2++;
-		    filterValues.push_back(std::make_pair(prev1, prev2));
-		    while (itr2 != valuesToFilter->end()) {
-			Term_t v1 = *itr2;
-			itr2++;
-			Term_t v2 = *itr2;
-			itr2++;
-			filterValues.push_back(std::make_pair(v1, v2));
-			if (sorted && (v1 < prev1 || (v1 == prev1 && v2 < prev2))) {
-			    sorted = false;
-			} else {
-			    prev1 = v1;
-			    prev2 = v2;
-			}
-		    }
-		}
-		if (! sorted) {
-		    std::sort(filterValues.begin(), filterValues.end());
-		}
-                std::vector<std::pair<Term_t, Term_t>> *pairs;
-                bool inverted = posToFilter->at(0) != 0;
-                if (!inverted) {
-                    pairs = rel->getTwoColumn1();
-                } else {
-                    pairs = rel->getTwoColumn2();
-                }
+                                            if (valid) {
+                                                outputTable->addRow(row);
+                                            }
+                                        }
+                                        itr1++;
+                                    }
+                                }
+                            }
+                        } else {
+                            //posToFilter==2
+                            std::vector<std::pair<Term_t, Term_t>> filterValues;
+                            std::vector<Term_t>::iterator itr2 = valuesToFilter->begin();
+                            bool sorted = true;
+                            if (itr2 < valuesToFilter->end()) {
+                                Term_t prev1 = *itr2;
+                                itr2++;
+                                Term_t prev2 = *itr2;
+                                itr2++;
+                                filterValues.push_back(std::make_pair(prev1, prev2));
+                                while (itr2 != valuesToFilter->end()) {
+                                    Term_t v1 = *itr2;
+                                    itr2++;
+                                    Term_t v2 = *itr2;
+                                    itr2++;
+                                    filterValues.push_back(std::make_pair(v1, v2));
+                                    if (sorted && (v1 < prev1 || (v1 == prev1 && v2 < prev2))) {
+                                        sorted = false;
+                                    } else {
+                                        prev1 = v1;
+                                        prev2 = v2;
+                                    }
+                                }
+                            }
+                            if (! sorted) {
+                                std::sort(filterValues.begin(), filterValues.end());
+                            }
+                            std::vector<std::pair<Term_t, Term_t>> *pairs;
+                            bool inverted = posToFilter->at(0) != 0;
+                            if (!inverted) {
+                                pairs = rel->getTwoColumn1();
+                            } else {
+                                pairs = rel->getTwoColumn2();
+                            }
 
-                for (std::vector<std::pair<Term_t, Term_t>>::iterator itr = filterValues.begin();
-                        itr != filterValues.end(); itr++) {
-                    //Binary search
-                    if (std::binary_search(pairs->begin(), pairs->end(),
-                                           *itr)) {
-                        bool valid = true;
-			row[0] = itr->first;
-			row[1] = itr->second;
-                        if (nRepeatedVars > 0) {
-                            for (uint8_t i = 0; i < nRepeatedVars; ++i) {
-                                std::pair<uint8_t, uint8_t> rp = query->getRepeatedVar(i);
-                                if (row[rp.first] != row[rp.second]) {
-                                    valid = false;
-                                    break;
+                            for (std::vector<std::pair<Term_t, Term_t>>::iterator itr = filterValues.begin();
+                                    itr != filterValues.end(); itr++) {
+                                //Binary search
+                                if (std::binary_search(pairs->begin(), pairs->end(),
+                                            *itr)) {
+                                    bool valid = true;
+                                    row[0] = itr->first;
+                                    row[1] = itr->second;
+                                    if (nRepeatedVars > 0) {
+                                        for (uint8_t i = 0; i < nRepeatedVars; ++i) {
+                                            std::pair<uint8_t, uint8_t> rp = query->getRepeatedVar(i);
+                                            if (row[rp.first] != row[rp.second]) {
+                                                valid = false;
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    if (valid) {
+                                        outputTable->addRow(row);
+                                    }
                                 }
                             }
                         }
-
-                        if (valid) {
-                            outputTable->addRow(row);
-                        }
+                        break;
                     }
-                }
-            }
-            break;
-        }
-        default:
-            LOG(ERRORL) << "This should not happen";
-            throw 10;
+            default:
+                    LOG(ERRORL) << "This should not happen";
+                    throw 10;
         }
     }
     // LOG(DEBUGL) << "result size = " << outputTable->getNRows();
@@ -333,17 +330,17 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
         if (c2)
             vc2 = literal->getTermAtPos(1).getValue();
 
-	// LOG(DEBUGL) << "getIterator, equalFields = " << equalFields << ", c1 = " << c1 << ", c2 = " << c2 << ", size = " << size;
+        // LOG(DEBUGL) << "getIterator, equalFields = " << equalFields << ", c1 = " << c1 << ", c2 = " << c2 << ", size = " << size;
         EDBMemIterator *itr;
         switch (size) {
-        case 1:
-            itr = memItrFactory.get();
-            itr->init1(predid, rel->getSingleColumn(), c1, vc1);
-            return itr;
-        case 2:
-            itr = memItrFactory.get();
-            itr->init2(predid, c1, rel->getTwoColumn1(), c1, vc1, c2, vc2, equalFields);
-            return itr;
+            case 1:
+                itr = memItrFactory.get();
+                itr->init1(predid, rel->getSingleColumn(), c1, vc1);
+                return itr;
+            case 2:
+                itr = memItrFactory.get();
+                itr->init2(predid, c1, rel->getTwoColumn1(), c1, vc1, c2, vc2, equalFields);
+                return itr;
         }
     }
     throw 10;
@@ -373,40 +370,40 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
 
         IndexedTupleTable *rel = tmpRelations[predid];
         uint8_t size = rel->getSizeTuple();
-	// LOG(DEBUGL) << "getSortedIterator, equalFields = " << equalFields << ", c1 = " << c1 << ", c2 = " << c2 << ", size = " << (int) size << ", fields.size() = " << fields.size();
-	for (int i = 0; i < fields.size(); i++) {
-	    // LOG(DEBUGL) << "fields[" << i << "] = " << (int) fields[i];
-	}
+        // LOG(DEBUGL) << "getSortedIterator, equalFields = " << equalFields << ", c1 = " << c1 << ", c2 = " << c2 << ", size = " << (int) size << ", fields.size() = " << fields.size();
+        for (int i = 0; i < fields.size(); i++) {
+            // LOG(DEBUGL) << "fields[" << i << "] = " << (int) fields[i];
+        }
         EDBMemIterator *itr;
         switch (size) {
-        case 1:
-            itr = memItrFactory.get();
-            itr->init1(predid, rel->getSingleColumn(), c1, vc1);
-            return itr;
-        case 2:
-            itr = memItrFactory.get();
-            if (c1) {
-                itr->init2(predid, true, rel->getTwoColumn1(), c1, vc1, c2, vc2, equalFields);
-            } else {
-                if (c2) {
-                    itr->init2(predid, false, rel->getTwoColumn2(), c1, vc1, c2, vc2, equalFields);
+            case 1:
+                itr = memItrFactory.get();
+                itr->init1(predid, rel->getSingleColumn(), c1, vc1);
+                return itr;
+            case 2:
+                itr = memItrFactory.get();
+                if (c1) {
+                    itr->init2(predid, true, rel->getTwoColumn1(), c1, vc1, c2, vc2, equalFields);
                 } else {
-                    //No constraints
-                    if (fields.size() != 0 && fields[0] == 0) {
-                        itr->init2(predid, true, rel->getTwoColumn1(), c1, vc1, c2, vc2, equalFields);
-                    } else {
+                    if (c2) {
                         itr->init2(predid, false, rel->getTwoColumn2(), c1, vc1, c2, vc2, equalFields);
+                    } else {
+                        //No constraints
+                        if (fields.size() != 0 && fields[0] == 0) {
+                            itr->init2(predid, true, rel->getTwoColumn1(), c1, vc1, c2, vc2, equalFields);
+                        } else {
+                            itr->init2(predid, false, rel->getTwoColumn2(), c1, vc1, c2, vc2, equalFields);
+                        }
                     }
                 }
-            }
-            return itr;
+                return itr;
         }
     }
     throw 10;
 }
 
 size_t EDBLayer::getCardinalityColumn(const Literal &query,
-                                      uint8_t posColumn) {
+        uint8_t posColumn) {
     const Literal *literal = &query;
     PredId_t predid = literal->getPredicate().getId();
     if (dbPredicates.count(predid)) {
@@ -428,9 +425,9 @@ size_t EDBLayer::getCardinality(const Literal &query) {
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
         if (literal->getNVars() == literal->getTupleSize()) {
-	    return rel->getNTuples();
-	}
-	// TODO: Can we optimize this?
+            return rel->getNTuples();
+        }
+        // TODO: Can we optimize this?
         bool equalFields = false;
         if (query.hasRepeatedVars()) {
             equalFields = true;
@@ -447,26 +444,26 @@ size_t EDBLayer::getCardinality(const Literal &query) {
 
         EDBMemIterator *itr = NULL;
         switch (size) {
-        case 1:
-            itr = memItrFactory.get();
-            itr->init1(predid, rel->getSingleColumn(), c1, vc1);
-            break;
-        case 2:
-            itr = memItrFactory.get();
-	    if (c1 || ! c2) {
-		itr->init2(predid, c1, rel->getTwoColumn1(), c1, vc1, c2, vc2, equalFields);
-	    } else {
-		itr->init2(predid, c1, rel->getTwoColumn2(), c1, vc1, c2, vc2, equalFields);
-	    }
-            break;
+            case 1:
+                itr = memItrFactory.get();
+                itr->init1(predid, rel->getSingleColumn(), c1, vc1);
+                break;
+            case 2:
+                itr = memItrFactory.get();
+                if (c1 || ! c2) {
+                    itr->init2(predid, c1, rel->getTwoColumn1(), c1, vc1, c2, vc2, equalFields);
+                } else {
+                    itr->init2(predid, c1, rel->getTwoColumn2(), c1, vc1, c2, vc2, equalFields);
+                }
+                break;
         }
-	size_t count = 0;
-	while (itr->hasNext()) {
-	    count++;
-	    itr->next();
-	}
+        size_t count = 0;
+        while (itr->hasNext()) {
+            count++;
+            itr->next();
+        }
         memItrFactory.release(itr);
-	return count;
+        return count;
     }
 }
 
@@ -486,7 +483,7 @@ size_t EDBLayer::estimateCardinality(const Literal &query) {
 }
 
 bool EDBLayer::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
-                       std::vector<Term_t> *valuesToFilter) {
+        std::vector<Term_t> *valuesToFilter) {
     const Literal *literal = &query;
     PredId_t predid = literal->getPredicate().getId();
     if (dbPredicates.count(predid)) {
@@ -495,20 +492,20 @@ bool EDBLayer::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
         assert(literal->getTupleSize() <= 2);
-	/*
-	if (posToFilter != NULL) {
-	    LOG(DEBUGL) << "isEmpty literal = " << literal->tostring()
-		<< ", posToFilter->size() = " << posToFilter->size() 
-		<< ", valuesToFilter->size() = " << valuesToFilter->size();
-	}
-	*/
+        /*
+           if (posToFilter != NULL) {
+           LOG(DEBUGL) << "isEmpty literal = " << literal->tostring()
+           << ", posToFilter->size() = " << posToFilter->size()
+           << ", valuesToFilter->size() = " << valuesToFilter->size();
+           }
+           */
 
         std::unique_ptr<Literal> rewrittenLiteral;
         if (posToFilter != NULL) {
             //Create a new literal where the var are replaced by the constants
             VTuple t = literal->getTuple();
-	    //TODO: this cannot be right, since valuesToFilter may contain a list of multiple
-	    //patterns. --Ceriel
+            //TODO: this cannot be right, since valuesToFilter may contain a list of multiple
+            //patterns. --Ceriel
             for (int i = 0; i < posToFilter->size(); ++i) {
                 uint8_t pos = posToFilter->at(i);
                 Term_t value = valuesToFilter->at(i);
@@ -539,7 +536,7 @@ bool EDBLayer::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
                 //Check all rows where two columns are equal
                 assert(literal->getTupleSize() == 2);
                 for (std::vector<std::pair<Term_t, Term_t>>::iterator itr =
-                            rel->getTwoColumn1()->begin(); itr != rel->getTwoColumn1()->end();
+                        rel->getTwoColumn1()->begin(); itr != rel->getTwoColumn1()->end();
                         ++itr) {
                     if (itr->first == itr->second) {
                         return false;
@@ -552,9 +549,9 @@ bool EDBLayer::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
                 //Need to check whether a particular row exists
                 assert(literal->getTupleSize() == 2);
                 if (std::binary_search(rel->getTwoColumn1()->begin(),
-                                       rel->getTwoColumn1()->end(),
-                                       std::make_pair((Term_t) literal->getTermAtPos(0).getValue(),
-                                                      (Term_t) literal->getTermAtPos(1).getValue())))
+                            rel->getTwoColumn1()->end(),
+                            std::make_pair((Term_t) literal->getTermAtPos(0).getValue(),
+                                (Term_t) literal->getTermAtPos(1).getValue())))
                     return false;
                 else
                     return  true;
@@ -573,7 +570,7 @@ void EDBLayer::addTmpRelation(Predicate & pred, IndexedTupleTable * table) {
 
 // Only used in prematerialization
 bool EDBLayer::checkValueInTmpRelation(const uint8_t relId, const uint8_t posInRelation,
-                                       const Term_t value) const {
+        const Term_t value) const {
     if (tmpRelations[relId] != NULL) {
         return tmpRelations[relId]->exists(posInRelation, value);
     } else {
@@ -591,10 +588,10 @@ void EDBLayer::releaseIterator(EDBIterator * itr) {
 }
 
 std::vector<std::shared_ptr<Column>>  EDBLayer::checkNewIn(
-                                      std::vector <
-                                      std::shared_ptr<Column >> &valuesToCheck,
-                                      const Literal &l,
-std::vector<uint8_t> &posInL) {
+        std::vector <
+        std::shared_ptr<Column >> &valuesToCheck,
+        const Literal &l,
+        std::vector<uint8_t> &posInL) {
     if (!dbPredicates.count(l.getPredicate().getId())) {
         LOG(ERRORL) << "Not supported";
         throw 10;
@@ -604,9 +601,9 @@ std::vector<uint8_t> &posInL) {
 }
 
 std::vector<std::shared_ptr<Column>> EDBLayer::checkNewIn(const Literal &l1,
-                                  std::vector<uint8_t> &posInL1,
-                                  const Literal &l2,
-std::vector<uint8_t> &posInL2) {
+        std::vector<uint8_t> &posInL1,
+        const Literal &l2,
+        std::vector<uint8_t> &posInL2) {
     if (l1.getPredicate().getId() != l2.getPredicate().getId() ||
             !dbPredicates.count(l1.getPredicate().getId())) {
         LOG(ERRORL) << "Not supported";
@@ -621,10 +618,10 @@ bool EDBLayer::supportsCheckIn(const Literal &l) {
 }
 
 std::shared_ptr<Column> EDBLayer::checkIn(
-    std::vector<Term_t> &values,
-    const Literal &l,
-    uint8_t posInL,
-    size_t &sizeOutput) {
+        std::vector<Term_t> &values,
+        const Literal &l,
+        uint8_t posInL,
+        size_t &sizeOutput) {
     if (!dbPredicates.count(l.getPredicate().getId())) {
         LOG(ERRORL) << "Not supported: literal = " << l.tostring();
         throw 10;
@@ -638,7 +635,7 @@ bool EDBLayer::getDictNumber(const char *text, const size_t sizeText, uint64_t &
     if (dbPredicates.size() > 0) {
         //Get the number from the first edb table
         return dbPredicates.begin()->second.manager->
-               getDictNumber(text, sizeText, id);
+            getDictNumber(text, sizeText, id);
     }
     return false;
 }
@@ -688,8 +685,8 @@ void EDBMemIterator::init1(PredId_t id, std::vector<Term_t>* v, const bool c1, c
 }
 
 void EDBMemIterator::init2(PredId_t id, const bool defaultSorting, std::vector<std::pair<Term_t, Term_t>>* v, const bool c1,
-                           const Term_t vc1, const bool c2, const Term_t vc2,
-                           const bool equalFields) {
+        const Term_t vc1, const bool c2, const Term_t vc2,
+        const bool equalFields) {
     predid = id;
     ignoreSecondColumn = false;
     isIgnoreAllowed = true;
@@ -727,16 +724,16 @@ void EDBMemIterator::init2(PredId_t id, const bool defaultSorting, std::vector<s
             assert(!defaultSorting);
             std::pair<Term_t, Term_t> pair = std::make_pair(0, vc2);
             twoColumns = std::lower_bound(v->begin(), v->end(), pair, [](const std::pair<Term_t, Term_t>& lhs, const std::pair<Term_t, Term_t>& rhs) {
-                return lhs.second < rhs.second || (lhs.second == rhs.second && lhs.first < rhs.first);
-            } );
+                    return lhs.second < rhs.second || (lhs.second == rhs.second && lhs.first < rhs.first);
+                    } );
             bool lowerOk = twoColumns != endTwoColumns && twoColumns->second == vc2;
             if (!lowerOk) {
                 twoColumns = endTwoColumns;
             } else {
                 std::pair<Term_t, Term_t> pair = std::make_pair(std::numeric_limits<Term_t>::max(), vc2);
                 endTwoColumns = std::upper_bound(twoColumns, v->end(), pair, [](const std::pair<Term_t, Term_t>& lhs, const std::pair<Term_t, Term_t>& rhs) {
-                    return lhs.second < rhs.second || (lhs.second == rhs.second && lhs.first < rhs.first);
-                });
+                        return lhs.second < rhs.second || (lhs.second == rhs.second && lhs.first < rhs.first);
+                        });
             }
         }
     }
@@ -784,21 +781,21 @@ bool EDBMemIterator::hasNext() {
     } else {
         if (ignoreSecondColumn) {
             //Go through the next value in the first column
-	    //Make hasNext callable multiple times before calling next. --Ceriel
-	    if (isNextCheck) {
-		return isNext;
-	    }
-	    isNextCheck = true;
+            //Make hasNext callable multiple times before calling next. --Ceriel
+            if (isNextCheck) {
+                return isNext;
+            }
+            isNextCheck = true;
             do {
                 Term_t prevel = twoColumns->first;
                 twoColumns++;
                 if (twoColumns != endTwoColumns) {
                     if (twoColumns->first != prevel) {
-			isNext = true;
+                        isNext = true;
                         return true;
-		    }
+                    }
                 } else {
-		    isNext = false;
+                    isNext = false;
                     return false;
                 }
 

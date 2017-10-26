@@ -8,14 +8,12 @@
 #include <vlog/filterer.h>
 #include <vlog/resultjoinproc.h>
 
-#include <boost/functional/hash.hpp>
-
 #include <inttypes.h>
 #include <mutex>
 
 typedef google::dense_hash_map<Term_t, std::pair<size_t, size_t>, std::hash<Term_t>, std::equal_to<Term_t>> JoinHashMap;
 typedef google::dense_hash_map<std::pair<Term_t, Term_t>,
-        std::pair<size_t, size_t>, boost::hash<std::pair<Term_t, Term_t>>,
+        std::pair<size_t, size_t>, std::hash<std::pair<Term_t, Term_t>>,
         std::equal_to<std::pair<Term_t, Term_t>>> DoubleJoinHashMap;
 
 struct LessTwoTuples {

@@ -97,7 +97,6 @@ private:
 
     void removeBlock(const size_t iteration);
 
-    //boost::shared_mutex *getMutex() const;
 public:
     FCTable(std::shared_mutex *mutex, const uint8_t sizeRow);
 

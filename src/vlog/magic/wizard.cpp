@@ -3,7 +3,6 @@
 #include <kognac/logs.h>
 
 #include <unordered_set>
-#include <boost/log/trivial.hpp>
 
 std::shared_ptr<Program> Wizard::getAdornedProgram(Literal &query, Program &program) {
 

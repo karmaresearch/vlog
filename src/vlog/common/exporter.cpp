@@ -7,21 +7,10 @@
 #include <trident/kb/kbconfig.h>
 #include <trident/kb/updater.h>
 
-#include <boost/log/trivial.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/chrono.hpp>
-#include <boost/iostreams/filtering_stream.hpp>
-#include <boost/iostreams/filter/gzip.hpp>
-#include <boost/interprocess/file_mapping.hpp>
-#include <boost/interprocess/mapped_region.hpp>
-
 #include <inttypes.h>
 #include <vector>
 #include <fstream>
-
-namespace fs = boost::filesystem;
-namespace bip = boost::interprocess;
+#include <zstr/zstr.hpp>
 
 struct AggrIndex {
     uint64_t first, second;
@@ -99,7 +88,7 @@ void Exporter::extractTriples(std::vector <uint64_t> &all_s,
                 isFirst = false;
                 if (tableItr.getCurrentBlock()->rule->ruleid == it->ruleid) {
                     //Skip the first table since they are all duplicates
-		    LOG(DEBUGL) << "Skipping table of " << nrows << " nrows, iter = " << tableItr.getCurrentIteration();
+                    LOG(DEBUGL) << "Skipping table of " << nrows << " nrows, iter = " << tableItr.getCurrentIteration();
                     tableItr.moveNextCount();
                     continue;
                 }
@@ -417,9 +406,8 @@ void Exporter::generateNTTriples(string outputdir, bool decompress) {
     EDBLayer &edb = sn->getEDBLayer();
 
     //Store the raw dataset in a text file for debug purposes
-    fs::create_directories(fs::path(outputdir));
-    ofstream ntFile;
-    boost::iostreams::filtering_stream<boost::iostreams::output> out;
+    Utils::create_directories(outputdir);
+    std::unique_ptr<zstr::ofstream> out;
 
     char supportBuffer[MAX_TERM_SIZE];
     size_t idx = 0;
@@ -427,48 +415,41 @@ void Exporter::generateNTTriples(string outputdir, bool decompress) {
         if (i % 10000000 == 0) {
             if (i > 0) {
                 LOG(INFOL) << "So far exported " << i << " triples ...";
-                out.flush();
-                out.reset();
-                ntFile.close();
             }
             //Create the file. Close the previous one
             string filename = outputdir + "/out-" + to_string(idx++) + ".nt.gz";
             LOG(DEBUGL) << "Creating file " << filename;
-            ntFile.open(filename, std::ios_base::out);
-            out.push(boost::iostreams::gzip_compressor());
-            out.push(ntFile);
+            out = std::unique_ptr<zstr::ofstream>(new zstr::ofstream(filename));
         }
         if (decompress) {
             if (edb.getDictText(all_s[i], supportBuffer)) {
-                out << supportBuffer << " ";
+                *out << supportBuffer << " ";
             } else {
                 std::string t = sn->getProgram()->getFromAdditional(all_s[i]);
                 if (t == std::string("")) t = std::to_string(all_s[i]);
-                out << t << " ";
+                *out << t << " ";
             }
             if (edb.getDictText(all_p[i], supportBuffer)) {
-                out << supportBuffer << " ";
+                *out << supportBuffer << " ";
             } else {
                 std::string t = sn->getProgram()->getFromAdditional(all_p[i]);
                 if (t == std::string("")) t = std::to_string(all_p[i]);
-                out << t << " ";
+                *out << t << " ";
             }
             if (edb.getDictText(all_o[i], supportBuffer)) {
-                out << supportBuffer << " ." << endl;
+                *out << supportBuffer << " ." << endl;
             } else {
                 std::string t = sn->getProgram()->getFromAdditional(all_o[i]);
                 if (t == std::string("")) t = std::to_string(all_o[i]);
-                out << t << " ." << endl;
+                *out << t << " ." << endl;
             }
         } else {
-            out << all_s[i];
-            out << " ";
-            out << all_p[i];
-            out << " ";
-            out << all_o[i];
-            out << endl;
+            *out << all_s[i];
+            *out << " ";
+            *out << all_p[i];
+            *out << " ";
+            *out << all_o[i];
+            *out << endl;
         }
     }
-    //out.flush();
-    //ntFile.close();
 }

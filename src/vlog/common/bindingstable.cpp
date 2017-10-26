@@ -1,8 +1,6 @@
 #include <vlog/bindingstable.h>
 #include <trident/model/table.h>
 
-#include <boost/log/trivial.hpp>
-
 Term_t const * const EMPTY_TUPLE = {0};
 BindingsRow EMPTY_ROW(0, EMPTY_TUPLE);
 

@@ -2,8 +2,6 @@
 
 #include <trident/model/table.h>
 
-#include <boost/log/trivial.hpp>
-
 IndexedTupleTable::IndexedTupleTable(TupleTable *table) : sizeTuple((uint8_t) table->getSizeRow()) {
 
     singleColumn = NULL;

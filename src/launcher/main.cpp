@@ -9,9 +9,12 @@
 #include <vlog/exporter.h>
 
 //Used to load a Trident KB
+#include <vlog/trident/tridenttable.h>
 #include <launcher/vloglayer.h>
 #include <trident/loader.h>
 #include <kognac/utils.h>
+#include <kognac/progargs.h>
+#include <layers/TridentLayer.hpp>
 
 //RDF3X
 #include <cts/parser/SPARQLLexer.hpp>
@@ -25,16 +28,6 @@
 #include <rts/operator/Operator.hpp>
 #include <rts/operator/PlanPrinter.hpp>
 #include <rts/operator/ResultsPrinter.hpp>
-
-//Boost
-#include <boost/log/utility/setup/console.hpp>
-#include <boost/log/core.hpp>
-#include <boost/log/expressions.hpp>
-#include <boost/log/support/date_time.hpp>
-#include <boost/log/utility/setup/common_attributes.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/program_options.hpp>
 
 //TBB
 // Don't use global_control, to allow for older TBB versions.
@@ -50,10 +43,8 @@
 #include <thread>
 
 using namespace std;
-namespace fs = boost::filesystem;
-namespace po = boost::program_options;
 
-void printHelp(const char *programName, po::options_description &desc) {
+void printHelp(const char *programName, ProgramArgs &desc) {
     cout << "Usage: " << programName << " <command> [options]" << endl << endl;
     cout << "Possible commands:" << endl;
     cout << "help\t\t produce help message." << endl;
@@ -64,7 +55,7 @@ void printHelp(const char *programName, po::options_description &desc) {
     cout << "load\t\t load a Trident KB." << endl;
     cout << "lookup\t\t lookup for values in the dictionary." << endl << endl;
 
-    cout << desc << endl;
+    cout << desc.tostring() << endl;
 }
 
 inline void printErrorMsg(const char *msg) {
@@ -73,8 +64,7 @@ inline void printErrorMsg(const char *msg) {
         << endl;
 }
 
-bool checkParams(po::variables_map &vm, int argc, const char** argv,
-        po::options_description &desc) {
+bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
 
     string cmd;
     if (argc < 2) {
@@ -92,13 +82,13 @@ bool checkParams(po::variables_map &vm, int argc, const char** argv,
     }
 
     if (cmd == "help") {
-        printHelp(argv[0], desc);
+        printHelp(argv[0], vm);
         return false;
     } else {
         /*** Check specific parameters ***/
         if (cmd == "query" || cmd == "queryLiteral") {
             string queryFile = vm["query"].as<string>();
-            if (cmd == "query" && (queryFile == ""  || !fs::exists(queryFile))) {
+            if (cmd == "query" && (queryFile == ""  || !Utils::exists(queryFile))) {
                 printErrorMsg(
                         (string("The file ") + queryFile
                          + string(" doesn't exist.")).c_str());
@@ -107,7 +97,7 @@ bool checkParams(po::variables_map &vm, int argc, const char** argv,
 
             if (vm["rules"].as<string>().compare("") != 0) {
                 string path = vm["rules"].as<string>();
-                if (!fs::exists(path)) {
+                if (!Utils::exists(path)) {
                     printErrorMsg((string("The rule file ") + path + string(" doe not exists")).c_str());
                     return false;
                 }
@@ -133,7 +123,7 @@ bool checkParams(po::variables_map &vm, int argc, const char** argv,
 
             if (vm.count("comprinput")) {
                 string tripleDir = vm["comprinput"].as<string>();
-                if (!fs::exists(tripleDir)) {
+                if (!Utils::exists(tripleDir)) {
                     printErrorMsg(
                             (string("The file ") + tripleDir
                              + string(" does not exist.")).c_str());
@@ -146,7 +136,7 @@ bool checkParams(po::variables_map &vm, int argc, const char** argv,
                 }
             } else {
                 string tripleDir = vm["input"].as<string>();
-                if (!fs::exists(tripleDir)) {
+                if (!Utils::exists(tripleDir)) {
                     printErrorMsg(
                             (string("The path ") + tripleDir
                              + string(" does not exist.")).c_str());
@@ -160,7 +150,7 @@ bool checkParams(po::variables_map &vm, int argc, const char** argv,
                 return false;
             }
             string kbdir = vm["output"].as<string>();
-            if (fs::exists(kbdir)) {
+            if (Utils::exists(kbdir)) {
                 printErrorMsg(
                         (string("The path ") + kbdir
                          + string(" already exist. Please remove it or choose another path.")).c_str());
@@ -180,7 +170,7 @@ bool checkParams(po::variables_map &vm, int argc, const char** argv,
 
         } else if (cmd == "mat") {
             string path = vm["rules"].as<string>();
-            if (path != "" && !fs::exists(path)) {
+            if (path != "" && !Utils::exists(path)) {
                 printErrorMsg((string("The rule file '") +
                             path + string("' does not exists")).c_str());
                 return false;
@@ -191,101 +181,89 @@ bool checkParams(po::variables_map &vm, int argc, const char** argv,
     return true;
 }
 
-bool initParams(int argc, const char** argv, po::variables_map &vm) {
+bool initParams(int argc, const char** argv, ProgramArgs &vm) {
 
-    po::options_description query_options("Options for <query>, <queryLiteral> or <mat>");
-    query_options.add_options()("query,q", po::value<string>()->default_value(""),
-            "The path of the file with a query. It is REQUIRED with <query> or <queryLiteral>");
-    query_options.add_options()("rules", po::value<string>()->default_value(""),
-            "Activate reasoning during query answering using the rules defined at this path. It is REQUIRED in case the command is <mat>. Default is '' (disabled).");
-    query_options.add_options()("reasoningThreshold", po::value<long>()->default_value(1000000),
-            "This parameter sets a threshold to estimate the reasoning cost of a pattern. This cost can be broadly associated to the cardinality of the pattern. It is used to choose either TopDown or Magic evalution. Default is 1000000 (1M).");
-    query_options.add_options()("reasoningAlgo", po::value<string>()->default_value(""),
-            "Determines the reasoning algo (only for <queryLiteral>). Possible values are \"qsqr\", \"magic\", \"auto\".");
-    query_options.add_options()("selectionStrategy", po::value<string>()->default_value(""),
-            "Determines the selection strategy (only for <queryLiteral>, when \"auto\" is specified for the reasoningAlgorithm). Possible values are \"cardEst\", ... (to be extended) .");
-    query_options.add_options()("matThreshold", po::value<long>()->default_value(10000000),
-            "In case reasoning is activated, this parameter sets a threshold above which a full materialization is performed before we execute the query. Default is 10000000 (10M).");
-    query_options.add_options()("automat",
-            "Automatically premateralialize some atoms.");
-    query_options.add_options()("timeoutPremat", po::value<int>()->default_value(1000000),
-            "Timeout used during automatic prematerialization (in microseconds). Default is 1000000 (i.e. one second per query)");
-    query_options.add_options()("premat", po::value<string>()->default_value(""),
-            "Pre-materialize the atoms in the file passed as argument. Default is '' (disabled).");
-    query_options.add_options()("multithreaded",
-            "Run multithreaded (currently only supported for <mat>).");
-    query_options.add_options()("nthreads", po::value<int>()->default_value(tbb::task_scheduler_init::default_num_threads() / 2),
-            string("Set maximum number of threads to use when run in multithreaded mode. Default is " + to_string(tbb::task_scheduler_init::default_num_threads() / 2)).c_str());
-    query_options.add_options()("interRuleThreads", po::value<int>()->default_value(0),
-            "Set maximum number of threads to use for inter-rule parallelism. Default is 0");
+    ProgramArgs::GroupArgs& query_options = *vm.newGroup("Options for <query>, <queryLiteral> or <mat>");
+    query_options.add<string>("q", "query", "",
+            "The path of the file with a query. It is REQUIRED with <query> or <queryLiteral>", false);
+    query_options.add<string>("","rules", "",
+            "Activate reasoning during query answering using the rules defined at this path. It is REQUIRED in case the command is <mat>. Default is '' (disabled).", false);
+    query_options.add<long>("", "reasoningThreshold", 1000000,
+            "This parameter sets a threshold to estimate the reasoning cost of a pattern. This cost can be broadly associated to the cardinality of the pattern. It is used to choose either TopDown or Magic evalution. Default is 1000000 (1M).", false);
+    query_options.add<string>("", "reasoningAlgo", "",
+            "Determines the reasoning algo (only for <queryLiteral>). Possible values are \"qsqr\", \"magic\", \"auto\".", false);
+    query_options.add<string>("", "selectionStrategy", "",            
+            "Determines the selection strategy (only for <queryLiteral>, when \"auto\" is specified for the reasoningAlgorithm). Possible values are \"cardEst\", ... (to be extended) .", false);
+    query_options.add<long>("", "matThreshold", 10000000,
+            "In case reasoning is activated, this parameter sets a threshold above which a full materialization is performed before we execute the query. Default is 10000000 (10M).", false);
+    query_options.add<bool>("", "automat", false,
+            "Automatically premateralialize some atoms.", false);
+    query_options.add<int>("", "timeoutPremat", 1000000,
+            "Timeout used during automatic prematerialization (in microseconds). Default is 1000000 (i.e. one second per query)", false);
+    query_options.add<string>("", "premat", "",
+            "Pre-materialize the atoms in the file passed as argument. Default is '' (disabled).", false);
+    query_options.add<bool>("","multithreaded", false,
+            "Run multithreaded (currently only supported for <mat>).", false);
+    query_options.add<int>("", "nthreads", tbb::task_scheduler_init::default_num_threads() / 2,
+            string("Set maximum number of threads to use when run in multithreaded mode. Default is " + to_string(tbb::task_scheduler_init::default_num_threads() / 2)).c_str(), false);
+    query_options.add<int>("", "interRuleThreads", 0,
+            "Set maximum number of threads to use for inter-rule parallelism. Default is 0", false);
 
-    query_options.add_options()("shufflerules",
-            "shuffle rules randomly instead of using heuristics (only for <mat>, and only when running multithreaded).");
-    query_options.add_options()("repeatQuery,r",
-            po::value<int>()->default_value(0),
-            "Repeat the query <arg> times. If the argument is not specified, then the query will not be repeated.");
-    query_options.add_options()("storemat_path", po::value<string>()->default_value(""),
-            "Directory where to store all results of the materialization. Default is '' (disable).");
-    query_options.add_options()("storemat_format", po::value<string>()->default_value("files"),
-            "Format in which to dump the materialization. 'files' simply dumps the IDBs in files. 'db' creates a new RDF database. Default is 'files'.");
-    query_options.add_options()("explain", po::value<bool>()->default_value(false),
-            "Explain the query instead of executing it. Default is false.");
-    query_options.add_options()("decompressmat", po::value<bool>()->default_value(false),
-            "Decompress the results of the materialization when we write it to a file. Default is false.");
+    query_options.add<bool>("", "shufflerules", false,
+            "shuffle rules randomly instead of using heuristics (only for <mat>, and only when running multithreaded).", false);
+    query_options.add<int>("r", "repeatQuery", 0,
+            "Repeat the query <arg> times. If the argument is not specified, then the query will not be repeated.", false);
+    query_options.add<string>("","storemat_path", "",
+            "Directory where to store all results of the materialization. Default is '' (disable).",false);
+    query_options.add<string>("","storemat_format", "files",
+            "Format in which to dump the materialization. 'files' simply dumps the IDBs in files. 'db' creates a new RDF database. Default is 'files'.",false);
+    query_options.add<bool>("","explain", false,
+            "Explain the query instead of executing it. Default is false.",false);
+    query_options.add<bool>("","decompressmat", false,
+            "Decompress the results of the materialization when we write it to a file. Default is false.",false);
 
 #ifdef WEBINTERFACE
-    query_options.add_options()("webinterface", po::value<bool>()->default_value(false),
-            "Start a web interface to monitor the execution. Default is false.");
-    query_options.add_options()("port", po::value<int>()->default_value(8080), "Port to use for the web interface. Default is 8080");
+    query_options.add<bool>("","webinterface", false,
+            "Start a web interface to monitor the execution. Default is false.",false);
+    query_options.add<int>("","port", 8080, "Port to use for the web interface. Default is 8080",false);
 #endif
 
-    query_options.add_options()("no-filtering",
-            "Disable filter optimization.");
-    query_options.add_options()("no-intersect",
-            "Disable intersection optimization.");
-    query_options.add_options()("graphfile", po::value<string>(),
-            "Path to store the rule dependency graph");
+    query_options.add<bool>("","no-filtering", false, "Disable filter optimization.",false);
+    query_options.add<bool>("","no-intersect", false, "Disable intersection optimization.",false);
+    query_options.add<string>("","graphfile", "", "Path to store the rule dependency graph",false);
 
-    po::options_description load_options("Options for <load>");
-    load_options.add_options()("input,i", po::value<string>(),
-            "Path to the files that contain the compressed triples. This parameter is REQUIRED if already compressed triples/dict are not provided.");
-    load_options.add_options()("output,o", po::value<string>(),
-            "Path to the KB that should be created. This parameter is REQUIRED.");
-    load_options.add_options()("maxThreads",
-            po::value<int>()->default_value(Utils::getNumberPhysicalCores()),
-            "Sets the maximum number of threads to use during the compression. Default is the number of physical cores");
-    load_options.add_options()("readThreads",
-            po::value<int>()->default_value(2),
-            "Sets the number of concurrent threads that reads the raw input. Default is '2'");
-    load_options.add_options()("comprinput", po::value<string>(),
-            "Path to a file that contains a list of compressed triples.");
-    load_options.add_options()("comprdict", po::value<string>()->default_value(""),
-            "Path to a file that contains the dictionary for the compressed triples.");
+    ProgramArgs::GroupArgs& load_options = *vm.newGroup("Options for <load>");
+    load_options.add<string>("i","input", "",
+            "Path to the files that contain the compressed triples. This parameter is REQUIRED if already compressed triples/dict are not provided.",true);
+    load_options.add<string>("o","output", "",
+            "Path to the KB that should be created. This parameter is REQUIRED.",true);
+    load_options.add<int>("","maxThreads",
+            Utils::getNumberPhysicalCores(),
+            "Sets the maximum number of threads to use during the compression. Default is the number of physical cores",false);
+    load_options.add<int>("","readThreads", 2,
+            "Sets the number of concurrent threads that reads the raw input. Default is '2'",false);
+    load_options.add<string>("","comprinput", "",
+            "Path to a file that contains a list of compressed triples.",false);
+    load_options.add<string>("","comprdict", "",
+            "Path to a file that contains the dictionary for the compressed triples.",false);
 
-    po::options_description lookup_options("Options for <lookup>");
-    lookup_options.add_options()("text,t", po::value<string>(),
-            "Textual term to search")("number,n", po::value<long>(),
-                "Numeric term to search");
+    ProgramArgs::GroupArgs& lookup_options = *vm.newGroup("Options for <lookup>");
+    lookup_options.add<string>("t","text", "",
+            "Textual term to search", false);
+    lookup_options.add<int>("n","number", 0, "Numeric term to search",false);
 
-    po::options_description cmdline_options("Parameters");
-    cmdline_options.add(query_options).add(lookup_options).add(load_options);
+    ProgramArgs::GroupArgs& cmdline_options = *vm.newGroup("Parameters");
     //cmdline_options.add_options()("logLevel,l", po::value<logging::trivial::severity_level>(),
     //        "Set the log level (accepted values: trace, debug, info, warning, error, fatal). Default is info.");
 
-    cmdline_options.add_options()("edb,e", po::value<string>()->default_value("default"),
-            "Path to the edb conf file. Default is 'edb.conf' in the same directory as the exec file.");
-    cmdline_options.add_options()("sleep",
-            po::value<int>()->default_value(0),
-            "sleep <arg> seconds before starting the run. Useful for attaching profiler.");
+    cmdline_options.add<string>("e", "edb", "default",
+            "Path to the edb conf file. Default is 'edb.conf' in the same directory as the exec file.",false);
+    cmdline_options.add<int>("","sleep", 0, "sleep <arg> seconds before starting the run. Useful for attaching profiler.",false);
 
-    po::store(
-            po::command_line_parser(argc, argv).options(cmdline_options).run(),
-            vm);
-
-    return checkParams(vm, argc, argv, cmdline_options);
+    return checkParams(vm, argc, argv);
 }
 
-void lookup(EDBLayer &layer, po::variables_map &vm) {
+void lookup(EDBLayer &layer, ProgramArgs &vm) {
     if (vm.count("text")) {
         uint64_t value;
         string textTerm = vm["text"].as<string>();
@@ -335,11 +313,11 @@ void writeRuleDependencyGraph(EDBLayer &db, string pathRules, string filegraph) 
         fout << el.first << "\t" << el.second << endl;
     fout.close();
 }
-
+#ifdef WEBINTERFACE
 void startServer(int argc,
         const char** argv,
         string pathExec,
-        po::variables_map &vm) {
+        ProgramArgs &vm) {
     std::unique_ptr<WebInterface> webint;
     int port = vm["port"].as<int>();
     webint = std::unique_ptr<WebInterface>(
@@ -350,12 +328,13 @@ void startServer(int argc,
     LOG(INFOL) << "Server is launched at 0.0.0.0:" << to_string(port);
     webint->join();
 }
+#endif
 
 void launchFullMat(int argc,
         const char** argv,
         string pathExec,
         EDBLayer &db,
-        po::variables_map &vm,
+        ProgramArgs &vm,
         std::string pathRules) {
     //Load a program with all the rules
     Program p(db.getNTerms(), &db);
@@ -456,7 +435,7 @@ void launchFullMat(int argc,
     }
 }
 
-void execSPARQLQuery(EDBLayer &edb, po::variables_map &vm) {
+void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     //Parse the rules and create a program
     Program p(edb.getNTerms(), &edb);
     string pathRules = vm["rules"].as<string>();
@@ -520,9 +499,11 @@ void execSPARQLQuery(EDBLayer &edb, po::variables_map &vm) {
     std::stringstream strStream;
     strStream << inFile.rdbuf();//read the file
 
-    WebInterface::execSPARQLQuery(strStream.str(), vm["explain"].as<bool>(),
-            edb.getNTerms(), *db, true, false, NULL, NULL,
-            NULL);
+    //TODO
+    //WebInterface::execSPARQLQuery(strStream.str(), vm["explain"].as<bool>(),
+    //        edb.getNTerms(), *db, true, false, NULL, NULL,
+    //        NULL);
+
     delete db;
 
     /*QueryDict queryDict(edb.getNTerms());
@@ -618,7 +599,7 @@ cout.rdbuf(strm_buffer);
 }*/
 }
 
-string selectStrategy(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reasoner, po::variables_map &vm) {
+string selectStrategy(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reasoner, ProgramArgs &vm) {
     string strategy = vm["selectionStrategy"].as<string>();
     if (strategy == "" || strategy == "cardEst") {
         // Use the original cardinality estimation strategy
@@ -630,7 +611,7 @@ string selectStrategy(EDBLayer &edb, Program &p, Literal &literal, Reasoner &rea
     throw 10;
 }
 
-void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reasoner, po::variables_map &vm) {
+void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reasoner, ProgramArgs &vm) {
 
     std::chrono::system_clock::time_point startQ1 = std::chrono::system_clock::now();
 
@@ -728,7 +709,7 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
     }
 }
 
-void execLiteralQuery(EDBLayer &edb, po::variables_map &vm) {
+void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     //Parse the rules and create a program
     Program p(edb.getNTerms(), &edb);
     string pathRules = vm["rules"].as<string>();
@@ -767,7 +748,7 @@ void execLiteralQuery(EDBLayer &edb, po::variables_map &vm) {
 
     string query;
     string queryFileName = vm["query"].as<string>();
-    if (fs::exists(queryFileName)) {
+    if (Utils::exists(queryFileName)) {
         // Parse the query
         std::fstream inFile;
         inFile.open(queryFileName);//open the input file
@@ -784,11 +765,11 @@ void execLiteralQuery(EDBLayer &edb, po::variables_map &vm) {
 int main(int argc, const char** argv) {
 
     //Init params
-    po::variables_map vm;
+    ProgramArgs vm;
     if (!initParams(argc, argv, vm)) {
         return EXIT_FAILURE;
     }
-    fs::path full_path( fs::initial_path<fs::path>());
+    string full_path(argv[0]);
     //full_path = fs::system_complete(fs::path( argv[0]));
 
     //Init logging system
@@ -804,10 +785,10 @@ int main(int argc, const char** argv) {
     string edbFile = vm["edb"].as<string>();
     if (edbFile == "default") {
         //Get current directory
-        fs::path execFile(argv[0]);
-        fs::path dirExecFile = execFile.parent_path();
-        edbFile = dirExecFile.string() + string("/edb.conf");
-        if (cmd != "load" && !fs::exists(edbFile)) {
+        string execFile = string(argv[0]);
+        string dirExecFile = Utils::parentDir(execFile);
+        edbFile = dirExecFile + string("/edb.conf");
+        if (cmd != "load" && !Utils::exists(edbFile)) {
             printErrorMsg(string("I could not find the EDB conf file " + edbFile).c_str());
             return EXIT_FAILURE;
         }
@@ -860,7 +841,7 @@ int main(int argc, const char** argv) {
         EDBConf conf(edbFile);
         EDBLayer *layer = new EDBLayer(conf, ! vm["multithreaded"].empty());
         // EDBLayer layer(conf, false);
-        launchFullMat(argc, argv, full_path.string(), *layer, vm,
+        launchFullMat(argc, argv, full_path, *layer, vm,
                 vm["rules"].as<string>());
         delete layer;
     } else if (cmd == "rulesgraph") {
@@ -983,7 +964,9 @@ int main(int argc, const char** argv) {
         }
         delete loader;
     } else if (cmd == "server") {
-        startServer(argc, argv, full_path.string(), vm);
+#ifdef WEBINTERFACE
+        startServer(argc, argv, full_path, vm);
+#endif
     }
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Runtime = " << sec.count() * 1000 << " milliseconds";

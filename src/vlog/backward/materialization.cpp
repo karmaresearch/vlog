@@ -5,8 +5,6 @@
 
 #include <trident/model/table.h>
 
-#include <boost/tokenizer.hpp>
-
 #include <fstream>
 #include <string>
 #include <unistd.h>
@@ -26,9 +24,9 @@ void Materialization::loadLiteralsFromFile(Program &p, std::string filePath) {
 }
 
 void Materialization::loadLiteralsFromString(Program &p, std::string queries) {
-    boost::char_separator<char> sep("\n");
-    boost::tokenizer<boost::char_separator<char>> tokens(queries, sep);
-    for (const auto& t : tokens) {
+    stringstream ss(queries);
+    string t;
+    while (getline(ss, t)) {
         Literal l = p.parseLiteral(t);
         prematerializedLiterals.push_back(l);
     }

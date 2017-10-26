@@ -11,10 +11,6 @@ FCTable::FCTable(std::shared_mutex *mutex, const uint8_t sizeRow) :
     sizeRow(sizeRow), mutex(mutex) {
     }
 
-/*boost::shared_mutex *FCTable::getMutex() const {
-  return mutex;
-  }*/
-
 std::string FCTable::getSignature(const Literal &literal) {
     std::string out = "";
     std::vector<uint8_t> existingVars;

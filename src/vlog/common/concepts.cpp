@@ -5,8 +5,6 @@
 
 #include <kognac/consts.h>
 
-#include <boost/tokenizer.hpp>
-
 #include <cctype>
 #include <stdlib.h>
 #include <fstream>
@@ -94,8 +92,8 @@ std::string Literal::tostring(Program *program, EDBLayer *db) const {
         predName = std::to_string(pred.getId());
 
     std::string out = predName + std::string("[") +
-                      std::to_string(pred.getType()) + std::string("]") +
-                      adornmentToString(pred.getAdorment(), tuple.getSize()) + std::string("(");
+        std::to_string(pred.getType()) + std::string("]") +
+        adornmentToString(pred.getAdorment(), tuple.getSize()) + std::string("(");
 
     for (int i = 0; i < tuple.getSize(); ++i) {
         if (tuple.get(i).isVariable()) {
@@ -277,7 +275,7 @@ int Literal::subsumes(Substitution *substitutions, const Literal &l, const Liter
 }
 
 int Literal::getSubstitutionsA2B(Substitution *substitutions,
-                                 const Literal &a, const Literal &b) {
+        const Literal &a, const Literal &b) {
     if (a.getPredicate().getId() != b.getPredicate().getId()) {
         return -1;
     }
@@ -435,7 +433,7 @@ bool Literal::operator==(const Literal & other) const {
 }
 
 bool Rule::checkRecursion(const Literal &head,
-                          const std::vector<Literal> &body) {
+        const std::vector<Literal> &body) {
     for (const auto bodyLit : body) {
         Substitution subs[10];
         if (Literal::getSubstitutionsA2B(subs, bodyLit, head) != -1)
@@ -450,19 +448,19 @@ void Rule::checkRule() const {
     memset(vars, 0, sizeof(bool) * 256);
     int varCount = 0;
     for (int i = 0; i < body.size(); ++i) {
-	Literal l = body[i];
-	std::vector<uint8_t> v = l.getAllVars();
-	for (int j = 0; j < v.size(); j++) {
-	    if (! vars[v[j]]) {
-		vars[v[j]] = true;
-		varCount++;
-	    }
-	}
+        Literal l = body[i];
+        std::vector<uint8_t> v = l.getAllVars();
+        for (int j = 0; j < v.size(); j++) {
+            if (! vars[v[j]]) {
+                vars[v[j]] = true;
+                varCount++;
+            }
+        }
     }
     LOG(DEBUGL) << "Rule " << this->tostring() << " has " << varCount << " variables";
     if (varCount > MAX_ROWSIZE) {
-	LOG(ERRORL) << "MAX_ROWSIZE needs to be set to at least " << varCount << "!";
-	abort();
+        LOG(ERRORL) << "MAX_ROWSIZE needs to be set to at least " << varCount << "!";
+        abort();
     }
 }
 
@@ -488,21 +486,21 @@ Rule Rule::normalizeVars() const {
     std::vector<uint8_t> vars = head.getAllVars();
     for (std::vector<Literal>::const_iterator itr = body.cbegin(); itr != body.cend();
             ++itr) {
-	std::vector<uint8_t> newvars = itr->getNewVars(vars);
-	for (int i = 0; i < newvars.size(); i++) {
-	    vars.push_back(newvars[i]);
-	}
+        std::vector<uint8_t> newvars = itr->getNewVars(vars);
+        for (int i = 0; i < newvars.size(); i++) {
+            vars.push_back(newvars[i]);
+        }
     }
     std::vector<Substitution> subs;
     for (int i = 0; i < vars.size(); i++) {
-	subs.push_back(Substitution(vars[i], VTerm(i+1, 0)));
+        subs.push_back(Substitution(vars[i], VTerm(i+1, 0)));
     }
     Literal newHead = head.substitutes(&subs[0], subs.size());
     LOG(DEBUGL) << "head = " << head.tostring() << ", newHead = " << newHead.tostring();
     std::vector<Literal> newBody;
     for (std::vector<Literal>::const_iterator itr = body.cbegin(); itr != body.cend();
             ++itr) {
-	newBody.push_back(itr->substitutes(&subs[0], subs.size()));
+        newBody.push_back(itr->substitutes(&subs[0], subs.size()));
     }
     return Rule(newHead, newBody);
 }
@@ -569,7 +567,7 @@ Rule Rule::createAdornment(uint8_t headAdornment) {
         }
         boundVars.insert(boundVars.end(), uniqueVars.begin(), uniqueVars.end());
         newBody.push_back(Literal(Predicate(literal->getPredicate(), adornment),
-                                  literal->getTuple()));
+                    literal->getTuple()));
     }
     return Rule(newHead, newBody);
 }
@@ -597,34 +595,34 @@ std::string Rule::toprettystring(Program * program, EDBLayer *db) const {
 
 
 Program::Program(const uint64_t assignedIds,
-                 EDBLayer *kb) : assignedIds(assignedIds),
+        EDBLayer *kb) : assignedIds(assignedIds),
     kb(kb),
     dictPredicates(kb->getPredDictionary()),
     additionalConstants(assignedIds) {
-}
+    }
 
 void Program::readFromFile(std::string pathFile) {
     LOG(INFOL) << "Read program from file " << pathFile;
     if (pathFile == "") {
-	LOG(INFOL) << "Using default rule TI(A,B,C) :- TE(A,B,C)";
-	parseRule("TI(A,B,C) :- TE(A,B,C)");
+        LOG(INFOL) << "Using default rule TI(A,B,C) :- TE(A,B,C)";
+        parseRule("TI(A,B,C) :- TE(A,B,C)");
     } else {
-    std::ifstream file(pathFile);
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line != "" && line.substr(0, 2) != "//") {
-            LOG(DEBUGL) << "Parsing rule " << line;
-            parseRule(line);
+        std::ifstream file(pathFile);
+        std::string line;
+        while (std::getline(file, line)) {
+            if (line != "" && line.substr(0, 2) != "//") {
+                LOG(DEBUGL) << "Parsing rule " << line;
+                parseRule(line);
+            }
         }
-    }
-    LOG(INFOL) << "New assigned constants: " << additionalConstants.size();
+        LOG(INFOL) << "New assigned constants: " << additionalConstants.size();
     }
 }
 
 void Program::readFromString(std::string rules) {
-    boost::char_separator<char> sep("\n");
-    boost::tokenizer<boost::char_separator<char>> tokens(rules, sep);
-    for (const auto &rule : tokens) {
+    stringstream ss(rules);
+    string rule;
+    while (getline(ss, rule)) {
         if (rule != "" && rule .substr(0, 2) != "//") {
             LOG(DEBUGL) << "Parsing rule " << rule;
             parseRule(rule);
@@ -726,10 +724,10 @@ Literal Program::parseLiteral(std::string l) {
     if (cardPredicates.find(predid) == cardPredicates.end()) {
         cardPredicates.insert(make_pair(predid, t.size()));
     } else {
-	if (cardPredicates.find(predid)->second != t.size()) {
-	    LOG(INFOL) << "Wrong size in predicate: should be " << (int) cardPredicates.find(predid)->second;
-	    throw 10;
-	}
+        if (cardPredicates.find(predid)->second != t.size()) {
+            LOG(INFOL) << "Wrong size in predicate: should be " << (int) cardPredicates.find(predid)->second;
+            throw 10;
+        }
     }
     Predicate pred(predid, Predicate::calculateAdornment(t1), Predicate::isEDB(predicate) ? EDB : IDB, (uint8_t) t.size());
 
@@ -908,13 +906,13 @@ Predicate Program::getPredicate(std::string & p) {
 Predicate Program::getPredicate(const PredId_t id) {
     uint8_t card = cardPredicates.find(id)->second;
     return Predicate(id, 0, Predicate::isEDB(dictPredicates.getRawValue(id)) ? EDB : IDB,
-                     card);
+            card);
 }
 
 Predicate Program::getPredicate(std::string & p, uint8_t adornment) {
     PredId_t id = (PredId_t) dictPredicates.getOrAdd(p);
     return Predicate(id, adornment, Predicate::isEDB(p) ? EDB : IDB,
-                     cardPredicates.find(id)->second);
+            cardPredicates.find(id)->second);
 }
 
 std::string Program::getAllPredicates() {
