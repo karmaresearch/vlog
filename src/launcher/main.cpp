@@ -192,7 +192,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "This parameter sets a threshold to estimate the reasoning cost of a pattern. This cost can be broadly associated to the cardinality of the pattern. It is used to choose either TopDown or Magic evalution. Default is 1000000 (1M).", false);
     query_options.add<string>("", "reasoningAlgo", "",
             "Determines the reasoning algo (only for <queryLiteral>). Possible values are \"qsqr\", \"magic\", \"auto\".", false);
-    query_options.add<string>("", "selectionStrategy", "",            
+    query_options.add<string>("", "selectionStrategy", "",
             "Determines the selection strategy (only for <queryLiteral>, when \"auto\" is specified for the reasoningAlgorithm). Possible values are \"cardEst\", ... (to be extended) .", false);
     query_options.add<long>("", "matThreshold", 10000000,
             "In case reasoning is activated, this parameter sets a threshold above which a full materialization is performed before we execute the query. Default is 10000000 (10M).", false);
@@ -234,9 +234,9 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
 
     ProgramArgs::GroupArgs& load_options = *vm.newGroup("Options for <load>");
     load_options.add<string>("i","input", "",
-            "Path to the files that contain the compressed triples. This parameter is REQUIRED if already compressed triples/dict are not provided.",true);
+            "Path to the files that contain the compressed triples. This parameter is REQUIRED if already compressed triples/dict are not provided.", false);
     load_options.add<string>("o","output", "",
-            "Path to the KB that should be created. This parameter is REQUIRED.",true);
+            "Path to the KB that should be created. This parameter is REQUIRED.", false);
     load_options.add<int>("","maxThreads",
             Utils::getNumberPhysicalCores(),
             "Sets the maximum number of threads to use during the compression. Default is the number of physical cores",false);

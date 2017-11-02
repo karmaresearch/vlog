@@ -1,42 +1,29 @@
 # Init variables
-CUSTOM_LIBS =
 OUTPUTDIR = .
 # To enable MYSQL we must add the parameter MYSQL=1
 # To enable ODBC we must add the parameter ODBC=1
 # To enable MAPI we must add the parameter MAPI=1
 
 # where is trident? Default below, but can be overriden on the commandline.
-MYTRIDENT = ../trident
-RDF3X = $(MYTRIDENT)/rdf3x
-KOGNAC = $(MYTRIDENT)/build/kognac
-
+TRIDENT = ../trident
+KOGNAC = ../kognac
+RDF3X = $(TRIDENT)/rdf3x
 CPLUS = g++
-CC = gcc
+
+LDFLAGS= -lkognac-log -lkognac -ltrident-core -ltrident-sparql -lz -ltbb -lpthread
 
 uname_S := $(shell uname -s)
-ifeq ($(uname_S), Darwin)
-	# OSX-dependent stuff
-	MTSUFF = -mt
-CLIBS = -L$(MYTRIDENT)/build -L$(KOGNAC) \
-		-L/usr/local/lib -Wl,-install_name,/usr/local/lib
-endif
+#ifeq ($(uname_S), Darwin)
+#endif
 ifeq ($(uname_S), Linux)
-	# Linux-dependent stuff
-	MTSUFF = # -mt
-CLIBS = \
-		-L/usr/local/lib -Wl,-rpath,/usr/local/lib -L$(MYTRIDENT)/build \
-		-fopenmp
+	LDFLAGS = $(LDFLAGS) -fopenmp
 endif
-
-LDFLAGS= \
-		 -lkognac-log -lkognac -ltrident-core -ltrident-sparql \
-		 -lz
 
 #Add dependencies. We compile trident, kognac, and RDF3X
 CPPFLAGS=-Iinclude
-CPPFLAGS+= -I$(MYTRIDENT)/include
-CPPFLAGS+= -I$(MYTRIDENT)/include/layers
-CPPFLAGS+= -I$(MYTRIDENT)/rdf3x/include
+CPPFLAGS+= -I$(TRIDENT)/include
+CPPFLAGS+= -I$(TRIDENT)/include/layers
+CPPFLAGS+= -I$(RDF3X)/include
 CPPFLAGS+= -I$(KOGNAC)/include
 CPPFLAGS+= -isystem /usr/local/include
 #Take sparsehash from trident
@@ -44,7 +31,6 @@ CPPFLAGS+= -I$(KOGNAC)/external/sparsehash/src
 
 #Other flags
 CPPFLAGS += -c -MD -MF $(patsubst %.o,%.d,$@) -std=c++1z
-
 CPPFLAGS += -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1 # -DWEBINTERFACE=0
 
 SRCDIR=src
@@ -81,15 +67,19 @@ DEBUGFLAGS = -O0 -g -gdwarf-2 -Wall -Wno-sign-compare -DDEBUG=1
 
 ifeq ($(DEBUG),1)
 	CPPFLAGS+=$(DEBUGFLAGS)
-	CFLAGS+=$(DEBUGFLAGS)
 	VLOG=$(PRGNAME_DEBUG)
 	BUILDDIR=$(BUILDDIR_DEBUG)
+	KOGNACLIB=$(KOGNAC)/build_debug
+	TRIDENTLIB=$(TRIDENT)/build_debug
 else
 	CPPFLAGS+=$(RELEASEFLAGS)
-	CFLAGS+=$(RELEASEFLAGS)
 	VLOG=$(PRGNAME_RELEASE)
 	BUILDDIR=$(BUILDDIR_RELEASE)
+	KOGNACLIB=$(KOGNAC)/build
+	TRIDENTLIB=$(TRIDENT)/build
 endif
+
+CLIBS=-Wl,-rpath,$(KOGNACLIB) -L$(KOGNACLIB) -Wl,-rpath,$(TRIDENTLIB) -L$(TRIDENTLIB)
 
 #MySQL integration
 ifeq ($(MYSQL),1)
@@ -106,9 +96,6 @@ ifeq ($(ODBC),1)
 	LDFLAGS += -lmapi
 endif
 
-#Add link to Intel TBB library
-LDFLAGS += -ltbb # -ltbbmalloc_proxy
-
 OFILES = \
 		 $(subst $(SRCDIR),$(BUILDDIR),$(SRC_FILES:.cpp=.o))
 
@@ -118,7 +105,7 @@ BUILDDIR_DEBUG=$(OUTPUTDIR)/build_debug
 PRGNAME_DEBUG=$(OUTPUTDIR)/vlog_debug
 
 $(VLOG): init $(OFILES)
-	$(CPLUS) -o $@ $(CLIBS) $(OFILES) $(CLIBS) $(LDFLAGS) -lpthread $(CUSTOM_LIBS)
+	$(CPLUS) -o $@ $(CLIBS) $(OFILES) $(LDFLAGS)
 
 init:
 	@mkdir -p $(BUILDDIR)
