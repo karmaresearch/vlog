@@ -3,6 +3,8 @@
 
 #include <vlog/support.h>
 
+#include <kognac/logs.h>
+
 #include <string>
 #include <inttypes.h>
 #include <stdlib.h>
@@ -303,6 +305,8 @@ class Rule {
         }
 
         Literal getFirstHead() const {
+            if (heads.size() > 0)
+                LOG(WARNL) << "This method should be called only if we handle multiple heads properly...";
             return heads[0];
         }
 

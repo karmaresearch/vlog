@@ -483,7 +483,6 @@ bool Rule::doesVarAppearsInFollowingPatterns(int startingPattern, uint8_t value)
             }
         }
     }
-
     return false;
 }
 
@@ -910,9 +909,20 @@ void Program::parseRule(std::string rule) {
         }
         //process the head(s)
         std::string head = rule.substr(0, posEndHead - 1);
-        Literal firstHead = parseLiteral(head); //TODO
-        std::vector<Literal> lHead;
-        lHead.push_back(firstHead);
+        std::vector<Literal> lHeads;
+        while (head.size() > 0) {
+            std::string headLiteral;
+            size_t posEndLiteral = head.find("),");
+            if (posEndLiteral != std::string::npos) {
+                headLiteral = head.substr(0, posEndLiteral + 1);
+                head = head.substr(posEndLiteral + 2, std::string::npos);
+            } else {
+                headLiteral = head;
+                head = "";
+            }
+            Literal h = parseLiteral(headLiteral);
+            lHeads.push_back(h);
+        }
 
         //process the body
         std::string body = rule.substr(posEndHead + 3, std::string::npos);
@@ -931,12 +941,8 @@ void Program::parseRule(std::string rule) {
         }
 
         //Add the rule
-        for(const auto &h : lHead) {
-            auto &stack = rules[h.getPredicate().getId()];
-            stack.push_back(allrules.size());
-        }
-        allrules.push_back(Rule(lHead, lBody));
-
+        Rule r = Rule(lHeads, lBody);
+        addRule(r);
     } catch (int e) {
         LOG(ERRORL) << "Failed in parsing rule " << rule;
     }

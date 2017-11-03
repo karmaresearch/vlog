@@ -39,8 +39,8 @@ void RuleExecutionDetails::rearrangeLiterals(std::vector<const Literal*> &vector
         leftLiterals2.pop_back();
 
         /*if (lit->getNVars() > 0) {
-            assert(false); //not supported
-        } else {*/
+          assert(false); //not supported
+          } else {*/
         //just add it
         vector.push_back(lit);
         //}
@@ -227,11 +227,11 @@ void RuleExecutionDetails::checkWhetherEDBsRedundantHead(RuleExecutionPlan &p, c
     //Check whether some EDBs can lead to redundant derivation
     for (int i = 0; i < p.plan.size(); ++i) {
         const Literal *literal = p.plan[i];
-	// Should this not check if literal is an EDB?
-	// Otherwise, I don't understand why this method has the name it has. --Ceriel
-	if (literal->getPredicate().getType() != EDB) {
-	    continue;
-	}
+        // Should this not check if literal is an EDB?
+        // Otherwise, I don't understand why this method has the name it has. --Ceriel
+        if (literal->getPredicate().getType() != EDB) {
+            continue;
+        }
 
         std::vector<uint8_t> edbVars = literal->getAllVars();
         //Get all IDBs with the same predicate
@@ -327,9 +327,9 @@ void RuleExecutionDetails::createExecutionPlans() {
                 ++itr) {
             if (itr->getPredicate().getType() == IDB) {
                 posIdbLiterals.push_back(i);
-		if (itr->getPredicate().isMagic()) {
-		    posMagicAtoms.push_back(i);
-		}
+                if (itr->getPredicate().isMagic()) {
+                    posMagicAtoms.push_back(i);
+                }
             }
             i++;
         }
@@ -341,18 +341,18 @@ void RuleExecutionDetails::createExecutionPlans() {
             RuleExecutionPlan p;
             size_t idx = 0;
 
-	    if (posMagicAtoms.size() > 0) {
-		assert(posMagicAtoms.size() == 1);
+            if (posMagicAtoms.size() > 0) {
+                assert(posMagicAtoms.size() == 1);
                 p.plan.push_back(&bodyLiterals[posMagicAtoms[0]]);
                 extractAllEDBPatterns(p.plan, bodyLiterals);
-		if (! bodyLiterals[*itr].isMagic()) {
-		    p.plan.push_back(&bodyLiterals[*itr]);
-		}
-	    } else {
+                if (! bodyLiterals[*itr].isMagic()) {
+                    p.plan.push_back(&bodyLiterals[*itr]);
+                }
+            } else {
                 extractAllEDBPatterns(p.plan, bodyLiterals);
                 idx = p.plan.size();
                 p.plan.push_back(&bodyLiterals[*itr]);
-	    }
+            }
 
             //Add all others
             for (std::vector<uint8_t>::iterator itr2 = posIdbLiterals.begin();
@@ -366,7 +366,7 @@ void RuleExecutionDetails::createExecutionPlans() {
             rearrangeLiterals(p.plan, idx);
 
             RuleExecutionDetails::checkFilteringStrategy(
-                p, *p.plan[p.plan.size() - 1], rule.getFirstHead());
+                    p, *p.plan[p.plan.size() - 1], rule.getFirstHead());
 
             RuleExecutionDetails::checkWhetherEDBsRedundantHead(p,
                     rule.getFirstHead());
@@ -391,59 +391,7 @@ void RuleExecutionDetails::createExecutionPlans() {
                 }
             }
 
-            //Add all the appropriate ranges
-            /*if (order == 0) {
-                int nIDBs = 0;
-                for (int i = 0; i < p.plan.size(); ++i) {
-                    if (p.plan[i]->getPredicate().getType() == EDB) {
-                        p.ranges.push_back(std::make_pair(0, (size_t) - 1));
-                    } else {
-                        if (nIDBs == 0) {
-                            p.ranges.push_back(std::make_pair(1, (size_t) - 1));
-                        } else {
-                            p.ranges.push_back(std::make_pair(0, (size_t) - 1));
-                        }
-                        nIDBs++;
-                    }
-                }
-            } else if (order == 1) {
-                int nIDBs = 0;
-                for (int i = 0; i < p.plan.size(); ++i) {
-                    if (p.plan[i]->getPredicate().getType() == EDB) {
-                        p.ranges.push_back(std::make_pair(0, (size_t) - 1));
-                    } else {
-                        if (nIDBs == 0) {
-                            p.ranges.push_back(std::make_pair(1, (size_t) - 1));
-                        } else if (nIDBs == 1) {
-                            p.ranges.push_back(std::make_pair(0, 1));
-                        } else {
-                            p.ranges.push_back(std::make_pair(0, (size_t) - 1));
-                        }
-                        nIDBs++;
-                    }
-                }
-            } else if (order == 2) {
-                int nIDBs = 0;
-                for (int i = 0; i < p.plan.size(); ++i) {
-                    if (p.plan[i]->getPredicate().getType() == EDB) {
-                        p.ranges.push_back(std::make_pair(0, (size_t) - 1));
-                    } else {
-                        if (nIDBs == 0) {
-                            p.ranges.push_back(std::make_pair(1, (size_t) - 1));
-                        } else if (nIDBs == 1) {
-                            p.ranges.push_back(std::make_pair(0, 1));
-                        } else {
-                            p.ranges.push_back(std::make_pair(0, 1));
-                        }
-                        nIDBs++;
-                    }
-                }
-            } else {
-                //throw 10;
-            }*/
-
             orderExecutions.push_back(p);
-
             order++;
         }
         assert(orderExecutions.size() == nIDBs);
@@ -463,5 +411,3 @@ void RuleExecutionDetails::createExecutionPlans() {
         orderExecutions.push_back(p);
     }
 }
-
-
