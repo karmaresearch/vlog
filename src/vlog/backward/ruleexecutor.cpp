@@ -5,7 +5,7 @@
 
 #include <trident/model/table.h>
 
-RuleExecutor::RuleExecutor(Rule &rule, uint8_t headAdornment
+RuleExecutor::RuleExecutor(const Rule &rule, uint8_t headAdornment
                            , Program *program,
                            EDBLayer &layer
                           ) :
@@ -29,7 +29,7 @@ void RuleExecutor::calculateJoinsSizeIntermediateRelations() {
 
     int nBoundInAdornment = 0;
     int nBoundVarInAdornment = 0;
-    Literal head = adornedRule.getHead();
+    Literal head = adornedRule.getFirstHead();
     uint8_t headAdornment = head.getPredicate().getAdorment();
     for (size_t i = 0; i < head.getTupleSize(); ++i) {
         if (headAdornment >> i & 1) {
@@ -199,7 +199,7 @@ bool RuleExecutor::isUnifiable(const Term_t * const value, const size_t sizeTupl
     // LOG(DEBUGL) << "isUnifiable: adornedRule = " << adornedRule.tostring();
     for (size_t i = 0; i < sizeTuple; ++i) {
         size_t pos = posInAdorment[i];
-        VTerm t = adornedRule.getHead().getTermAtPos(pos);
+        VTerm t = adornedRule.getFirstHead().getTermAtPos(pos);
         if (!t.isVariable()) {
             // LOG(DEBUGL) << "isUnifiable: value check: " << t.getValue() << ", " << value[i];
             if (t.getValue() != value[i]) {
@@ -582,15 +582,15 @@ void RuleExecutor::copyLastRelInAnswers(QSQR *qsqr,
                                         BindingsTable **supplRelations,
                                         BindingsTable *lastSupplRelation) {
     if (nTuples > 0) {
-        Literal l = adornedRule.getHead();
+        Literal l = adornedRule.getFirstHead();
         BindingsTable *answer = qsqr->getAnswerTable(&l);
 
         //Copy the head in the tuple
         Term_t tuple[SIZETUPLE];
         uint8_t nvars = 0;
         uint8_t posVars[SIZETUPLE];
-        for (uint8_t i = 0; i < adornedRule.getHead().getTupleSize(); ++i) {
-            VTerm t = adornedRule.getHead().getTermAtPos(i);
+        for (uint8_t i = 0; i < adornedRule.getFirstHead().getTupleSize(); ++i) {
+            VTerm t = adornedRule.getFirstHead().getTermAtPos(i);
             if (t.isVariable()) {
                 posVars[nvars++] = i;
             } else {

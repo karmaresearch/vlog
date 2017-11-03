@@ -174,8 +174,8 @@ void RuleExecutionDetails::checkFilteringStrategy(RuleExecutionPlan &outputPlan,
 }
 
 void RuleExecutionDetails::calculateNVarsInHeadFromEDB() {
-    for (uint8_t i = 0; i < rule.getHead().getTupleSize(); ++i) {
-        VTerm t = rule.getHead().getTermAtPos(i);
+    for (uint8_t i = 0; i < rule.getFirstHead().getTupleSize(); ++i) {
+        VTerm t = rule.getFirstHead().getTermAtPos(i);
         if (t.isVariable()) {
             //Check if this variable appears on some edb terms
             std::vector<std::pair<uint8_t, uint8_t>> edbLiterals;
@@ -366,14 +366,14 @@ void RuleExecutionDetails::createExecutionPlans() {
             rearrangeLiterals(p.plan, idx);
 
             RuleExecutionDetails::checkFilteringStrategy(
-                p, *p.plan[p.plan.size() - 1], rule.getHead());
+                p, *p.plan[p.plan.size() - 1], rule.getFirstHead());
 
             RuleExecutionDetails::checkWhetherEDBsRedundantHead(p,
-                    rule.getHead());
+                    rule.getFirstHead());
 
-            p.checkIfFilteringHashMapIsPossible(rule.getHead());
+            p.checkIfFilteringHashMapIsPossible(rule.getFirstHead());
 
-            p.calculateJoinsCoordinates(rule.getHead());
+            p.calculateJoinsCoordinates(rule.getFirstHead());
 
             //New version. Should be able to catch everything
             for (int i = 0; i < p.plan.size(); ++i) {
@@ -456,9 +456,9 @@ void RuleExecutionDetails::createExecutionPlans() {
             p.plan.push_back(&(*itr));
             p.ranges.push_back(std::make_pair(0, (size_t) - 1));
         }
-        RuleExecutionDetails::checkFilteringStrategy(p, bodyLiterals[bodyLiterals.size() - 1], rule.getHead());
+        RuleExecutionDetails::checkFilteringStrategy(p, bodyLiterals[bodyLiterals.size() - 1], rule.getFirstHead());
 
-        p.calculateJoinsCoordinates(rule.getHead());
+        p.calculateJoinsCoordinates(rule.getFirstHead());
 
         orderExecutions.push_back(p);
     }

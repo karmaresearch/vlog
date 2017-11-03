@@ -20,10 +20,10 @@ std::shared_ptr<Program> Wizard::getAdornedProgram(Literal &query, Program &prog
         Literal lit = queries[idxQueries];
 
         //Go through all rules and get the ones which match the query
-        std::vector<Rule> *r = program.getAllRulesByPredicate(lit.getPredicate().getId());
-        for (std::vector<Rule>::iterator itr = r->begin(); itr != r->end();
-                ++itr) {
-            rules.push_back(itr->createAdornment(lit.getPredicate().getAdorment()));
+        auto rulesIds = program.getRulesIDsByPredicate(lit.getPredicate().getId());
+        for (auto ruleId : rulesIds) {
+            rules.push_back(program.getRule(ruleId).
+                    createAdornment(lit.getPredicate().getAdorment()));
         }
 
         //Go through all the new rules and get new queries to process
@@ -95,27 +95,29 @@ std::shared_ptr<Program> Wizard::doMagic(const Literal &query,
     for (std::vector<Rule>::iterator itr = originalRules.begin();
             itr != originalRules.end(); ++itr) {
 
-        Literal head = itr->getHead();
+        for (auto head : itr->getHeads()) {
+            Literal magicLiteral = getMagicRelation(true, newProgram, head);
 
-        Literal magicLiteral = getMagicRelation(true, newProgram, head);
+            if (head.getPredicate().getId() == query.getPredicate().getId() &&
+                    head.getPredicate().getAdorment() == query.getPredicate().getAdorment()) {
+                inputOutputRelIDs.first = magicLiteral.getPredicate().getId();
+                foundPredicate = true;
+            }
 
-        if (head.getPredicate().getId() == query.getPredicate().getId() &&
-                head.getPredicate().getAdorment() == query.getPredicate().getAdorment()) {
-            inputOutputRelIDs.first = magicLiteral.getPredicate().getId();
-            foundPredicate = true;
+            std::vector<Literal> newBody;
+            newBody.push_back(magicLiteral);
+            //Add all other body literals
+            for (std::vector<Literal>::const_iterator itrBody = itr->getBody().begin();
+                    itrBody != itr->getBody().end(); ++itrBody) {
+                newBody.push_back(*itrBody);
+            }
+            assert(newBody.size() > 0);
+            std::vector<Literal> heads;
+            heads.push_back(head);
+            Rule r(heads, newBody);
+            // LOG(DEBUGL) << "Adding rule " << r.tostring();
+            newRules.push_back(r.normalizeVars());
         }
-
-        std::vector<Literal> newBody;
-        newBody.push_back(magicLiteral);
-        //Add all other body literals
-        for (std::vector<Literal>::const_iterator itrBody = itr->getBody().begin();
-                itrBody != itr->getBody().end(); ++itrBody) {
-            newBody.push_back(*itrBody);
-        }
-        assert(newBody.size() > 0);
-        Rule r(head, newBody);
-        // LOG(DEBUGL) << "Adding rule " << r.tostring();
-        newRules.push_back(r.normalizeVars());
     }
 
     //Second pass: create an additional rule for each IDB in the rules body
@@ -150,7 +152,9 @@ std::shared_ptr<Program> Wizard::doMagic(const Literal &query,
                         newBody[0].getPredicate().getType() == newHead.getPredicate().getType() &&
                         newBody[0].getPredicate().getAdorment() == newHead.getPredicate().getAdorment()) {
                 } else {
-                    Rule r(newHead, newBody);
+                    std::vector<Literal> newheads;
+                    newheads.push_back(newHead);
+                    Rule r(newheads, newBody);
                     Rule normalized_r(r.normalizeVars());
                     std::string s = normalized_r.tostring();
                     bool found = false;

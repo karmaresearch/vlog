@@ -30,7 +30,7 @@ struct LineageInfo {
 
 class RuleExecutor {
 private:
-    Rule adornedRule;
+    const Rule adornedRule;
 
     Program *program;
     EDBLayer &layer;
@@ -94,7 +94,7 @@ private:
 #endif
 
 public:
-    RuleExecutor(Rule &rule, uint8_t headAdornment,
+    RuleExecutor(const Rule &rule, uint8_t headAdornment,
                  Program *program, EDBLayer &layer
                 );
 

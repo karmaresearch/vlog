@@ -253,13 +253,14 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     lookup_options.add<int>("n","number", 0, "Numeric term to search",false);
 
     ProgramArgs::GroupArgs& cmdline_options = *vm.newGroup("Parameters");
-    //cmdline_options.add_options()("logLevel,l", po::value<logging::trivial::severity_level>(),
-    //        "Set the log level (accepted values: trace, debug, info, warning, error, fatal). Default is info.");
+    cmdline_options.add<string>("l","logLevel", "info",
+            "Set the log level (accepted values: trace, debug, info, warning, error, fatal). Default is info.", false);
 
     cmdline_options.add<string>("e", "edb", "default",
             "Path to the edb conf file. Default is 'edb.conf' in the same directory as the exec file.",false);
     cmdline_options.add<int>("","sleep", 0, "sleep <arg> seconds before starting the run. Useful for attaching profiler.",false);
 
+    vm.parse(argc, argv);
     return checkParams(vm, argc, argv);
 }
 
@@ -340,6 +341,11 @@ void launchFullMat(int argc,
     Program p(db.getNTerms(), &db);
     p.readFromFile(pathRules);
 
+    //Existential check
+    if (p.areExistentialRules()) {
+        LOG(INFOL) << "The program might not terminate due to existential rules ...";
+    }
+
     //Set up the ruleset and perform the pre-materialization if necessary
     {
         if (!vm["automat"].empty()) {
@@ -373,7 +379,7 @@ void launchFullMat(int argc,
             interRuleThreads = 0;
         }
 
-        //Execute the materialization
+        //Prepare the materialization
         std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(db,
                 &p, vm["no-intersect"].empty(),
                 vm["no-filtering"].empty(),
@@ -770,14 +776,17 @@ int main(int argc, const char** argv) {
         return EXIT_FAILURE;
     }
     string full_path(argv[0]);
-    //full_path = fs::system_complete(fs::path( argv[0]));
-
-    //Init logging system
-    //logging::trivial::severity_level level =
-    //    vm.count("logLevel") ?
-    //    vm["logLevel"].as<logging::trivial::severity_level>() :
-    //    logging::trivial::info;
-    //initLogging(level);
+    //Set logging level
+    string ll = vm["logLevel"].as<string>();
+    if (ll == "debug") {
+        Logger::setMinLevel(DEBUGL);
+    } else if (ll == "info") {
+        Logger::setMinLevel(INFOL);
+    } else if (ll == "warning") {
+        Logger::setMinLevel(WARNL);
+    } else if (ll == "error") {
+        Logger::setMinLevel(ERRORL);
+    }
 
     string cmd = string(argv[1]);
 

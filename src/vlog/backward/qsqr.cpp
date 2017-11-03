@@ -55,7 +55,7 @@ QSQR::~QSQR() {
         if (rules[i] != NULL) {
             for (int j = 0; j < sizePreds[i]; ++j) {
                 if (rules[i][j] != NULL) {
-                    for (int m = 0; m < program->getAllRulesByPredicate(i)->size(); ++m) {
+                    for (int m = 0; m < program->getNRulesByPredicate(i); ++m) {
                         delete rules[i][j][m];
                     }
                     delete[] rules[i][j];
@@ -71,7 +71,7 @@ void QSQR::deallocateAllRules() {
         if (rules[i] != NULL) {
             for (int j = 0; j < sizePreds[i]; ++j) {
                 if (rules[i][j] != NULL) {
-                    for (int m = 0; m < program->getAllRulesByPredicate(i)->size(); ++m) {
+                    for (int m = 0; m < program->getNRulesByPredicate(i); ++m) {
                         delete rules[i][j][m];
                     }
                     delete[] rules[i][j];
@@ -118,15 +118,14 @@ void QSQR::createRules(Predicate &pred) {
     }
 
     if (rules[pred.getId()][pred.getAdorment()] == NULL) {
-        std::vector<Rule> *r = program->getAllRulesByPredicate(pred.getId());
+        const auto rulesIds = program->getRulesIDsByPredicate(pred.getId());
         // LOG(DEBUGL) << "createRules for predicate " << pred.getId() << ", adornment = " << pred.getAdorment() << ", r->size = " << r->size();
         rules[pred.getId()][pred.getAdorment()] =
-            new RuleExecutor*[r->size()];
+            new RuleExecutor*[rulesIds.size()];
         int m = 0;
-        for (std::vector<Rule>::iterator itr =
-                    r->begin(); itr != r->end(); ++itr) {
+        for (auto ruleId : rulesIds) {
             rules[pred.getId()][pred.getAdorment()][m] =
-                new RuleExecutor(*itr, pred.getAdorment(), program, layer);
+                new RuleExecutor(program->getRule(ruleId), pred.getAdorment(), program, layer);
             m++;
         }
     }
@@ -142,7 +141,7 @@ size_t QSQR::estimate(int depth, Predicate &pred, BindingsTable *inputTable/*, s
 
     std::vector<size_t> outputs;
     size_t output = 0;
-    for (int i = 0; i < program->getAllRulesByPredicate(pred.getId())->size(); ++i) {
+    for (int i = 0; i < program->getNRulesByPredicate(pred.getId()); ++i) {
         RuleExecutor *exec = rules[pred.getId()][pred.getAdorment()][i];
         size_t r = exec->estimate(depth + 1, inputTable/*, offsetInput*/, this, layer);
 	if (r != 0) {
@@ -197,7 +196,7 @@ void QSQR::evaluate(Predicate &pred, BindingsTable *inputTable,
     // LOG(DEBUGL) << "QSQR: finished execution of query";
 #else
     createRules(pred);
-    size_t sz = program->getAllRulesByPredicate(pred.getId())->size();
+    size_t sz = program->getNRulesByPredicate(pred.getId());
     if (sz > 0) {
 	QSQR_Task task(QSQR_TaskType::QUERY, pred);
 	task.currentRuleIndex = 1;
@@ -216,7 +215,7 @@ void QSQR::evaluate(Predicate &pred, BindingsTable *inputTable,
 void QSQR::processTask(QSQR_Task &task) {
     switch (task.type) {
     case QUERY: {
-	size_t sz = program->getAllRulesByPredicate(task.pred.getId())->size();
+	size_t sz = program->getNRulesByPredicate(task.pred.getId());
 	if (task.currentRuleIndex < sz) {
             //Execute the next rule
 	    QSQR_Task newTask(QSQR_TaskType::QUERY, task.pred);

@@ -10,15 +10,6 @@ KOGNAC = ../kognac
 RDF3X = $(TRIDENT)/rdf3x
 CPLUS = g++
 
-LDFLAGS= -lkognac-log -lkognac -ltrident-core -ltrident-sparql -lz -ltbb -lpthread
-
-uname_S := $(shell uname -s)
-#ifeq ($(uname_S), Darwin)
-#endif
-ifeq ($(uname_S), Linux)
-	LDFLAGS = $(LDFLAGS) -fopenmp
-endif
-
 #Add dependencies. We compile trident, kognac, and RDF3X
 CPPFLAGS=-Iinclude
 CPPFLAGS+= -I$(TRIDENT)/include
@@ -26,8 +17,6 @@ CPPFLAGS+= -I$(TRIDENT)/include/layers
 CPPFLAGS+= -I$(RDF3X)/include
 CPPFLAGS+= -I$(KOGNAC)/include
 CPPFLAGS+= -isystem /usr/local/include
-#Take sparsehash from trident
-CPPFLAGS+= -I$(KOGNAC)/external/sparsehash/src
 
 #Other flags
 CPPFLAGS += -c -MD -MF $(patsubst %.o,%.d,$@) -std=c++1z
@@ -79,7 +68,16 @@ else
 	TRIDENTLIB=$(TRIDENT)/build
 endif
 
+#Set up libs and other linking flags
 CLIBS=-Wl,-rpath,$(KOGNACLIB) -L$(KOGNACLIB) -Wl,-rpath,$(TRIDENTLIB) -L$(TRIDENTLIB)
+LDFLAGS= -lkognac-log -lkognac -ltrident-core -ltrident-sparql -lz -ltbb -lpthread
+uname_S := $(shell uname -s)
+#ifeq ($(uname_S), Darwin)
+#endif
+ifeq ($(uname_S), Linux)
+	LDFLAGS = $(LDFLAGS) -fopenmp
+endif
+
 
 #MySQL integration
 ifeq ($(MYSQL),1)

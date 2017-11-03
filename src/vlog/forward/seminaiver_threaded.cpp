@@ -144,7 +144,7 @@ void SemiNaiverThreaded::runThread(
 
         //Get atomic iteration
         data->iteration = getAtomicIteration();
-        Literal headLiteral = ruleset[ruleToExecute].rule.getHead();
+        Literal headLiteral = ruleset[ruleToExecute].rule.getFirstHead();
         PredId_t idHeadPredicate = headLiteral.getPredicate().getId();
         std::vector<PredId_t> predicates;
         predicates.push_back(idHeadPredicate);

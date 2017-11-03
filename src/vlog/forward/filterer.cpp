@@ -36,7 +36,7 @@ bool TableFilterer::producedDerivationInPreviousSteps(
     //Easy case: the body of the current rule is equal to our rule
     Substitution subs[10];
     int nsubs = Literal::getSubstitutionsA2B(subs,
-                rule->rule.getHead(), currentQuery);
+                rule->rule.getFirstHead(), currentQuery);
     assert(nsubs != -1);
 
     for (const auto &lit : rule->rule.getBody()) {
@@ -135,7 +135,7 @@ bool TableFilterer::isEligibleForPartialSubs(
         //Is the rule linear. Than I can look at the block tree of the antecedent...
         if (rule.getNIDBPredicates() == 1 && bodyLiterals.size() == 1 &&
                 headRule.getPredicate().getId() ==
-                rule.getHead().getPredicate().getId()) {
+                rule.getFirstHead().getPredicate().getId()) {
             //LOG(INFOL) << "THE RULE OF THE block is linear. Try to look at the child...";
             //Get the last block (before the iteration) of the child predicate
 
@@ -301,7 +301,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
         /*** This code calculates the new current query and pos of the subs ***/
         Substitution subs[10];
         const int nsubs = Literal::getSubstitutionsA2B(subs,
-                          blockRule.getHead(), currentQuery);
+                          blockRule.getFirstHead(), currentQuery);
         if (nsubs == -1) {
             throw 10;
         }
@@ -324,7 +324,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
         /*** This code calculates the new output query and pos of the subs ***/
         Substitution subs2[10];
         const int nsubs2 = Literal::getSubstitutionsA2B(subs2,
-                           blockRule.getHead(), outputQuery);
+                           blockRule.getFirstHead(), outputQuery);
         VTerm tAtOutQuery = outputQuery.getTermAtPos(posHead_first);
         uint8_t idVarOutQuery = tAtOutQuery.getId();
         for (int i = 0; i < nsubs2; ++i) {
@@ -361,7 +361,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
     }
 
     /*** START THE COMPUTATION ***/
-    Literal headBlockRule = blockRule.getHead();
+    Literal headBlockRule = blockRule.getFirstHead();
     //Pos var to be joined with the one in the head
     std::pair<uint8_t, uint8_t> joinHeadAndNRLits;
     //Pos of the variables to be joined with the recursive predicate

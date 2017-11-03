@@ -49,10 +49,14 @@ void Exporter::extractTriples(std::vector <uint64_t> &all_s,
             } else {
                 pred.triple[2] = t.get(2).getValue();
             }
-            pred.id = it->getHead().getPredicate().getId();
             pred.ruleid = ruleid;
-            LOG(DEBUGL) << "Pred.id " << pred.id << " rule: " << it->toprettystring(sn->getProgram(), &sn->getEDBLayer()) << " triple " << pred.triple[0] << " " << pred.triple[1] << " " << pred.triple[2] << " npostocopy: " << (int)pred.nPosToCopy << " pos1: " << (int)pred.posToCopy[0] << " pos2:" << (int)pred.posToCopy[1];
-            predicatesToExtract.push_back(pred);
+
+            for(const auto &h : it->getHeads()) {
+                _EDBPredicates pnew = pred;
+                pnew.id = h.getPredicate().getId();
+                LOG(DEBUGL) << "Pred.id " << pnew.id << " rule: " << it->toprettystring(sn->getProgram(), &sn->getEDBLayer()) << " triple " << pred.triple[0] << " " << pred.triple[1] << " " << pred.triple[2] << " npostocopy: " << (int)pred.nPosToCopy << " pos1: " << (int)pred.posToCopy[0] << " pos2:" << (int)pred.posToCopy[1];
+                predicatesToExtract.push_back(pnew);
+            }
         }
         ruleid++;
     }

@@ -26,7 +26,7 @@ void SemiNaiver::createGraphRuleDependency(std::vector<int> &nodes,
     std::vector<int> *definedBy = new std::vector<int>[MAX_NPREDS];
     for (int i = 0; i < rules.size(); i++) {
         Rule ri = rules[i];
-        PredId_t pred = ri.getHead().getPredicate().getId();
+        PredId_t pred = ri.getFirstHead().getPredicate().getId();
         std::vector<Literal> body = ri.getBody();
         for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end(); ++itr) {
             Predicate p = itr->getPredicate();
@@ -116,7 +116,7 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 std::vector<int> *definedBy = new std::vector<int>[MAX_NPREDS];
                 // First, determine which rules compute which predicate.
                 for (int i = 0; i < this->ruleset.size(); i++) {
-                    PredId_t pred = this->ruleset[i].rule.getHead().getPredicate().getId();
+                    PredId_t pred = this->ruleset[i].rule.getFirstHead().getPredicate().getId();
                     definedBy[pred].push_back(i);
                 }
 
@@ -128,7 +128,7 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 std::vector<int> nRulesForPredicate;
                 for (int i = 0; i < this->ruleset.size(); i++) {
                     const Rule *r = &(this->ruleset[i].rule);
-                    PredId_t pred = r->getHead().getPredicate().getId();
+                    PredId_t pred = r->getFirstHead().getPredicate().getId();
                     nRulesForPredicate.push_back(definedBy[pred].size());
                     std::unordered_set<int> exclude;
                     // Exclude rules that compute the same predicate.
@@ -781,7 +781,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         const uint32_t iteration,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
-    Literal headLiteral = rule.getHead();
+    Literal headLiteral = rule.getFirstHead();
     PredId_t idHeadPredicate = headLiteral.getPredicate().getId();
 #ifdef WEBINTERFACE
     // Cannot run multithreaded in this case.

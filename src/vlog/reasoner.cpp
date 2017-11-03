@@ -402,26 +402,26 @@ TupleIterator *Reasoner::getIncrReasoningIterator(Literal &query,
             // TODO: experiment with threshold on when to use this ...
             //I use QSQR
             QSQR evaluator(edb, &program);
-            std::vector<Rule> *originalRules = program.getAllRulesByPredicate(
+            std::vector<Rule> originalRules = program.getAllRulesByPredicate(
                     rootQuery.getLiteral()->getPredicate().getId());
 
             //Create a smaller program
             Program clonedProgram = program.clone();
-            std::vector<Rule> *clonedRules = clonedProgram.getAllRulesByPredicate(
+            std::vector<Rule> clonedRules = clonedProgram.getAllRulesByPredicate(
                     rootQuery.getLiteral()->getPredicate().getId());
             //Clean any rule with IDB predicates
-            while (clonedRules->size() > 0) {
-                if (clonedRules->back().getNIDBPredicates() != 0)
-                    clonedRules->pop_back();
+            while (clonedRules.size() > 0) {
+                if (clonedRules.back().getNIDBPredicates() != 0)
+                    clonedRules.pop_back();
                 else
                     break;
             }
 
-            LOG(DEBUGL) << "Rules in the cloned program " << clonedRules->size();
+            LOG(DEBUGL) << "Rules in the cloned program " << clonedRules.size();
 
             //Execute all simple rules with one IDB in a sequence
-            for (std::vector<Rule>::iterator itr = originalRules->begin();
-                    itr != originalRules->end() && possibleValuesJoins->size() > 0;
+            for (std::vector<Rule>::iterator itr = originalRules.begin();
+                    itr != originalRules.end() && possibleValuesJoins->size() > 0;
                     ++itr) {
 
                 if (itr->getNIDBPredicates() == 0) {
@@ -434,7 +434,7 @@ TupleIterator *Reasoner::getIncrReasoningIterator(Literal &query,
                 //Add the rule
                 evaluator.deallocateAllRules();
                 LOG(DEBUGL) << "Executing the rule " << itr->tostring(NULL, NULL);
-                clonedRules->push_back(*itr);
+                clonedRules.push_back(*itr);
                 evaluator.setProgram(&clonedProgram);
 
                 //Launch only the single rule
@@ -459,7 +459,7 @@ TupleIterator *Reasoner::getIncrReasoningIterator(Literal &query,
                 }
 
                 //Remove the rule
-                clonedRules->pop_back();
+                clonedRules.pop_back();
             }
         }
 

@@ -64,7 +64,7 @@ bool Materialization::cardIsTooLarge(const Literal &lit, Program &p,
     Substitution subs[10];
     for (auto &rule : p.getAllRules()) {
         if (rule.getNIDBPredicates() == 0 && rule.getBody().size() == 1) {
-            int nsubs = Literal::subsumes(subs, rule.getHead(), lit);
+            int nsubs = Literal::subsumes(subs, rule.getFirstHead(), lit);
             if (nsubs != -1) {
                 Literal query = rule.getBody()[0].substitutes(subs, nsubs);
                 size_t card = layer.estimateCardinality(query);
@@ -364,52 +364,52 @@ void Materialization::getAndStorePrematerialization(EDBLayer & kb, Program & p,
 void Materialization::rewriteLiteralInProgram(Literal & prematLiteral, Literal & rewrittenLiteral, EDBLayer & kb, Program & p) {
     std::vector<Rule> rewrittenRules;
     Substitution subs[3];
-    for (PredId_t m = 0; m < MAX_NPREDS; ++m) {
-        for (int i = 0; i < p.getAllRulesByPredicate(m)->size(); ++i ) {
-            Rule r = p.getAllRulesByPredicate(m)->at(i);
+    for (Rule r : p.getAllRules()) {
+        bool toBeAdded = true;
 
-            bool toBeAdded = true;
-
-            //If head is precomputed toBeAdded = false
-            if (Literal::subsumes(subs, prematLiteral, r.getHead()) != -1) {
-                toBeAdded = false;
-                continue;
-            }
-
-            //Replace the literals in the body
-            std::vector<Literal> newBody;
-            for (std::vector<Literal>::const_iterator itr1 = r.getBody().begin();
-                    itr1 != r.getBody().end(); itr1++) {
-                int nsubs = 0;
-                bool toRewrite = false;
-                nsubs = Literal::subsumes(subs, prematLiteral, *itr1);
-                if (nsubs != -1) {
-                    toRewrite = true;
-                    Predicate pred = rewrittenLiteral.getPredicate();
-                    if (kb.isTmpRelationEmpty(pred)) {
-                        toBeAdded = false;
-                        break;
-                    }
-                }
-                if (!toRewrite) {
-                    newBody.push_back(*itr1);
-                } else {
-                    newBody.push_back(rewrittenLiteral.substitutes(subs, nsubs));
-                }
-            }
-
-            if (toBeAdded)
-                rewrittenRules.push_back(Rule(r.getHead(), newBody));
+        if (r.getHeads().size() > 1) {
+            LOG(WARNL) << "The prematerialization procedure is tested only with"
+                "rules that have one atom in the head. This is not the case...";
+            throw 10;
         }
+
+        //If head is precomputed toBeAdded = false
+        if (Literal::subsumes(subs, prematLiteral, r.getFirstHead()) != -1) {
+            toBeAdded = false;
+            continue;
+        }
+
+        //Replace the literals in the body
+        std::vector<Literal> newBody;
+        for (std::vector<Literal>::const_iterator itr1 = r.getBody().begin();
+                itr1 != r.getBody().end(); itr1++) {
+            int nsubs = 0;
+            bool toRewrite = false;
+            nsubs = Literal::subsumes(subs, prematLiteral, *itr1);
+            if (nsubs != -1) {
+                toRewrite = true;
+                Predicate pred = rewrittenLiteral.getPredicate();
+                if (kb.isTmpRelationEmpty(pred)) {
+                    toBeAdded = false;
+                    break;
+                }
+            }
+            if (!toRewrite) {
+                newBody.push_back(*itr1);
+            } else {
+                newBody.push_back(rewrittenLiteral.substitutes(subs, nsubs));
+            }
+        }
+
+        if (toBeAdded)
+            rewrittenRules.push_back(Rule(r.getHeads(), newBody));
     }
 
-    for (PredId_t m = 0; m < MAX_NPREDS; ++m) {
-        p.getAllRulesByPredicate(m)->clear();
-    }
+    p.cleanAllRules();
 
     for (std::vector<Rule>::iterator itr = rewrittenRules.begin(); itr != rewrittenRules.end();
             ++itr) {
-        p.getAllRulesByPredicate(itr->getHead().getPredicate().getId())->push_back(*itr);
+        p.addRule(*itr);
     }
 
     //Add all rules that map the new edb relations
@@ -429,8 +429,10 @@ void Materialization::rewriteLiteralInProgram(Literal & prematLiteral, Literal &
         if (newTuples) {
             std::vector<Literal> body;
             body.push_back(rewrittenLiteral);
-            Rule r(prematLiteral, body);
-            p.getAllRulesByPredicate(prematLiteral.getPredicate().getId())->push_back(r);
+            std::vector<Literal> heads;
+            heads.push_back(prematLiteral);
+            Rule r(heads, body);
+            p.addRule(r);
         }
     }
 #if DEBUG
