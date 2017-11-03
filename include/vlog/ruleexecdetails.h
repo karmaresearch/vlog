@@ -5,6 +5,14 @@
 #include <vlog/ruleexecplan.h>
 
 struct RuleExecutionDetails {
+
+    struct HeadVars {
+        std::vector<uint8_t> posEDBVarsInHead;
+        std::vector<std::vector<std::pair<uint8_t, uint8_t>>> occEDBVarsInHead;
+        std::vector<std::pair<uint8_t,
+            std::vector<std::pair<uint8_t, uint8_t>>>> edbLiteralPerHeadVars;
+    };
+
     const Rule rule;
     const size_t ruleid;
     std::vector<Literal> bodyLiterals;
@@ -15,11 +23,7 @@ struct RuleExecutionDetails {
 
     uint8_t nIDBs = 0;
     std::vector<RuleExecutionPlan> orderExecutions;
-
-    std::vector<uint8_t> posEDBVarsInHead;
-    std::vector<std::vector<std::pair<uint8_t, uint8_t>>> occEDBVarsInHead;
-    std::vector<std::pair<uint8_t,
-        std::vector<std::pair<uint8_t, uint8_t>>>> edbLiteralPerHeadVars;
+    std::vector<HeadVars> infoHeads;
 
     RuleExecutionDetails(Rule rule, size_t ruleid) : rule(rule), ruleid(ruleid) {}
 
@@ -27,25 +31,23 @@ struct RuleExecutionDetails {
 
     void calculateNVarsInHeadFromEDB();
 
-    static void checkWhetherEDBsRedundantHead(RuleExecutionPlan &plan, const Literal &head);
+    static void checkWhetherEDBsRedundantHead(RuleExecutionPlan &plan,
+            const Literal &head,
+            RuleExecutionPlan::HeadVars &hv);
 
-    static void checkFilteringStrategy(RuleExecutionPlan &outputPlan, const Literal &lastLiteral, const Literal &head);
+    static void checkFilteringStrategy(const Literal &lastLiteral,
+            const Literal &head, RuleExecutionPlan::HeadVars &hv);
 
-private:
+    private:
 
     void rearrangeLiterals(std::vector<const Literal*> &vector, const size_t idx);
 
     void groupLiteralsBySharedVariables(std::vector<uint8_t> &startVars,
-                                        std::vector<const Literal *> &set, std::vector<const Literal*> &leftelements);
+            std::vector<const Literal *> &set,
+            std::vector<const Literal*> &leftelements);
 
-    void extractAllEDBPatterns(std::vector<const Literal*> &output, const std::vector<Literal> &input);
-
-/*
-  Commented out. It is private, and does not assign! --Ceriel
-    RuleExecutionDetails operator=(const RuleExecutionDetails &other) {
-        return RuleExecutionDetails(other.rule, other.ruleid);
-    }
-*/
+    void extractAllEDBPatterns(std::vector<const Literal*> &output,
+            const std::vector<Literal> &input);
 };
 
 

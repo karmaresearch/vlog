@@ -9,126 +9,17 @@
 #include <vector>
 #include <inttypes.h>
 
-bool JoinExecutor::isJoinTwoToOneJoin(const RuleExecutionPlan &plan,
+bool JoinExecutor::isJoinTwoToOneJoin(const RuleExecutionPlan::HeadVars &hv,
         const int currentLiteral) {
-    return plan.joinCoordinates[currentLiteral].size() == 1 &&
-        plan.posFromFirst[currentLiteral].size() == 0 &&
-        plan.sizeOutputRelation[currentLiteral] == 1 &&
-        plan.posFromSecond[currentLiteral].size() == 1;
-}
-
-void _joinTwoToOne_prev(std::shared_ptr<Column> firstColumn,
-        std::shared_ptr<const FCInternalTable> table,
-        const RuleExecutionPlan &plan,
-        const int currentLiteral,
-        ResultJoinProcessor *output) {
-    //I need a sorted table for the merge join
-    std::vector<uint8_t> joinFields;
-    joinFields.push_back(plan.joinCoordinates[currentLiteral][0].second);
-    assert(plan.joinCoordinates[currentLiteral].size() == 1);
-    FCInternalTableItr *itr = table->sortBy(joinFields);
-
-    //Get the second columns. One is for joining and the other for the
-    //output.
-    uint8_t columns[2];
-    columns[0] = plan.joinCoordinates[currentLiteral][0].second; //Join col.
-    columns[1] = plan.posFromSecond[currentLiteral][0].second;
-    assert(columns[0] != columns[1]);
-    std::vector<std::shared_ptr<Column>> cols = itr->getColumn(2,
-            columns);
-    //std::shared_ptr<const Column> secondColumn = cols[0]->sort_and_unique();
-    std::shared_ptr<const Column> secondColumn = cols[0];
-
-    //Get readers
-    //std::chrono::system_clock::time_point startC = std::chrono::system_clock::now();
-    std::unique_ptr<ColumnReader> r1 = firstColumn->getReader();
-    std::unique_ptr<ColumnReader> r2 = secondColumn->getReader();
-    std::unique_ptr<ColumnReader> rout;
-
-    //std::unique_ptr<ColumnReader> rout = cols[1]->getReader();
-    //std::chrono::duration<double> d =
-    //    std::chrono::system_clock::now() - startC;
-    //LOG(INFOL) << "Time getting readers" << d.count() * 1000;
-
-    //Merge join
-    long counter1 = 1;
-    long counter2 = 1;
-    long cout = 0;
-    bool identicalJoin = true; //This flags is used to detect when all values
-    //are joining. In this case, I can just copy the output column
-
-    Term_t v1, v2, vout;
-    Term_t prevout = (Term_t) - 1;
-
-    bool r1valid = r1->hasNext();
-    if (r1valid)
-        v1 = r1->next();
-    bool r2valid = r2->hasNext();
-    if (r2valid) {
-        v2 = r2->next();
-    }
-
-    while (r1valid && r2valid) {
-        if (v1 < v2) {
-            //Move on with v1
-            r1valid = r1->hasNext();
-            if (r1valid) {
-                v1 = r1->next();
-                counter1++;
-            }
-        } else {
-            //Output all rout with the same v2
-            if (v1 == v2) {
-                cout++;
-                if (!identicalJoin) {
-                    if (vout != prevout) {
-                        LOG(DEBUGL) << "vout = " << vout;
-                        output->processResultsAtPos(0, 0, vout, false);
-                        prevout = vout;
-                    }
-                }
-            } else if (identicalJoin) {
-                identicalJoin = false;
-                rout = cols[1]->getReader();
-                for (size_t i = 0; i < counter2; ++i) {
-                    rout->hasNext(); //Should always succeed
-                    vout = rout->next();
-                    if (i < cout) {
-                        if (vout != prevout) {
-                            LOG(DEBUGL) << "vout = " << vout;
-                            output->processResultsAtPos(0, 0, vout, false);
-                        }
-                    }
-                    prevout = vout;
-                }
-            }
-
-            //Move on
-            r2valid = r2->hasNext();
-            if (r2valid) {
-                v2 = r2->next();
-                counter2++;
-                if (!identicalJoin) {
-                    //Move also the output column
-                    rout->hasNext();
-                    vout = rout->next();
-                }
-            }
-        }
-    }
-    if (identicalJoin && cout > 0) {
-        //Copy the output column in the output
-        assert(rout == NULL);
-        assert(cout == counter2);
-        LOG(DEBUGL) << "Identical join!";
-        output->addColumn(0, 0, cols[1]->sort_and_unique(), false,  true);
-    }
-    table->releaseIterator(itr);
+    return hv.joinCoordinates[currentLiteral].size() == 1 &&
+        hv.posFromFirst[currentLiteral].size() == 0 &&
+        hv.sizeOutputRelation[currentLiteral] == 1 &&
+        hv.posFromSecond[currentLiteral].size() == 1;
 }
 
 void _joinTwoToOne_cur(std::shared_ptr<Column> firstColumn,
         std::shared_ptr<const FCInternalTable> table,
-        const RuleExecutionPlan &plan,
+        const RuleExecutionPlan::HeadVars &hv,
         const int currentLiteral,
         ResultJoinProcessor *output,
         const int nthreads) {
@@ -136,8 +27,8 @@ void _joinTwoToOne_cur(std::shared_ptr<Column> firstColumn,
 
     //I need a sorted table for the merge join
     std::vector<uint8_t> joinFields;
-    joinFields.push_back(plan.joinCoordinates[currentLiteral][0].second);
-    assert(plan.joinCoordinates[currentLiteral].size() == 1);
+    joinFields.push_back(hv.joinCoordinates[currentLiteral][0].second);
+    assert(hv.joinCoordinates[currentLiteral].size() == 1);
     FCInternalTableItr *itr;
     itr = table->sortBy(joinFields, nthreads);
     LOG(DEBUGL) << "sorted joinfields";
@@ -145,8 +36,8 @@ void _joinTwoToOne_cur(std::shared_ptr<Column> firstColumn,
     //Get the second columns. One is for joining and the other for the
     //output.
     uint8_t columns[2];
-    columns[0] = plan.joinCoordinates[currentLiteral][0].second; //Join col.
-    columns[1] = plan.posFromSecond[currentLiteral][0].second;
+    columns[0] = hv.joinCoordinates[currentLiteral][0].second; //Join col.
+    columns[1] = hv.posFromSecond[currentLiteral][0].second;
     assert(columns[0] != columns[1]);
     std::vector<std::shared_ptr<Column>> cols = itr->getColumn(2,
             columns);
@@ -217,14 +108,14 @@ void JoinExecutor::joinTwoToOne(
         const size_t min,
         const size_t max,
         ResultJoinProcessor *output,
-        const RuleExecutionPlan &plan,
+        const RuleExecutionPlan::HeadVars &hv,
         const int currentLiteral,
         const int nthreads) {
 
     //Get the first column to join. I need it sorted and only the unique els.
-    assert(plan.posFromFirst[currentLiteral].size() == 0);
+    assert(hv.posFromFirst[currentLiteral].size() == 0);
     std::shared_ptr<Column> firstColumn = intermediateResults->getColumn(
-            plan.joinCoordinates[currentLiteral][0].first);
+            hv.joinCoordinates[currentLiteral][0].first);
     std::chrono::system_clock::time_point startC = std::chrono::system_clock::now();
     firstColumn = firstColumn->sort_and_unique(nthreads);
     std::chrono::duration<double> d =
@@ -239,7 +130,7 @@ void JoinExecutor::joinTwoToOne(
         LOG(DEBUGL) << "Calling _joinTwoToOne_cur";
         //Newer faster version. It is not completely tested. I leave the old
         //version commented in case we still need it.
-        _joinTwoToOne_cur(firstColumn, table, plan, currentLiteral, output,
+        _joinTwoToOne_cur(firstColumn, table, hv, currentLiteral, output,
                 nthreads);
         // _joinTwoToOne_prev(firstColumn, table, plan, currentLiteral, output);
 
@@ -249,14 +140,14 @@ void JoinExecutor::joinTwoToOne(
 
 bool JoinExecutor::isJoinVerificative(
         const FCInternalTable *t1,
-        const RuleExecutionPlan &plan,
+        const RuleExecutionPlan::HeadVars &hv,
         const int currentLiteral) {
     //All the fields in the result belong to the existing relation
-    return plan.posFromSecond[currentLiteral].size() == 0 &&
-        plan.joinCoordinates[currentLiteral].size() == 1 &&
+    return hv.posFromSecond[currentLiteral].size() == 0 &&
+        hv.joinCoordinates[currentLiteral].size() == 1 &&
         (t1->supportsDirectAccess() ||
-         (plan.posFromFirst[currentLiteral].size() > 0 && plan.posFromFirst[currentLiteral][0].second ==
-          plan.joinCoordinates[currentLiteral][0].second && currentLiteral == plan.posFromFirst.size() - 1));
+         (hv.posFromFirst[currentLiteral].size() > 0 && hv.posFromFirst[currentLiteral][0].second ==
+          hv.joinCoordinates[currentLiteral][0].second && currentLiteral == hv.posFromFirst.size() - 1));
     //The second condition is because we haven't implemented the optimized code
     //yet. The third condition is needed because we need to read the values to
     //return as output directly from memory. If the table does not support it,
@@ -270,13 +161,13 @@ void JoinExecutor::verificativeJoinOneColumnSameOutput(
         const size_t min,
         const size_t max,
         ResultJoinProcessor *output,
-        const RuleExecutionPlan &plan,
+        const RuleExecutionPlan::HeadVars &hv,
         const int currentLiteral,
         int nthreads) {
 
     //Get the first column to join. I need it sorted and only the unique els.
     std::shared_ptr<Column> firstColumn = intermediateResults->getColumn(
-            plan.joinCoordinates[currentLiteral][0].first);
+            hv.joinCoordinates[currentLiteral][0].first);
     //std::chrono::system_clock::time_point startC = std::chrono::system_clock::now();
     firstColumn = firstColumn->sort_and_unique(nthreads);
 
@@ -292,11 +183,11 @@ void JoinExecutor::verificativeJoinOneColumnSameOutput(
                 getCurrentTable();
             //I need a sorted table for the merge join
             std::vector<uint8_t> joinFields;
-            joinFields.push_back(plan.joinCoordinates[currentLiteral][0].second);
+            joinFields.push_back(hv.joinCoordinates[currentLiteral][0].second);
             FCInternalTableItr *itr = table->sortBy(joinFields, nthreads);
 
             uint8_t columns[1];
-            columns[0] = plan.joinCoordinates[currentLiteral][0].second; //Join col.
+            columns[0] = hv.joinCoordinates[currentLiteral][0].second; //Join col.
             std::vector<std::shared_ptr<Column>> cols = itr->getColumn(1,
                     columns);
             std::shared_ptr<Column> secondColumn = cols[0]->sort_and_unique(nthreads);
@@ -322,7 +213,7 @@ void JoinExecutor::verificativeJoinOneColumnSameOutput(
         while (!tableItr.isEmpty()) {
             std::shared_ptr<const FCInternalTable> table = tableItr.getCurrentTable();
             std::shared_ptr<Column> column =
-                table->getColumn(plan.joinCoordinates[currentLiteral][0].second);
+                table->getColumn(hv.joinCoordinates[currentLiteral][0].second);
             //column = column->sort_and_unique(nthreads);
             allColumns.push_back(column);
             tableItr.moveNextCount();
@@ -367,7 +258,7 @@ void JoinExecutor::verificativeJoinOneColumn(
         const size_t min,
         const size_t max,
         ResultJoinProcessor * output,
-        const RuleExecutionPlan & plan,
+        const RuleExecutionPlan::HeadVars &hv,
         const int currentLiteral,
         int nthreads) {
 
@@ -375,7 +266,7 @@ void JoinExecutor::verificativeJoinOneColumn(
 
     //1- Sort the existing results by the join field
     std::vector<uint8_t> joinField;
-    joinField.push_back(plan.joinCoordinates[currentLiteral][0].first);
+    joinField.push_back(hv.joinCoordinates[currentLiteral][0].first);
 
     FCInternalTableItr *itr = intermediateResults->sortBy(joinField, nthreads);
     const uint8_t intResSizeRow = intermediateResults->getRowSize();
@@ -422,9 +313,7 @@ void JoinExecutor::verificativeJoinOneColumn(
         //Get the column from the table. Is it EDB? Then offload the join
         //to the EDB layer
         shared_ptr<const Column> column = table->
-            getColumn(
-                    plan.joinCoordinates[currentLiteral][0]
-                    .second);
+            getColumn(hv.joinCoordinates[currentLiteral][0].second);
         LOG(DEBUGL) << "Count = " << count;
         FCInternalTableItr *itr = intermediateResults->sortBy(joinField /*, nthreads */);
         EDBLayer &layer = naiver->getEDBLayer();
@@ -617,7 +506,7 @@ void JoinExecutor::verificativeJoin(
         const size_t min,
         const size_t max,
         ResultJoinProcessor * output,
-        const RuleExecutionPlan & plan,
+        const RuleExecutionPlan::HeadVars &hv,
         const int currentLiteral,
         int nthreads) {
 
@@ -627,18 +516,18 @@ void JoinExecutor::verificativeJoin(
     //       << plan.joinCoordinates[currentLiteral][0].first;
 
     // If the index of the result in the intermediate is equal to the index of the join in the intermediate...
-    if (plan.posFromFirst[currentLiteral][0].second ==
-            plan.joinCoordinates[currentLiteral][0].first &&
-            plan.sizeOutputRelation[currentLiteral] == 1 &&
-            currentLiteral == plan.posFromFirst.size() - 1) { //The last literal checks that this is the last join we execute
+    if (hv.posFromFirst[currentLiteral][0].second ==
+            hv.joinCoordinates[currentLiteral][0].first &&
+            hv.sizeOutputRelation[currentLiteral] == 1 &&
+            currentLiteral == hv.posFromFirst.size() - 1) { //The last literal checks that this is the last join we execute
         LOG(DEBUGL) << "Verificative join one column same output";
         verificativeJoinOneColumnSameOutput(naiver, intermediateResults,
                 literal, min,
-                max, output, plan, currentLiteral, nthreads);
-    } else if (plan.joinCoordinates[currentLiteral].size() == 1) {
+                max, output, hv, currentLiteral, nthreads);
+    } else if (hv.joinCoordinates[currentLiteral].size() == 1) {
         LOG(DEBUGL) << "Verificative join one column";
         verificativeJoinOneColumn(naiver, intermediateResults, literal, min,
-                max, output, plan, currentLiteral, nthreads);
+                max, output, hv, currentLiteral, nthreads);
     } else {
         //not yet supported. Should never occur.
         throw 10;
@@ -652,20 +541,20 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
         std::vector<std::pair<uint8_t, uint8_t>> joinsCoordinates,
         ResultJoinProcessor * output, const bool lastLiteral
         , const RuleExecutionDetails & ruleDetails,
-        const RuleExecutionPlan & plan,
+        const RuleExecutionPlan::HeadVars &hv,
         int &processedTables,
         const int currentLiteral,
         const int nthreads) {
 
     //First I calculate whether the join is verificative or explorative.
-    if (JoinExecutor::isJoinVerificative(t1, plan, currentLiteral)) {
+    if (JoinExecutor::isJoinVerificative(t1, hv, currentLiteral)) {
         LOG(DEBUGL) << "Executing verificativeJoin. t1->getNRows()=" << t1->getNRows();
-        verificativeJoin(naiver, t1, literal, min, max, output, plan,
+        verificativeJoin(naiver, t1, literal, min, max, output, hv,
                 currentLiteral, nthreads);
-    } else if (JoinExecutor::isJoinTwoToOneJoin(plan, currentLiteral)) {
+    } else if (JoinExecutor::isJoinTwoToOneJoin(hv, currentLiteral)) {
         //Is the join of the like (A),(A,B)=>(A|B). Then we can speed up the merge join
         LOG(DEBUGL) << "Executing joinTwoToOne";
-        joinTwoToOne(naiver, t1, literal, min, max, output, plan,
+        joinTwoToOne(naiver, t1, literal, min, max, output, hv,
                 currentLiteral, nthreads);
     } else {
         //This code is to execute more generic joins. We do hash join if
@@ -678,7 +567,7 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
             LOG(DEBUGL) << "Executing hashjoin. t1->getNRows()=" << t1->getNRows();
             hashjoin(t1, naiver, outputLiteral, literal, min, max, filterValueVars,
                     joinsCoordinates, output,
-                    lastLiteral, ruleDetails, plan, processedTables, nthreads);
+                    lastLiteral, ruleDetails, hv, processedTables, nthreads);
 #ifdef DEBUG
             output->checkSizes();
 #endif
@@ -1004,14 +893,19 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
         const size_t min, const size_t max,
         const std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
         std::vector<std::pair<uint8_t, uint8_t>> joinsCoordinates,
-        ResultJoinProcessor * output, const bool lastLiteral,
-        const RuleExecutionDetails & ruleDetails, const RuleExecutionPlan & plan,
-        int &processedTables, int nthreads) {
+        ResultJoinProcessor * output,
+        const int lastLiteral,
+        const RuleExecutionDetails & ruleDetails,
+        const RuleExecutionPlan::HeadVars &hv,
+        int &processedTables,
+        int nthreads) {
 
-    const bool literalSharesVarsWithHead = plan.lastLiteralSharesWithHead;
+    bool literalSharesVarsWithHead;
     std::vector<uint8_t> lastPosToSort;
-    if (lastLiteral)
-        lastPosToSort = plan.lastSorting;
+    if (lastLiteral != -1) {
+        lastPosToSort = hv.lastSorting;
+        literalSharesVarsWithHead = hv.lastLiteralSharesWithHead; 
+    }
 
     JoinHashMap map;
     DoubleJoinHashMap doublemap;
@@ -1045,7 +939,7 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
                 keyField = joinsCoordinates[0].first;
 
             //Filter equal value in the join and head position
-            bool filterRowsInhashMap = lastLiteral && plan.filterLastHashMap;
+            bool filterRowsInhashMap = lastLiteral && hv.filterLastHashMap;
             uint8_t filterRowsPosJoin, filterRowsPosOther = 0;
             if (filterRowsInhashMap) {
                 filterRowsPosJoin = joinsCoordinates[0].first;

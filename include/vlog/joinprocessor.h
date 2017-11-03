@@ -163,10 +163,10 @@ class JoinExecutor {
 
         static bool isJoinVerificative(
                 const FCInternalTable *t1,
-                const RuleExecutionPlan &plan,
+                const RuleExecutionPlan::HeadVars &vars,
                 const int currentLiteral);
 
-        static bool isJoinTwoToOneJoin(const RuleExecutionPlan &plan,
+        static bool isJoinTwoToOneJoin(const RuleExecutionPlan::HeadVars &hv,
                 const int currentLiteral);
 
         static void verificativeJoin(
@@ -176,7 +176,7 @@ class JoinExecutor {
                 const size_t min,
                 const size_t max,
                 ResultJoinProcessor *output,
-                const RuleExecutionPlan &plan,
+                const RuleExecutionPlan::HeadVars &hv,
                 const int currentLiteral,
                 int nthreads);
 
@@ -187,7 +187,7 @@ class JoinExecutor {
                 const size_t min,
                 const size_t max,
                 ResultJoinProcessor *output,
-                const RuleExecutionPlan &plan,
+                const RuleExecutionPlan::HeadVars &hv,
                 const int currentLiteral,
                 int nthreads);
 
@@ -198,7 +198,7 @@ class JoinExecutor {
                 const size_t min,
                 const size_t max,
                 ResultJoinProcessor *output,
-                const RuleExecutionPlan &plan,
+                const RuleExecutionPlan::HeadVars &hv,
                 const int currentLiteral,
                 int nthreads);
 
@@ -209,7 +209,7 @@ class JoinExecutor {
                 const size_t min,
                 const size_t max,
                 ResultJoinProcessor *output,
-                const RuleExecutionPlan &plan,
+                const RuleExecutionPlan::HeadVars &hv,
                 const int currentLiteral,
                 const int nthreads);
 
@@ -289,13 +289,14 @@ class JoinExecutor {
                 const Term_t *valBlocks,
                 Output * output);
 
-        static void join(SemiNaiver *naiver, const FCInternalTable * t1, const Literal *outputLiteral, const Literal &literal,
+        static void join(SemiNaiver *naiver, const FCInternalTable * t1,
+                const Literal *outputLiteral, const Literal &literal,
                 const size_t min, const size_t max,
                 const std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
                 std::vector<std::pair<uint8_t, uint8_t>> joinsCoordinates,
                 ResultJoinProcessor * output, const bool lastLiteral,
                 const RuleExecutionDetails &ruleDetails,
-                const RuleExecutionPlan &plan, int &processedTables,
+                const RuleExecutionPlan::HeadVars &hv, int &processedTables,
                 const int currentLiteral,
                 const int nthreads);
 
@@ -306,12 +307,14 @@ class JoinExecutor {
                 std::vector<std::pair<uint8_t, uint8_t>> joinsCoordinates,
                 ResultJoinProcessor * output, int nthreads);
 
-        static void hashjoin(const FCInternalTable * t1, SemiNaiver *naiver, const Literal *outputLiteral,
+        static void hashjoin(const FCInternalTable * t1,
+                SemiNaiver *naiver, const Literal *outputLiteral,
                 const Literal &literal, const size_t min, const size_t max,
                 const std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
                 std::vector<std::pair<uint8_t, uint8_t>> joinsCoordinates,
-                ResultJoinProcessor * output, const bool lastLiteral,
-                const RuleExecutionDetails &ruleDetails, const RuleExecutionPlan &plan,
+                ResultJoinProcessor *output, const int lastLiteral,
+                const RuleExecutionDetails &ruleDetails,
+                const RuleExecutionPlan::HeadVars &hv,
                 int &processedTables, int nthreads);
 
         static int cmp(const Term_t *r1, const Term_t *r2, const uint8_t s);

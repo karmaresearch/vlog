@@ -670,7 +670,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
 
 void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
         const std::vector<size_t> &cards,
-        const Literal &headLiteral) {
+        const Literal &headLiteral, int posHeadLiteral) {
     //Reorder the atoms in terms of cardinality.
     std::vector<std::pair<uint8_t, size_t>> positionCards;
     for (uint8_t i = 0; i < cards.size(); ++i) {
@@ -678,25 +678,6 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
         positionCards.push_back(std::make_pair(i, cards[i]));
     }
     sort(positionCards.begin(), positionCards.end(), _sortCards);
-
-    /*
-    // Now, make sure that the first IDB literal is magic (if present).
-    for (uint8_t i = 0; i < cards.size(); ++i) {
-    if (plan.plan[positionCards[i].first]->getPredicate().getType() == IDB) {
-    for (uint8_t j = i + 1; j < cards.size(); j++) {
-    if (plan.plan[positionCards[j].first]->getPredicate().isMagic()) {
-    std::pair<uint8_t, size_t> temp = positionCards[j];
-    for (uint8_t k = j; k > i; k--) {
-    positionCards[k] = positionCards[k-1];
-    }
-    positionCards[i] = temp;
-    break;
-    }
-    }
-    break;
-    }
-    }
-    */
 
     //Ensure there are always variables
     std::vector<std::pair<uint8_t, size_t>> adaptedPosCards;
@@ -749,7 +730,7 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
             LOG(DEBUGL) << "Reordered plan is " << (int)adaptedPosCards[i].first;
             orderLiterals.push_back(adaptedPosCards[i].first);
         }
-        plan = plan.reorder(orderLiterals, headLiteral);
+        plan = plan.reorder(orderLiterals, headLiteral, posHeadLiteral);
     }
 }
 
@@ -781,7 +762,22 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         const uint32_t iteration,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
-    Literal headLiteral = rule.getFirstHead();
+    bool answer = true;
+    std::vector<Literal> heads = rule.getHeads();
+    for (int i = 0; i < heads.size(); ++i) {
+        Literal head = heads[i];
+        answer &= executeRule(ruleDetails, head, i, iteration, finalResultContainer);
+    }
+    return answer;
+}
+
+
+bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
+        Literal &headLiteral,
+        int posHeadLiteral,
+        const uint32_t iteration,
+        std::vector<ResultJoinProcessor*> *finalResultContainer) {
+    Rule rule = ruleDetails.rule;
     PredId_t idHeadPredicate = headLiteral.getPredicate().getId();
 #ifdef WEBINTERFACE
     // Cannot run multithreaded in this case.
@@ -843,13 +839,13 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         }
 
         //Reorder the list of atoms depending on the observed cardinalities
-        reorderPlan(plan, cards, headLiteral);
+        reorderPlan(plan, cards, headLiteral, posHeadLiteral);
 
-        if (plan.hasCartesian()) {
+        /*if (plan.hasCartesian()) {
             //Jacopo for Ceriel: We cannot skip combinations of executions. If the plan has a cartesian product, then either we choose another order or we must execute the plan
             //LOG(WARNL) << "Skipping plan that has a cartesian product";
             //continue;
-        }
+        }*/
 
         //#ifdef DEBUG
         std::string listLiterals = "EXEC COMB: ";
@@ -873,10 +869,11 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             //This data structure is used to filter out rows where different columns
             //lead to the same derivation
             std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars = NULL;
-            if (plan.matches.size() > 0) {
-                for (int i = 0; i < plan.matches.size(); ++i) {
-                    if (plan.matches[i].posLiteralInOrder == optimalOrderIdx) {
-                        filterValueVars = &plan.matches[i].matches;
+            if (plan.infoHeads[posHeadLiteral].matches.size() > 0) {
+                for (int i = 0; i < plan.infoHeads[posHeadLiteral].matches.size(); ++i) {
+                    if (plan.infoHeads[posHeadLiteral].matches[i].posLiteralInOrder
+                            == optimalOrderIdx) {
+                        filterValueVars = &plan.infoHeads[posHeadLiteral].matches[i].matches;
                     }
                 }
             }
@@ -886,14 +883,14 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             const bool lastLiteral = optimalOrderIdx == (nBodyLiterals - 1);
             if (!lastLiteral) {
                 joinOutput = new InterTableJoinProcessor(
-                        plan.sizeOutputRelation[optimalOrderIdx],
-                        plan.posFromFirst[optimalOrderIdx],
-                        plan.posFromSecond[optimalOrderIdx],
+                        plan.infoHeads[posHeadLiteral].sizeOutputRelation[optimalOrderIdx],
+                        plan.infoHeads[posHeadLiteral].posFromFirst[optimalOrderIdx],
+                        plan.infoHeads[posHeadLiteral].posFromSecond[optimalOrderIdx],
                         ! multithreaded ? -1 : nthreads);
             } else {
                 joinOutput = new FinalTableJoinProcessor(
-                        plan.posFromFirst[optimalOrderIdx],
-                        plan.posFromSecond[optimalOrderIdx],
+                        plan.infoHeads[posHeadLiteral].posFromFirst[optimalOrderIdx],
+                        plan.infoHeads[posHeadLiteral].posFromSecond[optimalOrderIdx],
                         listDerivations,
                         endTable,
                         headLiteral, &ruleDetails,
@@ -932,8 +929,11 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 JoinExecutor::join(this, currentResults.get(),
                         lastLiteral ? &headLiteral : NULL,
                         *bodyLiteral, min, max, filterValueVars,
-                        plan.joinCoordinates[optimalOrderIdx], joinOutput,
-                        lastLiteral, ruleDetails, plan, processedTables,
+                        plan.infoHeads[posHeadLiteral].joinCoordinates[optimalOrderIdx],
+                        joinOutput,
+                        lastLiteral, ruleDetails,
+                        plan.infoHeads[posHeadLiteral],
+                        processedTables,
                         optimalOrderIdx,
                         nthreads);
                 std::chrono::duration<double> d =
