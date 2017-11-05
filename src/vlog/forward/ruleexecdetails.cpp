@@ -184,7 +184,8 @@ void RuleExecutionDetails::calculateNVarsInHeadFromEDB() {
                 //Check if this variable appears on some edb terms
                 std::vector<std::pair<uint8_t, uint8_t>> edbLiterals;
                 uint8_t idxLiteral = 0;
-                for (std::vector<Literal>::iterator itr = bodyLiterals.begin(); itr != bodyLiterals.end();
+                for (std::vector<Literal>::iterator itr = bodyLiterals.begin();
+                        itr != bodyLiterals.end();
                         ++itr) {
                     if (itr->getPredicate().getType() == EDB) {
                         for (uint8_t j = 0; j < itr->getTupleSize(); ++j) {
