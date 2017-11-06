@@ -1,5 +1,8 @@
 #include <vlog/ruleexecdetails.h>
 
+#include <set>
+#include <map>
+
 void RuleExecutionDetails::rearrangeLiterals(std::vector<const Literal*> &vector, const size_t idx) {
     //First go through all the elements before, to make sure that there is always at least one shared variable.
     std::vector<const Literal*> subset;
@@ -210,7 +213,7 @@ void RuleExecutionDetails::calculateNVarsInHeadFromEDB() {
         //Group the occurrences by EDB literal
         for (uint8_t idxVar = 0; idxVar < hv.posEDBVarsInHead.size(); ++idxVar) {
             uint8_t var = hv.posEDBVarsInHead[idxVar];
-            for (uint8_t idxPattern = 0; 
+            for (uint8_t idxPattern = 0;
                     idxPattern < hv.occEDBVarsInHead[idxVar].size();
                     ++idxPattern) {
                 std::pair<uint8_t, uint8_t> patternAndPos = hv.occEDBVarsInHead[idxVar][idxPattern];
@@ -330,6 +333,33 @@ void RuleExecutionDetails::createExecutionPlans() {
     }
     orderExecutions.clear();
 
+    //Calculate the dependencies of the existential variables to the variables in the body
+    std::map<uint8_t, std::set<uint8_t>> dependenciesExtVars_tmp;
+    auto extvars = rule.getVarsNotInBody();
+    auto othervars = rule.getVarsInBody();
+    for(auto head : rule.getHeads()) {
+        auto allvars = head.getAllVars();
+        for(auto v : allvars) {
+            bool isext = false;
+            for(auto extvar : extvars)
+                if (extvar == v) {
+                    isext = true;
+                    break;
+                }
+            if (isext) {
+                for (auto othervar : othervars) {
+                    dependenciesExtVars_tmp[v].insert(othervar);
+                }
+            }
+        }
+    }
+    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars;
+    for(auto pair : dependenciesExtVars_tmp) {
+        for(auto el : pair.second) {
+            dependenciesExtVars[pair.first].push_back(el);
+        }
+    }
+
     if (nIDBs > 0) {
         //Collect the IDB predicates
         std::vector<uint8_t> posMagicAtoms;
@@ -353,6 +383,7 @@ void RuleExecutionDetails::createExecutionPlans() {
                 itr != posIdbLiterals.end();
                 ++itr) {
             RuleExecutionPlan p;
+            p.dependenciesExtVars = dependenciesExtVars;
             size_t idx = 0;
 
             if (posMagicAtoms.size() > 0) {
@@ -385,10 +416,9 @@ void RuleExecutionDetails::createExecutionPlans() {
                         *p.plan[p.plan.size() - 1], h, hv);
 
                 RuleExecutionDetails::checkWhetherEDBsRedundantHead(p, h , hv);
-
                 p.checkIfFilteringHashMapIsPossible(h, hv);
-
                 p.calculateJoinsCoordinates(h, hv);
+
                 p.infoHeads.push_back(hv);
             }
 
@@ -416,6 +446,7 @@ void RuleExecutionDetails::createExecutionPlans() {
         //Create a single plan. Here they are all EDBs. So the ranges are all the same
         std::vector<const Literal*> v;
         RuleExecutionPlan p;
+        p.dependenciesExtVars = dependenciesExtVars;
         for (std::vector<Literal>::const_iterator itr = bodyLiterals.begin();
                 itr != bodyLiterals.end();
                 ++itr) {

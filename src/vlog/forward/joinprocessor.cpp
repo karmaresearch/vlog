@@ -943,7 +943,7 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
             uint8_t filterRowsPosJoin, filterRowsPosOther = 0;
             if (filterRowsInhashMap) {
                 filterRowsPosJoin = joinsCoordinates[0].first;
-                FinalTableJoinProcessor* o = (FinalTableJoinProcessor*)output;
+                FinalRuleProcessor* o = (FinalRuleProcessor*)output;
                 assert(o->getNCopyFromFirst() == 1);
                 filterRowsPosOther = o->getPosFromFirst()[0].second;
                 if (filterRowsPosJoin == filterRowsPosOther) {

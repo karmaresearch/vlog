@@ -517,7 +517,7 @@ Rule Rule::normalizeVars() const {
             ++itr) {
         newBody.push_back(itr->substitutes(&subs[0], subs.size()));
     }
-    return Rule(newheads, newBody);
+    return Rule(ruleId, newheads, newBody);
 }
 
 Rule Rule::createAdornment(uint8_t headAdornment) const {
@@ -591,7 +591,7 @@ Rule Rule::createAdornment(uint8_t headAdornment) const {
     }
     std::vector<Literal> newHeads;
     newHeads.push_back(newHead);
-    return Rule(newHeads, newBody);
+    return Rule(ruleId, newHeads, newBody);
 }
 
 std::string Rule::tostring() const {
@@ -623,8 +623,33 @@ std::vector<uint8_t> Rule::getVarsNotInBody() const {
     return out;
 }
 
+std::vector<uint8_t> Rule::getVarsInBody() const {
+    //Check if every variable in the head appears in the body
+    std::vector<uint8_t> out;
+    for(const auto& head : heads) {
+        for(auto var : head.getAllVars()) {
+            //Does var appear in the body?
+            bool ok = false;
+            for(auto& bodyLit : body) {
+                auto allvars = bodyLit.getAllVars();
+                for(auto v : allvars) {
+                    if (v == var) {
+                        ok = true; //found it!
+                        break;
+                    }
+                }
+                if (ok)
+                    break;
+            }
+            if (ok)
+                out.push_back(var);
+        }
+    }
+    return out;
+}
+
 bool Rule::isExistential() const {
-    return !getVarsNotInBody().empty();
+    return existential;
 }
 
 std::string Rule::tostring(Program * program, EDBLayer *db) const {
@@ -869,6 +894,14 @@ void Program::addRule(Rule &rule) {
     allrules.push_back(rule);
 }
 
+void Program::addRule(std::vector<Literal> heads, std::vector<Literal> body) {
+    Rule rule(allrules.size(), heads, body);
+    for (const auto &head : heads) {
+        rules[head.getPredicate().getId()].push_back(allrules.size());
+    }
+    allrules.push_back(rule);
+}
+
 void Program::addAllRules(std::vector<Rule> &rules) {
     for (auto &r : rules) {
         addRule(r);
@@ -941,7 +974,7 @@ void Program::parseRule(std::string rule) {
         }
 
         //Add the rule
-        Rule r = Rule(lHeads, lBody);
+        Rule r = Rule(allrules.size(), lHeads, lBody);
         addRule(r);
     } catch (int e) {
         LOG(ERRORL) << "Failed in parsing rule " << rule;

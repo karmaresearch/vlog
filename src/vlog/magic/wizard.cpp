@@ -114,7 +114,7 @@ std::shared_ptr<Program> Wizard::doMagic(const Literal &query,
             assert(newBody.size() > 0);
             std::vector<Literal> heads;
             heads.push_back(head);
-            Rule r(heads, newBody);
+            Rule r(newRules.size(), heads, newBody);
             // LOG(DEBUGL) << "Adding rule " << r.tostring();
             newRules.push_back(r.normalizeVars());
         }
@@ -154,7 +154,8 @@ std::shared_ptr<Program> Wizard::doMagic(const Literal &query,
                 } else {
                     std::vector<Literal> newheads;
                     newheads.push_back(newHead);
-                    Rule r(newheads, newBody);
+                    Rule r(newRules.size() + additionalRules.size(), 
+                            newheads, newBody);
                     Rule normalized_r(r.normalizeVars());
                     std::string s = normalized_r.tostring();
                     bool found = false;

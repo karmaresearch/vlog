@@ -50,7 +50,7 @@ RuleExecutionPlan RuleExecutionPlan::reorder(std::vector<uint8_t> &order,
 
     HeadVars hv;
     RuleExecutionDetails::checkFilteringStrategy(*newPlan.plan[order.size() - 1],
-         headLiteral, hv);
+            headLiteral, hv);
     RuleExecutionDetails::checkWhetherEDBsRedundantHead(newPlan, headLiteral, hv);
     newPlan.checkIfFilteringHashMapIsPossible(headLiteral, hv);
     newPlan.calculateJoinsCoordinates(headLiteral, hv);
@@ -71,21 +71,42 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const Literal &headLiteral,
         std::vector<std::pair<uint8_t, uint8_t>> ps;
         std::vector<uint8_t> newExistingVariables;
 
-        //Should I copy all the previous variables?
+        //Should I copy all the previous variables
         if (i == plan.size() - 1) {
+            std::map<uint8_t, std::vector<uint8_t>> extvars2pos;
+
             //No need to store any new variable. Just copy the old ones in the head
             for (uint8_t headPos = 0; headPos < headLiteral.getTupleSize(); ++headPos) {
                 const VTerm headTerm = headLiteral.getTermAtPos(headPos);
                 if (headTerm.isVariable()) {
+                    bool found = false;
                     for (uint8_t m = 0; m < existingVariables.size(); ++m) {
                         if (existingVariables[m] == headTerm.getId()) {
-                            // LOG(DEBUGL) << "Adding [" << (int) headPos << ", " << (int) m << "] to pf";
+                            found = true;
                             pf.push_back(make_pair(headPos, m));
                             break;
                         }
                     }
+                    if (!found) {
+                        //The variable is existential
+                        if (!dependenciesExtVars.count(headTerm.getId())) {
+                            LOG(ERRORL) << "An existential variable is not found! Should not happen...";
+                            throw 10;
+                        } else {
+                            std::vector<uint8_t> posOfDependenciesInBody;
+                            for(auto var : dependenciesExtVars[headTerm.getId()]) {
+                                for(uint8_t i = 0; i < existingVariables.size(); ++i) {
+                                    if (existingVariables[i] == var) {
+                                        posOfDependenciesInBody.push_back(i);
+                                    }
+                                }
+                            }
+                            extvars2pos[headTerm.getId()] = posOfDependenciesInBody;
+                        }
+                    }
                 }
             }
+            output.extvars2posFromSecond = extvars2pos;
         } else {
             //copy only the ones that will be used later on
             for (uint8_t j = 0; j < existingVariables.size(); ++j) {
@@ -118,7 +139,6 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const Literal &headLiteral,
                 }
             }
         }
-
 
         //Put in join coordinates between the previous and the current literal
         uint8_t litVars = 0;
@@ -207,7 +227,6 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const Literal &headLiteral,
                 litVars++;
             }
         }
-
 
         if (i == plan.size() - 1) {
             output.sizeOutputRelation.push_back((uint8_t) headLiteral.getTupleSize());

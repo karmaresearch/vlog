@@ -278,19 +278,25 @@ class Literal {
 
 class Rule {
     private:
+        const uint32_t ruleId;
         const std::vector<Literal> heads;
         const std::vector<Literal> body;
         const bool _isRecursive;
+        const bool existential;
 
-        static bool checkRecursion(const std::vector<Literal> &head, const std::vector<Literal> &body);
+        static bool checkRecursion(const std::vector<Literal> &head,
+                const std::vector<Literal> &body);
 
     public:
         bool doesVarAppearsInFollowingPatterns(int startingPattern, uint8_t value) const;
 
-        Rule(const std::vector<Literal> heads, std::vector<Literal> body) :
+        Rule(uint32_t ruleId, const std::vector<Literal> heads,
+                std::vector<Literal> body) :
+            ruleId(ruleId),
             heads(heads),
             body(body),
-            _isRecursive(checkRecursion(heads, body)) {
+            _isRecursive(checkRecursion(heads, body)),
+            existential(!getVarsNotInBody().empty()) {
                 checkRule();
             }
 
@@ -298,6 +304,10 @@ class Rule {
 
         bool isRecursive() const {
             return this->_isRecursive;
+        }
+
+        uint32_t getId() const {
+            return ruleId;
         }
 
         const std::vector<Literal> &getHeads() const {
@@ -313,6 +323,8 @@ class Rule {
         bool isExistential() const;
 
         std::vector<uint8_t> getVarsNotInBody() const;
+
+        std::vector<uint8_t> getVarsInBody() const;
 
         const std::vector<Literal> &getBody() const {
             return body;
@@ -429,6 +441,8 @@ class Program {
         void cleanAllRules();
 
         void addRule(Rule &rule);
+
+        void addRule(std::vector<Literal> heads, std::vector<Literal> body);
 
         void addAllRules(std::vector<Rule> &rules);
 

@@ -204,6 +204,8 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
 #endif
     listDerivations.clear();
 
+    chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt((uint64_t)1 << 32));
+
     //Prepare for the execution
 #if DEBUG
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
@@ -224,7 +226,8 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
             LOG(DEBUGL) << "-->" << plan;
         }
     }
-    for (std::vector<RuleExecutionDetails>::iterator itr = edbRuleset.begin(); itr != edbRuleset.end();
+    for (std::vector<RuleExecutionDetails>::iterator itr = edbRuleset.begin();
+            itr != edbRuleset.end();
             ++itr) {
         itr->createExecutionPlans();
     }
@@ -537,7 +540,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
             endTable->getSizeRow() == literalItr.getCurrentTable()->getRowSize() &&
             headLiteral.sameVarSequenceAs(*bodyLiteral) &&
             bodyLiteral->getTupleSize() == headLiteral.getTupleSize() &&
-            ((FinalTableJoinProcessor*)joinOutput)->shouldAddToEndTable()) {
+            ((FinalRuleProcessor*)joinOutput)->shouldAddToEndTable()) {
         while (!literalItr.isEmpty()) {
             std::shared_ptr<const FCInternalTable> table =
                 literalItr.getCurrentTable();
@@ -779,6 +782,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
     PredId_t idHeadPredicate = headLiteral.getPredicate().getId();
+
 #ifdef WEBINTERFACE
     // Cannot run multithreaded in this case.
     currentRule = rule.tostring(program, &layer);
@@ -787,7 +791,6 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 
     LOG(DEBUGL) << "Iteration: " << iteration <<
         " Rule: " << rule.tostring(program, &layer);
-
 
     //Set up timers
     const std::chrono::system_clock::time_point startRule = std::chrono::system_clock::now();
@@ -799,7 +802,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     FCTable *endTable = getTable(idHeadPredicate, headLiteral.
             getPredicate().getCardinality());
 
-    if (headLiteral.getNVars() == 0 && ! endTable->isEmpty()) {
+    if (headLiteral.getNVars() == 0 && !endTable->isEmpty()) {
         LOG(DEBUGL) << "No variables and endtable not empty, so cannot find new derivations";
         return false;
     }
@@ -841,13 +844,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         //Reorder the list of atoms depending on the observed cardinalities
         reorderPlan(plan, cards, headLiteral, posHeadLiteral);
 
-        /*if (plan.hasCartesian()) {
-            //Jacopo for Ceriel: We cannot skip combinations of executions. If the plan has a cartesian product, then either we choose another order or we must execute the plan
-            //LOG(WARNL) << "Skipping plan that has a cartesian product";
-            //continue;
-        }*/
-
-        //#ifdef DEBUG
+#ifdef DEBUG
         std::string listLiterals = "EXEC COMB: ";
         for (std::vector<const Literal*>::iterator itr = plan.plan.begin();
                 itr != plan.plan.end();
@@ -855,7 +852,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             listLiterals += (*itr)->tostring(program, &layer);
         }
         LOG(DEBUGL) << listLiterals;
-        //#endif
+#endif
 
         /*******************************************************************/
 
@@ -888,15 +885,28 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                         plan.infoHeads[posHeadLiteral].posFromSecond[optimalOrderIdx],
                         ! multithreaded ? -1 : nthreads);
             } else {
-                joinOutput = new FinalTableJoinProcessor(
-                        plan.infoHeads[posHeadLiteral].posFromFirst[optimalOrderIdx],
-                        plan.infoHeads[posHeadLiteral].posFromSecond[optimalOrderIdx],
-                        listDerivations,
-                        endTable,
-                        headLiteral, &ruleDetails,
-                        (uint8_t) orderExecution, iteration,
-                        finalResultContainer == NULL,
-                        !multithreaded ? -1 : nthreads);
+                if (ruleDetails.rule.isExistential()) {
+                    joinOutput = new ExistentialRuleProcessor(
+                            plan.infoHeads[posHeadLiteral].posFromFirst[optimalOrderIdx],
+                            plan.infoHeads[posHeadLiteral].posFromSecond[optimalOrderIdx],
+                            listDerivations,
+                            endTable,
+                            headLiteral, &ruleDetails,
+                            (uint8_t) orderExecution, iteration,
+                            finalResultContainer == NULL,
+                            !multithreaded ? -1 : nthreads,
+                            chaseMgmt);
+                } else {
+                    joinOutput = new FinalRuleProcessor(
+                            plan.infoHeads[posHeadLiteral].posFromFirst[optimalOrderIdx],
+                            plan.infoHeads[posHeadLiteral].posFromSecond[optimalOrderIdx],
+                            listDerivations,
+                            endTable,
+                            headLiteral, &ruleDetails,
+                            (uint8_t) orderExecution, iteration,
+                            finalResultContainer == NULL,
+                            !multithreaded ? -1 : nthreads);
+                }
             }
             //END --  Determine where to put the results of the query
 
@@ -956,37 +966,6 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             //Prepare for the processing of the next atom (if any)
             if (!lastLiteral && ! first) {
                 currentResults = ((InterTableJoinProcessor*)joinOutput)->getTable();
-#if 0
-                if (currentResults == NULL) {
-                    LOG(DEBUGL) << "NULL currentResults";
-                } else {
-                    char buffer[16384];
-                    LOG(DEBUGL) << "Current results:";
-                    FCInternalTableItr *test = currentResults->getIterator();
-                    int ncols = test->getNColumns();
-                    while (test->hasNext()) {
-                        test->next();
-                        std::string s = "";
-                        for (int i = 0; i < ncols; i++) {
-                            Term_t t = test->getCurrentValue(i);
-                            if (i > 0) {
-                                s += ", ";
-                            }
-                            if (layer.getDictText(t, buffer)) {
-                                s += string(buffer);
-                            } else {
-                                std::string str = program->getFromAdditional(t);
-                                if (str == std::string("")) {
-                                    str = std::to_string(t);
-                                }
-                                s += str;
-                            }
-                        }
-                        LOG(DEBUGL) << "Tuple: <" << s << ">";
-                    }
-                    currentResults->releaseIterator(test);
-                }
-#endif
             }
             if (lastLiteral && finalResultContainer) {
                 finalResultContainer->push_back(joinOutput);
@@ -1051,31 +1030,6 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             processedTables << ", Total runtime " << stream.str()
             << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
             durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
-
-#ifdef DEBUG
-        //Print the derivation
-        /*FCIterator itr = endTable->read(iteration);
-          while (!itr.isEmpty()) {
-          std::shared_ptr<const FCInternalTable> table = itr.getCurrentTable();
-          FCInternalTableItr *itrt = table->getIterator();
-          size_t cols = itrt->getNColumns();
-          cout << "*** CONTENT DERIVATION ***" << endl;
-          while (itrt->hasNext()) {
-          itrt->next();
-          string row = "";
-          for(int j = 0; j < cols; ++j) {
-          char support[MAX_TERM_SIZE];
-          layer.getDictText(itrt->getCurrentValue(j), support);
-          row += string(support) + " ";
-          }
-          cout << row << endl;
-          }
-          cout << "*** END DERIVATION ***" << endl;
-          table->releaseIterator(itrt);
-          itr.moveNextCount();
-          }*/
-#endif
-
     } else {
         LOG(DEBUGL) << "Iteration " << iteration << ". Rule derived NO new tuples. Combinations " << orderExecution << ", Processed IDB Tables=" <<
             processedTables << ", Total runtime " << stream.str()
@@ -1114,10 +1068,6 @@ size_t SemiNaiver::estimateCardTable(const Literal &literal,
         size_t estimate = table->estimateCardinality(literal, minIteration, maxIteration);
         if (estimate == 0) {
             return 0;
-            /*
-               } else if (literal.getPredicate().isMagic()) {
-               return 1;
-               */
         }
         return estimate;
         // Was: return table->estimateCardInRange(minIteration, maxIteration);

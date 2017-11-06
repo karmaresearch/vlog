@@ -6,6 +6,8 @@
 #include <vlog/fctable.h>
 #include <vlog/ruleexecplan.h>
 #include <vlog/ruleexecdetails.h>
+#include <vlog/chasemgmt.h>
+
 #include <trident/model/table.h>
 
 #include <vector>
@@ -45,6 +47,7 @@ class SemiNaiver {
         bool opt_intersect;
         bool opt_filtering;
         bool multithreaded;
+        std::shared_ptr<ChaseMgmt> chaseMgmt;
 
         std::chrono::system_clock::time_point startTime;
         bool running;
@@ -61,10 +64,14 @@ class SemiNaiver {
 #endif
 
     private:
-        FCIterator getTableFromIDBLayer(const Literal & literal, const size_t minIteration, TableFilterer *filter);
+        FCIterator getTableFromIDBLayer(const Literal & literal,
+                const size_t minIteration,
+                TableFilterer *filter);
 
-        FCIterator getTableFromIDBLayer(const Literal & literal, const size_t minIteration,
-                const size_t maxIteration, TableFilterer *filter);
+        FCIterator getTableFromIDBLayer(const Literal & literal,
+                const size_t minIteration,
+                const size_t maxIteration,
+                TableFilterer *filter);
 
         size_t countAllIDBs();
 

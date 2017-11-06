@@ -402,7 +402,7 @@ void Materialization::rewriteLiteralInProgram(Literal & prematLiteral, Literal &
         }
 
         if (toBeAdded)
-            rewrittenRules.push_back(Rule(r.getHeads(), newBody));
+            rewrittenRules.push_back(Rule(r.getId(), r.getHeads(), newBody));
     }
 
     p.cleanAllRules();
@@ -431,8 +431,7 @@ void Materialization::rewriteLiteralInProgram(Literal & prematLiteral, Literal &
             body.push_back(rewrittenLiteral);
             std::vector<Literal> heads;
             heads.push_back(prematLiteral);
-            Rule r(heads, body);
-            p.addRule(r);
+            p.addRule(heads, body);
         }
     }
 #if DEBUG

@@ -3,6 +3,7 @@
 
 #include <vlog/concepts.h>
 #include <vector>
+#include <map>
 
 struct RuleExecutionPlan {
 
@@ -38,6 +39,11 @@ struct RuleExecutionPlan {
         std::vector<std::vector<std::pair<uint8_t, uint8_t>>> posFromFirst;
         std::vector<std::vector<std::pair<uint8_t, uint8_t>>> posFromSecond;
 
+        //If the head contains unbound variables, I assume they are existentially
+        //quantified. This map keeps trace, for each of such variable, whether they are linked to
+        //any variable in the body. I need it to construct function terms.
+        std::map<uint8_t, std::vector<uint8_t>> extvars2posFromSecond;
+
         //This variable is used to check whether we can filter out entries in the hashmap.
         //It is used if the rule might trigger derivation that is equal to the last literal
         bool filterLastHashMap;
@@ -47,12 +53,15 @@ struct RuleExecutionPlan {
     std::vector<std::pair<size_t, size_t>> ranges;
 
     std::vector<HeadVars> infoHeads;
+    //Created by ruleexecdetails::createExectutionPlan
+    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars;
 
     //Check if we can apply filtering HashMap. See comment above
     void checkIfFilteringHashMapIsPossible(const Literal &head,
             HeadVars &output);
 
-    void calculateJoinsCoordinates(const Literal &headLiteral, HeadVars &output);
+    void calculateJoinsCoordinates(const Literal &headLiteral,
+            HeadVars &output);
 
     RuleExecutionPlan reorder(std::vector<uint8_t> &order,
             const Literal &headLiteral, int posHead) const;

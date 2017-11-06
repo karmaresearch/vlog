@@ -47,8 +47,8 @@ void SemiNaiverThreaded::executeUntilSaturation(std::vector<StatIteration> &cost
 }
 
 bool sortByIteration(ResultJoinProcessor *p1, ResultJoinProcessor *p2) {
-    return ((FinalTableJoinProcessor*)p1)->getIteration() <
-        ((FinalTableJoinProcessor*)p2)->getIteration();
+    return ((FinalRuleProcessor*)p1)->getIteration() <
+        ((FinalRuleProcessor*)p2)->getIteration();
 }
 
 bool SemiNaiverThreaded::doGlobalConsolidation(
@@ -62,15 +62,15 @@ bool SemiNaiverThreaded::doGlobalConsolidation(
             sortByIteration);
 
     bool response = false;
-    std::map<PredId_t, std::vector<FinalTableJoinProcessor*>> allDersByPred;
+    std::map<PredId_t, std::vector<FinalRuleProcessor*>> allDersByPred;
     for (const auto &el : data.getTmpDerivations()) {
-        FinalTableJoinProcessor *fel = (FinalTableJoinProcessor*)el;
+        FinalRuleProcessor *fel = (FinalRuleProcessor*)el;
         if (!el->isEmpty()) {
             PredId_t pid = fel->getLiteral().getPredicate().getId();
             if (allDersByPred.count(pid)) {
                 allDersByPred.find(pid)->second.push_back(fel);
             } else {
-                std::vector<FinalTableJoinProcessor*> vec;
+                std::vector<FinalRuleProcessor*> vec;
                 vec.push_back(fel);
                 allDersByPred.insert(make_pair(pid, vec));
             }
@@ -78,7 +78,7 @@ bool SemiNaiverThreaded::doGlobalConsolidation(
     }
 
     //Determine which derivations should be consolidated in parallel
-    std::vector<std::pair<PredId_t, std::vector<FinalTableJoinProcessor*>>> parallelDerivations;
+    std::vector<std::pair<PredId_t, std::vector<FinalRuleProcessor*>>> parallelDerivations;
     for (auto p = allDersByPred.begin(); p != allDersByPred.end(); ++p) {
         /*if (p->second.size() == 1) {
         //Is the derivation unique? Or very small?

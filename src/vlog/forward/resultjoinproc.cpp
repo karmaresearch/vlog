@@ -32,10 +32,6 @@ InterTableJoinProcessor::InterTableJoinProcessor(const uint8_t rowsize,
             segments[i] = std::shared_ptr<SegmentInserter>(new SegmentInserter(rowsize));
 
         }
-
-        //Create a hashtable count of 100K elements to filter out duplicates
-        //hashcount = new std::pair<size_t, size_t>[SIZE_HASHCOUNT];
-        //memset(hashcount, 0, sizeof(std::pair<size_t, size_t>)*SIZE_HASHCOUNT);
     }
 
 void InterTableJoinProcessor::processResults(const int blockid, const Term_t *first,
@@ -47,21 +43,6 @@ void InterTableJoinProcessor::processResults(const int blockid, const Term_t *fi
     for (uint8_t i = 0; i < nCopyFromSecond; ++i) {
         row[posFromSecond[i].first] = second->getCurrentValue(posFromSecond[i].second);
     }
-
-    /* //Calculate hashcode from the two arrays.
-       size_t hashcode = Hashes::hashArray(row, rowsize);
-       size_t idx = hashcode % SIZE_HASHCOUNT;
-       if (hashcount[idx].first == hashcode) {
-       if (eq(row, hashcount[idx].second)) {
-       return;
-       } else {
-       hashcount[idx].second = segment->getNRows();
-       }
-       } else {
-       hashcount[idx].first = hashcode;
-       hashcount[idx].second = segment->getNRows();
-       }*/
-
     //Add the row
     processResults(blockid, unique, NULL);
 }
@@ -110,20 +91,6 @@ void InterTableJoinProcessor::processResults(const int blockid, FCInternalTableI
     for (uint8_t i = 0; i < nCopyFromSecond; ++i) {
         row[posFromSecond[i].first] = second->getCurrentValue(posFromSecond[i].second);
     }
-
-    /*//Calculate hashcode from the two arrays.
-      size_t hashcode = Hashes::hashArray(row, rowsize);
-      size_t idx = hashcode % SIZE_HASHCOUNT;
-      if (hashcount[idx].first == hashcode) {
-      if (eq(row, hashcount[idx].second)) {
-      return;
-      } else {
-      hashcount[idx].second = segment->getNRows();
-      }
-      } else {
-      hashcount[idx].first = hashcode;
-      hashcount[idx].second = segment->getNRows();
-      }*/
 
     //Add the row
     processResults(blockid, unique, NULL);
@@ -290,7 +257,27 @@ InterTableJoinProcessor::~InterTableJoinProcessor() {
     delete[] segments;
 }
 
-void FinalTableJoinProcessor::processResults(std::vector<int> &blockid, Term_t *p,
+void FinalRuleProcessor::processResults(const int blockid, const bool unique,
+        std::mutex *m) {
+    enlargeBuffers(blockid + 1);
+    if (!unique) {
+        if (tmpt[blockid] == NULL) {
+            tmpt[blockid] = new SegmentInserter(rowsize);
+        }
+
+        tmpt[blockid]->addRow(row);
+        if (tmpt[blockid]->getNRows() > TMPT_THRESHOLD) {
+            mergeTmpt(blockid, unique, m);
+        }
+    } else {
+        if (utmpt[blockid] == NULL) {
+            utmpt[blockid] = new SegmentInserter(rowsize);
+        }
+        utmpt[blockid]->addRow(row);
+    }
+}
+
+void FinalRuleProcessor::processResults(std::vector<int> &blockid, Term_t *p,
         std::vector<bool> &unique, std::mutex *m) {
 
     for (int j = 0; j < blockid.size(); j++) {
@@ -308,7 +295,7 @@ void FinalTableJoinProcessor::processResults(std::vector<int> &blockid, Term_t *
     }
 }
 
-FinalTableJoinProcessor::FinalTableJoinProcessor(
+FinalRuleProcessor::FinalRuleProcessor(
         std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
         std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
         std::vector<FCBlock> &listDerivations,
@@ -325,12 +312,12 @@ FinalTableJoinProcessor::FinalTableJoinProcessor(
             posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads),
     listDerivations(listDerivations),
     t(table),
-    literal(head),
-    ruleDetails(ruleDetails),
     ruleExecOrder(ruleExecOrder),
     iteration(iteration),
     addToEndTable(addToEndTable),
-    newDerivation(false) {
+    newDerivation(false),
+    ruleDetails(ruleDetails),
+    literal(head) {
 
         for (int i = 0; i < head.getTupleSize(); ++i) {
             VTerm t = head.getTermAtPos(i);
@@ -358,7 +345,7 @@ FinalTableJoinProcessor::FinalTableJoinProcessor(
 
     }
 
-void FinalTableJoinProcessor::enlargeBuffers(const int newsize) {
+void FinalRuleProcessor::enlargeBuffers(const int newsize) {
     if (nbuffers < newsize) {
         SegmentInserter** newb1 = new SegmentInserter*[newsize];
         SegmentInserter** newb2 = new SegmentInserter*[newsize];
@@ -385,13 +372,13 @@ void FinalTableJoinProcessor::enlargeBuffers(const int newsize) {
     }
 }
 
-void FinalTableJoinProcessor::processResults(const int blockid, const Term_t *first,
+void FinalRuleProcessor::processResults(const int blockid, const Term_t *first,
         FCInternalTableItr *second, const bool unique) {
     copyRawRow(first, second);
     processResults(blockid, unique, NULL);
 }
 
-void FinalTableJoinProcessor::processResults(const int blockid, FCInternalTableItr *first,
+void FinalRuleProcessor::processResults(const int blockid, FCInternalTableItr *first,
         FCInternalTableItr* second, const bool unique) {
     for (uint32_t i = 0; i < nCopyFromFirst; ++i) {
         row[posFromFirst[i].first] = first->getCurrentValue(posFromFirst[i].second);
@@ -403,7 +390,7 @@ void FinalTableJoinProcessor::processResults(const int blockid, FCInternalTableI
     processResults(blockid, unique, NULL);
 }
 
-void FinalTableJoinProcessor::processResults(const int blockid,
+void FinalRuleProcessor::processResults(const int blockid,
         const std::vector<const std::vector<Term_t> *> &vectors1, size_t i1,
         const std::vector<const std::vector<Term_t> *> &vectors2, size_t i2,
         const bool unique) {
@@ -416,7 +403,7 @@ void FinalTableJoinProcessor::processResults(const int blockid,
     processResults(blockid, unique, NULL);
 }
 
-void FinalTableJoinProcessor::processResultsAtPos(const int blockid, const uint8_t pos,
+void FinalRuleProcessor::processResultsAtPos(const int blockid, const uint8_t pos,
         const Term_t v, const bool unique) {
     enlargeBuffers(blockid + 1);
     if (!unique) {
@@ -432,7 +419,7 @@ void FinalTableJoinProcessor::processResultsAtPos(const int blockid, const uint8
     }
 }
 
-bool FinalTableJoinProcessor::isBlockEmpty(const int blockId, const bool unique) const {
+bool FinalRuleProcessor::isBlockEmpty(const int blockId, const bool unique) const {
     if (!unique) {
         return tmpt[blockId] == NULL || tmpt[blockId]->isEmpty();
     } else {
@@ -440,7 +427,7 @@ bool FinalTableJoinProcessor::isBlockEmpty(const int blockId, const bool unique)
     }
 }
 
-bool FinalTableJoinProcessor::isEmpty() const {
+bool FinalRuleProcessor::isEmpty() const {
     for (int i = 0; i < nbuffers; ++i) {
         if (utmpt[i] != NULL && !utmpt[i]->isEmpty())
             return false;
@@ -450,7 +437,7 @@ bool FinalTableJoinProcessor::isEmpty() const {
     return true;
 }
 
-uint32_t FinalTableJoinProcessor::getRowsInBlock(const int blockId,
+uint32_t FinalRuleProcessor::getRowsInBlock(const int blockId,
         const bool unique) const {
     if (!unique) {
         return tmpt[blockId] == NULL ? 0 : tmpt[blockId]->getNRows();
@@ -460,7 +447,7 @@ uint32_t FinalTableJoinProcessor::getRowsInBlock(const int blockId,
 
 }
 
-void FinalTableJoinProcessor::addColumns(const int blockid,
+void FinalRuleProcessor::addColumns(const int blockid,
         std::vector<std::shared_ptr<Column>> &columns,
         const bool unique, const bool sorted) {
     enlargeBuffers(blockid + 1);
@@ -480,11 +467,11 @@ void FinalTableJoinProcessor::addColumns(const int blockid,
 #endif
 }
 
-void FinalTableJoinProcessor::addColumns(const int blockid,
+void FinalRuleProcessor::addColumns(const int blockid,
         FCInternalTableItr *itr, const bool unique,
         const bool sorted, const bool lastInsert) {
     enlargeBuffers(blockid + 1);
-    if (unique) {
+    if (unique) { //I am sure that the results are unique...
         if (utmpt[blockid] == NULL) {
             utmpt[blockid] = new SegmentInserter(rowsize);
         }
@@ -537,9 +524,11 @@ void FinalTableJoinProcessor::addColumns(const int blockid,
             }
             c = newc;
         }
-
         utmpt[blockid]->addColumns(c, sorted, lastInsert);
+
     } else {
+        //There might be duplicates...
+
         if (tmpt[blockid] == NULL) {
             tmpt[blockid] = new SegmentInserter(rowsize);
         }
@@ -598,7 +587,7 @@ void FinalTableJoinProcessor::addColumns(const int blockid,
 #endif
 }
 
-void FinalTableJoinProcessor::addColumn(const int blockid,
+void FinalRuleProcessor::addColumn(const int blockid,
         const uint8_t pos, std::shared_ptr<Column> column,
         const bool unique, const bool sorted) {
     enlargeBuffers(blockid + 1);
@@ -616,7 +605,7 @@ void FinalTableJoinProcessor::addColumn(const int blockid,
 }
 
 #if USE_DUPLICATE_DETECTION
-void FinalTableJoinProcessor::processResults(const int blockid, const bool unique, std::mutex *m) {
+void FinalRuleProcessor::processResults(const int blockid, const bool unique, std::mutex *m) {
     enlargeBuffers(blockid + 1);
 
     if (!unique) {
@@ -693,7 +682,7 @@ void FinalTableJoinProcessor::processResults(const int blockid, const bool uniqu
 }
 
 #else
-void FinalTableJoinProcessor::mergeTmpt(const int blockid, const bool unique, std::mutex *m) {
+void FinalRuleProcessor::mergeTmpt(const int blockid, const bool unique, std::mutex *m) {
     if (tmptseg[blockid] != NULL && tmptseg[blockid]->getNRows() > tmpt[blockid]->getNRows()) {
         // Only start sorting and merging if it is large enough.
         return;
@@ -723,7 +712,7 @@ void FinalTableJoinProcessor::mergeTmpt(const int blockid, const bool unique, st
 }
 #endif
 
-void FinalTableJoinProcessor::copyRawRow(const Term_t *first,
+void FinalRuleProcessor::copyRawRow(const Term_t *first,
         const Term_t* second) {
     for (uint32_t i = 0; i < nCopyFromFirst; ++i) {
         row[posFromFirst[i].first] = first[posFromFirst[i].second];
@@ -733,7 +722,7 @@ void FinalTableJoinProcessor::copyRawRow(const Term_t *first,
     }
 }
 
-void FinalTableJoinProcessor::copyRawRow(const Term_t *first,
+void FinalRuleProcessor::copyRawRow(const Term_t *first,
         FCInternalTableItr* second) {
     for (uint32_t i = 0; i < nCopyFromFirst; ++i) {
         row[posFromFirst[i].first] = first[posFromFirst[i].second];
@@ -743,7 +732,7 @@ void FinalTableJoinProcessor::copyRawRow(const Term_t *first,
     }
 }
 
-void FinalTableJoinProcessor::consolidateSegment(std::shared_ptr<const Segment> seg) {
+void FinalRuleProcessor::consolidateSegment(std::shared_ptr<const Segment> seg) {
     std::shared_ptr<const FCInternalTable> ptrTable(
             new InmemoryFCInternalTable(rowsize,
                 iteration,
@@ -753,7 +742,7 @@ void FinalTableJoinProcessor::consolidateSegment(std::shared_ptr<const Segment> 
             iteration, true, nthreads);
 }
 
-void FinalTableJoinProcessor::consolidate(const bool isFinished,
+void FinalRuleProcessor::consolidate(const bool isFinished,
         const bool forceCheck) {
     if (!addToEndTable) {
         //do nothing. We'll consolidate later on.
@@ -934,7 +923,7 @@ void FinalTableJoinProcessor::consolidate(const bool isFinished,
 #endif
 }
 
-std::vector<std::shared_ptr<const Segment>> FinalTableJoinProcessor::getAllSegments() {
+std::vector<std::shared_ptr<const Segment>> FinalRuleProcessor::getAllSegments() {
     std::vector<std::shared_ptr<const Segment>> out;
     if (tmpt != NULL) {
         for (int i = 0; i < nbuffers; ++i) {
@@ -960,7 +949,7 @@ std::vector<std::shared_ptr<const Segment>> FinalTableJoinProcessor::getAllSegme
     return out;
 }
 
-FinalTableJoinProcessor::~FinalTableJoinProcessor() {
+FinalRuleProcessor::~FinalRuleProcessor() {
     if (utmpt != NULL) {
         for (int i = 0; i < nbuffers; ++i)
             if (utmpt[i] != NULL)
