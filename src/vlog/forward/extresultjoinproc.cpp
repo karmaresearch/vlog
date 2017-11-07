@@ -22,6 +22,8 @@ ExistentialRuleProcessor::ExistentialRuleProcessor(
 void ExistentialRuleProcessor::processResults(const int blockid,
         const bool unique, std::mutex *m) {
     //TODO: Chase...
+    LOG(ERRORL) << "Not implemented yet";
+    throw 10;
     FinalRuleProcessor::processResults(blockid, unique, m);
 }
 

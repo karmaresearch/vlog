@@ -6,6 +6,7 @@
 #include <trident/iterators/arrayitr.h>
 
 #include <cstring>
+#include <cmath>
 #include <unordered_map>
 
 BindingsTable *QSQR::getInputTable(const Predicate pred) {
