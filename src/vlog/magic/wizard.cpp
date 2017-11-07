@@ -148,7 +148,8 @@ std::shared_ptr<Program> Wizard::doMagic(const Literal &query,
                 Literal newHead = getMagicRelation(true, newProgram, itr->getBody()[j]);
                 assert(newBody.size() > 0);
 
-                if (newBody.size() == 1 && newBody[0].getPredicate().getId() == newHead.getPredicate().getId() &&
+                if (newBody.size() == 1 &&
+                        newBody[0].getPredicate().getId() == newHead.getPredicate().getId() &&
                         newBody[0].getPredicate().getType() == newHead.getPredicate().getType() &&
                         newBody[0].getPredicate().getAdorment() == newHead.getPredicate().getAdorment()) {
                 } else {

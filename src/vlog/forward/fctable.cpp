@@ -93,7 +93,8 @@ size_t FCTable::estimateCardinality(const Literal &literal, const size_t min, co
     return estimation;
 }
 
-std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal, const size_t minIteration, TableFilterer *filterer, int nthreads) {
+std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal,
+        const size_t minIteration, TableFilterer *filterer, int nthreads) {
     bool shouldFilter = literal.getNUniqueVars() < literal.getTupleSize();
 
     if (shouldFilter) {
@@ -187,7 +188,8 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal, const siz
                             nthreads);
 
                 if (filteredTable != NULL) {
-                    output->add(filteredTable, literal, itr->rule, itr->ruleExecOrder, itr->iteration, true, nthreads);
+                    output->add(filteredTable, literal, itr->posQueryInRule,
+                            itr->rule, itr->ruleExecOrder, itr->iteration, true, nthreads);
                 }
             }
             itr++;
@@ -277,6 +279,7 @@ std::shared_ptr<const Segment> FCTable::retainFrom(
 
 bool FCTable::add(std::shared_ptr<const FCInternalTable> t,
         const Literal &literal,
+        const uint8_t posLiteralInRule,
         const RuleExecutionDetails *rule,
         const uint8_t ruleExecOrder,
         const size_t iteration, const bool isCompleted,
@@ -325,7 +328,8 @@ bool FCTable::add(std::shared_ptr<const FCInternalTable> t,
         throw 10;
     }
 
-    FCBlock block(iteration, t, literal, rule, ruleExecOrder, isCompleted);
+    FCBlock block(iteration, t, literal, posLiteralInRule, 
+            rule, ruleExecOrder, isCompleted);
     blocks.push_back(block);
     return true;
 }

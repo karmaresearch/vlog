@@ -280,6 +280,7 @@ class FinalRuleProcessor: public ResultJoinProcessor {
     protected:
         const RuleExecutionDetails *ruleDetails;
         const Literal literal;
+        const uint8_t posLiteralInRule;
 
         SegmentInserter **tmpt;
 
@@ -292,7 +293,8 @@ class FinalRuleProcessor: public ResultJoinProcessor {
         FinalRuleProcessor(std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
                 std::vector<FCBlock> &listDerivations, FCTable *t,
-                Literal &head, const RuleExecutionDetails *detailsRule,
+                Literal &head, const uint8_t posHeadInRule,
+                const RuleExecutionDetails *detailsRule,
                 const uint8_t ruleExecOrder,
                 const size_t iteration,
                 const bool addToEndTable,
@@ -408,6 +410,7 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 std::vector<FCBlock> &listDerivations,
                 FCTable *t,
                 Literal &head,
+                const uint8_t posHeadInRule,
                 const RuleExecutionDetails *detailsRule,
                 const uint8_t ruleExecOrder,
                 const size_t iteration,

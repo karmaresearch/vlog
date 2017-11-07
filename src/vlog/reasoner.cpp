@@ -278,7 +278,8 @@ FCBlock Reasoner::getBlockFromQuery(Literal constantsQuery, Literal &boundQuery,
         }
     }
     //iteration==1
-    return FCBlock(1, table, Literal(constantsQuery.getPredicate(), constantsTuple),
+    return FCBlock(1, table,
+            Literal(constantsQuery.getPredicate(), constantsTuple), 0,
             NULL, 0, true);
 }
 

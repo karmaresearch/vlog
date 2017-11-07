@@ -36,7 +36,7 @@ bool TableFilterer::producedDerivationInPreviousSteps(
     //Easy case: the body of the current rule is equal to our rule
     Substitution subs[10];
     int nsubs = Literal::getSubstitutionsA2B(subs,
-                rule->rule.getFirstHead(), currentQuery);
+                rule->rule.getHead(block->posQueryInRule), currentQuery);
     assert(nsubs != -1);
 
     for (const auto &lit : rule->rule.getBody()) {

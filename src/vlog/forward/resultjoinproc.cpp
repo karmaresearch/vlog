@@ -300,6 +300,7 @@ FinalRuleProcessor::FinalRuleProcessor(
         std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
         std::vector<FCBlock> &listDerivations,
         FCTable *table, Literal &head,
+        const uint8_t posHeadInRule,
         const RuleExecutionDetails *ruleDetails,
         const uint8_t ruleExecOrder,
         const size_t iteration,
@@ -317,7 +318,7 @@ FinalRuleProcessor::FinalRuleProcessor(
     addToEndTable(addToEndTable),
     newDerivation(false),
     ruleDetails(ruleDetails),
-    literal(head) {
+    literal(head), posLiteralInRule(posHeadInRule) {
 
         for (int i = 0; i < head.getTupleSize(); ++i) {
             VTerm t = head.getTermAtPos(i);
@@ -738,7 +739,7 @@ void FinalRuleProcessor::consolidateSegment(std::shared_ptr<const Segment> seg) 
                 iteration,
                 true,
                 seg));
-    t->add(ptrTable, literal, ruleDetails, ruleExecOrder,
+    t->add(ptrTable, literal, posLiteralInRule, ruleDetails, ruleExecOrder,
             iteration, true, nthreads);
 }
 
@@ -767,7 +768,7 @@ void FinalRuleProcessor::consolidate(const bool isFinished,
                                     iteration,
                                     true,
                                     seg));
-                        t->add(ptrTable, literal, ruleDetails, ruleExecOrder,
+                        t->add(ptrTable, literal, posLiteralInRule, ruleDetails, ruleExecOrder,
                                 iteration, isFinished, nthreads);
 #if 0
                         char buffer[16384];
@@ -816,7 +817,8 @@ void FinalRuleProcessor::consolidate(const bool isFinished,
                         }
                         ptrTable->releaseIterator(test);
 #endif
-                        t->add(ptrTable, literal, ruleDetails, ruleExecOrder, iteration, isFinished, nthreads);
+                        t->add(ptrTable, literal, posLiteralInRule,
+                                ruleDetails, ruleExecOrder, iteration, isFinished, nthreads);
                     } else {
                         std::shared_ptr<const FCInternalTable> ptrTable(new InmemoryFCInternalTable(rowsize, iteration, true, utmpt[i]->getSegment()));
 #if 0
@@ -837,7 +839,7 @@ void FinalRuleProcessor::consolidate(const bool isFinished,
                         }
                         ptrTable->releaseIterator(test);
 #endif
-                        t->add(ptrTable, literal, ruleDetails, ruleExecOrder, iteration, isFinished, nthreads);
+                        t->add(ptrTable, literal, posLiteralInRule, ruleDetails, ruleExecOrder, iteration, isFinished, nthreads);
                     }
                 }
 
@@ -890,7 +892,7 @@ void FinalRuleProcessor::consolidate(const bool isFinished,
                     }
                     ptrTable->releaseIterator(test);
 #endif
-                    t->add(ptrTable, literal, ruleDetails, ruleExecOrder,
+                    t->add(ptrTable, literal, posLiteralInRule, ruleDetails, ruleExecOrder,
                             iteration, isFinished, nthreads);
 
                 }

@@ -320,6 +320,10 @@ class Rule {
             return heads[0];
         }
 
+        Literal getHead(uint8_t pos) const {
+            return heads[pos];
+        }
+
         bool isExistential() const;
 
         std::vector<uint8_t> getVarsNotInBody() const;

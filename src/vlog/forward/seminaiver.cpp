@@ -204,8 +204,6 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
 #endif
     listDerivations.clear();
 
-    chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt((uint64_t)1 << 32));
-
     //Prepare for the execution
 #if DEBUG
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
@@ -247,6 +245,13 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
 #endif
     for (auto el : ruleset)
         LOG(DEBUGL) << el.rule.tostring(program, &layer);
+
+    //Setup the datastructures to handle the chase
+    std::vector<RuleExecutionDetails> allrules;
+    std::copy(edbRuleset.begin(), edbRuleset.end(), std::back_inserter(allrules));
+    std::copy(ruleset.begin(), ruleset.end(), std::back_inserter(allrules));
+    chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt(allrules));
+
 
     //Used for statistics
     std::vector<StatIteration> costRules;
@@ -517,6 +522,7 @@ struct CreateParallelFirstAtom {
 void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
         const Literal *bodyLiteral,
         const Literal &headLiteral,
+        const uint8_t posHeadInRule,
         const size_t min,
         const size_t max,
         int &processedTables,
@@ -551,7 +557,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
                         literalItr.getCurrentBlock())) {
 
                 endTable->add(table->cloneWithIteration(iteration),
-                        headLiteral, &ruleDetails,
+                        headLiteral, posHeadInRule, &ruleDetails,
                         orderExecution, iteration, true, nthreads);
 
             }
@@ -891,7 +897,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                             plan.infoHeads[posHeadLiteral].posFromSecond[optimalOrderIdx],
                             listDerivations,
                             endTable,
-                            headLiteral, &ruleDetails,
+                            headLiteral, posHeadLiteral, &ruleDetails,
                             (uint8_t) orderExecution, iteration,
                             finalResultContainer == NULL,
                             !multithreaded ? -1 : nthreads,
@@ -902,7 +908,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                             plan.infoHeads[posHeadLiteral].posFromSecond[optimalOrderIdx],
                             listDerivations,
                             endTable,
-                            headLiteral, &ruleDetails,
+                            headLiteral, posHeadLiteral, &ruleDetails,
                             (uint8_t) orderExecution, iteration,
                             finalResultContainer == NULL,
                             !multithreaded ? -1 : nthreads);
@@ -924,7 +930,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 std::chrono::system_clock::time_point startFirstA = std::chrono::system_clock::now();
                 if (lastLiteral || bodyLiteral->getNVars() > 0) {
                     processRuleFirstAtom(nBodyLiterals, bodyLiteral,
-                            headLiteral, min, max, processedTables,
+                            headLiteral, posHeadLiteral, min, max, processedTables,
                             lastLiteral, endTable,
                             iteration, ruleDetails,
                             orderExecution,
@@ -1131,7 +1137,7 @@ FCIterator SemiNaiver::getTableFromEDBLayer(const Literal & literal) {
 
         std::shared_ptr<FCInternalTable> ptrTable(new EDBFCInternalTable(0,
                     mostGenericLiteral, &layer));
-        table->add(ptrTable, mostGenericLiteral, NULL, 0, 0, true, nthreads);
+        table->add(ptrTable, mostGenericLiteral, 0, NULL, 0, 0, true, nthreads);
     }
     if (literal.getNUniqueVars() < literal.getTupleSize()) {
         return table->filter(literal, nthreads)->read(0);

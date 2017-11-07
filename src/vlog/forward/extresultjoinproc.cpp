@@ -7,6 +7,7 @@ ExistentialRuleProcessor::ExistentialRuleProcessor(
         std::vector<FCBlock> &listDerivations,
         FCTable *t,
         Literal &head,
+        const uint8_t posHeadInRule,
         const RuleExecutionDetails *detailsRule,
         const uint8_t ruleExecOrder,
         const size_t iteration,
@@ -14,7 +15,7 @@ ExistentialRuleProcessor::ExistentialRuleProcessor(
         const int nthreads,
         std::shared_ptr<ChaseMgmt> chaseMgmt) :
     FinalRuleProcessor(posFromFirst, posFromSecond, listDerivations,
-            t, head, detailsRule, ruleExecOrder, iteration,
+            t, head, posHeadInRule, detailsRule, ruleExecOrder, iteration,
             addToEndTable, nthreads), chaseMgmt(chaseMgmt) {
     }
 
@@ -37,9 +38,34 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     for (uint32_t i = 0; i < nCopyFromSecond; ++i) {
         columns[i] = posFromSecond[i].second;
     }
-    std::vector<std::shared_ptr<Column>> c =
-        itr->getColumn(nCopyFromSecond, columns);
-    assert(c.size() <= rowsize);
+    std::vector<std::shared_ptr<Column>> c = itr->getColumn(nCopyFromSecond, columns);
+
+    //Create existential columns store them in a vector with the corresponding var ID
+    std::vector<std::pair<uint8_t, std::shared_ptr<Column>>> extvars;
+    for (int i = 0; i < rowsize; ++i) {
+        auto t = literal.getTermAtPos(i);
+        if (t.isVariable()) {
+            bool found = false;
+            for(int j = 0; j < nCopyFromSecond; ++j) {
+                if (posFromSecond[j].first == i) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) { //Must be existential
+                uint64_t sizecolumn = 0;
+                if (c.size() > 0) {
+                    sizecolumn = c[0]->size();
+                }
+                auto extcolumn = chaseMgmt->getNewOrExistingIDs(
+                        ruleDetails->rule.getId(),
+                        t.getId(),
+                        c,
+                        sizecolumn);
+                extvars.push_back(std::make_pair(t.getId(), extcolumn));
+            }
+        }
+    }
 
     if (nCopyFromSecond > 1) { //Rearrange the columns depending on the order
         //in the head
@@ -63,8 +89,17 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         c = c2;
     }
 
+    //Remove from c all columns that do not appear in the head
+    uint8_t nonheadcolumns = 0;
+    for (uint32_t i = 0; i < nCopyFromSecond; ++i) {
+        if (posFromSecond[i].first == (uint8_t)~0) {
+            nonheadcolumns++;
+        }
+    }
+    c.resize(c.size() - nonheadcolumns);
+
     if (c.size() < rowsize) {
-        //The head contains also constants. We must add fields in the vector
+        //The head contains also constants or ext vars. We must add fields in the vector
         // of created columns.
         std::vector<std::shared_ptr<Column>> newc;
         int idxVar = 0;
@@ -81,18 +116,19 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     newc.push_back(c[idxVar++]);
                 } else {
                     //Existential variable
-                    uint64_t sizecolumn = 0;
-                    if (c.size() > 0) {
-                        sizecolumn = c[0]->size();
+                    uint8_t idx = 0;
+                    bool found = false;
+                    for(; idx < extvars.size(); ++idx) {
+                        if (extvars[idx].first == t.getId()) {
+                            found = true;
+                            break;
+                        }
                     }
-                    newc.push_back(
-                            chaseMgmt->getNewOrExistingIDs(
-                                ruleDetails->rule.getId(),
-                                t.getId(),
-                                c,
-                                sizecolumn));
-                    //newc.push_back(std::shared_ptr<Column>
-                    //        (new FunctionalColumn(chaseMgmt, c)));
+                    if (!found) {
+                        LOG(ERRORL) << "Should not happen";
+                        throw 10;
+                    }
+                    newc.push_back(extvars[idx].second);
                 }
             }
         }

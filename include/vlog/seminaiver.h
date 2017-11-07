@@ -83,6 +83,7 @@ class SemiNaiver {
         void processRuleFirstAtom(const uint8_t nBodyLiterals,
                 const Literal *bodyLiteral,
                 const Literal &headLiteral,
+                const uint8_t posHeadInRule,
                 const size_t min,
                 const size_t max,
                 int &processedTables,
