@@ -117,7 +117,6 @@ class FCTable {
             }
         }
 
-
         std::shared_ptr<const FCTable> filter(const Literal &literal,
                 const size_t minIteration,
                 TableFilterer *filterer, int nthreads);

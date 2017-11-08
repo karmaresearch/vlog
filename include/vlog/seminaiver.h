@@ -47,6 +47,7 @@ class SemiNaiver {
         bool opt_intersect;
         bool opt_filtering;
         bool multithreaded;
+        bool restrictedChase;
         std::shared_ptr<ChaseMgmt> chaseMgmt;
 
         std::chrono::system_clock::time_point startTime;
@@ -140,7 +141,16 @@ class SemiNaiver {
         SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
-                int nthreads, bool shuffleRules);
+                bool restrictedChase, int nthreads, bool shuffleRules);
+
+        //disable restricted chase
+        SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
+                Program *program, bool opt_intersect,
+                bool opt_filtering, bool multithreaded,
+                int nthreads, bool shuffleRules) :
+            SemiNaiver(ruleset, layer, program, opt_intersect, opt_filtering,
+                    multithreaded, false, nthreads, shuffleRules) {
+            }
 
         void run() {
             run(0, 1);

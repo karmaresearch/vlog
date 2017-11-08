@@ -312,11 +312,11 @@ FinalRuleProcessor::FinalRuleProcessor(
             posFromFirst.size() > 0 ? & (posFromFirst[0]) : NULL,
             posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads),
     listDerivations(listDerivations),
-    t(table),
     ruleExecOrder(ruleExecOrder),
     iteration(iteration),
     addToEndTable(addToEndTable),
     newDerivation(false),
+    t(table),
     ruleDetails(ruleDetails),
     literal(head), posLiteralInRule(posHeadInRule) {
 

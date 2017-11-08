@@ -32,7 +32,8 @@ ChaseMgmt::Rows *ChaseMgmt::RuleContainer::getRows(uint8_t var) {
 //************** END RULE CONTAINER *************
 
 //************** CHASE MGMT ***************
-ChaseMgmt::ChaseMgmt(std::vector<RuleExecutionDetails> &rules) {
+ChaseMgmt::ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
+        const bool restricted) : restricted(restricted) {
     this->rules.resize(rules.size());
     for(const auto &r : rules) {
         if (r.rule.getId() >= rules.size()) {
@@ -70,10 +71,17 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
             }
             row[j] = readers[j]->next();
         }
-        uint64_t *address = rows->addRow(row);
-        uint64_t castedValue = (uint64_t) address;
+        uint64_t castedValue = UINT64_MAX;
+        uint64_t *address;
+        if (restricted || !existingRow(row, address))
+            address = rows->addRow(row);
+        castedValue = (uint64_t) address;
         functerms.push_back(castedValue);
     }
     return ColumnWriter::getColumn(functerms, false);
+}
+
+bool ChaseMgmt::existingRow(uint64_t *row, uint64_t *&address) {
+    throw 10; //not implemented
 }
 //************** END CHASE MGMT ************

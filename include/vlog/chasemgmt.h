@@ -44,15 +44,23 @@ class ChaseMgmt {
         };
 
         std::vector<std::unique_ptr<ChaseMgmt::RuleContainer>> rules;
+        const bool restricted;
+
+        bool existingRow(uint64_t *row, uint64_t *&address);
 
     public:
-        ChaseMgmt(std::vector<RuleExecutionDetails> &rules);
+        ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
+                const bool restricted);
 
         std::shared_ptr<Column> getNewOrExistingIDs(
                 uint32_t ruleid,
                 uint8_t var,
                 std::vector<std::shared_ptr<Column>> &columns,
                 uint64_t size);
+
+        bool isRestricted() {
+            return restricted;
+        }
 
 };
 

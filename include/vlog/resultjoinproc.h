@@ -257,7 +257,6 @@ class InterTableJoinProcessor: public ResultJoinProcessor {
 class FinalRuleProcessor: public ResultJoinProcessor {
     private:
         std::vector<FCBlock> &listDerivations;
-        FCTable *t;
         const uint8_t ruleExecOrder;
 
         const size_t iteration;
@@ -278,6 +277,7 @@ class FinalRuleProcessor: public ResultJoinProcessor {
         void mergeTmpt(const int blockid, const bool unique, std::mutex *m);
 #endif
     protected:
+        FCTable *t;
         const RuleExecutionDetails *ruleDetails;
         const Literal literal;
         const uint8_t posLiteralInRule;
@@ -403,6 +403,9 @@ class FinalRuleProcessor: public ResultJoinProcessor {
 class ExistentialRuleProcessor : public FinalRuleProcessor {
     private:
         std::shared_ptr<ChaseMgmt> chaseMgmt;
+
+        void filterDerivations(std::vector<std::shared_ptr<Column>> c,
+                std::vector<uint64_t> &output);
 
     public:
         ExistentialRuleProcessor(std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,

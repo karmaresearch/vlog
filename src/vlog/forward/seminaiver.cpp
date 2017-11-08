@@ -74,10 +74,11 @@ string set_to_string(std::unordered_set<int> s) {
 
 SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
         Program *program, bool opt_intersect, bool opt_filtering,
-        bool multithreaded, int nthreads, bool shuffle) :
+        bool multithreaded, bool restrictedChase, int nthreads, bool shuffle) :
     opt_intersect(opt_intersect),
     opt_filtering(opt_filtering),
     multithreaded(multithreaded),
+    restrictedChase(restrictedChase),
     running(false),
     layer(layer),
     program(program),
@@ -250,7 +251,8 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
     std::vector<RuleExecutionDetails> allrules;
     std::copy(edbRuleset.begin(), edbRuleset.end(), std::back_inserter(allrules));
     std::copy(ruleset.begin(), ruleset.end(), std::back_inserter(allrules));
-    chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt(allrules));
+    chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt(allrules,
+                restrictedChase));
 
 
     //Used for statistics
