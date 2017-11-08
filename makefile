@@ -27,7 +27,7 @@ CLIBS = \
 endif
 
 LDFLAGS= \
-	 -llz4 -lcurl \
+	 -llz4 -lcurl -lz \
 	 -lboost_filesystem -lboost_system -lboost_chrono \
 	 -lboost_thread$(MTSUFF) -lboost_log$(MTSUFF) \
 	 -lboost_log_setup$(MTSUFF) \
