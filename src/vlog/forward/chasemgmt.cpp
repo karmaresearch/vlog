@@ -2,21 +2,52 @@
 
 //************** ROWS ***************
 uint64_t ChaseMgmt::Rows::addRow(uint64_t* row) {
-    if (!currentblock || currentcounter >= SIZE_BLOCK) {
+    if (!currentblock || blockCounter >= SIZE_BLOCK) {
         //Create a new block
         std::unique_ptr<uint64_t> n =
             std::unique_ptr<uint64_t>(
                     new uint64_t[sizerow * SIZE_BLOCK]);
         currentblock = n.get();
         blocks.push_back(std::move(n));
-        currentcounter = 0;
+        blockCounter = 0;
     }
     for(uint8_t i = 0; i < sizerow; ++i) {
         currentblock[i] = row[i];
     }
     currentblock += sizerow;
-    currentcounter++;
-    return startCounter++;
+    blockCounter++;
+    if (startCounter == UINT32_MAX) {
+        LOG(ERRORL) << "I can assign at most 2^32 new IDs to an ext. variable... Stop!";
+        throw 10;
+    }
+    return currentcounter++;
+}
+
+bool ChaseMgmt::Rows::existingRow(uint64_t *row, uint64_t &value) {
+    //Linear search among the blocks. If I find one equivalent to row, then I add
+    //its ID and return true
+    uint64_t i = startCounter;
+    for(auto &b : blocks) {
+        uint64_t *start = b.get();
+        uint64_t *end = start + sizerow * SIZE_BLOCK;
+        while (i < currentcounter && start < end) {
+            //Compare a row
+            bool found = true;
+            for(uint32_t j = 0; j < sizerow; ++j) {
+                if (start[j] != row[j]) {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) {
+                value = i;
+                return true;
+            }
+            start += sizerow;
+            i++;
+        }
+    }
+    return false;
 }
 //************** END ROWS *************
 
@@ -25,7 +56,9 @@ ChaseMgmt::Rows *ChaseMgmt::RuleContainer::getRows(uint8_t var) {
     if (!vars2rows.count(var)) {
         uint8_t sizerow = dependencies[var].size();
         uint64_t startCounter = ruleBaseCounter;
-        startCounter += (uint64_t) var << 32; // The variable is encoded in the space between the rule ID and the counter ID.
+        // The variable is encoded in the space between the rule ID and the
+        // counter ID.
+        startCounter += (uint64_t) var << 32;
         vars2rows.insert(std::make_pair(var, Rows(startCounter, sizerow)));
     }
     return &vars2rows.find(var)->second;
@@ -41,7 +74,7 @@ ChaseMgmt::ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
             LOG(ERRORL) << "Should not happen...";
             throw 10;
         }
-        uint64_t ruleBaseCounter = (uint64_t) r.rule.getId() << 40;
+        uint64_t ruleBaseCounter = (uint64_t) (r.rule.getId()+1) << 40;
         this->rules[r.rule.getId()] = std::unique_ptr<ChaseMgmt::RuleContainer>(
                 new ChaseMgmt::RuleContainer(ruleBaseCounter,
                     r.orderExecutions[0].dependenciesExtVars));
@@ -75,14 +108,10 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
             row[j] = readers[j]->next();
         }
         uint64_t value;
-        if (restricted || !existingRow(row, value))
+        if (!rows->existingRow(row, value))
             value = rows->addRow(row);
         functerms.push_back(value);
     }
     return ColumnWriter::getColumn(functerms, false);
-}
-
-bool ChaseMgmt::existingRow(uint64_t *row, uint64_t &value) {
-    return false; //TODO
 }
 //************** END CHASE MGMT ************
