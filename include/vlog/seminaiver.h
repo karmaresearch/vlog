@@ -101,7 +101,7 @@ class SemiNaiver {
                 const Literal &headLiteral,
                 int posHead);
 
-        void executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
+        bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
                 std::vector<RuleExecutionDetails> &allIDBRules,
                 std::vector<StatIteration> &costRules);
 
@@ -137,7 +137,7 @@ class SemiNaiver {
 
         virtual FCTable *getTable(const PredId_t pred, const uint8_t card);
 
-        virtual void executeUntilSaturation(
+        virtual bool executeUntilSaturation(
                 std::vector<RuleExecutionDetails> &ruleset,
                 std::vector<StatIteration> &costRules);
 

@@ -193,14 +193,15 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
         }
     }
 
-void SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
-               std::vector<RuleExecutionDetails> &ruleset,
-               std::vector<StatIteration> &costRules) {
+bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
+        std::vector<RuleExecutionDetails> &ruleset,
+        std::vector<StatIteration> &costRules) {
 #if DEBUG
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 #endif
+    bool newDer = false;
     for (int i = 0; i < edbRuleset.size(); ++i) {
-        executeRule(edbRuleset[i], iteration, NULL);
+        newDer |= executeRule(edbRuleset[i], iteration, NULL);
         iteration++;
     }
 #if DEBUG
@@ -209,8 +210,9 @@ void SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
 #endif
 
     if (ruleset.size() > 0) {
-        executeUntilSaturation(ruleset, costRules);
+        newDer |= executeUntilSaturation(ruleset, costRules);
     }
+    return newDer;
 }
 
 void SemiNaiver::run(size_t lastExecution, size_t it) {
@@ -240,7 +242,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
         for (int i = 0; i < itr->orderExecutions.size(); ++i) {
             string plan = "";
             for (int j = 0; j < itr->orderExecutions[i].plan.size(); ++j) {
-                plan += string(" ") + 
+                plan += string(" ") +
                     itr->orderExecutions[i].plan[j]->tostring(program, &layer);
             }
             LOG(DEBUGL) << "-->" << plan;
@@ -287,21 +289,37 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
                 tmpIDBRules.push_back(r);
             }
         }
-        executeRules(tmpEDBRules, tmpIDBRules, costRules);
         //Now execute the existential rules
-        tmpEDBRules.clear();
+        std::vector<RuleExecutionDetails> tmpExtEDBRules;
         for(auto &r : originalEDBruleset) {
             if (r.rule.isExistential())  {
-                tmpEDBRules.push_back(r);
+                tmpExtEDBRules.push_back(r);
             }
         }
-        tmpIDBRules.clear();
+        std::vector<RuleExecutionDetails> tmpExtIDBRules;
         for(auto &r : originalRuleset) {
             if (r.rule.isExistential()) {
-                tmpIDBRules.push_back(r);
+                tmpExtIDBRules.push_back(r);
             }
         }
-        executeRules(tmpEDBRules, tmpIDBRules, costRules);
+        int loopNr = 0;
+        std::vector<RuleExecutionDetails> emptyRuleset;
+        while (true) {
+            bool resp1;
+            if (loopNr == 0)
+                resp1 = executeRules(tmpEDBRules, tmpIDBRules, costRules);
+            else
+                resp1 = executeRules(emptyRuleset, tmpIDBRules, costRules);
+            bool resp2;
+            if (loopNr == 0)
+                resp2 = executeRules(tmpExtEDBRules, tmpExtIDBRules, costRules);
+            else
+                resp2 = executeRules(emptyRuleset, tmpExtIDBRules, costRules);
+            if (!resp1 && !resp2) {
+                break; //Fix-point
+            }
+            loopNr++;
+        }
     } else {
         executeRules(allEDBRules, allIDBRules, costRules);
     }
@@ -330,7 +348,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
         << " first 10:" << sum10;
 }
 
-void SemiNaiver::executeUntilSaturation(
+bool SemiNaiver::executeUntilSaturation(
         std::vector<RuleExecutionDetails> &ruleset,
         std::vector<StatIteration> &costRules) {
     size_t currentRule = 0;
@@ -338,6 +356,7 @@ void SemiNaiver::executeUntilSaturation(
 
     size_t nRulesOnePass = 0;
     size_t lastIteration = 0;
+    bool newDer = false;
 
     std::chrono::system_clock::time_point round_start = std::chrono::system_clock::now();
     do {
@@ -346,6 +365,7 @@ void SemiNaiver::executeUntilSaturation(
         bool response = executeRule(ruleset[currentRule],
                 iteration,
                 NULL);
+        newDer |= response;
         std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
         StatIteration stat;
         stat.iteration = iteration;
@@ -366,6 +386,7 @@ void SemiNaiver::executeUntilSaturation(
                     response = executeRule(ruleset[currentRule],
                             iteration,
                             NULL);
+                    newDer |= response;
                     stat.iteration = iteration;
                     ruleset[currentRule].lastExecution = iteration++;
                     sec = std::chrono::system_clock::now() - start;
@@ -374,18 +395,11 @@ void SemiNaiver::executeUntilSaturation(
                     stat.time = sec.count() * 1000;
                     stat.derived = response;
                     costRules.push_back(stat);
-                    /*if (++recursiveIterations % 10 == 0) {
-                      LOG(INFOL) << "Saturating rule " <<
-                      ruleset[currentRule].rule.tostring(program, dict) <<
-                      " " << recursiveIterations;
-                      }*/
                 } while (response);
                     LOG(DEBUGL) << "Rules " <<
                         ruleset[currentRule].rule.tostring(program, &layer) <<
                         "  required " << recursiveIterations << " to saturate";
             }
-
-            //lastPosWithDerivation = currentRule;
             rulesWithoutDerivation = 0;
             nRulesOnePass++;
         } else {
@@ -424,6 +438,7 @@ void SemiNaiver::executeUntilSaturation(
 #endif
         }
     } while (rulesWithoutDerivation != ruleset.size());
+                    return newDer;
 }
 
 void SemiNaiver::storeOnFiles(std::string path, const bool decompress,

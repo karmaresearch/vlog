@@ -13,13 +13,15 @@ class ChaseMgmt {
     private:
         class Rows {
             private:
+                uint64_t startCounter;
                 const uint8_t sizerow;
                 std::vector<std::unique_ptr<uint64_t>> blocks;
                 uint32_t currentcounter;
                 uint64_t *currentblock;
 
             public:
-                Rows(uint8_t sizerow) : sizerow(sizerow) {
+                Rows(uint32_t startCounter, uint8_t sizerow) :
+                    startCounter(startCounter), sizerow(sizerow) {
                     currentcounter = 0;
                     currentblock = NULL;
                 }
@@ -28,15 +30,18 @@ class ChaseMgmt {
                     return sizerow;
                 }
 
-                uint64_t *addRow(uint64_t* row);
+                uint64_t addRow(uint64_t* row);
         };
 
         class RuleContainer {
             private:
                 std::map<uint8_t, std::vector<uint8_t>> dependencies;
                 std::map<uint8_t, ChaseMgmt::Rows> vars2rows;
+                uint64_t ruleBaseCounter;
             public:
-                RuleContainer(std::map<uint8_t, std::vector<uint8_t>> dep) {
+                RuleContainer(uint64_t ruleBaseCounter,
+                        std::map<uint8_t, std::vector<uint8_t>> dep) {
+                    this->ruleBaseCounter = ruleBaseCounter;
                     dependencies = dep;
                 }
 
@@ -46,7 +51,7 @@ class ChaseMgmt {
         std::vector<std::unique_ptr<ChaseMgmt::RuleContainer>> rules;
         const bool restricted;
 
-        bool existingRow(uint64_t *row, uint64_t *&address);
+        bool existingRow(uint64_t *row, uint64_t &value);
 
     public:
         ChaseMgmt(std::vector<RuleExecutionDetails> &rules,

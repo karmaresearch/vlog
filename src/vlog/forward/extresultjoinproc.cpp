@@ -140,8 +140,8 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         filterDerivations(c, sizecolumns, filterRows);
     }
 
+    //Filter out the potential values for the derivation
     if (!filterRows.empty()) {
-        //Filter out the potential values for the derivation
         std::vector<ColumnWriter> writers;
         std::vector<std::unique_ptr<ColumnReader>> readers;
         for(uint8_t i = 0; i < rowsize; ++i) {

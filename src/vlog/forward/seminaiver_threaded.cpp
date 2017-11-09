@@ -3,13 +3,14 @@
 
 #include <vector>
 
-void SemiNaiverThreaded::executeUntilSaturation(
+bool SemiNaiverThreaded::executeUntilSaturation(
         std::vector<RuleExecutionDetails> &ruleset,
         std::vector<StatIteration> &costRules) {
 
     //Create n threads
     std::vector<std::thread> threads(interRuleThreads);
     bool anotherRound;
+    bool newDer = false;
     do {
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         //LOG(INFOL) << "Creating threads ...";
@@ -46,7 +47,9 @@ void SemiNaiverThreaded::executeUntilSaturation(
         //LOG(INFOL) << "Another round = " << anotherRound;
         std::chrono::duration<double> sec2 = std::chrono::system_clock::now() - start;
         LOG(WARNL) << "--Time round " << sec2.count() * 1000 << " " << iteration;
+        newDer |= anotherRound;
     } while (anotherRound);
+    return newDer;
 }
 
 bool sortByIteration(ResultJoinProcessor *p1, ResultJoinProcessor *p2) {

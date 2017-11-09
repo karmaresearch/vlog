@@ -107,7 +107,7 @@ class SemiNaiverThreaded: public SemiNaiver {
                 std::vector<StatIteration> *costRules,
                 size_t lastExec);
 
-        void executeUntilSaturation(
+        bool executeUntilSaturation(
                 std::vector<RuleExecutionDetails> &ruleset,
                 std::vector<StatIteration> &costRules);
 };
