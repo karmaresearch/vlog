@@ -204,6 +204,8 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "Pre-materialize the atoms in the file passed as argument. Default is '' (disabled).", false);
     query_options.add<bool>("","multithreaded", false,
             "Run multithreaded (currently only supported for <mat>).", false);
+    query_options.add<bool>("","restrictedChase", false,
+            "Use the restricted chase if there are existential rules.", false);
     query_options.add<int>("", "nthreads", tbb::task_scheduler_init::default_num_threads() / 2,
             string("Set maximum number of threads to use when run in multithreaded mode. Default is " + to_string(tbb::task_scheduler_init::default_num_threads() / 2)).c_str(), false);
     query_options.add<int>("", "interRuleThreads", 0,
@@ -298,7 +300,7 @@ void writeRuleDependencyGraph(EDBLayer &db, string pathRules, string filegraph) 
     Program p(db.getNTerms(), &db);
     p.readFromFile(pathRules);
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(db,
-            &p, true, true, false, 1, 1, false);
+            &p, true, true, false, false, 1, 1, false);
 
     std::vector<int> nodes;
     std::vector<std::pair<int, int>> edges;
@@ -383,7 +385,8 @@ void launchFullMat(int argc,
         std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(db,
                 &p, vm["no-intersect"].empty(),
                 vm["no-filtering"].empty(),
-                ! vm["multithreaded"].empty(),
+                !vm["multithreaded"].empty(),
+                vm["restrictedChase"].as<bool>(),
                 nthreads,
                 interRuleThreads,
                 ! vm["shufflerules"].empty());

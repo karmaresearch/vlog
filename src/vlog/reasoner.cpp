@@ -901,6 +901,7 @@ TupleIterator *Reasoner::getTopDownIterator(Literal &query,
 
 std::shared_ptr<SemiNaiver> Reasoner::getSemiNaiver(EDBLayer &layer,
         Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
+        bool restrictedChase,
         int nthreads, int interRuleThreads, bool shuffleRules) {
     LOG(DEBUGL) << "interRuleThreads = " << interRuleThreads << ", shuffleRules = " << shuffleRules;
     if (interRuleThreads > 0) {
@@ -911,17 +912,19 @@ std::shared_ptr<SemiNaiver> Reasoner::getSemiNaiver(EDBLayer &layer,
     } else {
         std::shared_ptr<SemiNaiver> sn(new SemiNaiver(p->getAllRules(),
                     layer, p, opt_intersect, opt_filtering,
-                    opt_threaded, nthreads, shuffleRules));
+                    opt_threaded, restrictedChase, nthreads, shuffleRules));
         return sn;
     }
 }
 
 std::shared_ptr<SemiNaiver> Reasoner::fullMaterialization(EDBLayer &layer,
-        Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded, int nthreads, int interRuleThreads, bool shuffleRules) {
+        Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
+        bool restrictedChase, int nthreads, int interRuleThreads, bool shuffleRules) {
     LOG(INFOL) << "Starting full materialization";
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     std::shared_ptr<SemiNaiver> sn = getSemiNaiver(layer,
-            p, opt_intersect, opt_filtering, opt_threaded, nthreads, interRuleThreads, shuffleRules);
+            p, opt_intersect, opt_filtering, opt_threaded,
+            restrictedChase, nthreads, interRuleThreads, shuffleRules);
     sn->run();
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";

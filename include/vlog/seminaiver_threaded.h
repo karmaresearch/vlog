@@ -101,11 +101,15 @@ class SemiNaiverThreaded: public SemiNaiver {
 
         FCIterator getTableFromEDBLayer(const Literal & literal);
 
-        void runThread(StatusRuleExecution_ThreadSafe *status,
+        void runThread(
+                std::vector<RuleExecutionDetails> &ruleset,
+                StatusRuleExecution_ThreadSafe *status,
                 std::vector<StatIteration> *costRules,
                 size_t lastExec);
 
-        void executeUntilSaturation(std::vector<StatIteration> &costRules);
+        void executeUntilSaturation(
+                std::vector<RuleExecutionDetails> &ruleset,
+                std::vector<StatIteration> &costRules);
 };
 
 #endif

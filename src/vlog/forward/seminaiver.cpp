@@ -100,24 +100,24 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                     d->nIDBs++;
             }
             if (d->nIDBs != 0)
-                this->ruleset.push_back(*d);
+                this->allIDBRules.push_back(*d);
             else
-                this->edbRuleset.push_back(*d);
+                this->allEDBRules.push_back(*d);
             delete d;
         }
 
         if (multithreaded) {
             // newDetails will ultimately contain the new rule order.
             std::vector<int> newDetails;
-            for (size_t i = 0; i < this->ruleset.size(); i++) {
+            for (size_t i = 0; i < this->allIDBRules.size(); i++) {
                 newDetails.push_back(i);
             }
 
             if (!shuffle) {
                 std::vector<int> *definedBy = new std::vector<int>[MAX_NPREDS];
                 // First, determine which rules compute which predicate.
-                for (int i = 0; i < this->ruleset.size(); i++) {
-                    PredId_t pred = this->ruleset[i].rule.getFirstHead().getPredicate().getId();
+                for (int i = 0; i < this->allIDBRules.size(); i++) {
+                    PredId_t pred = this->allIDBRules[i].rule.getFirstHead().getPredicate().getId();
                     definedBy[pred].push_back(i);
                 }
 
@@ -127,8 +127,8 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 // - the RHS of one contains the predicate computed by the other.
                 std::vector<std::unordered_set<int>> excludes;
                 std::vector<int> nRulesForPredicate;
-                for (int i = 0; i < this->ruleset.size(); i++) {
-                    const Rule *r = &(this->ruleset[i].rule);
+                for (int i = 0; i < this->allIDBRules.size(); i++) {
+                    const Rule *r = &(this->allIDBRules[i].rule);
                     PredId_t pred = r->getFirstHead().getPredicate().getId();
                     nRulesForPredicate.push_back(definedBy[pred].size());
                     std::unordered_set<int> exclude;
@@ -160,10 +160,10 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 // Now, create groups of rules that can be computed concurrently.
                 std::unordered_set<int> blocked;
                 std::vector<int> newOrder;
-                while (newOrder.size() < this->ruleset.size()) {
+                while (newOrder.size() < this->allIDBRules.size()) {
                     LOG(DEBUGL) << "New round";
                     int count = 0;
-                    for (int i = 0; i < this->ruleset.size(); i++) {
+                    for (int i = 0; i < this->allIDBRules.size(); i++) {
                         auto search = blocked.find(newDetails[i]);
                         if (search == blocked.end()) {
                             // This rule is currently not blocked yet, so we add it to the group.
@@ -185,14 +185,33 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 // Just shuffle all the rules.
                 std::random_shuffle(newDetails.begin(), newDetails.end());
             }
-            std::vector<RuleExecutionDetails> saved = this->ruleset;
-            this->ruleset.clear();
+            std::vector<RuleExecutionDetails> saved = this->allIDBRules;
+            this->allIDBRules.clear();
             for (size_t i = 0; i < newDetails.size(); i++) {
-                this->ruleset.push_back(saved[newDetails[i]]);
+                this->allIDBRules.push_back(saved[newDetails[i]]);
             }
         }
     }
 
+void SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
+               std::vector<RuleExecutionDetails> &ruleset,
+               std::vector<StatIteration> &costRules) {
+#if DEBUG
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+#endif
+    for (int i = 0; i < edbRuleset.size(); ++i) {
+        executeRule(edbRuleset[i], iteration, NULL);
+        iteration++;
+    }
+#if DEBUG
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    LOG(DEBUGL) << "Runtime EDB rules ms = " << sec.count() * 1000;
+#endif
+
+    if (ruleset.size() > 0) {
+        executeUntilSaturation(ruleset, costRules);
+    }
+}
 
 void SemiNaiver::run(size_t lastExecution, size_t it) {
     running = true;
@@ -210,7 +229,8 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     LOG(DEBUGL) << "Optimizing ruleset...";
 #endif
-    for (std::vector<RuleExecutionDetails>::iterator itr = ruleset.begin(); itr != ruleset.end();
+    for (std::vector<RuleExecutionDetails>::iterator itr = allIDBRules.begin();
+            itr != allIDBRules.end();
             ++itr) {
         LOG(DEBUGL) << "Optimizing rule " << itr->rule.tostring(NULL, NULL);
         itr->createExecutionPlans();
@@ -220,47 +240,72 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
         for (int i = 0; i < itr->orderExecutions.size(); ++i) {
             string plan = "";
             for (int j = 0; j < itr->orderExecutions[i].plan.size(); ++j) {
-                plan += string(" ") + itr->orderExecutions[i].plan[j]->tostring(program, &layer);
+                plan += string(" ") + 
+                    itr->orderExecutions[i].plan[j]->tostring(program, &layer);
             }
             LOG(DEBUGL) << "-->" << plan;
         }
     }
-    for (std::vector<RuleExecutionDetails>::iterator itr = edbRuleset.begin();
-            itr != edbRuleset.end();
+    for (std::vector<RuleExecutionDetails>::iterator itr = allEDBRules.begin();
+            itr != allEDBRules.end();
             ++itr) {
         itr->createExecutionPlans();
     }
-#if DEBUG
-    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    LOG(DEBUGL) << "Runtime ruleset optimization ms = " << sec.count() * 1000;
-
-    start = std::chrono::system_clock::now();
-#endif
-    for (int i = 0; i < edbRuleset.size(); ++i) {
-        executeRule(edbRuleset[i], iteration, NULL);
-        iteration++;
-    }
-#if DEBUG
-    sec = std::chrono::system_clock::now() - start;
-    LOG(DEBUGL) << "Runtime EDB rules ms = " << sec.count() * 1000;
-#endif
-    for (auto el : ruleset)
+    for (auto el : allIDBRules)
         LOG(DEBUGL) << el.rule.tostring(program, &layer);
 
     //Setup the datastructures to handle the chase
     std::vector<RuleExecutionDetails> allrules;
-    std::copy(edbRuleset.begin(), edbRuleset.end(), std::back_inserter(allrules));
-    std::copy(ruleset.begin(), ruleset.end(), std::back_inserter(allrules));
+    std::copy(allEDBRules.begin(), allEDBRules.end(), std::back_inserter(allrules));
+    std::copy(allIDBRules.begin(), allIDBRules.end(), std::back_inserter(allrules));
     chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt(allrules,
                 restrictedChase));
-
+#if DEBUG
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    LOG(DEBUGL) << "Runtime ruleset optimization ms = " << sec.count() * 1000;
+#endif
 
     //Used for statistics
     std::vector<StatIteration> costRules;
 
-    if (ruleset.size() > 0) {
-        executeUntilSaturation(costRules);
+    if (restrictedChase && program->areExistentialRules()) {
+        //Split the program: First execute the rules without existential
+        //quantifiers, then all the others
+        std::vector<RuleExecutionDetails> originalEDBruleset = allEDBRules;
+        std::vector<RuleExecutionDetails> originalRuleset = allIDBRules;
+
+        //Only non-existential rules
+        std::vector<RuleExecutionDetails> tmpEDBRules;
+        for(auto &r : originalEDBruleset) {
+            if (!r.rule.isExistential())  {
+                tmpEDBRules.push_back(r);
+            }
+        }
+        std::vector<RuleExecutionDetails> tmpIDBRules;
+        for(auto &r : originalRuleset) {
+            if (!r.rule.isExistential()) {
+                tmpIDBRules.push_back(r);
+            }
+        }
+        executeRules(tmpEDBRules, tmpIDBRules, costRules);
+        //Now execute the existential rules
+        tmpEDBRules.clear();
+        for(auto &r : originalEDBruleset) {
+            if (r.rule.isExistential())  {
+                tmpEDBRules.push_back(r);
+            }
+        }
+        tmpIDBRules.clear();
+        for(auto &r : originalRuleset) {
+            if (r.rule.isExistential()) {
+                tmpIDBRules.push_back(r);
+            }
+        }
+        executeRules(tmpEDBRules, tmpIDBRules, costRules);
+    } else {
+        executeRules(allEDBRules, allIDBRules, costRules);
     }
+
     running = false;
     LOG(INFOL) << "Finished process. Iterations=" << iteration;
 
@@ -285,7 +330,9 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
         << " first 10:" << sum10;
 }
 
-void SemiNaiver::executeUntilSaturation(std::vector<StatIteration> &costRules) {
+void SemiNaiver::executeUntilSaturation(
+        std::vector<RuleExecutionDetails> &ruleset,
+        std::vector<StatIteration> &costRules) {
     size_t currentRule = 0;
     uint32_t rulesWithoutDerivation = 0;
 

@@ -29,10 +29,11 @@ void ExistentialRuleProcessor::processResults(const int blockid,
 
 int _compare(std::unique_ptr<SegmentIterator> &itr1,
         FCInternalTableItr *itr2,
-        uint8_t rowsize) {
-    for(uint8_t i = 0; i < rowsize; ++i) {
-        auto t1 = itr1->get(i);
-        auto t2 = itr2->getCurrentValue(i);
+        const uint8_t *colsCheck,
+        const uint8_t ncolsCheck) {
+    for(uint8_t i = 0; i < ncolsCheck; ++i) {
+        auto t1 = itr1->get(colsCheck[i]);
+        auto t2 = itr2->getCurrentValue(colsCheck[i]);
         if (t1 < t2) {
             return -1;
         } else if (t1 > t2) {
@@ -44,6 +45,7 @@ int _compare(std::unique_ptr<SegmentIterator> &itr1,
 
 void ExistentialRuleProcessor::filterDerivations(
         std::vector<std::shared_ptr<Column>> c,
+        uint64_t sizecolumns,
         std::vector<uint64_t> &output) {
     //Filter out all substitutions are are already existing...
     std::vector<std::shared_ptr<Column>> tobeRetained;
@@ -67,7 +69,8 @@ void ExistentialRuleProcessor::filterDerivations(
             }
             if (!found) {
                 //Add a dummy column since this is an existential variable
-                tobeRetained.push_back(std::shared_ptr<Column>());
+                tobeRetained.push_back(std::shared_ptr<Column>(
+                            new CompressedColumn(0, sizecolumns)));
             } else {
                 tobeRetained.push_back(std::shared_ptr<Column>(c[posToCopy]));
                 columnsToCheck.push_back(i);
@@ -80,6 +83,8 @@ void ExistentialRuleProcessor::filterDerivations(
             new Segment(rowsize, tobeRetained));
 
     //do the filtering
+    const uint8_t *colsCheck = columnsToCheck.data();
+    const uint8_t nColsCheck = columnsToCheck.size();
     auto sortedSeg = seg->sortBy(NULL);
     auto tableItr = t->read(0);
     while (!tableItr.isEmpty()) {
@@ -92,7 +97,7 @@ void ExistentialRuleProcessor::filterDerivations(
         bool itr2Ok = itr2->hasNext();
         if (itr2Ok) itr2->next();
         while (itr1Ok && itr2Ok) {
-            int cmp = _compare(itr1, itr2, rowsize);
+            int cmp = _compare(itr1, itr2, colsCheck, nColsCheck);
             if (cmp > 0) {
                 //the table must move to the next one
                 itr2Ok = itr2->hasNext();
@@ -125,14 +130,14 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         columns[i] = posFromSecond[i].second;
     }
     std::vector<std::shared_ptr<Column>> c = itr->getColumn(nCopyFromSecond, columns);
-    uint64_t sizecolumn = 0;
+    uint64_t sizecolumns = 0;
     if (c.size() > 0) {
-        sizecolumn = c[0]->size();
+        sizecolumns = c[0]->size();
     }
 
     std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
     if (chaseMgmt->isRestricted()) {
-        filterDerivations(c, filterRows);
+        filterDerivations(c, sizecolumns, filterRows);
     }
 
     if (!filterRows.empty()) {
@@ -145,7 +150,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         writers.resize(c.size());
         uint64_t idxs = 0;
         uint64_t nextid = filterRows[idxs];
-        for(uint64_t i = 0; i < sizecolumn; ++i) {
+        for(uint64_t i = 0; i < sizecolumns; ++i) {
             if (i < nextid) {
                 //Copy
                 for(uint8_t j = 0; j < rowsize; ++j) {
@@ -167,6 +172,14 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         for(uint8_t i = 0; i < rowsize; ++i) {
             c[i] = writers[i].getColumn();
         }
+        sizecolumns = 0;
+        if (rowsize > 0) {
+            sizecolumns = c[0]->size();
+        }
+    }
+
+    if (sizecolumns == 0) {
+        return; //Nothing should be added
     }
 
     //Create existential columns store them in a vector with the corresponding var ID
@@ -186,7 +199,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                         ruleDetails->rule.getId(),
                         t.getId(),
                         c,
-                        sizecolumn);
+                        sizecolumns);
                 extvars.push_back(std::make_pair(t.getId(), extcolumn));
             }
         }

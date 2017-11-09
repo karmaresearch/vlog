@@ -51,6 +51,7 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
         uint8_t var,
         std::vector<std::shared_ptr<Column>> &columns,
         uint64_t sizecolumns) {
+    assert(sizecolumns > 0);
     auto &ruleContainer = rules[ruleid];
     auto rows = ruleContainer->getRows(var);
     const uint8_t sizerow = rows->getSizeRow();
@@ -82,6 +83,6 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
 }
 
 bool ChaseMgmt::existingRow(uint64_t *row, uint64_t *&address) {
-    throw 10; //not implemented
+    return false;
 }
 //************** END CHASE MGMT ************

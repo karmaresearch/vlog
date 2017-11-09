@@ -3,7 +3,9 @@
 
 #include <vector>
 
-void SemiNaiverThreaded::executeUntilSaturation(std::vector<StatIteration> &costRules) {
+void SemiNaiverThreaded::executeUntilSaturation(
+        std::vector<RuleExecutionDetails> &ruleset,
+        std::vector<StatIteration> &costRules) {
 
     //Create n threads
     std::vector<std::thread> threads(interRuleThreads);
@@ -19,6 +21,7 @@ void SemiNaiverThreaded::executeUntilSaturation(std::vector<StatIteration> &cost
         for (int i = 0; i < interRuleThreads; ++i) {
             threads[i] = std::thread(&SemiNaiverThreaded::runThread,
                     this,
+                    std::ref(ruleset),
                     &status,
                     &costRules,
                     iterationBeginBlock);
@@ -130,6 +133,7 @@ bool SemiNaiverThreaded::doGlobalConsolidation(
 }
 
 void SemiNaiverThreaded::runThread(
+        std::vector<RuleExecutionDetails> &ruleset,
         StatusRuleExecution_ThreadSafe *status,
         std::vector<StatIteration> *costRules,
         size_t lastExec) {

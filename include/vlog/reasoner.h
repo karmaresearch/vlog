@@ -92,13 +92,12 @@ public:
 
     static std::shared_ptr<SemiNaiver> fullMaterialization(EDBLayer &layer,
             Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
-            int nthreads, int interRuleThreads, bool shuffleRules);
+            bool restrictedChase, int nthreads, int interRuleThreads, bool shuffleRules);
 
     static std::shared_ptr<SemiNaiver> getSemiNaiver(EDBLayer &layer,
             Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
+            bool restrictedChase,
             int nthreads, int interRuleThreads, bool shuffleRules);
-
-    //static int materializationOrOnDemand(const uint64_t matThreshold, std::vector<std::shared_ptr<SPARQLOperator>> &patterns);
 
     ~Reasoner() {
     }

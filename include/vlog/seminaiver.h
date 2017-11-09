@@ -43,7 +43,7 @@ typedef std::unordered_map<std::string, FCTable*> EDBCache;
 class ResultJoinProcessor;
 class SemiNaiver {
     private:
-        std::vector<RuleExecutionDetails> edbRuleset;
+        std::vector<RuleExecutionDetails> allEDBRules;
         bool opt_intersect;
         bool opt_filtering;
         bool multithreaded;
@@ -101,7 +101,9 @@ class SemiNaiver {
                 const Literal &headLiteral,
                 int posHead);
 
-        //int getRuleID(const RuleExecutionDetails *rule);
+        void executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
+                std::vector<RuleExecutionDetails> &allIDBRules,
+                std::vector<StatIteration> &costRules);
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
                 Literal &headLiteral,
@@ -117,7 +119,7 @@ class SemiNaiver {
         FCTable *predicatesTables[MAX_NPREDS];
         EDBLayer &layer;
         Program *program;
-        std::vector<RuleExecutionDetails> ruleset;
+        std::vector<RuleExecutionDetails> allIDBRules;
         size_t iteration;
         int nthreads;
 
@@ -135,7 +137,9 @@ class SemiNaiver {
 
         virtual FCTable *getTable(const PredId_t pred, const uint8_t card);
 
-        virtual void executeUntilSaturation(std::vector<StatIteration> &costRules);
+        virtual void executeUntilSaturation(
+                std::vector<RuleExecutionDetails> &ruleset,
+                std::vector<StatIteration> &costRules);
 
     public:
         SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,

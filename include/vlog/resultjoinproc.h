@@ -405,6 +405,7 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
         std::shared_ptr<ChaseMgmt> chaseMgmt;
 
         void filterDerivations(std::vector<std::shared_ptr<Column>> c,
+                uint64_t sizecolumns,
                 std::vector<uint64_t> &output);
 
     public:
