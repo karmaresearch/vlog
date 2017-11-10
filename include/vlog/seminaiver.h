@@ -78,18 +78,15 @@ class SemiNaiver {
 
         bool checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
                 const RuleExecutionPlan &plan,
-                const Literal &headLiteral,
                 std::vector<size_t> &cards);
 
         void processRuleFirstAtom(const uint8_t nBodyLiterals,
                 const Literal *bodyLiteral,
-                const Literal &headLiteral,
-                const uint8_t posHeadInRule,
+                std::vector<Literal> &heads,
                 const size_t min,
                 const size_t max,
                 int &processedTables,
                 const bool lastLiteral,
-                FCTable *endTable,
                 const uint32_t iteration,
                 const RuleExecutionDetails &ruleDetails,
                 const uint8_t orderExecution,
@@ -98,16 +95,14 @@ class SemiNaiver {
 
         void reorderPlan(RuleExecutionPlan &plan,
                 const std::vector<size_t> &cards,
-                const Literal &headLiteral,
-                int posHead);
+                const std::vector<Literal> &headLiteral);
 
         bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
                 std::vector<RuleExecutionDetails> &allIDBRules,
                 std::vector<StatIteration> &costRules);
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
-                Literal &headLiteral,
-                int posHeadLiteral,
+                std::vector<Literal> &heads,
                 const uint32_t iteration,
                 std::vector<ResultJoinProcessor*> *finalResultContainer);
 

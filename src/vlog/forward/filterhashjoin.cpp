@@ -8,16 +8,16 @@ FilterHashJoinSorter::FilterHashJoinSorter(const uint8_t s, const std::pair<uint
 }
 
 FilterHashJoin::FilterHashJoin(ResultJoinProcessor *output,
-                               const JoinHashMap *map1, const DoubleJoinHashMap *map2,
-                               std::vector<Term_t> *mapValues,
-                               const uint8_t mapRowSize, const uint8_t njoinfields,
-                               const uint8_t joinField1, const uint8_t joinField2,
-                               const Literal *literal, const bool isDerivationUnique,
-                               const bool literalSubsumesHead,
-                               std::vector<DuplicateContainers> *existingTuples,
-                               const uint8_t nLastLiteralPosConstsInHead,
-                               const Term_t *lastLiteralValueConstsInHead,
-                               const uint8_t *lastLiteralPosConstsInHead) :
+        const JoinHashMap *map1, const DoubleJoinHashMap *map2,
+        std::vector<Term_t> *mapValues,
+        const uint8_t mapRowSize, const uint8_t njoinfields,
+        const uint8_t joinField1, const uint8_t joinField2,
+        const Literal *literal, const bool isDerivationUnique,
+        const bool literalSubsumesHead,
+        std::vector<DuplicateContainers> *existingTuples,
+        const uint8_t nLastLiteralPosConstsInHead,
+        const Term_t *lastLiteralValueConstsInHead,
+        const uint8_t *lastLiteralPosConstsInHead) :
     output(output), map1(map1), map2(map2),
     mapValues(mapValues), mapRowSize(mapRowSize), njoinfields(njoinfields),
     joinField1(joinField1), joinField2(joinField2),
@@ -28,24 +28,24 @@ FilterHashJoin::FilterHashJoin(ResultJoinProcessor *output,
     existingTuples(existingTuples), nLastLiteralPosConstsInHead(nLastLiteralPosConstsInHead),
     lastLiteralValueConstsInHead(lastLiteralValueConstsInHead), lastLiteralPosConstsInHead(lastLiteralPosConstsInHead),
     processedElements(0) {
-    for (int i = 0; i < nValuesHead; ++i) {
-        posValuesHeadRowEdition.push_back(posValuesHead[i]);
-    }
+        for (int i = 0; i < nValuesHead; ++i) {
+            posValuesHeadRowEdition.push_back(posValuesHead[i]);
+        }
 #if DEBUG
-    for (int i = 0; i < nValuesHead; ++i) {
-        LOG(DEBUGL) << "posValuesHead[" << i << "] = [" << (int) posValuesHead[i].first << ", " << (int) posValuesHead[i].second << "]";
-    }
-    for (int i = 0; i < nValuesHashHead; ++i) {
-        LOG(DEBUGL) << "posValuesHashHead[" << i << "] = [" << (int) posValuesHashHead[i].first << ", " << (int) posValuesHashHead[i].second << "]";
-    }
+        for (int i = 0; i < nValuesHead; ++i) {
+            LOG(DEBUGL) << "posValuesHead[" << i << "] = [" << (int) posValuesHead[i].first << ", " << (int) posValuesHead[i].second << "]";
+        }
+        for (int i = 0; i < nValuesHashHead; ++i) {
+            LOG(DEBUGL) << "posValuesHashHead[" << i << "] = [" << (int) posValuesHashHead[i].first << ", " << (int) posValuesHashHead[i].second << "]";
+        }
 #endif
-    std::sort(posValuesHeadRowEdition.begin(), posValuesHeadRowEdition.end());
-}
+        std::sort(posValuesHeadRowEdition.begin(), posValuesHeadRowEdition.end());
+    }
 
 inline void FilterHashJoin::doJoin_join(const Term_t *constantValues,
-                                        const std::vector<Term_t> &joins1,
-                                        const std::vector<std::pair<Term_t, Term_t>> &joins2,
-                                        std::vector<Term_t> &otherVariablesContainer) {
+        const std::vector<Term_t> &joins1,
+        const std::vector<std::pair<Term_t, Term_t>> &joins2,
+        std::vector<Term_t> &otherVariablesContainer) {
 
     matches.clear();
     if (njoinfields == 1) {
@@ -150,7 +150,7 @@ inline void FilterHashJoin::doJoin_join(const Term_t *constantValues,
         }
     }
 #if DEBUG
-    output->checkSizes();
+    output->checkSizes(0);
 #endif
 }
 
@@ -203,15 +203,15 @@ inline void FilterHashJoin::doJoin_cartprod(const Term_t *constantValues,
         i++;
     }
 #if DEBUG
-    output->checkSizes();
+    output->checkSizes(0);
 #endif
 }
 
 void FilterHashJoin::run(const std::vector<FilterHashJoinBlock> &inputTables, const bool cartprod,
-                         const size_t startCarprod, const size_t endCartprod,
-                         const std::vector<uint8_t> ps, int &processedTables,
-                         const std::vector<std::pair<uint8_t, Term_t>> *valueColumnsToFilter,
-                         const std::vector<std::pair<uint8_t, uint8_t>> *columnsToFilterOut) {
+        const size_t startCarprod, const size_t endCartprod,
+        const std::vector<uint8_t> ps, int &processedTables,
+        const std::vector<std::pair<uint8_t, Term_t>> *valueColumnsToFilter,
+        const std::vector<std::pair<uint8_t, uint8_t>> *columnsToFilterOut) {
 
     std::vector<uint8_t> posToSort = ps;
 
@@ -243,11 +243,11 @@ void FilterHashJoin::run(const std::vector<FilterHashJoinBlock> &inputTables, co
 
             if (existingTuples == NULL && cartprod) {
                 run_processitr_columnversion(itr, startCarprod, endCartprod,
-                                             posOtherVariables, valueColumnsToFilter, columnsToFilterOut);
+                        posOtherVariables, valueColumnsToFilter, columnsToFilterOut);
             } else {
                 run_processitr_rowversion(itr, cartprod, startCarprod,
-                                          endCartprod, posOtherVariables, valueColumnsToFilter,
-                                          columnsToFilterOut);
+                        endCartprod, posOtherVariables, valueColumnsToFilter,
+                        columnsToFilterOut);
             }
         }
         table->releaseIterator(itr);
@@ -293,10 +293,10 @@ void FilterHashJoin::run(const std::vector<FilterHashJoinBlock> &inputTables, co
         MergerInternalTableItr mergeItr(iterators, sortingCriteria, inputTables[0].table->getRowSize());
         if (existingTuples == NULL && cartprod) {
             run_processitr_columnversion(&mergeItr, startCarprod, endCartprod, posOtherVariables,
-                                         valueColumnsToFilter, columnsToFilterOut);
+                    valueColumnsToFilter, columnsToFilterOut);
         } else {
             run_processitr_rowversion(&mergeItr, cartprod, startCarprod, endCartprod, posOtherVariables,
-                                      valueColumnsToFilter, columnsToFilterOut);
+                    valueColumnsToFilter, columnsToFilterOut);
         }
         //Release all counters
         for (int i = 0; i < iterators.size(); ++i) {
@@ -368,12 +368,12 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
 
         for (uint8_t i = 0; i < nValuesHead; ++i) {
             columns[posValuesHead[i].first] = c[i];
-	    size_t sz = c[i]->size();
-	    if (i > 0) {
-		assert(size == sz);
-	    } else {
-		size = sz;
-	    }
+            size_t sz = c[i]->size();
+            if (i > 0) {
+                assert(size == sz);
+            } else {
+                size = sz;
+            }
         }
 
     } else {
@@ -411,10 +411,10 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
                 }
                 prevEl = v;
                 //}
-            }
+        }
 
-            columns[posValuesHead[0].first] = p.getColumn();
-            //size = columns[posValuesHead[0].first]->size();
+        columns[posValuesHead[0].first] = p.getColumn();
+        //size = columns[posValuesHead[0].first]->size();
         } else if (nValuesHead == 2) {
             //Filter away the duplicates. I assume it is already sorted
             Column *c1 = c[0].get();
@@ -464,171 +464,171 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
         } else {
             throw 10;
         }
-    }
-
-    LOG(DEBUGL) << "startCarprod = " << startCarprod << ", mapRowSize = " << (int) mapRowSize
-                             << ", endCartprod = " << endCartprod << ", size = " << size << ", pos = " << (int) pos;
-    LOG(DEBUGL) << "nValuesHead = " << (int) nValuesHead << ", nValuesHashHead = " << (int) nValuesHashHead;
-    if (size > 0) {
-        //Add other constants
-        const Term_t *row = output->getRawRow();
-        for (uint8_t i = 0; i < pos; ++i) {
-            columns[otherPos[i]] = std::shared_ptr<Column>(
-                                       new CompressedColumn(row[otherPos[i]], size));
         }
 
-        uint32_t s = startCarprod;
-        uint32_t i = 0;
-        while (s < endCartprod) {
-            //create constants with the values of the map
-            const Term_t *row = &(mapValues->at(s));
-            for (uint8_t i = 0; i < nValuesHashHead; ++i) {
-                columns[posValuesHashHead[i].first] = std::shared_ptr<Column>(
-                        new CompressedColumn(row[posValuesHashHead[i].second], size));
+        LOG(DEBUGL) << "startCarprod = " << startCarprod << ", mapRowSize = " << (int) mapRowSize
+            << ", endCartprod = " << endCartprod << ", size = " << size << ", pos = " << (int) pos;
+        LOG(DEBUGL) << "nValuesHead = " << (int) nValuesHead << ", nValuesHashHead = " << (int) nValuesHashHead;
+        if (size > 0) {
+            //Add other constants
+            const Term_t *row = output->getRawRow();
+            for (uint8_t i = 0; i < pos; ++i) {
+                columns[otherPos[i]] = std::shared_ptr<Column>(
+                        new CompressedColumn(row[otherPos[i]], size));
             }
 
-	    /*
-            if (s != startCarprod) {
-                for (uint8_t i = 0; i < nValuesHead; ++i) {
-                    columns[posValuesHead[i].first] = columns[posValuesHead[i].first]; // NOOP??? --Ceriel
+            uint32_t s = startCarprod;
+            uint32_t i = 0;
+            while (s < endCartprod) {
+                //create constants with the values of the map
+                const Term_t *row = &(mapValues->at(s));
+                for (uint8_t i = 0; i < nValuesHashHead; ++i) {
+                    columns[posValuesHashHead[i].first] = std::shared_ptr<Column>(
+                            new CompressedColumn(row[posValuesHashHead[i].second], size));
                 }
-                for (uint8_t i = 0; i < pos; ++i) {
-                    columns[otherPos[i]] = columns[otherPos[i]]; // NOOP??? --Ceriel
-                }
-            }
-	    */
+
+                /*
+                   if (s != startCarprod) {
+                   for (uint8_t i = 0; i < nValuesHead; ++i) {
+                   columns[posValuesHead[i].first] = columns[posValuesHead[i].first]; // NOOP??? --Ceriel
+                   }
+                   for (uint8_t i = 0; i < pos; ++i) {
+                   columns[otherPos[i]] = columns[otherPos[i]]; // NOOP??? --Ceriel
+                   }
+                   }
+                   */
 
 #if DEBUG
-	    for (int i = 0; i < columns.size(); i++) {
-		size_t sz = columns[i]->size();
-		assert(size == sz);
-	    }
+                for (int i = 0; i < columns.size(); i++) {
+                    size_t sz = columns[i]->size();
+                    assert(size == sz);
+                }
 #endif
 
-            //Add the columns to the output container
-            output->addColumns(i, columns, isDerivationUnique,
-                               true);
+                //Add the columns to the output container
+                output->addColumns(i, columns, isDerivationUnique,
+                        true);
 
 
-            s += mapRowSize;
-            i++;
+                s += mapRowSize;
+                i++;
+            }
         }
-    }
 #if DEBUG
-    output->checkSizes();
+        output->checkSizes(0);
 #endif
-}
-
-void FilterHashJoin::run_processitr_rowversion(FCInternalTableItr *itr, const bool cartprod,
-        const size_t startCarprod, const size_t endCartprod,
-        const uint8_t *posOtherVariables,
-        const std::vector<std::pair<uint8_t, Term_t>> *valueColumnsToFilter,
-        const std::vector<std::pair<uint8_t, uint8_t>> *columnsToFilterOut) {
-
-    uint8_t posToFilter;
-    Term_t valueToFilter;
-    if (valueColumnsToFilter != NULL) {
-        assert(valueColumnsToFilter->size() == 1);
-        posToFilter = valueColumnsToFilter->at(0).first;
-        valueToFilter = valueColumnsToFilter->at(0).second;
-    }
-    uint8_t c1, c2;
-    if (columnsToFilterOut != NULL) {
-        assert(columnsToFilterOut->size() == 1);
-        c1 = columnsToFilterOut->at(0).first;
-        c2 = columnsToFilterOut->at(0).second;
     }
 
-    std::vector<Term_t> joinsContainer1;
-    std::vector<std::pair<Term_t, Term_t>> joinsContainer2;
-    Term_t valuesHead[SIZETUPLE];
-    bool firstGroup = true;
-    std::vector<Term_t> otherVariablesContainer;
-    while (itr->hasNext()) {
-        processedElements++;
-        itr->next();
+    void FilterHashJoin::run_processitr_rowversion(FCInternalTableItr *itr, const bool cartprod,
+            const size_t startCarprod, const size_t endCartprod,
+            const uint8_t *posOtherVariables,
+            const std::vector<std::pair<uint8_t, Term_t>> *valueColumnsToFilter,
+            const std::vector<std::pair<uint8_t, uint8_t>> *columnsToFilterOut) {
 
-        if (valueColumnsToFilter != NULL
-                && itr->getCurrentValue(posToFilter) == valueToFilter) {
-            LOG(DEBUGL) << "Avoid to consider the value "
-                                     << valueToFilter << " of column " << (int) posToFilter;
-            continue;
+        uint8_t posToFilter;
+        Term_t valueToFilter;
+        if (valueColumnsToFilter != NULL) {
+            assert(valueColumnsToFilter->size() == 1);
+            posToFilter = valueColumnsToFilter->at(0).first;
+            valueToFilter = valueColumnsToFilter->at(0).second;
         }
-        if (columnsToFilterOut != NULL
-                && itr->getCurrentValue(c1) == itr->getCurrentValue(c2)) {
-            LOG(DEBUGL) << "The columns " << c1 << " and " << c2
-                                     << " are equivalent " << itr->getCurrentValue(c1);
-            continue;
+        uint8_t c1, c2;
+        if (columnsToFilterOut != NULL) {
+            assert(columnsToFilterOut->size() == 1);
+            c1 = columnsToFilterOut->at(0).first;
+            c2 = columnsToFilterOut->at(0).second;
         }
 
-        if (firstGroup) {
-            for (uint8_t i = 0; i < nValuesHead; ++i) {
-                valuesHead[i] = itr->getCurrentValue(posValuesHeadRowEdition[i].second);
+        std::vector<Term_t> joinsContainer1;
+        std::vector<std::pair<Term_t, Term_t>> joinsContainer2;
+        Term_t valuesHead[SIZETUPLE];
+        bool firstGroup = true;
+        std::vector<Term_t> otherVariablesContainer;
+        while (itr->hasNext()) {
+            processedElements++;
+            itr->next();
+
+            if (valueColumnsToFilter != NULL
+                    && itr->getCurrentValue(posToFilter) == valueToFilter) {
+                LOG(DEBUGL) << "Avoid to consider the value "
+                    << valueToFilter << " of column " << (int) posToFilter;
+                continue;
             }
-            firstGroup = false;
-        } else {
-            //Check if the current value is equivalent to the previous one
-            bool ok = true;
-            for (uint8_t i = 0; i < nValuesHead; ++i) {
-                if (itr->getCurrentValue(posValuesHeadRowEdition[i].second) != valuesHead[i]) {
-                    ok = false;
-                }
+            if (columnsToFilterOut != NULL
+                    && itr->getCurrentValue(c1) == itr->getCurrentValue(c2)) {
+                LOG(DEBUGL) << "The columns " << c1 << " and " << c2
+                    << " are equivalent " << itr->getCurrentValue(c1);
+                continue;
             }
 
-            if (!ok) {
-                if (!cartprod) {
-                    doJoin_join(valuesHead, joinsContainer1, joinsContainer2, otherVariablesContainer);
-                    if (njoinfields == 1) {
-                        joinsContainer1.clear();
-                    } else {
-                        joinsContainer2.clear();
-                    }
-                } else {
-                    doJoin_cartprod(valuesHead, startCarprod, endCartprod, otherVariablesContainer);
-                }
-                otherVariablesContainer.clear();
+            if (firstGroup) {
                 for (uint8_t i = 0; i < nValuesHead; ++i) {
                     valuesHead[i] = itr->getCurrentValue(posValuesHeadRowEdition[i].second);
                 }
-            }
-        }
-
-        if (!cartprod) {
-            if (njoinfields == 1) {
-                joinsContainer1.push_back(itr->getCurrentValue(joinField1));
+                firstGroup = false;
             } else {
-                joinsContainer2.push_back(std::make_pair(itr->getCurrentValue(joinField1),
-                                          itr->getCurrentValue(joinField2)));
-            }
-        }
-
-        if (literalSubsumesHead) {
-            //Filter first
-            bool ok = true;
-            for (uint8_t i = 0; i < nLastLiteralPosConstsInHead && ok; ++i) {
-                if (itr->getCurrentValue(lastLiteralPosConstsInHead[i]) != lastLiteralValueConstsInHead[i]) {
-                    ok = false;
-                }
-            }
-            if (ok) {
-                for (uint8_t i = 0; i < nValuesHashHead; ++i) {
-                    otherVariablesContainer.push_back(itr->getCurrentValue(posOtherVariables[i]));
+                //Check if the current value is equivalent to the previous one
+                bool ok = true;
+                for (uint8_t i = 0; i < nValuesHead; ++i) {
+                    if (itr->getCurrentValue(posValuesHeadRowEdition[i].second) != valuesHead[i]) {
+                        ok = false;
+                    }
                 }
 
+                if (!ok) {
+                    if (!cartprod) {
+                        doJoin_join(valuesHead, joinsContainer1, joinsContainer2, otherVariablesContainer);
+                        if (njoinfields == 1) {
+                            joinsContainer1.clear();
+                        } else {
+                            joinsContainer2.clear();
+                        }
+                    } else {
+                        doJoin_cartprod(valuesHead, startCarprod, endCartprod, otherVariablesContainer);
+                    }
+                    otherVariablesContainer.clear();
+                    for (uint8_t i = 0; i < nValuesHead; ++i) {
+                        valuesHead[i] = itr->getCurrentValue(posValuesHeadRowEdition[i].second);
+                    }
+                }
+            }
+
+            if (!cartprod) {
+                if (njoinfields == 1) {
+                    joinsContainer1.push_back(itr->getCurrentValue(joinField1));
+                } else {
+                    joinsContainer2.push_back(std::make_pair(itr->getCurrentValue(joinField1),
+                                itr->getCurrentValue(joinField2)));
+                }
+            }
+
+            if (literalSubsumesHead) {
+                //Filter first
+                bool ok = true;
+                for (uint8_t i = 0; i < nLastLiteralPosConstsInHead && ok; ++i) {
+                    if (itr->getCurrentValue(lastLiteralPosConstsInHead[i]) != lastLiteralValueConstsInHead[i]) {
+                        ok = false;
+                    }
+                }
+                if (ok) {
+                    for (uint8_t i = 0; i < nValuesHashHead; ++i) {
+                        otherVariablesContainer.push_back(itr->getCurrentValue(posOtherVariables[i]));
+                    }
+
+                }
             }
         }
-    }
-    if (!firstGroup) {
-        if (!cartprod) {
-            doJoin_join(valuesHead, joinsContainer1, joinsContainer2, otherVariablesContainer);
-            if (njoinfields == 1) {
-                joinsContainer1.clear();
+        if (!firstGroup) {
+            if (!cartprod) {
+                doJoin_join(valuesHead, joinsContainer1, joinsContainer2, otherVariablesContainer);
+                if (njoinfields == 1) {
+                    joinsContainer1.clear();
+                } else {
+                    joinsContainer2.clear();
+                }
             } else {
-                joinsContainer2.clear();
+                doJoin_cartprod(valuesHead, startCarprod, endCartprod, otherVariablesContainer);
             }
-        } else {
-            doJoin_cartprod(valuesHead, startCarprod, endCartprod, otherVariablesContainer);
+            otherVariablesContainer.clear();
         }
-        otherVariablesContainer.clear();
     }
-}

@@ -5,14 +5,6 @@
 #include <vlog/ruleexecplan.h>
 
 struct RuleExecutionDetails {
-
-    struct HeadVars {
-        std::vector<uint8_t> posEDBVarsInHead;
-        std::vector<std::vector<std::pair<uint8_t, uint8_t>>> occEDBVarsInHead;
-        std::vector<std::pair<uint8_t,
-            std::vector<std::pair<uint8_t, uint8_t>>>> edbLiteralPerHeadVars;
-    };
-
     const Rule rule;
     const size_t ruleid;
     std::vector<Literal> bodyLiterals;
@@ -23,7 +15,12 @@ struct RuleExecutionDetails {
 
     uint8_t nIDBs = 0;
     std::vector<RuleExecutionPlan> orderExecutions;
-    std::vector<HeadVars> infoHeads;
+
+    std::vector<uint8_t> posEDBVarsInHead;
+    std::vector<std::vector<std::pair<uint8_t, uint8_t>>> occEDBVarsInHead;
+    std::vector<std::pair<uint8_t,
+        std::vector<std::pair<uint8_t, uint8_t>>>> edbLiteralPerHeadVars;
+
 
     RuleExecutionDetails(Rule rule, size_t ruleid) : rule(rule), ruleid(ruleid) {}
 
@@ -31,12 +28,11 @@ struct RuleExecutionDetails {
 
     void calculateNVarsInHeadFromEDB();
 
-    static void checkWhetherEDBsRedundantHead(RuleExecutionPlan &plan,
-            const Literal &head,
-            RuleExecutionPlan::HeadVars &hv);
+    //static void checkWhetherEDBsRedundantHead(RuleExecutionPlan &plan,
+    //        const Literal &head);
 
     static void checkFilteringStrategy(const Literal &lastLiteral,
-            const Literal &head, RuleExecutionPlan::HeadVars &hv);
+            const Literal &head, RuleExecutionPlan &hv);
 
     private:
 

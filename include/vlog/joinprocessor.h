@@ -163,10 +163,10 @@ class JoinExecutor {
 
         static bool isJoinVerificative(
                 const FCInternalTable *t1,
-                const RuleExecutionPlan::HeadVars &vars,
+                const RuleExecutionPlan &vars,
                 const int currentLiteral);
 
-        static bool isJoinTwoToOneJoin(const RuleExecutionPlan::HeadVars &hv,
+        static bool isJoinTwoToOneJoin(const RuleExecutionPlan &hv,
                 const int currentLiteral);
 
         static void verificativeJoin(
@@ -176,7 +176,7 @@ class JoinExecutor {
                 const size_t min,
                 const size_t max,
                 ResultJoinProcessor *output,
-                const RuleExecutionPlan::HeadVars &hv,
+                const RuleExecutionPlan &hv,
                 const int currentLiteral,
                 int nthreads);
 
@@ -187,7 +187,7 @@ class JoinExecutor {
                 const size_t min,
                 const size_t max,
                 ResultJoinProcessor *output,
-                const RuleExecutionPlan::HeadVars &hv,
+                const RuleExecutionPlan &hv,
                 const int currentLiteral,
                 int nthreads);
 
@@ -198,7 +198,7 @@ class JoinExecutor {
                 const size_t min,
                 const size_t max,
                 ResultJoinProcessor *output,
-                const RuleExecutionPlan::HeadVars &hv,
+                const RuleExecutionPlan &hv,
                 const int currentLiteral,
                 int nthreads);
 
@@ -209,7 +209,7 @@ class JoinExecutor {
                 const size_t min,
                 const size_t max,
                 ResultJoinProcessor *output,
-                const RuleExecutionPlan::HeadVars &hv,
+                const RuleExecutionPlan &hv,
                 const int currentLiteral,
                 const int nthreads);
 
@@ -248,7 +248,7 @@ class JoinExecutor {
                 const DoubleJoinHashMap &doublemap,
                 ResultJoinProcessor *out, const uint8_t njoinfields,
                 const uint8_t idxJoinField1, const uint8_t idxJoinField2,
-                const Literal *outputLiteral,
+                const std::vector<Literal> *outputLiterals,
                 const Literal &literal, const uint8_t rowSize,
                 const std::vector<uint8_t> &posToSort, std::vector<Term_t> &values,
                 const bool literalSharesVarsWithHead,
@@ -290,31 +290,31 @@ class JoinExecutor {
                 Output * output);
 
         static void join(SemiNaiver *naiver, const FCInternalTable * t1,
-                const Literal *outputLiteral, const Literal &literal,
+                const std::vector<Literal> *outputLiterals, const Literal &literal,
                 const size_t min, const size_t max,
                 const std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
                 std::vector<std::pair<uint8_t, uint8_t>> joinsCoordinates,
                 ResultJoinProcessor * output, const bool lastLiteral,
                 const RuleExecutionDetails &ruleDetails,
-                const RuleExecutionPlan::HeadVars &hv, int &processedTables,
+                const RuleExecutionPlan &hv, int &processedTables,
                 const int currentLiteral,
                 const int nthreads);
 
         static void mergejoin(const FCInternalTable * t1, SemiNaiver *naiver,
-                const Literal *outputLiteral,
+                const std::vector<Literal> *outputLiterals,
                 const Literal &literalToQuery,
                 const uint32_t min, const uint32_t max,
                 std::vector<std::pair<uint8_t, uint8_t>> joinsCoordinates,
                 ResultJoinProcessor * output, int nthreads);
 
         static void hashjoin(const FCInternalTable * t1,
-                SemiNaiver *naiver, const Literal *outputLiteral,
+                SemiNaiver *naiver, const std::vector<Literal> *outputLiterals,
                 const Literal &literal, const size_t min, const size_t max,
                 const std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
                 std::vector<std::pair<uint8_t, uint8_t>> joinsCoordinates,
                 ResultJoinProcessor *output, const int lastLiteral,
                 const RuleExecutionDetails &ruleDetails,
-                const RuleExecutionPlan::HeadVars &hv,
+                const RuleExecutionPlan &hv,
                 int &processedTables, int nthreads);
 
         static int cmp(const Term_t *r1, const Term_t *r2, const uint8_t s);

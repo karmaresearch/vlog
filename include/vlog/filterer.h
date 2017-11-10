@@ -70,14 +70,14 @@ public:
 
     bool isEligibleForPartialSubs(
         const FCBlock *block,
-        const Literal &headRule,
+        const std::vector<Literal> &heads,
         const FCInternalTable *currentResults,
         const int nPosFromFirst,
         const int nPosFromSecond);
 
     bool producedDerivationInPreviousStepsWithSubs(
         const FCBlock *block,
-        const Literal &outputQuery,
+        const std::vector<Literal> &outputQueries,
         const Literal &currentQuery,
         const FCInternalTable *currentResults,
         const int nPosForHead,

@@ -72,7 +72,10 @@ bool SemiNaiverThreaded::doGlobalConsolidation(
     for (const auto &el : data.getTmpDerivations()) {
         FinalRuleProcessor *fel = (FinalRuleProcessor*)el;
         if (!el->isEmpty()) {
-            PredId_t pid = fel->getLiteral().getPredicate().getId();
+            if (fel->getHeads().size() > 1) {
+                LOG(ERRORL) << "Not supported";
+            }
+            PredId_t pid = fel->getHeads()[0].getPredicate().getId();
             if (allDersByPred.count(pid)) {
                 allDersByPred.find(pid)->second.push_back(fel);
             } else {

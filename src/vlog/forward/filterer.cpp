@@ -10,7 +10,7 @@ TableFilterer::TableFilterer(SemiNaiver *naiver) : naiver(naiver) {}
 bool TableFilterer::opt_intersection;
 
 bool TableFilterer::intersection(const Literal &currentQuery,
-                                 const FCBlock &block) {
+        const FCBlock &block) {
     if (!getOptIntersect()) {
         LOG(DEBUGL) << "intersection disabled";
         return true;
@@ -24,9 +24,9 @@ bool TableFilterer::intersection(const Literal &currentQuery,
 }
 
 bool TableFilterer::producedDerivationInPreviousSteps(
-    const Literal &outputQuery,
-    const Literal &currentQuery,
-    const FCBlock *block) {
+        const Literal &outputQuery,
+        const Literal &currentQuery,
+        const FCBlock *block) {
 
     const RuleExecutionDetails *rule = block->rule;
     if (rule == NULL || rule->nIDBs == 0) {
@@ -36,7 +36,7 @@ bool TableFilterer::producedDerivationInPreviousSteps(
     //Easy case: the body of the current rule is equal to our rule
     Substitution subs[10];
     int nsubs = Literal::getSubstitutionsA2B(subs,
-                rule->rule.getHead(block->posQueryInRule), currentQuery);
+            rule->rule.getHead(block->posQueryInRule), currentQuery);
     assert(nsubs != -1);
 
     for (const auto &lit : rule->rule.getBody()) {
@@ -53,16 +53,20 @@ bool TableFilterer::producedDerivationInPreviousSteps(
 }
 
 bool TableFilterer::isEligibleForPartialSubs(
-    const FCBlock *block,
-    const Literal &headRule,
-    const FCInternalTable *currentResults,
-    const int nPosFromFirst,
-    const int nPosFromSecond) {
+        const FCBlock *block,
+        const std::vector<Literal> &heads,
+        const FCInternalTable *currentResults,
+        const int nPosFromFirst,
+        const int nPosFromSecond) {
 
-    if (! naiver->opt_filter()) {
+    if (!naiver->opt_filter()) {
         LOG(DEBUGL) << "isEligibleForPartialSubs disabled";
         return false;
     }
+
+    if (heads.size() > 1)
+        return false;
+    const Literal &headRule = heads[0];
 
     //Minimum requirements for the rule at hand
     if ((currentResults != NULL && currentResults->getNRows() > 10000000) ||
@@ -83,21 +87,21 @@ bool TableFilterer::isEligibleForPartialSubs(
         return false;
     }
     if (bodyLiterals.size() == 2) {
-	// Check the join: may have only one join position.
-	int count = 0;
-	std::vector<uint8_t> v1 = bodyLiterals[0].getAllVars();
-	std::vector<uint8_t> v2 = bodyLiterals[1].getAllVars();
-	for (int i = 0; i < v1.size(); i++) {
-	    for (int j = 0; j < v2.size(); j++) {
-		if (v1[i] == v2[j]) {
-		    count++;
-		    if (count > 1) {
-			return false;
-		    }
-		    break;
-		}
-	    }
-	}
+        // Check the join: may have only one join position.
+        int count = 0;
+        std::vector<uint8_t> v1 = bodyLiterals[0].getAllVars();
+        std::vector<uint8_t> v2 = bodyLiterals[1].getAllVars();
+        for (int i = 0; i < v1.size(); i++) {
+            for (int j = 0; j < v2.size(); j++) {
+                if (v1[i] == v2[j]) {
+                    count++;
+                    if (count > 1) {
+                        return false;
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     // One body literal must match the head of the rule at hand
@@ -110,12 +114,12 @@ bool TableFilterer::isEligibleForPartialSubs(
         if (!foundRecursive && el.getPredicate().getId() == headRule.getPredicate().getId()) {
             long estimate = naiver->estimateCardinality(el, 0, block->iteration);
             if (estimate < 30000000) { //I must be quick to query...
-		foundRecursive = true;
+                foundRecursive = true;
                 idxRecursive = i;
             } else {
-		// Recursive but too large
-		return false;
-	    }
+                // Recursive but too large
+                return false;
+            }
         }
         if (!foundSmall && el.getPredicate().getId() != headRule.getPredicate().getId()) {
             //Check if the size is small
@@ -178,8 +182,10 @@ bool TableFilterer::isEligibleForPartialSubs(
                     // Ok, I'm in business. Now I'm sure block contains only
                     // the content of this rule. Now I can check whether this rule
                     // satisfies the eligibility criteria.
+                    std::vector<Literal> newHead;
+                    newHead.push_back(bodyLiterals[0]);
                     bool resp = isEligibleForPartialSubs(childBlocks.back(),
-                                                         bodyLiterals[0], NULL, 1, 1);
+                            newHead, NULL, 1, 1);
                     //LOG(INFOL) << "Here I would have returned " << resp;
                     return resp;
                 } else {
@@ -196,9 +202,9 @@ bool TableFilterer::isEligibleForPartialSubs(
         }
     }
 
-//LOG(INFOL) << "TODERIVE=" << headRule.tostring(naiver->getProgram(), naiver->getDict()) << " rule=" << rule.tostring(naiver->getProgram(), naiver->getDict()) << "recursive=" << foundRecursive << " small=" << foundSmall;
+    //LOG(INFOL) << "TODERIVE=" << headRule.tostring(naiver->getProgram(), naiver->getDict()) << " rule=" << rule.tostring(naiver->getProgram(), naiver->getDict()) << "recursive=" << foundRecursive << " small=" << foundSmall;
 
-//Check if the small literal shares variables with the recursive literal
+    //Check if the small literal shares variables with the recursive literal
     if (foundSmall) {
         std::vector<uint8_t> allvars = bodyLiterals[idxRecursive].getAllVars();
         if (bodyLiterals[idxSmall].getSharedVars(allvars).size() == 0)
@@ -211,14 +217,17 @@ bool TableFilterer::isEligibleForPartialSubs(
 }
 
 bool TableFilterer::producedDerivationInPreviousStepsWithSubs(
-    const FCBlock *block,
-    const Literal &outputQuery,
-    const Literal &currentQuery,
-    const FCInternalTable *currentResults,
-    const int nPosForHead,
-    const std::pair<uint8_t, uint8_t> *posHead,
-    const int nPosForLit,
-    const std::pair<uint8_t, uint8_t> *posLiteral) {
+        const FCBlock *block,
+        const std::vector<Literal> &outputQueries,
+        const Literal &currentQuery,
+        const FCInternalTable *currentResults,
+        const int nPosForHead,
+        const std::pair<uint8_t, uint8_t> *posHead,
+        const int nPosForLit,
+        const std::pair<uint8_t, uint8_t> *posLiteral) {
+
+    if (outputQueries.size() > 1)
+        throw 10; // Work only with one head
 
     //Create a map that points from all subs in the body to the head
     if (nPosForHead != 1) {
@@ -232,30 +241,30 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs(
     std::shared_ptr<Column> vLitCol = currentResults->getColumn(posLiteral[0].first);
     std::shared_ptr<Column> vHeadCol = currentResults->getColumn(posHead[0].second);
     if (vLitCol->isBackedByVector() && vHeadCol->isBackedByVector()) {
-	const std::vector<Term_t> *vLitVec = &vLitCol->getVectorRef();
-	const std::vector<Term_t> *vHeadVec = &vHeadCol->getVectorRef();
+        const std::vector<Term_t> *vLitVec = &vLitCol->getVectorRef();
+        const std::vector<Term_t> *vHeadVec = &vHeadCol->getVectorRef();
 
-	for (size_t i = 0; i < vLitVec->size(); i++) {
-	    const Term_t vLit = (*vLitVec)[i];
-	    if (!mapSubstitutions.count(vLit)) {
-		mapSubstitutions.insert(std::make_pair(vLit,
-						       std::vector<Term_t>()));
-	    }
-	    mapSubstitutions[vLit].push_back((*vHeadVec)[i]);
-	}
+        for (size_t i = 0; i < vLitVec->size(); i++) {
+            const Term_t vLit = (*vLitVec)[i];
+            if (!mapSubstitutions.count(vLit)) {
+                mapSubstitutions.insert(std::make_pair(vLit,
+                            std::vector<Term_t>()));
+            }
+            mapSubstitutions[vLit].push_back((*vHeadVec)[i]);
+        }
     } else {
-	FCInternalTableItr *itr = currentResults->getIterator();
-	while (itr->hasNext()) {
-	    itr->next();
-	    const Term_t vLit = itr->getCurrentValue(posLiteral[0].first);
-	    if (!mapSubstitutions.count(vLit)) {
-		mapSubstitutions.insert(std::make_pair(vLit,
-						       std::vector<Term_t>()));
-	    }
-	    const Term_t vHead = itr->getCurrentValue(posHead[0].second);
-	    mapSubstitutions[vLit].push_back(vHead);
-	}
-	currentResults->releaseIterator(itr);
+        FCInternalTableItr *itr = currentResults->getIterator();
+        while (itr->hasNext()) {
+            itr->next();
+            const Term_t vLit = itr->getCurrentValue(posLiteral[0].first);
+            if (!mapSubstitutions.count(vLit)) {
+                mapSubstitutions.insert(std::make_pair(vLit,
+                            std::vector<Term_t>()));
+            }
+            const Term_t vHead = itr->getCurrentValue(posHead[0].second);
+            mapSubstitutions[vLit].push_back(vHead);
+        }
+        currentResults->releaseIterator(itr);
     }
     // finished creating the map
 
@@ -272,26 +281,25 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs(
     // currentQuery.
     // --Ceriel
     return producedDerivationInPreviousStepsWithSubs_rec(block,
-            mapSubstitutions, outputQuery, currentQuery,
-            // posVarsInHead[posHead[0].first], posVarsInLit[posLiteral[0].second]);
-            posHead[0].first, posVarsInLit[posLiteral[0].second]);
+            mapSubstitutions, outputQueries[0], currentQuery,
+           posHead[0].first, posVarsInLit[posLiteral[0].second]);
 }
 
 bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
-    const FCBlock *block,
-    const map<Term_t, std::vector<Term_t>> &mapSubstitutions,
-    const Literal &outputQuery,
-    const Literal &currentQuery,
-    const size_t posHead_first,
-    const size_t posLit_second
-) {
+        const FCBlock *block,
+        const map<Term_t, std::vector<Term_t>> &mapSubstitutions,
+        const Literal &outputQuery,
+        const Literal &currentQuery,
+        const size_t posHead_first,
+        const size_t posLit_second
+        ) {
 
     const Rule &blockRule = block->rule->rule;
     //Get the body atom that matches with our head. This atom must exists.
     std::unique_ptr<Literal> rLit = getRecursiveLiteral(blockRule, outputQuery);
     //Get possibly the other atom which we can use to retrieve the subs
     std::unique_ptr<Literal> nrLit = getNonRecursiveLiteral(blockRule,
-                                     outputQuery);
+            outputQuery);
 
     //Recursive call
     if (rLit == NULL) {
@@ -301,7 +309,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
         /*** This code calculates the new current query and pos of the subs ***/
         Substitution subs[10];
         const int nsubs = Literal::getSubstitutionsA2B(subs,
-                          blockRule.getFirstHead(), currentQuery);
+                blockRule.getFirstHead(), currentQuery);
         if (nsubs == -1) {
             throw 10;
         }
@@ -313,7 +321,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
             }
         }
         const Literal childCurrentQuery = blockRule.getBody()[0].substitutes(
-                                              subs, nsubs);
+                subs, nsubs);
         uint8_t childPosLit_second;
         for (int i = 0; i < childCurrentQuery.getTupleSize(); ++i) {
             if (childCurrentQuery.getTermAtPos(i).getId() == idVarCurQuery)
@@ -324,7 +332,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
         /*** This code calculates the new output query and pos of the subs ***/
         Substitution subs2[10];
         const int nsubs2 = Literal::getSubstitutionsA2B(subs2,
-                           blockRule.getFirstHead(), outputQuery);
+                blockRule.getFirstHead(), outputQuery);
         VTerm tAtOutQuery = outputQuery.getTermAtPos(posHead_first);
         uint8_t idVarOutQuery = tAtOutQuery.getId();
         for (int i = 0; i < nsubs2; ++i) {
@@ -333,7 +341,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
             }
         }
         const Literal childOutputQuery = blockRule.getBody()[0].substitutes(
-                                             subs2, nsubs2);
+                subs2, nsubs2);
         uint8_t childPosHead_first;
         for (int i = 0; i < childOutputQuery.getTupleSize(); ++i) {
             if (childOutputQuery.getTermAtPos(i).getId() == idVarOutQuery)
@@ -343,7 +351,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
 
         //Get the last block of the first body
         FCIterator itr = naiver->getTable(childCurrentQuery,
-                                          0, block->iteration);
+                0, block->iteration);
         const FCBlock *recursiveBlock = NULL;
         while (!itr.isEmpty()) {
             recursiveBlock = itr.getCurrentBlock();
@@ -417,7 +425,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
             while (itr2->hasNext()) {
                 itr2->next();
                 const Term_t key = itr2->getCurrentValue(
-                                       joinHeadAndNRLits.second);
+                        joinHeadAndNRLits.second);
                 if (!mapSubstitutionsInBlockQuery.count(key)) {
                     mapSubstitutionsInBlockQuery[key] = std::set<Term_t>();
                 }
@@ -458,7 +466,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
 
         // Copy the substitutions in the head of the block rule
         int nsubs = Literal::getSubstitutionsA2B(subs, headBlockRule,
-                    substitutedLiteral);
+                substitutedLiteral);
         // If nsubs == -1, then the content of the block cannot match the query
         // we will ask. I'll count these cases. If this occurs for any subs.
         // then I can exclude the block.
@@ -472,7 +480,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
         //should match with our head
         const Literal srLit = rLit->substitutes(subs, nsubs);
         assert(srLit.getPredicate().getId() ==
-               outputQuery.getPredicate().getId());
+                outputQuery.getPredicate().getId());
 
         if (nrLit != NULL) {
             //Substitutes also the other non-recursive atom

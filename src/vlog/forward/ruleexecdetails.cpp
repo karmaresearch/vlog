@@ -128,28 +128,10 @@ void RuleExecutionDetails::extractAllEDBPatterns(std::vector<const Literal*> &ou
 }
 
 void RuleExecutionDetails::checkFilteringStrategy(
-        const Literal &literal, const Literal &head, RuleExecutionPlan::HeadVars &hv) {
-    //Two conditions: head and last literals must be compatible, and they must share at least one variable in the same position
+        const Literal &literal, const Literal &head, RuleExecutionPlan &hv) {
+    //Two conditions: head and last literals must be compatible, and they must
+    //share at least one variable in the same position
     Substitution substitutions[SIZETUPLE];
-    /*int nsubs = Literal::subsumes(substitutions, literal, head);
-      if (nsubs != -1) {
-    //hv.lastLiteralSubsumesHead = true;
-    for (uint32_t j = 0; j < nsubs; ++j) {
-    if (!substitutions[j].destination.isVariable()) {
-    //Find pos of the variable in the literal
-    uint8_t idVar = substitutions[j].origin;
-    for (uint8_t m = 0; m < literal.getTupleSize(); ++m) {
-    if (literal.getTermAtPos(m).getId() == idVar) {
-    //hv.lastLiteralPosConstsInHead.push_back(m);
-    //hv.lastLiteralValueConstsInHead.push_back(
-    //        substitutions[j].destination.getValue());
-    }
-    }
-    }
-    }
-    } else {
-    //hv.lastLiteralSubsumesHead = false;
-    }*/
 
     std::vector<uint8_t> vars = literal.getAllVars();
     std::vector<uint8_t> sharedVars = head.getSharedVars(vars);
@@ -162,7 +144,8 @@ void RuleExecutionDetails::checkFilteringStrategy(
     hv.lastSorting.clear();
     if (sharedVars.size() > 0) {
         //set the sorting by the position of the sharedVars in the literal
-        for (std::vector<uint8_t>::iterator itr = sharedVars.begin(); itr != sharedVars.end();
+        for (std::vector<uint8_t>::iterator itr = sharedVars.begin();
+                itr != sharedVars.end();
                 ++itr) {
             uint8_t posVar = 0;
             for (uint8_t pos = 0; pos < literal.getTupleSize(); ++pos) {
@@ -179,8 +162,8 @@ void RuleExecutionDetails::checkFilteringStrategy(
 }
 
 void RuleExecutionDetails::calculateNVarsInHeadFromEDB() {
+    int globalCounter = 0;
     for (auto head : rule.getHeads()) {
-        RuleExecutionDetails::HeadVars hv;
         for (uint8_t i = 0; i < head.getTupleSize(); ++i) {
             VTerm t = head.getTermAtPos(i);
             if (t.isVariable()) {
@@ -204,125 +187,124 @@ void RuleExecutionDetails::calculateNVarsInHeadFromEDB() {
 
                 if (edbLiterals.size() > 0) {
                     //add the position and the occurrences
-                    hv.posEDBVarsInHead.push_back(i);
-                    hv.occEDBVarsInHead.push_back(edbLiterals);
+                    posEDBVarsInHead.push_back(globalCounter + i);
+                    occEDBVarsInHead.push_back(edbLiterals);
                 }
             }
         }
+        globalCounter += head.getTupleSize();
 
         //Group the occurrences by EDB literal
-        for (uint8_t idxVar = 0; idxVar < hv.posEDBVarsInHead.size(); ++idxVar) {
-            uint8_t var = hv.posEDBVarsInHead[idxVar];
+        for (uint8_t idxVar = 0; idxVar < posEDBVarsInHead.size(); ++idxVar) {
+            uint8_t var = posEDBVarsInHead[idxVar];
             for (uint8_t idxPattern = 0;
-                    idxPattern < hv.occEDBVarsInHead[idxVar].size();
+                    idxPattern < occEDBVarsInHead[idxVar].size();
                     ++idxPattern) {
-                std::pair<uint8_t, uint8_t> patternAndPos = hv.occEDBVarsInHead[idxVar][idxPattern];
+                std::pair<uint8_t, uint8_t> patternAndPos =
+                    occEDBVarsInHead[idxVar][idxPattern];
                 bool found = false;
-                for (uint8_t i = 0; i < hv.edbLiteralPerHeadVars.size() &&
+                for (uint8_t i = 0; i < edbLiteralPerHeadVars.size() &&
                         !found; ++i) {
                     std::pair<uint8_t,
-                        std::vector<std::pair<uint8_t, uint8_t>>> el = hv.edbLiteralPerHeadVars[i];
+                        std::vector<std::pair<uint8_t, uint8_t>>> el =
+                            edbLiteralPerHeadVars[i];
                     if (el.first == patternAndPos.first) {
-                        hv.edbLiteralPerHeadVars[i].second.push_back(
+                        edbLiteralPerHeadVars[i].second.push_back(
                                 std::make_pair(var, patternAndPos.second));
                         found = true;
                     }
                 }
                 if (!found) {
-                    hv.edbLiteralPerHeadVars.push_back(std::make_pair(patternAndPos.first, std::vector<std::pair<uint8_t, uint8_t>>()));
-                    hv.edbLiteralPerHeadVars.back().second.push_back(std::make_pair(var, patternAndPos.second));
-                }
-            }
-        }
-
-        infoHeads.push_back(hv);
-    }
-}
-
-void RuleExecutionDetails::checkWhetherEDBsRedundantHead(RuleExecutionPlan &p,
-        const Literal &head, RuleExecutionPlan::HeadVars &hv) {
-    //Check whether some EDBs can lead to redundant derivation
-    for (int i = 0; i < p.plan.size(); ++i) {
-        const Literal *literal = p.plan[i];
-        // Should this not check if literal is an EDB?
-        // Otherwise, I don't understand why this method has the name it has. --Ceriel
-        if (literal->getPredicate().getType() != EDB) {
-            continue;
-        }
-
-        std::vector<uint8_t> edbVars = literal->getAllVars();
-        //Get all IDBs with the same predicate
-        for (int j = 0; j < p.plan.size(); ++j) {
-            if (i != j) {
-                const Literal *body = p.plan[j];
-                if (head.getPredicate().getId() == body->getPredicate().getId()) {
-                    //Do the two patterns share the same variables at the
-                    //same position?
-                    bool match = true;
-                    std::vector<std::pair<uint8_t, uint8_t>> positions;
-                    for (int l = 0; l < head.getTupleSize(); ++l) {
-                        VTerm headTerm = head.getTermAtPos(l);
-                        VTerm bodyTerm = body->getTermAtPos(l);
-                        if (headTerm.isVariable() && bodyTerm.isVariable()) {
-                            if (headTerm.getId() != bodyTerm.getId()) {
-                                bool found1 = false;
-                                bool found2 = false;
-                                for (std::vector<uint8_t>::iterator itr = edbVars.begin();
-                                        itr != edbVars.end(); ++itr) {
-                                    if (*itr == headTerm.getId()) {
-                                        found1 = true;
-                                    }
-                                    if (*itr == bodyTerm.getId()) {
-                                        found2 = true;
-                                    }
-                                }
-
-                                if (found1 && found2) {
-                                    //Add in positions the vars in the edb literal
-
-                                    uint8_t pos1 = 255, pos2 = 255;
-                                    for (uint8_t x = 0; x < literal->getTupleSize(); ++x) {
-                                        if (literal->getTermAtPos(x).isVariable()) {
-                                            if (literal->getTermAtPos(x).getId() == headTerm.getId())
-                                                pos1 = x;
-                                            if (literal->getTermAtPos(x).getId() == bodyTerm.getId())
-                                                pos2 = x;
-                                        }
-                                    }
-                                    assert(pos1 != 255 && pos2 != 255);
-                                    if (pos1 > pos2) {
-                                        positions.push_back(std::make_pair(pos2, pos1));
-                                    } else {
-                                        positions.push_back(std::make_pair(pos1, pos2));
-                                    }
-                                } else {
-                                    match = false;
-                                    break; //Mismatch
-                                }
-                            }
-                        } else if (!headTerm.isVariable() && !bodyTerm.isVariable()) {
-                            if (headTerm.getValue() != bodyTerm.getValue()) {
-                                match = false;
-                                break; //Mismatch
-                            }
-                        } else {
-                            match = false;
-                            break;//Mismatch
-                        }
-                    }
-
-                    if (match && positions.size() > 0) {
-                        RuleExecutionPlan::HeadVars::MatchVariables r;
-                        r.posLiteralInOrder = (uint8_t) i;
-                        r.matches = positions;
-                        hv.matches.push_back(r);
-                        break;
-                    }
+                    edbLiteralPerHeadVars.push_back(std::make_pair(patternAndPos.first, std::vector<std::pair<uint8_t, uint8_t>>()));
+                    edbLiteralPerHeadVars.back().second.push_back(std::make_pair(var, patternAndPos.second));
                 }
             }
         }
     }
 }
+
+/*void RuleExecutionDetails::checkWhetherEDBsRedundantHead(RuleExecutionPlan &p,
+  const Literal &head) {
+//Check whether some EDBs can lead to redundant derivation
+for (int i = 0; i < p.plan.size(); ++i) {
+const Literal *literal = p.plan[i];
+if (literal->getPredicate().getType() != EDB) {
+continue;
+}
+
+std::vector<uint8_t> edbVars = literal->getAllVars();
+//Get all IDBs with the same predicate
+for (int j = 0; j < p.plan.size(); ++j) {
+if (i != j) {
+const Literal *body = p.plan[j];
+if (head.getPredicate().getId() == body->getPredicate().getId()) {
+//Do the two patterns share the same variables at the
+//same position?
+bool match = true;
+std::vector<std::pair<uint8_t, uint8_t>> positions;
+for (int l = 0; l < head.getTupleSize(); ++l) {
+VTerm headTerm = head.getTermAtPos(l);
+VTerm bodyTerm = body->getTermAtPos(l);
+if (headTerm.isVariable() && bodyTerm.isVariable()) {
+if (headTerm.getId() != bodyTerm.getId()) {
+bool found1 = false;
+bool found2 = false;
+for (std::vector<uint8_t>::iterator itr = edbVars.begin();
+itr != edbVars.end(); ++itr) {
+if (*itr == headTerm.getId()) {
+found1 = true;
+}
+if (*itr == bodyTerm.getId()) {
+found2 = true;
+}
+}
+
+if (found1 && found2) {
+//Add in positions the vars in the edb literal
+
+uint8_t pos1 = 255, pos2 = 255;
+for (uint8_t x = 0; x < literal->getTupleSize(); ++x) {
+if (literal->getTermAtPos(x).isVariable()) {
+if (literal->getTermAtPos(x).getId() == headTerm.getId())
+pos1 = x;
+if (literal->getTermAtPos(x).getId() == bodyTerm.getId())
+pos2 = x;
+}
+}
+assert(pos1 != 255 && pos2 != 255);
+if (pos1 > pos2) {
+positions.push_back(std::make_pair(pos2, pos1));
+} else {
+positions.push_back(std::make_pair(pos1, pos2));
+}
+} else {
+match = false;
+break; //Mismatch
+}
+}
+} else if (!headTerm.isVariable() && !bodyTerm.isVariable()) {
+if (headTerm.getValue() != bodyTerm.getValue()) {
+match = false;
+break; //Mismatch
+}
+} else {
+match = false;
+break;//Mismatch
+}
+}
+
+if (match && positions.size() > 0) {
+RuleExecutionPlan::MatchVariables r;
+r.posLiteralInOrder = (uint8_t) i;
+r.matches = positions;
+hv.matches.push_back(r);
+break;
+}
+}
+}
+}
+}
+}*/
 
 void RuleExecutionDetails::createExecutionPlans() {
     //Init
@@ -407,20 +389,20 @@ void RuleExecutionDetails::createExecutionPlans() {
                     p.plan.push_back(&bodyLiterals[*itr2]);
                 }
             }
-
             rearrangeLiterals(p.plan, idx);
 
-            for (auto h : rule.getHeads()) {
-                RuleExecutionPlan::HeadVars hv;
+            //Do some checks
+            auto &heads = rule.getHeads();
+            if (heads.size() == 1) {
                 RuleExecutionDetails::checkFilteringStrategy(
-                        *p.plan[p.plan.size() - 1], h, hv);
-
-                RuleExecutionDetails::checkWhetherEDBsRedundantHead(p, h , hv);
-                p.checkIfFilteringHashMapIsPossible(h, hv);
-                p.calculateJoinsCoordinates(h, hv);
-
-                p.infoHeads.push_back(hv);
+                        *p.plan[p.plan.size() - 1], heads[0], p);
+                p.checkIfFilteringHashMapIsPossible(heads[0]);
             }
+
+            //RuleExecutionDetails::checkWhetherEDBsRedundantHead(p, h);
+
+            //Calculate all join coordinates
+            p.calculateJoinsCoordinates(heads);
 
             //New version. Should be able to catch everything
             for (int i = 0; i < p.plan.size(); ++i) {
@@ -454,14 +436,12 @@ void RuleExecutionDetails::createExecutionPlans() {
             p.ranges.push_back(std::make_pair(0, (size_t) - 1));
         }
 
-        for(auto h : rule.getHeads()) {
-            RuleExecutionPlan::HeadVars hv;
+        auto &heads = rule.getHeads();
+        if (heads.size() == 1) {
             RuleExecutionDetails::checkFilteringStrategy(
-                    bodyLiterals[bodyLiterals.size() - 1], h, hv);
-            p.calculateJoinsCoordinates(h, hv);
-            p.infoHeads.push_back(hv);
+                    bodyLiterals[bodyLiterals.size() - 1], heads[0], p);
         }
-
+        p.calculateJoinsCoordinates(heads);
         orderExecutions.push_back(p);
     }
 }

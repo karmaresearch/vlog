@@ -9,7 +9,7 @@
 #include <vector>
 #include <inttypes.h>
 
-bool JoinExecutor::isJoinTwoToOneJoin(const RuleExecutionPlan::HeadVars &hv,
+bool JoinExecutor::isJoinTwoToOneJoin(const RuleExecutionPlan &hv,
         const int currentLiteral) {
     return hv.joinCoordinates[currentLiteral].size() == 1 &&
         hv.posFromFirst[currentLiteral].size() == 0 &&
@@ -19,7 +19,7 @@ bool JoinExecutor::isJoinTwoToOneJoin(const RuleExecutionPlan::HeadVars &hv,
 
 void _joinTwoToOne_cur(std::shared_ptr<Column> firstColumn,
         std::shared_ptr<const FCInternalTable> table,
-        const RuleExecutionPlan::HeadVars &hv,
+        const RuleExecutionPlan &hv,
         const int currentLiteral,
         ResultJoinProcessor *output,
         const int nthreads) {
@@ -108,7 +108,7 @@ void JoinExecutor::joinTwoToOne(
         const size_t min,
         const size_t max,
         ResultJoinProcessor *output,
-        const RuleExecutionPlan::HeadVars &hv,
+        const RuleExecutionPlan &hv,
         const int currentLiteral,
         const int nthreads) {
 
@@ -140,7 +140,7 @@ void JoinExecutor::joinTwoToOne(
 
 bool JoinExecutor::isJoinVerificative(
         const FCInternalTable *t1,
-        const RuleExecutionPlan::HeadVars &hv,
+        const RuleExecutionPlan &hv,
         const int currentLiteral) {
     //All the fields in the result belong to the existing relation
     return hv.posFromSecond[currentLiteral].size() == 0 &&
@@ -161,7 +161,7 @@ void JoinExecutor::verificativeJoinOneColumnSameOutput(
         const size_t min,
         const size_t max,
         ResultJoinProcessor *output,
-        const RuleExecutionPlan::HeadVars &hv,
+        const RuleExecutionPlan &hv,
         const int currentLiteral,
         int nthreads) {
 
@@ -258,7 +258,7 @@ void JoinExecutor::verificativeJoinOneColumn(
         const size_t min,
         const size_t max,
         ResultJoinProcessor * output,
-        const RuleExecutionPlan::HeadVars &hv,
+        const RuleExecutionPlan &hv,
         const int currentLiteral,
         int nthreads) {
 
@@ -506,7 +506,7 @@ void JoinExecutor::verificativeJoin(
         const size_t min,
         const size_t max,
         ResultJoinProcessor * output,
-        const RuleExecutionPlan::HeadVars &hv,
+        const RuleExecutionPlan &hv,
         const int currentLiteral,
         int nthreads) {
 
@@ -535,13 +535,13 @@ void JoinExecutor::verificativeJoin(
 }
 
 void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
-        const Literal * outputLiteral, const Literal & literal,
+        const std::vector<Literal> *outputLiterals, const Literal & literal,
         const size_t min, const size_t max,
         const std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
         std::vector<std::pair<uint8_t, uint8_t>> joinsCoordinates,
         ResultJoinProcessor * output, const bool lastLiteral
         , const RuleExecutionDetails & ruleDetails,
-        const RuleExecutionPlan::HeadVars &hv,
+        const RuleExecutionPlan &hv,
         int &processedTables,
         const int currentLiteral,
         const int nthreads) {
@@ -565,7 +565,7 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
                     joinsCoordinates[0].first != joinsCoordinates[0].second ||
                     joinsCoordinates[0].first != 0)) {
             LOG(DEBUGL) << "Executing hashjoin. t1->getNRows()=" << t1->getNRows();
-            hashjoin(t1, naiver, outputLiteral, literal, min, max, filterValueVars,
+            hashjoin(t1, naiver, outputLiterals, literal, min, max, filterValueVars,
                     joinsCoordinates, output,
                     lastLiteral, ruleDetails, hv, processedTables, nthreads);
 #ifdef DEBUG
@@ -573,7 +573,7 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
 #endif
         } else {
             LOG(DEBUGL) << "Executing mergejoin. t1->getNRows()=" << t1->getNRows();
-            mergejoin(t1, naiver, outputLiteral, literal, min, max,
+            mergejoin(t1, naiver, outputLiterals, literal, min, max,
                     joinsCoordinates, output, nthreads);
 #ifdef DEBUG
             output->checkSizes();
@@ -615,7 +615,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
         const DoubleJoinHashMap & doublemap,
         ResultJoinProcessor * out, const uint8_t njoinfields,
         const uint8_t idxJoinField1, const uint8_t idxJoinField2,
-        const Literal * outputLiteral, const Literal & literal, const uint8_t rowSize,
+        const std::vector<Literal> *outputLiterals, const Literal & literal, const uint8_t rowSize,
         const std::vector<uint8_t> &posToSort, std::vector<Term_t> &values,
         const bool literalSharesVarsWithHead,
         const size_t min, const size_t max,
@@ -764,7 +764,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
 #if DEBUG
                 LOG(DEBUGL) << "Check " << (end - start) / rowSize << " duplicates";
 #endif
-                while (outputLiteral != NULL && start < end) {
+                /*while (outputLiteral != NULL && start < end) {
                     VTuple t = outputLiteral->getTuple();
                     for (uint8_t i = 0; i < nPosFromFirst; ++i) {
                         t.set(VTerm(0, values[start + posFromFirst[i].second]), posFromFirst[i].first);
@@ -799,7 +799,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                         existingTuples.push_back(DuplicateContainers());
                     }
                     start += rowSize;
-                }
+                }*/
 
 
                 {
@@ -889,14 +889,14 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
 }
 
 void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
-        const Literal * outputLiteral, const Literal & literal,
+        const std::vector<Literal> *outputLiterals, const Literal & literal,
         const size_t min, const size_t max,
         const std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
         std::vector<std::pair<uint8_t, uint8_t>> joinsCoordinates,
         ResultJoinProcessor * output,
         const int lastLiteral,
         const RuleExecutionDetails & ruleDetails,
-        const RuleExecutionPlan::HeadVars &hv,
+        const RuleExecutionPlan &hv,
         int &processedTables,
         int nthreads) {
 
@@ -904,7 +904,7 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
     std::vector<uint8_t> lastPosToSort;
     if (lastLiteral != -1) {
         lastPosToSort = hv.lastSorting;
-        literalSharesVarsWithHead = hv.lastLiteralSharesWithHead; 
+        literalSharesVarsWithHead = hv.lastLiteralSharesWithHead;
     }
 
     JoinHashMap map;
@@ -1034,7 +1034,7 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
     execSelectiveHashJoin(ruleDetails, naiver, map, doublemap, output, (uint8_t) joinsCoordinates.size(),
             (joinsCoordinates.size() > 0) ? joinsCoordinates[0].second : 0,
             (joinsCoordinates.size() > 1) ? joinsCoordinates[1].second : 0,
-            outputLiteral, literal, t1->getRowSize(), lastPosToSort, values,
+            outputLiterals, literal, t1->getRowSize(), lastPosToSort, values,
             literalSharesVarsWithHead, min, max, filterValueVars,
             processedTables);
 }
@@ -1075,7 +1075,7 @@ void JoinExecutor::doPhysicalHashJoin(FCIterator & itr2, JoinHashMap & map,
 }
 
 void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
-        const Literal *outputLiteral,
+        const std::vector<Literal> *outputLiterals,
         const Literal &literalToQuery,
         const uint32_t min, const uint32_t max,
         std::vector<std::pair<uint8_t, uint8_t>> joinsCoordinates,
@@ -1142,26 +1142,21 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
             bool ok = true;
 
             //The first condition tests we are evaluating the last literal
-            bool isEligibleForPruning = outputLiteral != NULL &&
+            bool isEligibleForPruning = outputLiterals != NULL &&
                 filterer.isEligibleForPartialSubs(
                         it.getCurrentBlock(),
-                        *outputLiteral,
+                        *outputLiterals,
                         t1,
                         output->getNCopyFromFirst(),
                         joinsCoordinates.size());
             if (isEligibleForPruning) {
                 if (filterer.producedDerivationInPreviousStepsWithSubs(
                             it.getCurrentBlock(),
-                            *outputLiteral, literalToQuery, t1,
+                            *outputLiterals, literalToQuery, t1,
                             output->getNCopyFromFirst(),
                             output->getPosFromFirst(),
                             joinsCoordinates.size(),
                             &joinsCoordinates[0])) {
-
-                    LOG(DEBUGL) << "REMOVED" <<
-                        outputLiteral->tostring(NULL, NULL) << " "
-                        << literalToQuery.tostring(NULL, NULL);
-
                     ok = false;
                 }
             }

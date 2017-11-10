@@ -1,4 +1,4 @@
-#include <vlog/resultjoinproc.h>
+/*#include <vlog/resultjoinproc.h>
 #include <vlog/ruleexecdetails.h>
 
 ExistentialRuleProcessor::ExistentialRuleProcessor(
@@ -273,4 +273,4 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         c = newc;
     }
     tmpt[blockid]->addColumns(c, sorted, lastInsert);
-}
+}*/

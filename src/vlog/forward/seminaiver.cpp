@@ -500,7 +500,6 @@ void SemiNaiver::addDataToIDBRelation(const Predicate pred,
 
 bool SemiNaiver::checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
         const RuleExecutionPlan &plan,
-        const Literal &headLiteral,
         std::vector<size_t> &cards) {
     const uint8_t nBodyLiterals = (uint8_t) plan.plan.size();
     bool isOneRelEmpty = false;
@@ -509,8 +508,6 @@ bool SemiNaiver::checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
     //Get the cardinality of all relations
     for (int i = 0; i < nBodyLiterals; ++i) {
         size_t min = plan.ranges[i].first, max = plan.ranges[i].second;
-        // TODO: lastExecution cannot be trusted as it is used here, at least not with this
-        // precision, in the parallel version. --Ceriel
         if (min == 1)
             min = ruleDetails.lastExecution;
         if (max == 1)
@@ -585,13 +582,11 @@ struct CreateParallelFirstAtom {
 
 void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
         const Literal *bodyLiteral,
-        const Literal &headLiteral,
-        const uint8_t posHeadInRule,
+        std::vector<Literal> &heads,
         const size_t min,
         const size_t max,
         int &processedTables,
         const bool lastLiteral,
-        FCTable *endTable,
         const uint32_t iteration,
         const RuleExecutionDetails &ruleDetails,
         const uint8_t orderExecution,
@@ -604,24 +599,33 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
     if (bodyLiteral->getPredicate().getType() == IDB) {
         processedTables += literalItr.getNTables();
     }
+    Literal &firstHeadLiteral = heads[0];
+    auto idHeadPredicate = firstHeadLiteral.getPredicate().getId();
+    FCTable *firstEndTable = getTable(idHeadPredicate, firstHeadLiteral.
+            getPredicate().getCardinality());
 
-    if (lastLiteral && endTable->isEmpty() &&
-            literalItr.getNTables() == 1 &&
-            endTable->getSizeRow() == literalItr.getCurrentTable()->getRowSize() &&
-            headLiteral.sameVarSequenceAs(*bodyLiteral) &&
-            bodyLiteral->getTupleSize() == headLiteral.getTupleSize() &&
-            ((FinalRuleProcessor*)joinOutput)->shouldAddToEndTable()) {
+    //Can I copy the table in the body as is?
+    bool rawCopy = lastLiteral && heads.size() == 1 && literalItr.getNTables() == 1;
+    if (rawCopy) {
+        rawCopy &= firstEndTable->isEmpty() &&
+            firstEndTable->getSizeRow() == literalItr.getCurrentTable()->getRowSize() &&
+            firstHeadLiteral.sameVarSequenceAs(*bodyLiteral) &&
+            bodyLiteral->getTupleSize() == firstHeadLiteral.getTupleSize() &&
+            ((FinalRuleProcessor*)joinOutput)->shouldAddToEndTable();
+    }
+
+    if (rawCopy) { //The previous check was successful
         while (!literalItr.isEmpty()) {
             std::shared_ptr<const FCInternalTable> table =
                 literalItr.getCurrentTable();
 
             if (!queryFilterer.
                     producedDerivationInPreviousSteps(
-                        headLiteral, *bodyLiteral,
+                        firstHeadLiteral, *bodyLiteral,
                         literalItr.getCurrentBlock())) {
 
-                endTable->add(table->cloneWithIteration(iteration),
-                        headLiteral, posHeadInRule, &ruleDetails,
+                firstEndTable->add(table->cloneWithIteration(iteration),
+                        firstHeadLiteral, 0, &ruleDetails,
                         orderExecution, iteration, true, nthreads);
 
             }
@@ -629,15 +633,15 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
             literalItr.moveNextCount();
         }
     } else if (nBodyLiterals == 1) {
-        const bool uniqueResults = headLiteral.getNUniqueVars()
+        const bool uniqueResults = firstHeadLiteral.getNUniqueVars()
             == bodyLiteral->getNUniqueVars()
-            && literalItr.getNTables() == 1;
+            && literalItr.getNTables() == 1 && heads.size() == 1;
         while (!literalItr.isEmpty()) {
             //Add the columns to the output container
             if (!lastLiteral ||
-                    !queryFilterer.
+                    heads.size() != 1 || !queryFilterer.
                     producedDerivationInPreviousSteps(
-                        headLiteral,
+                        firstHeadLiteral,
                         *bodyLiteral,
                         literalItr.getCurrentBlock())) {
 
@@ -645,22 +649,24 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
                     literalItr.getCurrentTable();
                 FCInternalTableItr *interitr = table->getIterator();
 
+                bool unique = uniqueResults && heads.size() == 0 && firstEndTable->isEmpty();
+                bool sorted = uniqueResults && heads.size() == 0 && firstHeadLiteral.
+                    sameVarSequenceAs(*bodyLiteral);
                 joinOutput->addColumns(0, interitr,
-                        uniqueResults && endTable->isEmpty(),
-                        uniqueResults && headLiteral.
-                        sameVarSequenceAs(*bodyLiteral),
+                        unique,
+                        sorted,
                         literalItr.getNTables() == 1);
 
                 table->releaseIterator(interitr);
             }
-
             literalItr.moveNextCount();
         }
     } else {
         //Copy the iterator in the tmp container.
         //This process cannot derive duplicates if the number of variables is equivalent.
-        const bool uniqueResults = headLiteral.getNUniqueVars() ==
-            bodyLiteral->getNUniqueVars() && (! lastLiteral || endTable->isEmpty());
+        const bool uniqueResults = heads.size() == 1 && firstHeadLiteral.getNUniqueVars() ==
+            bodyLiteral->getNUniqueVars() && (!lastLiteral || firstEndTable->isEmpty());
+
         while (!literalItr.isEmpty()) {
             std::shared_ptr<const FCInternalTable> table = literalItr.getCurrentTable();
             LOG(DEBUGL) << "Creating iterator";
@@ -743,7 +749,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
 
 void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
         const std::vector<size_t> &cards,
-        const Literal &headLiteral, int posHeadLiteral) {
+        const std::vector<Literal> &heads) {
     //Reorder the atoms in terms of cardinality.
     std::vector<std::pair<uint8_t, size_t>> positionCards;
     for (uint8_t i = 0; i < cards.size(); ++i) {
@@ -803,7 +809,7 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
             LOG(DEBUGL) << "Reordered plan is " << (int)adaptedPosCards[i].first;
             orderLiterals.push_back(adaptedPosCards[i].first);
         }
-        plan = plan.reorder(orderLiterals, headLiteral, posHeadLiteral);
+        plan = plan.reorder(orderLiterals, heads);
     }
 }
 
@@ -819,12 +825,8 @@ FCTable *SemiNaiver::getTable(const PredId_t pred, const uint8_t card) {
 }
 
 void SemiNaiver::saveDerivationIntoDerivationList(FCTable *endTable) {
-    if (! endTable->isEmpty()) {
-        FCBlock block = endTable->getLastBlock();
-        if (block.iteration == iteration && (listDerivations.size() == 0 || listDerivations.back().iteration != iteration)) {
-            listDerivations.push_back(block);
-        }
-    }
+    LOG(ERRORL) << "Legacy method. Shouldn't be needed anymore ...";
+    throw 10;
 }
 
 void SemiNaiver::saveStatistics(StatsRule &stats) {
@@ -837,21 +839,18 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     Rule rule = ruleDetails.rule;
     bool answer = true;
     std::vector<Literal> heads = rule.getHeads();
-    for (int i = 0; i < heads.size(); ++i) {
-        Literal head = heads[i];
-        answer &= executeRule(ruleDetails, head, i, iteration, finalResultContainer);
-    }
+    answer &= executeRule(ruleDetails, heads, iteration, finalResultContainer);
     return answer;
 }
 
 
 bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
-        Literal &headLiteral,
-        int posHeadLiteral,
+        std::vector<Literal> &heads,
         const uint32_t iteration,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
-    PredId_t idHeadPredicate = headLiteral.getPredicate().getId();
+
+    //PredId_t idHeadPredicate = headLiteral.getPredicate().getId();
 
 #ifdef WEBINTERFACE
     // Cannot run multithreaded in this case.
@@ -869,13 +868,13 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     std::chrono::duration<double> durationFirstAtom(0);
 
     //Get table corresponding to the head predicate
-    FCTable *endTable = getTable(idHeadPredicate, headLiteral.
-            getPredicate().getCardinality());
+    //FCTable *endTable = getTable(idHeadPredicate, headLiteral.
+    //        getPredicate().getCardinality());
 
-    if (headLiteral.getNVars() == 0 && !endTable->isEmpty()) {
-        LOG(DEBUGL) << "No variables and endtable not empty, so cannot find new derivations";
-        return false;
-    }
+    //if (headLiteral.getNVars() == 0 && !endTable->isEmpty()) {
+    //    LOG(DEBUGL) << "No variables and endtable not empty, so cannot find new derivations";
+    //    return false;
+    //}
 
     //In case the rule has many IDBs predicates, I calculate several
     //combinations of countings.
@@ -904,15 +903,14 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         const uint8_t nBodyLiterals = (uint8_t) plan.plan.size();
 
         //**** Should I skip the evaluation because some atoms are empty? ***
-        bool isOneRelEmpty = checkIfAtomsAreEmpty(ruleDetails, plan,
-                headLiteral, cards);
+        bool isOneRelEmpty = checkIfAtomsAreEmpty(ruleDetails, plan, cards);
         if (isOneRelEmpty) {
             LOG(DEBUGL) << "Aborting this combination";
             continue;
         }
 
         //Reorder the list of atoms depending on the observed cardinalities
-        reorderPlan(plan, cards, headLiteral, posHeadLiteral);
+        reorderPlan(plan, cards, heads);
 
 #ifdef DEBUG
         std::string listLiterals = "EXEC COMB: ";
@@ -936,11 +934,13 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             //This data structure is used to filter out rows where different columns
             //lead to the same derivation
             std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars = NULL;
-            if (plan.infoHeads[posHeadLiteral].matches.size() > 0) {
-                for (int i = 0; i < plan.infoHeads[posHeadLiteral].matches.size(); ++i) {
-                    if (plan.infoHeads[posHeadLiteral].matches[i].posLiteralInOrder
-                            == optimalOrderIdx) {
-                        filterValueVars = &plan.infoHeads[posHeadLiteral].matches[i].matches;
+            if (heads.size() == 1) {
+                if (plan.matches.size() > 0) {
+                    for (int i = 0; i < plan.matches.size(); ++i) {
+                        if (plan.matches[i].posLiteralInOrder
+                                == optimalOrderIdx) {
+                            filterValueVars = &plan.matches[i].matches;
+                        }
                     }
                 }
             }
@@ -950,29 +950,27 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             const bool lastLiteral = optimalOrderIdx == (nBodyLiterals - 1);
             if (!lastLiteral) {
                 joinOutput = new InterTableJoinProcessor(
-                        plan.infoHeads[posHeadLiteral].sizeOutputRelation[optimalOrderIdx],
-                        plan.infoHeads[posHeadLiteral].posFromFirst[optimalOrderIdx],
-                        plan.infoHeads[posHeadLiteral].posFromSecond[optimalOrderIdx],
+                        plan.sizeOutputRelation[optimalOrderIdx],
+                        plan.posFromFirst[optimalOrderIdx],
+                        plan.posFromSecond[optimalOrderIdx],
                         ! multithreaded ? -1 : nthreads);
             } else {
                 if (ruleDetails.rule.isExistential()) {
                     joinOutput = new ExistentialRuleProcessor(
-                            plan.infoHeads[posHeadLiteral].posFromFirst[optimalOrderIdx],
-                            plan.infoHeads[posHeadLiteral].posFromSecond[optimalOrderIdx],
+                            plan.posFromFirst[optimalOrderIdx],
+                            plan.posFromSecond[optimalOrderIdx],
                             listDerivations,
-                            endTable,
-                            headLiteral, posHeadLiteral, &ruleDetails,
+                            heads, &ruleDetails,
                             (uint8_t) orderExecution, iteration,
                             finalResultContainer == NULL,
                             !multithreaded ? -1 : nthreads,
                             chaseMgmt);
                 } else {
                     joinOutput = new FinalRuleProcessor(
-                            plan.infoHeads[posHeadLiteral].posFromFirst[optimalOrderIdx],
-                            plan.infoHeads[posHeadLiteral].posFromSecond[optimalOrderIdx],
+                            plan.posFromFirst[optimalOrderIdx],
+                            plan.posFromSecond[optimalOrderIdx],
                             listDerivations,
-                            endTable,
-                            headLiteral, posHeadLiteral, &ruleDetails,
+                            heads, &ruleDetails,
                             (uint8_t) orderExecution, iteration,
                             finalResultContainer == NULL,
                             !multithreaded ? -1 : nthreads);
@@ -994,8 +992,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 std::chrono::system_clock::time_point startFirstA = std::chrono::system_clock::now();
                 if (lastLiteral || bodyLiteral->getNVars() > 0) {
                     processRuleFirstAtom(nBodyLiterals, bodyLiteral,
-                            headLiteral, posHeadLiteral, min, max, processedTables,
-                            lastLiteral, endTable,
+                            heads, min, max, processedTables,
+                            lastLiteral,
                             iteration, ruleDetails,
                             orderExecution,
                             filterValueVars,
@@ -1007,12 +1005,12 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 //Perform the join
                 std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
                 JoinExecutor::join(this, currentResults.get(),
-                        lastLiteral ? &headLiteral : NULL,
+                        lastLiteral ? &heads: NULL,
                         *bodyLiteral, min, max, filterValueVars,
-                        plan.infoHeads[posHeadLiteral].joinCoordinates[optimalOrderIdx],
+                        plan.joinCoordinates[optimalOrderIdx],
                         joinOutput,
                         lastLiteral, ruleDetails,
-                        plan.infoHeads[posHeadLiteral],
+                        plan,
                         processedTables,
                         optimalOrderIdx,
                         nthreads);
@@ -1032,7 +1030,6 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 durationConsolidation += d;
             }
 
-
             //Prepare for the processing of the next atom (if any)
             if (!lastLiteral && ! first) {
                 currentResults = ((InterTableJoinProcessor*)joinOutput)->getTable();
@@ -1043,10 +1040,6 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 delete joinOutput;
             }
             optimalOrderIdx++;
-
-            if (lastLiteral) {
-                saveDerivationIntoDerivationList(endTable);
-            }
 
             if (!lastLiteral && ! first && (currentResults == NULL ||
                         currentResults->isEmpty())) {
@@ -1064,7 +1057,19 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         }
     }
 
-    const bool prodDer = !endTable->isEmpty(iteration);
+    bool prodDer = false;
+    for (auto &h : heads) {
+        auto idHeadPredicate = h.getPredicate().getId();
+        FCTable *t = getTable(idHeadPredicate, h.
+                getPredicate().getCardinality());
+        if (!t->isEmpty(iteration)) {
+            FCBlock block = t->getLastBlock();
+            if (block.iteration == iteration) {
+                listDerivations.push_back(block);
+            }
+            prodDer |= true;
+        }
+    }
 
     std::chrono::duration<double> totalDuration =
         std::chrono::system_clock::now() - startRule;

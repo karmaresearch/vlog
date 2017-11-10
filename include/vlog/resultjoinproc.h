@@ -80,7 +80,10 @@ class ResultJoinProcessor {
             }
 
 #if DEBUG
-        virtual void checkSizes() const {
+        virtual void checkSizes(uint8_t headPos) const {
+        }
+        void checkSizes() const {
+            checkSizes(0);
         }
 #endif
 
@@ -198,7 +201,7 @@ class InterTableJoinProcessor: public ResultJoinProcessor {
     public:
 
 #if DEBUG
-        void checkSizes() const {
+        void checkSizes(uint8_t headPos) const {
             for (int i = 0; i < currentSegmentSize; i++) {
                 segments[i]->checkSizes();
             }
@@ -261,9 +264,75 @@ class FinalRuleProcessor: public ResultJoinProcessor {
 
         const size_t iteration;
 
-        int nbuffers;
-        SegmentInserter **utmpt;
-        std::shared_ptr<const Segment> *tmptseg;
+        struct SegmentsTable {
+            uint8_t rowsize;
+            uint64_t *row;
+
+            int nbuffers;
+            SegmentInserter **utmpt;
+            SegmentInserter **tmpt;
+            std::shared_ptr<const Segment> *tmptseg;
+
+            void processResults(const int blockid, const bool unique,
+                    std::mutex *m);
+
+            void processResultsAtPos(const int blockid, const uint8_t pos,
+                    const Term_t v, const bool unique);
+
+            bool isBlockEmpty(const int blockId, const bool unique) const;
+
+            void enlargeBuffers(const int newsize);
+#if USE_DUPLICATE_DETECTION
+#else
+            void mergeTmpt(const int blockid, const bool unique, std::mutex *m);
+#endif
+
+            bool isEmpty() const;
+
+            void addColumns(const int blockid,
+                    std::vector<std::shared_ptr<Column>> &columns,
+                    const bool unique, const bool sorted);
+
+            void addColumn(const int blockid, const uint8_t pos,
+                    std::shared_ptr<Column> column, const bool unique,
+                    const bool sorted);
+
+            void addColumns(const int blockid, FCInternalTableItr *itr,
+                    const bool unique, const bool sorted,
+                    const bool lastInsert);
+
+
+            uint32_t getRowsInBlock(const int blockId, const bool unique) const;
+
+            SegmentsTable(uint8_t rowsize, uint64_t *row) : rowsize(rowsize),
+            row(row),
+            nbuffers(0),
+            utmpt(NULL), tmpt(NULL) {
+                enlargeBuffers(3);
+            }
+
+            ~SegmentsTable() {
+                if (utmpt != NULL) {
+                    for (int i = 0; i < nbuffers; ++i)
+                        if (utmpt[i] != NULL)
+                            delete utmpt[i];
+                    delete[] utmpt;
+                }
+
+                if (tmpt != NULL) {
+                    for (int i = 0; i < nbuffers; ++i) {
+                        if (tmpt[i] != NULL)
+                            delete tmpt[i];
+                    }
+                    delete[] tmpt;
+                }
+                if (tmptseg != NULL) {
+                    delete[] tmptseg;
+                }
+            }
+
+        };
+        std::vector<SegmentsTable> segmentTables;
 
         bool addToEndTable;
         bool newDerivation;
@@ -272,28 +341,22 @@ class FinalRuleProcessor: public ResultJoinProcessor {
 
         void copyRawRow(const Term_t *first, FCInternalTableItr* second);
 
-#if USE_DUPLICATE_DETECTION
-#else
-        void mergeTmpt(const int blockid, const bool unique, std::mutex *m);
-#endif
     protected:
-        FCTable *t;
         const RuleExecutionDetails *ruleDetails;
-        const Literal literal;
-        const uint8_t posLiteralInRule;
+        const std::vector<Literal> &heads;
 
-        SegmentInserter **tmpt;
+        std::vector<std::shared_ptr<Column>> addConstantColumns(
+                std::vector<std::shared_ptr<Column>> &c, bool lastInsert);
 
-        void enlargeBuffers(const int newsize);
-
-        virtual void processResults(const int blockid, const bool unique,
-                std::mutex *m);
+        static bool consolidateTable(const bool isFinished,
+                const bool forceCheck, SegmentInserter **utmpt,
+                SegmentInserter **tmpt);
 
     public:
         FinalRuleProcessor(std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
-                std::vector<FCBlock> &listDerivations, FCTable *t,
-                Literal &head, const uint8_t posHeadInRule,
+                std::vector<FCBlock> &listDerivations,
+                std::vector<Literal> &heads,
                 const RuleExecutionDetails *detailsRule,
                 const uint8_t ruleExecOrder,
                 const size_t iteration,
@@ -301,16 +364,13 @@ class FinalRuleProcessor: public ResultJoinProcessor {
                 const int nthreads);
 
 #if DEBUG
-        void checkSizes() const {
-            for (int i = 0; i < nbuffers; i++) {
-                if (tmpt[i] != NULL) {
-                    tmpt[i]->checkSizes();
+        void checkSizes(uint8_t headPos) const {
+            for (int i = 0; i < segmentTables[headPos].nbuffers; i++) {
+                if (segmentTables[headPos].tmpt[i] != NULL) {
+                    segmentTables[headPos].tmpt[i]->checkSizes();
                 }
-                if (tmptseg[i] != NULL) {
-                    tmptseg[i]->checkSizes();
-                }
-                if (utmpt[i] != NULL) {
-                    utmpt[i]->checkSizes();
+                if (segmentTables[headPos].utmpt[i] != NULL) {
+                    segmentTables[headPos].utmpt[i]->checkSizes();
                 }
             }
         }
@@ -324,31 +384,17 @@ class FinalRuleProcessor: public ResultJoinProcessor {
             return newDerivation;
         }
 
-        Literal getLiteral() const {
-            return literal;
+        const std::vector<Literal> &getHeads() const {
+            return heads;
+        }
+
+        FCTable *getTable() const {
+            throw 10; //no longer supported
         }
 
         size_t getIteration() const {
             return iteration;
         }
-
-        FCTable *getTable() const {
-            return t;
-        }
-
-        void addColumns(const int blockid,
-                std::vector<std::shared_ptr<Column>> &columns,
-                const bool unique, const bool sorted);
-
-        void addColumn(const int blockid, const uint8_t pos,
-                std::shared_ptr<Column> column, const bool unique,
-                const bool sorted);
-
-        virtual void addColumns(const int blockid, FCInternalTableItr *itr,
-                const bool unique, const bool sorted,
-                const bool lastInsert);
-
-        bool isEmpty() const;
 
         void processResults(std::vector<int> &blockid, Term_t *p,
                 std::vector<bool> &unique, std::mutex *m);
@@ -367,25 +413,23 @@ class FinalRuleProcessor: public ResultJoinProcessor {
         void processResultsAtPos(const int blockid, const uint8_t pos,
                 const Term_t v, const bool unique);
 
-        bool containsUnfilteredDerivation() const {
-            if (tmpt != NULL) {
-                for (int i = 0; i < nbuffers; ++i) {
-                    if (tmpt[i] != NULL && !tmpt[i]->isEmpty())
+        bool containsUnfilteredDerivation(uint8_t headPos) const {
+            if (segmentTables[headPos].tmpt != NULL) {
+                for (int i = 0; i < segmentTables[headPos].nbuffers; ++i) {
+                    if (segmentTables[headPos].tmpt[i] != NULL &&
+                            !segmentTables[headPos].tmpt[i]->isEmpty())
                         return true;
                 }
             }
-            if (tmptseg != NULL) {
-                for (int i = 0; i < nbuffers; ++i) {
-                    if (tmptseg[i] != NULL && !tmptseg[i]->isEmpty())
+            if (segmentTables[headPos].tmptseg != NULL) {
+                for (int i = 0; i < segmentTables[headPos].nbuffers; ++i) {
+                    if (segmentTables[headPos].tmptseg[i] != NULL &&
+                            !segmentTables[headPos].tmptseg[i]->isEmpty())
                         return true;
                 }
             }
             return false;
         }
-
-        bool isBlockEmpty(const int blockId, const bool unique) const;
-
-        uint32_t getRowsInBlock(const int blockId, const bool unique) const;
 
         void consolidate(const bool isFinished) {
             consolidate(isFinished, false);
@@ -393,11 +437,7 @@ class FinalRuleProcessor: public ResultJoinProcessor {
 
         void consolidate(const bool isFinished, const bool forceCheck);
 
-        void consolidateSegment(std::shared_ptr<const Segment> seg);
-
         std::vector<std::shared_ptr<const Segment>> getAllSegments();
-
-        ~FinalRuleProcessor();
 };
 
 class ExistentialRuleProcessor : public FinalRuleProcessor {
@@ -412,9 +452,7 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
         ExistentialRuleProcessor(std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
                 std::vector<FCBlock> &listDerivations,
-                FCTable *t,
-                Literal &head,
-                const uint8_t posHeadInRule,
+                std::vector<Literal> &heads,
                 const RuleExecutionDetails *detailsRule,
                 const uint8_t ruleExecOrder,
                 const size_t iteration,

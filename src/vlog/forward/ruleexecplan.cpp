@@ -5,10 +5,9 @@
 
 #include <set>
 
-void RuleExecutionPlan::checkIfFilteringHashMapIsPossible(const Literal &head,
-        HeadVars &output) {
+void RuleExecutionPlan::checkIfFilteringHashMapIsPossible(const Literal &head) {
     //2 conditions: the last literal shares the same variables as the head in the same position and has the same constants
-    output.filterLastHashMap = false;
+    filterLastHashMap = false;
     const Literal *lastLit = plan.back();
 
     if (head.getPredicate().getId() != lastLit->getPredicate().getId()) {
@@ -37,11 +36,11 @@ void RuleExecutionPlan::checkIfFilteringHashMapIsPossible(const Literal &head,
         }
     }
 
-    output.filterLastHashMap = true;
+    filterLastHashMap = true;
 }
 
 RuleExecutionPlan RuleExecutionPlan::reorder(std::vector<uint8_t> &order,
-        const Literal &headLiteral, int posHead) const {
+        const std::vector<Literal> &heads) const {
     RuleExecutionPlan newPlan;
     for (int i = 0; i < order.size(); ++i) {
         newPlan.plan.push_back(plan[order[i]]);
@@ -49,36 +48,37 @@ RuleExecutionPlan RuleExecutionPlan::reorder(std::vector<uint8_t> &order,
     }
     newPlan.dependenciesExtVars = dependenciesExtVars;
 
-    HeadVars hv;
-    RuleExecutionDetails::checkFilteringStrategy(*newPlan.plan[order.size() - 1],
-            headLiteral, hv);
-    RuleExecutionDetails::checkWhetherEDBsRedundantHead(newPlan, headLiteral, hv);
-    newPlan.checkIfFilteringHashMapIsPossible(headLiteral, hv);
-    newPlan.calculateJoinsCoordinates(headLiteral, hv);
-    newPlan.infoHeads = infoHeads;
-    newPlan.infoHeads[posHead] = hv;
-
+    if (heads.size() == 1) {
+        RuleExecutionDetails::checkFilteringStrategy(*newPlan.plan[order.size() - 1],
+                heads[0], newPlan);
+        newPlan.checkIfFilteringHashMapIsPossible(heads[0]);
+    }
+    //RuleExecutionDetails::checkWhetherEDBsRedundantHead(newPlan, headLiteral, hv);
+    newPlan.calculateJoinsCoordinates(heads);
     return newPlan;
 }
 
-void RuleExecutionPlan::calculateJoinsCoordinates(const Literal &headLiteral,
-        HeadVars &output) {
+void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &heads) {
     std::vector<uint8_t> existingVariables;
 
     //Get all variables in the head, and dependencies if they are existential
     std::map<uint8_t,uint8_t> variablesNeededForHead;
-    for (uint8_t headPos = 0; headPos < headLiteral.getTupleSize(); ++headPos) {
-        const VTerm headTerm = headLiteral.getTermAtPos(headPos);
-        if (headTerm.isVariable()) {
-            variablesNeededForHead.insert(std::make_pair(headTerm.getId(), headPos));
-            if (dependenciesExtVars.count(headTerm.getId())) {
-                for(auto v : dependenciesExtVars[headTerm.getId()]) {
-                    uint8_t notfoundvalue = 0;
-                    notfoundvalue = ~notfoundvalue;
-                    variablesNeededForHead.insert(std::make_pair(v, notfoundvalue));
+    uint32_t countVars = 0;
+    for (auto &headLiteral : heads) {
+        for (uint8_t headPos = 0; headPos < headLiteral.getTupleSize(); ++headPos) {
+            const VTerm headTerm = headLiteral.getTermAtPos(headPos);
+            if (headTerm.isVariable()) {
+                variablesNeededForHead.insert(std::make_pair(headTerm.getId(), countVars + headPos));
+                if (dependenciesExtVars.count(headTerm.getId())) {
+                    for(auto v : dependenciesExtVars[headTerm.getId()]) {
+                        uint8_t notfoundvalue = 0;
+                        notfoundvalue = ~notfoundvalue;
+                        variablesNeededForHead.insert(std::make_pair(v, notfoundvalue));
+                    }
                 }
             }
         }
+        countVars += headLiteral.getTupleSize();
     }
 
     for (uint8_t i = 0; i < plan.size(); ++i) {
@@ -201,7 +201,8 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const Literal &headLiteral,
         }
 
         if (i == plan.size() - 1) {
-            output.sizeOutputRelation.push_back((uint8_t) headLiteral.getTupleSize());
+            //output.sizeOutputRelation.push_back((uint8_t) headLiteral.getTupleSize());
+            sizeOutputRelation.push_back(~0);
 
             //Calculate the positions of the dependencies for the chase
             std::map<uint8_t, std::vector<uint8_t>> extvars2pos;
@@ -235,23 +236,23 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const Literal &headLiteral,
                     }
                 }
             }
-            output.extvars2posFromSecond = extvars2pos;
+            extvars2posFromSecond = extvars2pos;
 
         } else {
             existingVariables = newExistingVariables;
-            output.sizeOutputRelation.push_back((uint8_t) existingVariables.size());
+            sizeOutputRelation.push_back((uint8_t) existingVariables.size());
         }
-        output.joinCoordinates.push_back(jc);
-        output.posFromFirst.push_back(pf);
-        output.posFromSecond.push_back(ps);
+        joinCoordinates.push_back(jc);
+        posFromFirst.push_back(pf);
+        posFromSecond.push_back(ps);
     }
 
 }
 
-bool RuleExecutionPlan::hasCartesian(HeadVars &hv) {
-    for (int i = 1; i < hv.joinCoordinates.size(); i++) {
-        LOG(DEBUGL) << "joinCoordinates[" << i << "]: size = " << hv.joinCoordinates[i].size();
-        if (hv.joinCoordinates[i].size() == 0) {
+bool RuleExecutionPlan::hasCartesian() {
+    for (int i = 1; i < joinCoordinates.size(); i++) {
+        LOG(DEBUGL) << "joinCoordinates[" << i << "]: size = " << joinCoordinates[i].size();
+        if (joinCoordinates[i].size() == 0) {
             return true;
         }
     }

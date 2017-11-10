@@ -11,14 +11,6 @@ void copyFromArray(Term_t *dest, const Term_t *source, const uint8_t n, const in
         dest[i] = source[(uint8_t) pos[i]];
 }
 
-/*bool InterTableJoinProcessor::eq(const Term_t *a1, const uint32_t idx) {
-  for (uint8_t i = 0; i < rowsize; ++i) {
-  if (a1[i] != segment->at(idx, i))
-  return false;
-  }
-  return true;
-  }*/
-
 InterTableJoinProcessor::InterTableJoinProcessor(const uint8_t rowsize,
         std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
         std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
@@ -106,38 +98,9 @@ void InterTableJoinProcessor::processResults(const int blockid,
     for (int i = 0; i < nCopyFromSecond; i++) {
         row[posFromSecond[i].first] = (*vectors2[posFromSecond[i].second])[i2];
     }
-    /*//Calculate hashcode from the two arrays.
-      size_t hashcode = Hashes::hashArray(row, rowsize);
-      size_t idx = hashcode % SIZE_HASHCOUNT;
-      if (hashcount[idx].first == hashcode) {
-      if (eq(row, hashcount[idx].second)) {
-      return;
-      } else {
-      hashcount[idx].second = segment->getNRows();
-      }
-      } else {
-      hashcount[idx].first = hashcode;
-      hashcount[idx].second = segment->getNRows();
-      }*/
-
     //Add the row
     processResults(blockid, unique, NULL);
 }
-
-/*void InterTableJoinProcessor::processResults(const int blockid, const Segment *first,
-  const uint32_t posFirst,
-  FCInternalTableItr* second, const bool unique) {
-  for (uint32_t i = 0; i < nCopyFromFirst; ++i) {
-  row[posFromFirst[i].first] = first->at(posFirst, posFromFirst[i].second);
-  }
-  for (uint32_t i = 0; i < nCopyFromSecond; ++i) {
-  row[posFromSecond[i].first] = second->getCurrentValue(posFromSecond[i].second);
-  }
-
-//Add the row
-enlargeArray(blockid);
-segments[blockid]->addRow(row, rowsize);
-}*/
 
 void InterTableJoinProcessor::addColumns(const int blockid,
         std::vector<std::shared_ptr<Column>> &columns,
@@ -147,7 +110,7 @@ void InterTableJoinProcessor::addColumns(const int blockid,
         segments[blockid]->addColumn(i, columns[i], sorted);
     }
 #if DEBUG
-    checkSizes();
+    ResultJoinProcessor::checkSizes();
 #endif
 }
 
@@ -251,13 +214,13 @@ void InterTableJoinProcessor::processResults(const int blockid, const bool uniqu
     enlargeArray(blockid);
     segments[blockid]->addRow(row, rowsize);
 }
-#endif /* USE_DUPLICATE_DETECTION */
+#endif
 
 InterTableJoinProcessor::~InterTableJoinProcessor() {
     delete[] segments;
 }
 
-void FinalRuleProcessor::processResults(const int blockid, const bool unique,
+void FinalRuleProcessor::SegmentsTable::processResults(const int blockid, const bool unique,
         std::mutex *m) {
     enlargeBuffers(blockid + 1);
     if (!unique) {
@@ -291,22 +254,30 @@ void FinalRuleProcessor::processResults(std::vector<int> &blockid, Term_t *p,
         }
 
         //Add the row
-        processResults(blockid[j], unique[j], m);
+        for(int i = 0; i < segmentTables.size(); ++i) {
+            segmentTables[i].processResults(blockid[j], unique[j], m);
+        }
     }
+}
+
+uint8_t __getSizeHeads(std::vector<Literal> &heads) {
+    uint8_t out = 0;
+    for(auto &h : heads)
+        out += h.getTupleSize();
+    return out;
 }
 
 FinalRuleProcessor::FinalRuleProcessor(
         std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
         std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
         std::vector<FCBlock> &listDerivations,
-        FCTable *table, Literal &head,
-        const uint8_t posHeadInRule,
+        std::vector<Literal> &heads,
         const RuleExecutionDetails *ruleDetails,
         const uint8_t ruleExecOrder,
         const size_t iteration,
         const bool addToEndTable,
         const int nthreads) :
-    ResultJoinProcessor(table->getSizeRow(),
+    ResultJoinProcessor(__getSizeHeads(heads),
             (uint8_t) posFromFirst.size(),
             (uint8_t) posFromSecond.size(),
             posFromFirst.size() > 0 ? & (posFromFirst[0]) : NULL,
@@ -316,15 +287,22 @@ FinalRuleProcessor::FinalRuleProcessor(
     iteration(iteration),
     addToEndTable(addToEndTable),
     newDerivation(false),
-    t(table),
     ruleDetails(ruleDetails),
-    literal(head), posLiteralInRule(posHeadInRule) {
+    heads(heads) {
 
-        for (int i = 0; i < head.getTupleSize(); ++i) {
-            VTerm t = head.getTermAtPos(i);
-            if (!t.isVariable()) {
-                row[i] = t.getValue();
+        uint8_t counter = 0;
+        for(int j = 0; j < heads.size(); ++j) {
+            const Literal &head = heads[j];
+            for (int i = 0; i < head.getTupleSize(); ++i) {
+                VTerm t = head.getTermAtPos(i);
+                if (!t.isVariable()) {
+                    row[counter] = t.getValue();
+                }
+                counter++;
             }
+
+            segmentTables.push_back(SegmentsTable(head.getTupleSize(),
+                        row + counter));
         }
 
 #if DEBUG
@@ -337,16 +315,9 @@ FinalRuleProcessor::FinalRuleProcessor(
                 << (int) posFromSecond[i].first << ", " << (int) posFromSecond[i].second << ")";
         }
 #endif
-
-        //Create a temporary table
-        nbuffers = 0;
-        tmpt = utmpt = NULL;
-        tmptseg = NULL;
-        enlargeBuffers(3);
-
     }
 
-void FinalRuleProcessor::enlargeBuffers(const int newsize) {
+void FinalRuleProcessor::SegmentsTable::enlargeBuffers(const int newsize) {
     if (nbuffers < newsize) {
         SegmentInserter** newb1 = new SegmentInserter*[newsize];
         SegmentInserter** newb2 = new SegmentInserter*[newsize];
@@ -376,7 +347,8 @@ void FinalRuleProcessor::enlargeBuffers(const int newsize) {
 void FinalRuleProcessor::processResults(const int blockid, const Term_t *first,
         FCInternalTableItr *second, const bool unique) {
     copyRawRow(first, second);
-    processResults(blockid, unique, NULL);
+    for(auto &st : segmentTables)
+        st.processResults(blockid, unique, NULL);
 }
 
 void FinalRuleProcessor::processResults(const int blockid, FCInternalTableItr *first,
@@ -388,7 +360,8 @@ void FinalRuleProcessor::processResults(const int blockid, FCInternalTableItr *f
         row[posFromSecond[i].first] = second->getCurrentValue(posFromSecond[i].second);
     }
 
-    processResults(blockid, unique, NULL);
+    for(auto &st : segmentTables)
+        st.processResults(blockid, unique, NULL);
 }
 
 void FinalRuleProcessor::processResults(const int blockid,
@@ -401,11 +374,15 @@ void FinalRuleProcessor::processResults(const int blockid,
     for (int i = 0; i < nCopyFromSecond; i++) {
         row[posFromSecond[i].first] = (*vectors2[posFromSecond[i].second])[i2];
     }
-    processResults(blockid, unique, NULL);
+    for(auto &st : segmentTables)
+        st.processResults(blockid, unique, NULL);
 }
 
-void FinalRuleProcessor::processResultsAtPos(const int blockid, const uint8_t pos,
-        const Term_t v, const bool unique) {
+void FinalRuleProcessor::SegmentsTable::processResultsAtPos(const int blockid,
+        const uint8_t pos,
+        const Term_t v,
+        const bool unique) {
+
     enlargeBuffers(blockid + 1);
     if (!unique) {
         if (tmpt[blockid] == NULL) {
@@ -420,7 +397,7 @@ void FinalRuleProcessor::processResultsAtPos(const int blockid, const uint8_t po
     }
 }
 
-bool FinalRuleProcessor::isBlockEmpty(const int blockId, const bool unique) const {
+bool FinalRuleProcessor::SegmentsTable::isBlockEmpty(const int blockId, const bool unique) const {
     if (!unique) {
         return tmpt[blockId] == NULL || tmpt[blockId]->isEmpty();
     } else {
@@ -428,7 +405,7 @@ bool FinalRuleProcessor::isBlockEmpty(const int blockId, const bool unique) cons
     }
 }
 
-bool FinalRuleProcessor::isEmpty() const {
+bool FinalRuleProcessor::SegmentsTable::isEmpty() const {
     for (int i = 0; i < nbuffers; ++i) {
         if (utmpt[i] != NULL && !utmpt[i]->isEmpty())
             return false;
@@ -438,7 +415,7 @@ bool FinalRuleProcessor::isEmpty() const {
     return true;
 }
 
-uint32_t FinalRuleProcessor::getRowsInBlock(const int blockId,
+uint32_t FinalRuleProcessor::SegmentsTable::getRowsInBlock(const int blockId,
         const bool unique) const {
     if (!unique) {
         return tmpt[blockId] == NULL ? 0 : tmpt[blockId]->getNRows();
@@ -468,7 +445,37 @@ void FinalRuleProcessor::addColumns(const int blockid,
 #endif
 }
 
-void FinalRuleProcessor::addColumns(const int blockid,
+std::vector<std::shared_ptr<Column>> FinalRuleProcessor::addConstantColumns(
+        std::vector<std::shared_ptr<Column>> &c, bool lastInsert) {
+    if (c.size() < rowsize) {
+        assert(lastInsert); //If it is not the last insert, the size
+        //of the columns can change. I must address this case. For
+        //now, I catch it.
+
+        //The head contains also constants. We must add fields in the vector
+        // of created columns.
+        std::vector<std::shared_ptr<Column>> newc;
+        int idxVar = 0;
+        int counter = 0;
+        for (auto &head : heads) {
+            for(int i = 0; i < head.getTupleSize(); ++i) {
+                if (!head.getTermAtPos(i).isVariable()) {
+                    newc.push_back(std::shared_ptr<Column>(
+                                new CompressedColumn(row[counter + i],
+                                    c[0]->size())));
+                } else {
+                    newc.push_back(c[idxVar++]);
+                }
+            }
+            counter += head.getTupleSize();
+        }
+        return newc;
+    } else {
+        return c;
+    }
+}
+
+void FinalRuleProcessor::SegmentsTable::addColumns(const int blockid,
         FCInternalTableItr *itr, const bool unique,
         const bool sorted, const bool lastInsert) {
     enlargeBuffers(blockid + 1);
@@ -505,26 +512,7 @@ void FinalRuleProcessor::addColumns(const int blockid,
             c = c2;
         }
 
-        if (c.size() < rowsize) {
-            assert(lastInsert); //If it is not the last insert, the size
-            //of the columns can change. I must address this case. For
-            //now, I catch it.
-
-            //The head contains also constants. We must add fields in the vector
-            // of created columns.
-            std::vector<std::shared_ptr<Column>> newc;
-            int idxVar = 0;
-            for (int i = 0; i < rowsize; ++i) {
-                if (!literal.getTermAtPos(i).isVariable()) {
-                    newc.push_back(std::shared_ptr<Column>(
-                                new CompressedColumn(row[i],
-                                    c[0]->size())));
-                } else {
-                    newc.push_back(c[idxVar++]);
-                }
-            }
-            c = newc;
-        }
+        c = addConstantColumns(c, lastInsert);
         utmpt[blockid]->addColumns(c, sorted, lastInsert);
 
     } else {
@@ -564,23 +552,7 @@ void FinalRuleProcessor::addColumns(const int blockid,
             c = c2;
         }
 
-        if (c.size() < rowsize) {
-            //The head contains also constants. We must add fields in the vector
-            // of created columns.
-            std::vector<std::shared_ptr<Column>> newc;
-            int idxVar = 0;
-            for (int i = 0; i < rowsize; ++i) {
-                if (!literal.getTermAtPos(i).isVariable()) {
-                    newc.push_back(std::shared_ptr<Column>(
-                                new CompressedColumn(row[i],
-                                    c[0]->size())));
-                } else {
-                    newc.push_back(c[idxVar++]);
-                }
-            }
-            c = newc;
-        }
-
+        c = addConstantColumns(c, lastInsert);
         tmpt[blockid]->addColumns(c, sorted, lastInsert);
     }
 #if DEBUG
@@ -683,7 +655,8 @@ void FinalRuleProcessor::processResults(const int blockid, const bool unique, st
 }
 
 #else
-void FinalRuleProcessor::mergeTmpt(const int blockid, const bool unique, std::mutex *m) {
+void FinalRuleProcessor::SegmentsTable::mergeTmpt(const int blockid,
+        const bool unique, std::mutex *m) {
     if (tmptseg[blockid] != NULL && tmptseg[blockid]->getNRows() > tmpt[blockid]->getNRows()) {
         // Only start sorting and merging if it is large enough.
         return;
@@ -733,22 +706,20 @@ void FinalRuleProcessor::copyRawRow(const Term_t *first,
     }
 }
 
-void FinalRuleProcessor::consolidateSegment(std::shared_ptr<const Segment> seg) {
-    std::shared_ptr<const FCInternalTable> ptrTable(
-            new InmemoryFCInternalTable(rowsize,
-                iteration,
-                true,
-                seg));
-    t->add(ptrTable, literal, posLiteralInRule, ruleDetails, ruleExecOrder,
-            iteration, true, nthreads);
-}
+/*void FinalRuleProcessor::consolidateSegment(std::shared_ptr<const Segment> seg,
+  FCTable *t, Literal &literal, int posLiteralInRule) {
+  std::shared_ptr<const FCInternalTable> ptrTable(
+  new InmemoryFCInternalTable(rowsize,
+  iteration,
+  true,
+  seg));
+  t->add(ptrTable, literal, posLiteralInRule, ruleDetails, ruleExecOrder,
+  iteration, true, nthreads);
+  }*/
 
-void FinalRuleProcessor::consolidate(const bool isFinished,
-        const bool forceCheck) {
-    if (!addToEndTable) {
-        //do nothing. We'll consolidate later on.
-        return;
-    }
+bool FinalRuleProcessor::consolidateTable(const bool isFinished,
+        const bool forceCheck, SegmentInserter **utmpt,
+        int nbuffers, SegmentInserter **tmpt) {
 
     if (utmpt != NULL) {
         for (int i = 0; i < nbuffers; ++i) {
@@ -770,24 +741,6 @@ void FinalRuleProcessor::consolidate(const bool isFinished,
                                     seg));
                         t->add(ptrTable, literal, posLiteralInRule, ruleDetails, ruleExecOrder,
                                 iteration, isFinished, nthreads);
-#if 0
-                        char buffer[16384];
-                        FCInternalTableItr *test = ptrTable->getIterator();
-                        int ncols = test->getNColumns();
-                        while (test->hasNext()) {
-                            test->next();
-                            std::string s = "";
-                            for (int i = 0; i < ncols; i++) {
-                                Term_t t = test->getCurrentValue(i);
-                                if (i > 0) {
-                                    s += ", ";
-                                }
-                                s += std::to_string(t);
-                            }
-                            LOG(DEBUGL) << "Tuple: <" << s << ">";
-                        }
-                        ptrTable->releaseIterator(test);
-#endif
                     }
 
                 } else {
@@ -799,46 +752,10 @@ void FinalRuleProcessor::consolidate(const bool isFinished,
                             sortedSegment = utmpt[i]->getSegment()->sortBy(NULL, nthreads, false);
 
                         std::shared_ptr<const FCInternalTable> ptrTable(new InmemoryFCInternalTable(rowsize, iteration, true, sortedSegment));
-#if 0
-                        char buffer[16384];
-                        FCInternalTableItr *test = ptrTable->getIterator();
-                        int ncols = test->getNColumns();
-                        while (test->hasNext()) {
-                            test->next();
-                            std::string s = "";
-                            for (int i = 0; i < ncols; i++) {
-                                Term_t t = test->getCurrentValue(i);
-                                if (i > 0) {
-                                    s += ", ";
-                                }
-                                s += std::to_string(t);
-                            }
-                            LOG(DEBUGL) << "Tuple: <" << s << ">";
-                        }
-                        ptrTable->releaseIterator(test);
-#endif
                         t->add(ptrTable, literal, posLiteralInRule,
                                 ruleDetails, ruleExecOrder, iteration, isFinished, nthreads);
                     } else {
                         std::shared_ptr<const FCInternalTable> ptrTable(new InmemoryFCInternalTable(rowsize, iteration, true, utmpt[i]->getSegment()));
-#if 0
-                        char buffer[16384];
-                        FCInternalTableItr *test = ptrTable->getIterator();
-                        int ncols = test->getNColumns();
-                        while (test->hasNext()) {
-                            test->next();
-                            std::string s = "";
-                            for (int i = 0; i < ncols; i++) {
-                                Term_t t = test->getCurrentValue(i);
-                                if (i > 0) {
-                                    s += ", ";
-                                }
-                                s += std::to_string(t);
-                            }
-                            LOG(DEBUGL) << "Tuple: <" << s << ">";
-                        }
-                        ptrTable->releaseIterator(test);
-#endif
                         t->add(ptrTable, literal, posLiteralInRule, ruleDetails, ruleExecOrder, iteration, isFinished, nthreads);
                     }
                 }
@@ -872,27 +789,8 @@ void FinalRuleProcessor::consolidate(const bool isFinished,
                                 iteration,
                                 true,
                                 seg));
-
-
-#if 0
-                    char buffer[16384];
-                    FCInternalTableItr *test = ptrTable->getIterator();
-                    int ncols = test->getNColumns();
-                    while (test->hasNext()) {
-                        test->next();
-                        std::string s = "";
-                        for (int i = 0; i < ncols; i++) {
-                            Term_t t = test->getCurrentValue(i);
-                            if (i > 0) {
-                                s += ", ";
-                            }
-                            s += std::to_string(t);
-                        }
-                        LOG(DEBUGL) << "Tuple: <" << s << ">";
-                    }
-                    ptrTable->releaseIterator(test);
-#endif
-                    t->add(ptrTable, literal, posLiteralInRule, ruleDetails, ruleExecOrder,
+                    t->add(ptrTable, literal, posLiteralInRule, ruleDetails,
+                            ruleExecOrder,
                             iteration, isFinished, nthreads);
 
                 }
@@ -923,6 +821,17 @@ void FinalRuleProcessor::consolidate(const bool isFinished,
         }
     }
 #endif
+
+}
+
+void FinalRuleProcessor::consolidate(const bool isFinished,
+        const bool forceCheck) {
+    if (!addToEndTable) {
+        //do nothing. We'll consolidate later on.
+        return;
+    }
+    //TODO
+    throw 10;
 }
 
 std::vector<std::shared_ptr<const Segment>> FinalRuleProcessor::getAllSegments() {
@@ -949,24 +858,4 @@ std::vector<std::shared_ptr<const Segment>> FinalRuleProcessor::getAllSegments()
     //std::chrono::duration<double> sec = std::chrono::system_clock::now() - startS;
     //LOG(WARNL) << "---Time other " << sec.count() * 1000;
     return out;
-}
-
-FinalRuleProcessor::~FinalRuleProcessor() {
-    if (utmpt != NULL) {
-        for (int i = 0; i < nbuffers; ++i)
-            if (utmpt[i] != NULL)
-                delete utmpt[i];
-        delete[] utmpt;
-    }
-
-    if (tmpt != NULL) {
-        for (int i = 0; i < nbuffers; ++i) {
-            if (tmpt[i] != NULL)
-                delete tmpt[i];
-        }
-        delete[] tmpt;
-    }
-    if (tmptseg != NULL) {
-        delete[] tmptseg;
-    }
 }
