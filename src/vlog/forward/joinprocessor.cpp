@@ -2,6 +2,7 @@
 #include <vlog/joinprocessor.h>
 #include <vlog/seminaiver.h>
 #include <vlog/filterhashjoin.h>
+#include <vlog/finalresultjoinproc.h>
 #include <trident/model/table.h>
 
 #include <google/dense_hash_map>

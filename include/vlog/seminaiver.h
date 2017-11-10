@@ -130,8 +130,6 @@ class SemiNaiver {
 
         virtual void saveStatistics(StatsRule &stats);
 
-        virtual FCTable *getTable(const PredId_t pred, const uint8_t card);
-
         virtual bool executeUntilSaturation(
                 std::vector<RuleExecutionDetails> &ruleset,
                 std::vector<StatIteration> &costRules);
@@ -162,6 +160,8 @@ class SemiNaiver {
         bool opt_inter() {
             return opt_intersect;
         }
+
+        virtual FCTable *getTable(const PredId_t pred, const uint8_t card);
 
         void run(size_t lastIteration, size_t iteration);
 

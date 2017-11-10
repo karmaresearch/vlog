@@ -150,7 +150,7 @@ inline void FilterHashJoin::doJoin_join(const Term_t *constantValues,
         }
     }
 #if DEBUG
-    output->checkSizes(0);
+    output->checkSizes();
 #endif
 }
 
@@ -203,7 +203,7 @@ inline void FilterHashJoin::doJoin_cartprod(const Term_t *constantValues,
         i++;
     }
 #if DEBUG
-    output->checkSizes(0);
+    output->checkSizes();
 #endif
 }
 
@@ -515,7 +515,7 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
             }
         }
 #if DEBUG
-        output->checkSizes(0);
+        output->checkSizes();
 #endif
     }
 

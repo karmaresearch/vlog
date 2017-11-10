@@ -4,6 +4,7 @@
 #include <vlog/fctable.h>
 #include <vlog/fcinttable.h>
 #include <vlog/filterer.h>
+#include <vlog/finalresultjoinproc.h>
 #include <trident/model/table.h>
 #include <kognac/consts.h>
 #include <kognac/utils.h>
@@ -956,24 +957,23 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                         ! multithreaded ? -1 : nthreads);
             } else {
                 if (ruleDetails.rule.isExistential()) {
-                    joinOutput = new ExistentialRuleProcessor(
-                            plan.posFromFirst[optimalOrderIdx],
-                            plan.posFromSecond[optimalOrderIdx],
-                            listDerivations,
-                            heads, &ruleDetails,
-                            (uint8_t) orderExecution, iteration,
-                            finalResultContainer == NULL,
-                            !multithreaded ? -1 : nthreads,
-                            chaseMgmt);
+                    /*joinOutput = new ExistentialRuleProcessor(
+                      plan.posFromFirst[optimalOrderIdx],
+                      plan.posFromSecond[optimalOrderIdx],
+                      listDerivations,
+                      heads, &ruleDetails,
+                      (uint8_t) orderExecution, iteration,
+                      finalResultContainer == NULL,
+                      !multithreaded ? -1 : nthreads,
+                      chaseMgmt);*/
                 } else {
                     joinOutput = new FinalRuleProcessor(
                             plan.posFromFirst[optimalOrderIdx],
                             plan.posFromSecond[optimalOrderIdx],
-                            listDerivations,
                             heads, &ruleDetails,
                             (uint8_t) orderExecution, iteration,
                             finalResultContainer == NULL,
-                            !multithreaded ? -1 : nthreads);
+                            !multithreaded ? -1 : nthreads, this);
                 }
             }
             //END --  Determine where to put the results of the query

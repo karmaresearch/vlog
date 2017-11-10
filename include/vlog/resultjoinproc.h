@@ -60,9 +60,20 @@ class ResultJoinProcessor {
     private:
         virtual void processResults(const int blockid, const bool unique, std::mutex *m) = 0;
 
-    public:
+    protected:
+        void copyRawRow(const Term_t *first, const Term_t* second);
 
+        void copyRawRow(const Term_t *first, FCInternalTableItr* second);
+
+    public:
         ResultJoinProcessor(const uint8_t rowsize, const uint8_t nCopyFromFirst,
+                const uint8_t nCopyFromSecond, const std::pair<uint8_t, uint8_t> *posFromFirst,
+                const std::pair<uint8_t, uint8_t> *posFromSecond, const int nthreads) :
+            ResultJoinProcessor(rowsize, new Term_t[rowsize], nCopyFromFirst,
+                    nCopyFromSecond, posFromFirst, posFromSecond, nthreads) {
+}
+
+        ResultJoinProcessor(const uint8_t rowsize, Term_t *row, const uint8_t nCopyFromFirst,
                 const uint8_t nCopyFromSecond, const std::pair<uint8_t, uint8_t> *posFromFirst,
                 const std::pair<uint8_t, uint8_t> *posFromSecond, const int nthreads) :
             rowsize(rowsize), nCopyFromFirst(nCopyFromFirst), nCopyFromSecond(nCopyFromSecond), nthreads(nthreads) {
@@ -72,7 +83,6 @@ class ResultJoinProcessor {
                 for (uint8_t i = 0; i < nCopyFromSecond; ++i) {
                     this->posFromSecond[i] = posFromSecond[i];
                 }
-                row = new Term_t[rowsize];
 #if USE_DUPLICATE_DETECTION
                 rowCount = 0;
                 rowsHash = NULL;
@@ -80,10 +90,7 @@ class ResultJoinProcessor {
             }
 
 #if DEBUG
-        virtual void checkSizes(uint8_t headPos) const {
-        }
-        void checkSizes() const {
-            checkSizes(0);
+        virtual void checkSizes() const {
         }
 #endif
 
@@ -109,7 +116,7 @@ class ResultJoinProcessor {
 
         virtual bool isBlockEmpty(const int blockId, const bool unique) const = 0;
 
-        virtual uint32_t getRowsInBlock(const int blockId, const bool unique) const = 0;
+        //virtual uint32_t getRowsInBlock(const int blockId, const bool unique) const = 0;
 
         virtual void addColumns(const int blockid,
                 std::vector<std::shared_ptr<Column>> &columns,
@@ -201,7 +208,7 @@ class InterTableJoinProcessor: public ResultJoinProcessor {
     public:
 
 #if DEBUG
-        void checkSizes(uint8_t headPos) const {
+        void checkSizes() const {
             for (int i = 0; i < currentSegmentSize; i++) {
                 segments[i]->checkSizes();
             }
@@ -250,221 +257,11 @@ class InterTableJoinProcessor: public ResultJoinProcessor {
 
         bool isEmpty() const;
 
-        uint32_t getRowsInBlock(const int blockId, const bool unique) const;
+        //uint32_t getRowsInBlock(const int blockId, const bool unique) const;
 
         std::shared_ptr<const FCInternalTable> getTable();
 
         ~InterTableJoinProcessor();
-};
-
-class FinalRuleProcessor: public ResultJoinProcessor {
-    private:
-        std::vector<FCBlock> &listDerivations;
-        const uint8_t ruleExecOrder;
-
-        const size_t iteration;
-
-        struct SegmentsTable {
-            uint8_t rowsize;
-            uint64_t *row;
-
-            int nbuffers;
-            SegmentInserter **utmpt;
-            SegmentInserter **tmpt;
-            std::shared_ptr<const Segment> *tmptseg;
-
-            void processResults(const int blockid, const bool unique,
-                    std::mutex *m);
-
-            void processResultsAtPos(const int blockid, const uint8_t pos,
-                    const Term_t v, const bool unique);
-
-            bool isBlockEmpty(const int blockId, const bool unique) const;
-
-            void enlargeBuffers(const int newsize);
-#if USE_DUPLICATE_DETECTION
-#else
-            void mergeTmpt(const int blockid, const bool unique, std::mutex *m);
-#endif
-
-            bool isEmpty() const;
-
-            void addColumns(const int blockid,
-                    std::vector<std::shared_ptr<Column>> &columns,
-                    const bool unique, const bool sorted);
-
-            void addColumn(const int blockid, const uint8_t pos,
-                    std::shared_ptr<Column> column, const bool unique,
-                    const bool sorted);
-
-            void addColumns(const int blockid, FCInternalTableItr *itr,
-                    const bool unique, const bool sorted,
-                    const bool lastInsert);
-
-
-            uint32_t getRowsInBlock(const int blockId, const bool unique) const;
-
-            SegmentsTable(uint8_t rowsize, uint64_t *row) : rowsize(rowsize),
-            row(row),
-            nbuffers(0),
-            utmpt(NULL), tmpt(NULL) {
-                enlargeBuffers(3);
-            }
-
-            ~SegmentsTable() {
-                if (utmpt != NULL) {
-                    for (int i = 0; i < nbuffers; ++i)
-                        if (utmpt[i] != NULL)
-                            delete utmpt[i];
-                    delete[] utmpt;
-                }
-
-                if (tmpt != NULL) {
-                    for (int i = 0; i < nbuffers; ++i) {
-                        if (tmpt[i] != NULL)
-                            delete tmpt[i];
-                    }
-                    delete[] tmpt;
-                }
-                if (tmptseg != NULL) {
-                    delete[] tmptseg;
-                }
-            }
-
-        };
-        std::vector<SegmentsTable> segmentTables;
-
-        bool addToEndTable;
-        bool newDerivation;
-
-        void copyRawRow(const Term_t *first, const Term_t* second);
-
-        void copyRawRow(const Term_t *first, FCInternalTableItr* second);
-
-    protected:
-        const RuleExecutionDetails *ruleDetails;
-        const std::vector<Literal> &heads;
-
-        std::vector<std::shared_ptr<Column>> addConstantColumns(
-                std::vector<std::shared_ptr<Column>> &c, bool lastInsert);
-
-        static bool consolidateTable(const bool isFinished,
-                const bool forceCheck, SegmentInserter **utmpt,
-                SegmentInserter **tmpt);
-
-    public:
-        FinalRuleProcessor(std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
-                std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
-                std::vector<FCBlock> &listDerivations,
-                std::vector<Literal> &heads,
-                const RuleExecutionDetails *detailsRule,
-                const uint8_t ruleExecOrder,
-                const size_t iteration,
-                const bool addToEndTable,
-                const int nthreads);
-
-#if DEBUG
-        void checkSizes(uint8_t headPos) const {
-            for (int i = 0; i < segmentTables[headPos].nbuffers; i++) {
-                if (segmentTables[headPos].tmpt[i] != NULL) {
-                    segmentTables[headPos].tmpt[i]->checkSizes();
-                }
-                if (segmentTables[headPos].utmpt[i] != NULL) {
-                    segmentTables[headPos].utmpt[i]->checkSizes();
-                }
-            }
-        }
-#endif
-
-        bool shouldAddToEndTable() {
-            return addToEndTable;
-        }
-
-        bool hasNewDerivation() const {
-            return newDerivation;
-        }
-
-        const std::vector<Literal> &getHeads() const {
-            return heads;
-        }
-
-        FCTable *getTable() const {
-            throw 10; //no longer supported
-        }
-
-        size_t getIteration() const {
-            return iteration;
-        }
-
-        void processResults(std::vector<int> &blockid, Term_t *p,
-                std::vector<bool> &unique, std::mutex *m);
-
-        void processResults(const int blockid, const Term_t *first,
-                FCInternalTableItr* second, const bool unique);
-
-        void processResults(const int blockid,
-                const std::vector<const std::vector<Term_t> *> &vectors1, size_t i1,
-                const std::vector<const std::vector<Term_t> *> &vectors2, size_t i2,
-                const bool unique);
-
-        void processResults(const int blockid, FCInternalTableItr *first,
-                FCInternalTableItr* second, const bool unique);
-
-        void processResultsAtPos(const int blockid, const uint8_t pos,
-                const Term_t v, const bool unique);
-
-        bool containsUnfilteredDerivation(uint8_t headPos) const {
-            if (segmentTables[headPos].tmpt != NULL) {
-                for (int i = 0; i < segmentTables[headPos].nbuffers; ++i) {
-                    if (segmentTables[headPos].tmpt[i] != NULL &&
-                            !segmentTables[headPos].tmpt[i]->isEmpty())
-                        return true;
-                }
-            }
-            if (segmentTables[headPos].tmptseg != NULL) {
-                for (int i = 0; i < segmentTables[headPos].nbuffers; ++i) {
-                    if (segmentTables[headPos].tmptseg[i] != NULL &&
-                            !segmentTables[headPos].tmptseg[i]->isEmpty())
-                        return true;
-                }
-            }
-            return false;
-        }
-
-        void consolidate(const bool isFinished) {
-            consolidate(isFinished, false);
-        }
-
-        void consolidate(const bool isFinished, const bool forceCheck);
-
-        std::vector<std::shared_ptr<const Segment>> getAllSegments();
-};
-
-class ExistentialRuleProcessor : public FinalRuleProcessor {
-    private:
-        std::shared_ptr<ChaseMgmt> chaseMgmt;
-
-        void filterDerivations(std::vector<std::shared_ptr<Column>> c,
-                uint64_t sizecolumns,
-                std::vector<uint64_t> &output);
-
-    public:
-        ExistentialRuleProcessor(std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
-                std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
-                std::vector<FCBlock> &listDerivations,
-                std::vector<Literal> &heads,
-                const RuleExecutionDetails *detailsRule,
-                const uint8_t ruleExecOrder,
-                const size_t iteration,
-                const bool addToEndTable,
-                const int nthreads,
-                std::shared_ptr<ChaseMgmt> chaseMgmt);
-
-        void processResults(const int blockid, const bool unique, std::mutex *m);
-
-        void addColumns(const int blockid, FCInternalTableItr *itr,
-                const bool unique, const bool sorted,
-                const bool lastInsert);
 };
 
 #endif

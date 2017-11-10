@@ -1,5 +1,6 @@
 #include <vlog/seminaiver_threaded.h>
 #include <vlog/resultjoinproc.h>
+#include <vlog/finalresultjoinproc.h>
 
 #include <vector>
 
@@ -53,8 +54,8 @@ bool SemiNaiverThreaded::executeUntilSaturation(
 }
 
 bool sortByIteration(ResultJoinProcessor *p1, ResultJoinProcessor *p2) {
-    return ((FinalRuleProcessor*)p1)->getIteration() <
-        ((FinalRuleProcessor*)p2)->getIteration();
+    return ((SingleHeadFinalRuleProcessor*)p1)->getIteration() <
+        ((SingleHeadFinalRuleProcessor*)p2)->getIteration();
 }
 
 bool SemiNaiverThreaded::doGlobalConsolidation(
@@ -68,18 +69,15 @@ bool SemiNaiverThreaded::doGlobalConsolidation(
             sortByIteration);
 
     bool response = false;
-    std::map<PredId_t, std::vector<FinalRuleProcessor*>> allDersByPred;
+    std::map<PredId_t, std::vector<SingleHeadFinalRuleProcessor*>> allDersByPred;
     for (const auto &el : data.getTmpDerivations()) {
-        FinalRuleProcessor *fel = (FinalRuleProcessor*)el;
+        SingleHeadFinalRuleProcessor *fel = (SingleHeadFinalRuleProcessor*)el;
         if (!el->isEmpty()) {
-            if (fel->getHeads().size() > 1) {
-                LOG(ERRORL) << "Not supported";
-            }
-            PredId_t pid = fel->getHeads()[0].getPredicate().getId();
+            PredId_t pid = fel->getLiteral().getPredicate().getId();
             if (allDersByPred.count(pid)) {
                 allDersByPred.find(pid)->second.push_back(fel);
             } else {
-                std::vector<FinalRuleProcessor*> vec;
+                std::vector<SingleHeadFinalRuleProcessor*> vec;
                 vec.push_back(fel);
                 allDersByPred.insert(make_pair(pid, vec));
             }
@@ -87,7 +85,7 @@ bool SemiNaiverThreaded::doGlobalConsolidation(
     }
 
     //Determine which derivations should be consolidated in parallel
-    std::vector<std::pair<PredId_t, std::vector<FinalRuleProcessor*>>> parallelDerivations;
+    std::vector<std::pair<PredId_t, std::vector<SingleHeadFinalRuleProcessor*>>> parallelDerivations;
     for (auto p = allDersByPred.begin(); p != allDersByPred.end(); ++p) {
         /*if (p->second.size() == 1) {
         //Is the derivation unique? Or very small?
