@@ -941,6 +941,9 @@ int main(int argc, const char** argv) {
             p.remoteLocation = "";
             p.limitSpace = 0;
             p.graphTransformation = "";
+	    p.timeoutStats = 0;
+	    p.storeDicts = true;
+	    p.relsOwnIDs = false;
 
             loader->load(p);
 
@@ -990,6 +993,7 @@ int main(int argc, const char** argv) {
             p.graphTransformation = "";
             p.timeoutStats = 0;
             p.storeDicts = true;
+	    p.relsOwnIDs = false;
 
             loader->load(p);
 
