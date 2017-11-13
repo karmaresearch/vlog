@@ -76,6 +76,7 @@ SingleHeadFinalRuleProcessor::SingleHeadFinalRuleProcessor(
     ruleExecOrder(ruleExecOrder),
     iteration(iteration),
     newDerivation(false),
+    addToEndTable(addToEndTable),
     t(table),
     ruleDetails(ruleDetails),
     literal(head), posLiteralInRule(posHeadInRule) {

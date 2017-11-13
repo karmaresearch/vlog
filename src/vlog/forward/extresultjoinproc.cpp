@@ -271,7 +271,14 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         c = newc;
     }
 
+    count = 0;
     for(auto &t : atomTables) {
-        t->addColumns(blockid, c, unique, sorted);
+        uint8_t sizeTuple = t->getLiteral().getTupleSize();
+        std::vector<std::shared_ptr<Column>> c2;
+        for(uint8_t i = 0; i < sizeTuple; ++i) {
+            c2.push_back(c[count + i]);
+        }
+        t->addColumns(blockid, c2, unique, sorted);
+        count += sizeTuple;
     }
 }
