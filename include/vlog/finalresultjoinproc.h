@@ -43,17 +43,17 @@ class SingleHeadFinalRuleProcessor: public ResultJoinProcessor {
                 const bool addToEndTable,
                 const int nthreads);
 
-            SingleHeadFinalRuleProcessor(
-                    Term_t *row,
-                    std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
-                    std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
-                    FCTable *t,
-                    Literal &head, const uint8_t posHeadInRule,
-                    const RuleExecutionDetails *detailsRule,
-                    const uint8_t ruleExecOrder,
-                    const size_t iteration,
-                    const bool addToEndTable,
-                    const int nthreads);
+        SingleHeadFinalRuleProcessor(
+                Term_t *row,
+                std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
+                std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
+                FCTable *t,
+                Literal &head, const uint8_t posHeadInRule,
+                const RuleExecutionDetails *detailsRule,
+                const uint8_t ruleExecOrder,
+                const size_t iteration,
+                const bool addToEndTable,
+                const int nthreads);
 
 #if DEBUG
         void checkSizes() const {
@@ -166,10 +166,11 @@ class FinalRuleProcessor: public ResultJoinProcessor {
         //const uint8_t ruleExecOrder;
         //const size_t iteration;
         //bool newDerivation;
-        //const RuleExecutionDetails *ruleDetails;
         //std::vector<Literal> &heads;
 
+    protected:
         std::vector<std::unique_ptr<SingleHeadFinalRuleProcessor>> atomTables;
+        const RuleExecutionDetails *ruleDetails;
 
     public:
         FinalRuleProcessor(
@@ -189,7 +190,7 @@ class FinalRuleProcessor: public ResultJoinProcessor {
 
         bool isEmpty() const;
 
-        void processResults(const int blockid, const bool unique,
+        virtual void processResults(const int blockid, const bool unique,
                 std::mutex *m);
 
         void processResults(std::vector<int> &blockid, Term_t *p,
@@ -217,7 +218,7 @@ class FinalRuleProcessor: public ResultJoinProcessor {
                 std::shared_ptr<Column> column, const bool unique,
                 const bool sorted);
 
-        void addColumns(const int blockid, FCInternalTableItr *itr,
+        virtual void addColumns(const int blockid, FCInternalTableItr *itr,
                 const bool unique, const bool sorted,
                 const bool lastInsert);
 

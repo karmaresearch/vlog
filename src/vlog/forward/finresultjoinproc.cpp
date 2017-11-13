@@ -731,12 +731,12 @@ FinalRuleProcessor::FinalRuleProcessor(
             (uint8_t) posFromFirst.size(),
             (uint8_t) posFromSecond.size(),
             posFromFirst.size() > 0 ? & (posFromFirst[0]) : NULL,
-            posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads)
+            posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads),
     //listDerivations(listDerivations),
     //ruleExecOrder(ruleExecOrder),
     //iteration(iteration),
     //newDerivation(false),
-    //ruleDetails(ruleDetails),
+    ruleDetails(ruleDetails)
     //heads(heads)
 {
         uint8_t headID = 0;
