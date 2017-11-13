@@ -80,7 +80,7 @@ MySQLIterator::MySQLIterator(sql::Connection *con, string tableName,
 	posFirstVar = -1;
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SQL query: " << sqlQuery;
+    LOG(DEBUGL) << "SQL query: " << sqlQuery;
 
     stmt = con->createStatement();
     res = stmt->executeQuery(sqlQuery);
@@ -116,7 +116,7 @@ MySQLIterator::MySQLIterator(sql::Connection *con, string sqlQuery,
 	posFirstVar = -1;
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SQL query: " << sqlQuery;
+    LOG(DEBUGL) << "SQL query: " << sqlQuery;
 
     stmt = con->createStatement();
     res = stmt->executeQuery(sqlQuery);
@@ -148,16 +148,16 @@ bool MySQLIterator::hasNext() {
 	hasNextValue = stop;
     }
     hasNextChecked = true;
-    // BOOST_LOG_TRIVIAL(debug) << "MySQLIterator::hasNext(): skipDuplicatedFirst = " << skipDuplicatedFirst << ", returns " << hasNextValue;
+    // LOG(DEBUGL) << "MySQLIterator::hasNext(): skipDuplicatedFirst = " << skipDuplicatedFirst << ", returns " << hasNextValue;
     return hasNextValue;
 }
 
 void MySQLIterator::next() {
     if (! hasNextChecked) {
-	BOOST_LOG_TRIVIAL(error) << "MySQLIterator::next called without hasNext check";
+	LOG(ERRORL) << "MySQLIterator::next called without hasNext check";
 	throw 10;
     }
-    // BOOST_LOG_TRIVIAL(debug) << "MySQLIterator::next()";
+    // LOG(DEBUGL) << "MySQLIterator::next()";
     if (isFirst) {
         isFirst = false;
     } else if (!res->next()) {
@@ -179,11 +179,11 @@ void MySQLIterator::skipDuplicatedFirstColumn() {
     if (posFirstVar != -1) {
 	skipDuplicatedFirst = true;
     }
-    BOOST_LOG_TRIVIAL(debug) << "posFirstVar = " << posFirstVar << ", skipDuplicatedFirst = " << skipDuplicatedFirst;
+    LOG(DEBUGL) << "posFirstVar = " << posFirstVar << ", skipDuplicatedFirst = " << skipDuplicatedFirst;
 }
 
 Term_t MySQLIterator::getElementAt(const uint8_t p) {
-    // BOOST_LOG_TRIVIAL(debug) << "MySQLIterator::getElementAt()";
+    // LOG(DEBUGL) << "MySQLIterator::getElementAt()";
     return res->getUInt64(p + 1);
 }
 

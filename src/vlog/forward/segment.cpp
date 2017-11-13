@@ -3,9 +3,6 @@
 #include <vlog/support.h>
 #include <vlog/fcinttable.h>
 
-#include <boost/log/trivial.hpp>
-#include <boost/chrono.hpp>
-
 #include <tbb/parallel_for.h>
 
 #include <random>
@@ -36,17 +33,17 @@ Segment::Segment(const uint8_t nfields, std::vector<std::shared_ptr<Column>> &c)
 #if DEBUG
 void Segment::checkSizes() const {
     if (nfields > 0) {
-	size_t sz = 0;
-	if (columns[0] != NULL) {
-	    sz = columns[0]->size();
-	}
-	for (uint8_t i = 1; i < nfields; ++i) {
-	    if (columns[i] == NULL) {
-		assert(sz == 0);
-	    } else {
-		assert(sz == columns[i]->size());
-	    }
-	}
+        size_t sz = 0;
+        if (columns[0] != NULL) {
+            sz = columns[0]->size();
+        }
+        for (uint8_t i = 1; i < nfields; ++i) {
+            if (columns[i] == NULL) {
+                assert(sz == 0);
+            } else {
+                assert(sz == columns[i]->size());
+            }
+        }
     }
 
 }
@@ -60,9 +57,9 @@ Segment& Segment::operator =(const std::shared_ptr<Column> *v) {
 }
 
 size_t Segment::estimate(const uint8_t nconstantsToFilter,
-                         const uint8_t *posConstantsToFilter,
-                         const Term_t *valuesConstantsToFilter,
-                         const uint8_t nfields) const {
+        const uint8_t *posConstantsToFilter,
+        const Term_t *valuesConstantsToFilter,
+        const uint8_t nfields) const {
 
     if (nconstantsToFilter == 0) {
         return columns[0]->estimateSize();
@@ -108,27 +105,27 @@ size_t Segment::estimate(const uint8_t nconstantsToFilter,
         size_t minSize = 1;
         size_t completeSize = columns[0]->estimateSize();
         size_t ratio = std::max(minSize, estimate /
-                                processedRows * completeSize);
+                processedRows * completeSize);
         return std::min(completeSize, ratio);
     }
 
     /*} else {
-        //sample 10% up to 1000 elements
-        std::default_random_engine generator;
-        std::uniform_int_distribution<size_t> distribution(0, nrows - 1);
-        for (int i = 0; i < 1000; ++i) {
-            size_t idx = distribution(generator) * nfields;
-            bool ok = true;
-            for (uint8_t j = 0; j < nconstantsToFilter; ++j) {
-                if (readers[j]->get(idx) != valuesConstantsToFilter[j]) {
-                    ok = false;
-                    break;
-                }
-            }
-            if (ok)
-                estimate++;
-        }
-        estimate = ((double) estimate * nrows) / 1000;
+    //sample 10% up to 1000 elements
+    std::default_random_engine generator;
+    std::uniform_int_distribution<size_t> distribution(0, nrows - 1);
+    for (int i = 0; i < 1000; ++i) {
+    size_t idx = distribution(generator) * nfields;
+    bool ok = true;
+    for (uint8_t j = 0; j < nconstantsToFilter; ++j) {
+    if (readers[j]->get(idx) != valuesConstantsToFilter[j]) {
+    ok = false;
+    break;
+    }
+    }
+    if (ok)
+    estimate++;
+    }
+    estimate = ((double) estimate * nrows) / 1000;
     }*/
     return estimate;
     //return std::min(nrows, estimate);
@@ -172,10 +169,10 @@ bool Segment::areAllColumnsPartOftheSameQuery(EDBLayer **edb, const Literal **l,
         //procedure below does not work for repeated fields
         std::vector<uint8_t> test = posInLiteral;
         std::sort(test.begin(), test.end());
-    boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+        std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         auto newlim = std::unique(test.begin(), test.end());
-    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    BOOST_LOG_TRIVIAL(debug) << "Time std::unique = " << sec.count() * 1000;
+        std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+        LOG(DEBUGL) << "Time std::unique = " << sec.count() * 1000;
         // assert(newlim == test.end());
         if (newlim != test.end()) {
             return false;
@@ -217,14 +214,14 @@ std::shared_ptr<Segment> Segment::sortBy(const std::vector<uint8_t> *fields,
                 //The flag unique is set to false because we have multiple fields
                 //and therefore the field itself cannot be unique
                 columns[i] = std::shared_ptr<Column>(
-                                 new EDBColumn(*layer, *lit, posInLiteral[i],
-                                               posPresorting,
-                                               false));
+                        new EDBColumn(*layer, *lit, posInLiteral[i],
+                            posPresorting,
+                            false));
                 posPresorting.push_back(posInLiteral[i]);
             }
 
             std::shared_ptr<Segment> newSeg(new Segment(nfields,
-                                            columns));
+                        columns));
             return newSeg;
         }
     } //End special case
@@ -237,7 +234,7 @@ std::shared_ptr<Segment> Segment::sortBy(const std::vector<uint8_t> *fields,
 }
 
 std::shared_ptr<Segment> Segment::intsort(
-    const std::vector<uint8_t> *fields) const {
+        const std::vector<uint8_t> *fields) const {
     if (!isEmpty()) {
         //Get all fields that are not constant
         std::vector<std::shared_ptr<Column>> varColumns;
@@ -289,18 +286,18 @@ std::shared_ptr<Segment> Segment::intsort(
 
             if (varColumns.size() == 2) {
                 //Populate the array
-		std::vector<const std::vector<Term_t> *> vectors = getAllVectors(varColumns);
+                std::vector<const std::vector<Term_t> *> vectors = getAllVectors(varColumns);
                 std::vector<std::pair<Term_t, Term_t>> values;
-		size_t sz1 = vectors[0]->size();
-		size_t sz2 = vectors[1]->size();
+                size_t sz1 = vectors[0]->size();
+                size_t sz2 = vectors[1]->size();
                 const size_t allRows = sz1 < sz2 ? sz1 : sz2;
-		values.reserve(allRows);
+                values.reserve(allRows);
                 for (size_t i = 0; i < allRows; ++i) {
                     const Term_t v1 = (*vectors[0])[i];
                     const Term_t v2 = (*vectors[1])[i];
                     values.push_back(make_pair(v1, v2));
                 }
-		deleteAllVectors(varColumns, vectors);
+                deleteAllVectors(varColumns, vectors);
                 std::sort(values.begin(), values.end());
                 ColumnWriter sortedColumnsInserters[2];
                 for (const auto v : values) {
@@ -311,18 +308,18 @@ std::shared_ptr<Segment> Segment::intsort(
                 sortedColumns.push_back(sortedColumnsInserters[1].getColumn());
             } else {
                 //Sort function
-		std::vector<const std::vector<Term_t> *> vectors = getAllVectors(varColumns);
+                std::vector<const std::vector<Term_t> *> vectors = getAllVectors(varColumns);
                 SegmentSorter sorter(vectors);
 
                 const size_t allRows = vectors[0]->size();
                 std::vector<size_t> rows;
-		rows.reserve(allRows);
+                rows.reserve(allRows);
                 for (size_t i = 0; i < allRows; ++i) {
                     rows.push_back(i);
                 }
 
                 std::sort(rows.begin(), rows.end(), std::ref(sorter));
-                // BOOST_LOG_TRIVIAL(debug) << "Sort done.";
+                // LOG(DEBUGL) << "Sort done.";
 
                 //Reconstruct the fields
                 const uint8_t nvarColumns = (uint8_t) varColumns.size();
@@ -339,7 +336,7 @@ std::shared_ptr<Segment> Segment::intsort(
                 assert(sortedColumns.size() == 0);
                 for (auto &writer : sortedColumnsInserters)
                     sortedColumns.push_back(writer.getColumn());
-		deleteAllVectors(varColumns, vectors);
+                deleteAllVectors(varColumns, vectors);
             }
         }
 
@@ -364,13 +361,13 @@ std::shared_ptr<Segment> Segment::intsort(
 }
 
 std::shared_ptr<Segment> Segment::intsort(
-    const std::vector<uint8_t> *fields,
-    const int nthreads,
-    const bool filterDupl) const {
+        const std::vector<uint8_t> *fields,
+        const int nthreads,
+        const bool filterDupl) const {
     assert(nthreads > 1);
 
     if (!isEmpty()) {
-        //boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+        //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         //Get all fields that are not constant
         std::vector<std::shared_ptr<Column>> varColumns;
         std::vector<std::unique_ptr<ColumnReader>> varColumnsR;
@@ -383,8 +380,8 @@ std::shared_ptr<Segment> Segment::intsort(
             }
         }
         std::vector<std::shared_ptr<Column>> sortedColumns;
-        //boost::chrono::duration<double> sec1 = boost::chrono::system_clock::now() - start;
-        //BOOST_LOG_TRIVIAL(warning) << "---- get readers =" << sec1.count() * 1000;
+        //std::chrono::duration<double> sec1 = std::chrono::system_clock::now() - start;
+        //LOG(WARNL) << "---- get readers =" << sec1.count() * 1000;
 
         if (varColumns.size() == 0) {
             if (filterDupl) {
@@ -397,14 +394,14 @@ std::shared_ptr<Segment> Segment::intsort(
                 return std::shared_ptr<Segment>(new Segment(nfields, columns));
             }
         } else if (varColumns.size() == 1) {
-            //boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+            //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
             if (filterDupl) {
                 sortedColumns.push_back(varColumns[0]->sort_and_unique(nthreads));
             } else {
                 sortedColumns.push_back(varColumns[0]->sort(nthreads));
             }
-            //boost::chrono::duration<double> sec1 = boost::chrono::system_clock::now() - start;
-            //BOOST_LOG_TRIVIAL(warning) << "----sort one column=" << sec1.count() * 1000;
+            //std::chrono::duration<double> sec1 = std::chrono::system_clock::now() - start;
+            //LOG(WARNL) << "----sort one column=" << sec1.count() * 1000;
         } else {
             if (fields != NULL) {
                 //Rearrange the fields
@@ -436,172 +433,172 @@ std::shared_ptr<Segment> Segment::intsort(
                 idxVarColumns = newIdxVarColumns;
             }
 
-	    std::vector<const std::vector<Term_t> *> vectors = getAllVectors(varColumns, nthreads);
+            std::vector<const std::vector<Term_t> *> vectors = getAllVectors(varColumns, nthreads);
 
-	    size_t sz = varColumns[0]->size();
-	    std::vector<size_t> idxs;
-	    idxs.reserve(sz);
+            size_t sz = varColumns[0]->size();
+            std::vector<size_t> idxs;
+            idxs.reserve(sz);
 
-	    size_t chunks = (sz + nthreads - 1) / nthreads;
+            size_t chunks = (sz + nthreads - 1) / nthreads;
 
-	    /*
-	    if (idxs.size() >= 1000000) {
-		tbb::parallel_for(tbb::blocked_range<size_t>(0, idxs.size(), chunks),
-				  InitArray(idxs));
-	    } else
-	    */
-	    {
-		for (size_t i = 0; i < sz; i++) {
-		    idxs.push_back(i);
-		}
-	    }
+            /*
+               if (idxs.size() >= 1000000) {
+               tbb::parallel_for(tbb::blocked_range<size_t>(0, idxs.size(), chunks),
+               InitArray(idxs));
+               } else
+               */
+            {
+                for (size_t i = 0; i < sz; i++) {
+                    idxs.push_back(i);
+                }
+            }
 
             if (varColumns.size() == 2) {
                 //Populate array
-                //boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+                //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
                 const Term_t *rawv1 = &(*(vectors[0]))[0];
                 const Term_t *rawv2 = &(*(vectors[1]))[0];
 
-                //boost::chrono::duration<double> sec1 = boost::chrono::system_clock::now() - start;
-                //BOOST_LOG_TRIVIAL(warning) << "---- populate pairs vector =" << sec1.count() * 1000 << " " << varColumns[0]->size();
+                //std::chrono::duration<double> sec1 = std::chrono::system_clock::now() - start;
+                //LOG(WARNL) << "---- populate pairs vector =" << sec1.count() * 1000 << " " << varColumns[0]->size();
 
                 //Sort
-                //start = boost::chrono::system_clock::now();
+                //start = std::chrono::system_clock::now();
                 PairComparator pc(rawv1, rawv2);
 
-		if (idxs.size() > 1000) {
-		    tbb::parallel_sort(idxs.begin(), idxs.end(), pc);
-		} else {
-		    std::sort(idxs.begin(), idxs.end(), pc);
-		}
-                //sec1 = boost::chrono::system_clock::now() - start;
-                //BOOST_LOG_TRIVIAL(warning) << "---- parallel sort =" << sec1.count() * 1000 << " " << nthreads;
+                if (idxs.size() > 1000) {
+                    tbb::parallel_sort(idxs.begin(), idxs.end(), pc);
+                } else {
+                    std::sort(idxs.begin(), idxs.end(), pc);
+                }
+                //sec1 = std::chrono::system_clock::now() - start;
+                //LOG(WARNL) << "---- parallel sort =" << sec1.count() * 1000 << " " << nthreads;
 
                 //Copy back sorted columns
-                //start = boost::chrono::system_clock::now();
+                //start = std::chrono::system_clock::now();
                 if (!filterDupl) {
                     std::vector<Term_t> out1;
                     std::vector<Term_t> out2;
-		    // Not sure if it makes sense to do this in parallel at all
-		    if (chunks < 10000) {
-			// Sequential version
-			out1.reserve(sz);
-			out2.reserve(sz);
-			for (size_t i = 0; i < sz; i++) {
-			    out1.push_back(rawv1[idxs[i]]);
-			    out2.push_back( rawv2[idxs[i]]);
-			}
-		    } else {
-			// Parallel version
-			out1.resize(sz);
-			out2.resize(sz);
-			tbb::parallel_for(tbb::blocked_range<size_t>(0, idxs.size(), chunks),
-					  CreateColumns2(idxs, rawv1, rawv2, out1, out2));
-		    }
+                    // Not sure if it makes sense to do this in parallel at all
+                    if (chunks < 10000) {
+                        // Sequential version
+                        out1.reserve(sz);
+                        out2.reserve(sz);
+                        for (size_t i = 0; i < sz; i++) {
+                            out1.push_back(rawv1[idxs[i]]);
+                            out2.push_back( rawv2[idxs[i]]);
+                        }
+                    } else {
+                        // Parallel version
+                        out1.resize(sz);
+                        out2.resize(sz);
+                        tbb::parallel_for(tbb::blocked_range<size_t>(0, idxs.size(), chunks),
+                                CreateColumns2(idxs, rawv1, rawv2, out1, out2));
+                    }
                     sortedColumns.push_back(ColumnWriter::getColumn(out1, true));
                     sortedColumns.push_back(ColumnWriter::getColumn(out2, false));
                 } else {
-		    // Not sure if it makes sense to do this in parallel at all
-		    if (chunks < 10000) {
-			// Sequential version
-			Term_t prev1 = (Term_t) - 1;
-			Term_t prev2 = (Term_t) - 1;
-			std::vector<Term_t> out1;
-			std::vector<Term_t> out2;
-			for (size_t i = 0; i < idxs.size(); i++) {
-			    const Term_t value1 =  rawv1[idxs[i]];
-			    const Term_t value2 =  rawv2[idxs[i]];
-			    if (value1 != prev1 || value2 != prev2) {
-				out1.push_back(value1);
-				out2.push_back(value2);
-			    }
-			    prev1 = value1;
-			    prev2 = value2;
-			}
-		       sortedColumns.push_back(ColumnWriter::getColumn(out1, true));
-		       sortedColumns.push_back(ColumnWriter::getColumn(out2, false));
-		    } else {
-			// Parallel version
-			std::vector<std::pair<size_t, std::vector<Term_t>>> ranges1;
-			std::vector<std::pair<size_t, std::vector<Term_t>>> ranges2;
-			boost::mutex m;
-			tbb::parallel_for(tbb::blocked_range<size_t>(0, idxs.size(), chunks),
-					  CreateColumnsNoDupl2(idxs, rawv1, rawv2,
-							      ranges1, ranges2, m));
+                    // Not sure if it makes sense to do this in parallel at all
+                    if (chunks < 10000) {
+                        // Sequential version
+                        Term_t prev1 = (Term_t) - 1;
+                        Term_t prev2 = (Term_t) - 1;
+                        std::vector<Term_t> out1;
+                        std::vector<Term_t> out2;
+                        for (size_t i = 0; i < idxs.size(); i++) {
+                            const Term_t value1 =  rawv1[idxs[i]];
+                            const Term_t value2 =  rawv2[idxs[i]];
+                            if (value1 != prev1 || value2 != prev2) {
+                                out1.push_back(value1);
+                                out2.push_back(value2);
+                            }
+                            prev1 = value1;
+                            prev2 = value2;
+                        }
+                        sortedColumns.push_back(ColumnWriter::getColumn(out1, true));
+                        sortedColumns.push_back(ColumnWriter::getColumn(out2, false));
+                    } else {
+                        // Parallel version
+                        std::vector<std::pair<size_t, std::vector<Term_t>>> ranges1;
+                        std::vector<std::pair<size_t, std::vector<Term_t>>> ranges2;
+                        std::mutex m;
+                        tbb::parallel_for(tbb::blocked_range<size_t>(0, idxs.size(), chunks),
+                                CreateColumnsNoDupl2(idxs, rawv1, rawv2,
+                                    ranges1, ranges2, m));
 
-			size_t totalSize = 0;
-			for (size_t i = 0; i < ranges1.size(); ++i) {
-			    totalSize += ranges1[i].second.size();
-			}
-			std::vector<Term_t> out1;
-			std::vector<Term_t> out2;
-			out1.reserve(totalSize);
-			out2.reserve(totalSize);
+                        size_t totalSize = 0;
+                        for (size_t i = 0; i < ranges1.size(); ++i) {
+                            totalSize += ranges1[i].second.size();
+                        }
+                        std::vector<Term_t> out1;
+                        std::vector<Term_t> out2;
+                        out1.reserve(totalSize);
+                        out2.reserve(totalSize);
 
-			//Sort the ranges
-			std::vector<int> idxRanges;
-			for (int i = 0; i < ranges1.size(); ++i) {
-			    idxRanges.push_back(i);
-			}
-			std::sort(idxRanges.begin(), idxRanges.end(),
-				  CompareRanges(ranges1));
-			for (int i = 0; i < ranges1.size(); ++i) {
-			    size_t idx = idxRanges[i];
-			    std::vector<Term_t> &vals1 = ranges1[idx].second;
-			    std::vector<Term_t> &vals2 = ranges2[idx].second;
-			    assert(ranges1[idx].first == ranges2[idx].first);
-			    assert(vals1.size() == vals2.size());
-			    for (size_t idxtocopy = 0; idxtocopy < vals1.size();
-				    idxtocopy++) {
-				out1.push_back(vals1[idxtocopy]);
-				out2.push_back(vals2[idxtocopy]);
-			    }
-			}
-			sortedColumns.push_back(ColumnWriter::getColumn(out1, true));
-			sortedColumns.push_back(ColumnWriter::getColumn(out2, false));
-		    }
-		}
-                //sec1 = boost::chrono::system_clock::now() - start;
-                //BOOST_LOG_TRIVIAL(warning) << "---- copy back =" << sec1.count() * 1000 << " " << nthreads;
+                        //Sort the ranges
+                        std::vector<int> idxRanges;
+                        for (int i = 0; i < ranges1.size(); ++i) {
+                            idxRanges.push_back(i);
+                        }
+                        std::sort(idxRanges.begin(), idxRanges.end(),
+                                CompareRanges(ranges1));
+                        for (int i = 0; i < ranges1.size(); ++i) {
+                            size_t idx = idxRanges[i];
+                            std::vector<Term_t> &vals1 = ranges1[idx].second;
+                            std::vector<Term_t> &vals2 = ranges2[idx].second;
+                            assert(ranges1[idx].first == ranges2[idx].first);
+                            assert(vals1.size() == vals2.size());
+                            for (size_t idxtocopy = 0; idxtocopy < vals1.size();
+                                    idxtocopy++) {
+                                out1.push_back(vals1[idxtocopy]);
+                                out2.push_back(vals2[idxtocopy]);
+                            }
+                        }
+                        sortedColumns.push_back(ColumnWriter::getColumn(out1, true));
+                        sortedColumns.push_back(ColumnWriter::getColumn(out2, false));
+                    }
+                }
+                //sec1 = std::chrono::system_clock::now() - start;
+                //LOG(WARNL) << "---- copy back =" << sec1.count() * 1000 << " " << nthreads;
             } else {
                 //Sort function
                 SegmentSorter sorter(vectors);
 
-		if (nthreads > 1 && idxs.size() > 1000) {
-		    tbb::parallel_sort(idxs.begin(), idxs.end(), std::ref(sorter));
-		} else {
-		    std::sort(idxs.begin(), idxs.end(), std::ref(sorter));
-		}
-                // BOOST_LOG_TRIVIAL(debug) << "Sort done.";
-		//
-		if (! filterDupl) {
+                if (nthreads > 1 && idxs.size() > 1000) {
+                    tbb::parallel_sort(idxs.begin(), idxs.end(), std::ref(sorter));
+                } else {
+                    std::sort(idxs.begin(), idxs.end(), std::ref(sorter));
+                }
+                // LOG(DEBUGL) << "Sort done.";
+                //
+                if (! filterDupl) {
                     std::vector<std::vector<Term_t>> out(varColumns.size());
-		    // Not sure if it makes sense to do this in parallel at all
-		    if (nthreads <= 1 || chunks < 10000) {
-			// Sequential version
-			for (size_t i = 0; i < idxs.size(); i++) {
-			    for (int j = 0; j < out.size(); j++) {
-				out[j].push_back((*vectors[j])[idxs[i]]);
-			    }
-			}
-		    } else {
-			// Parallel version
-			for (int i = 0; i < out.size(); i++) {
-			    out[i].resize(idxs.size());
-			}
-			tbb::parallel_for(tbb::blocked_range<size_t>(0, idxs.size(), chunks),
-					  CreateColumns(idxs, vectors, out));
-		    }
+                    // Not sure if it makes sense to do this in parallel at all
+                    if (nthreads <= 1 || chunks < 10000) {
+                        // Sequential version
+                        for (size_t i = 0; i < idxs.size(); i++) {
+                            for (int j = 0; j < out.size(); j++) {
+                                out[j].push_back((*vectors[j])[idxs[i]]);
+                            }
+                        }
+                    } else {
+                        // Parallel version
+                        for (int i = 0; i < out.size(); i++) {
+                            out[i].resize(idxs.size());
+                        }
+                        tbb::parallel_for(tbb::blocked_range<size_t>(0, idxs.size(), chunks),
+                                CreateColumns(idxs, vectors, out));
+                    }
                     sortedColumns.push_back(ColumnWriter::getColumn(out[0], true));
-		    for (int i = 1; i < out.size(); i++) {
-			sortedColumns.push_back(ColumnWriter::getColumn(out[i], false));
-		    }
-		} else {
-		    // TODO!
-		    throw 10;
-		}
+                    for (int i = 1; i < out.size(); i++) {
+                        sortedColumns.push_back(ColumnWriter::getColumn(out[i], false));
+                    }
+                } else {
+                    // TODO!
+                    throw 10;
+                }
             }
-	    deleteAllVectors(varColumns, vectors);
+            deleteAllVectors(varColumns, vectors);
         }
 
         //Reconstruct all the fields
@@ -638,10 +635,10 @@ std::shared_ptr<Segment> Segment::intsort(
 #if DEBUG
 void SegmentInserter::checkSizes() const {
     if (nfields > 0) {
-	size_t sz = columns[0].size();
-	for (uint8_t i = 1; i < nfields; ++i) {
-	    assert(sz == columns[i].size());
-	}
+        size_t sz = columns[0].size();
+        for (uint8_t i = 1; i < nfields; ++i) {
+            assert(sz == columns[i].size());
+        }
     }
 }
 #endif
@@ -667,24 +664,24 @@ void SegmentInserter::addRow(const Term_t *row, const uint8_t *posToCopy) {
 }
 
 /*void SegmentInserter::addRow(const Segment *seg, const uint32_t rowid) {
-    if (segmentSorted) {
-        assert(nfields > 0);
-        if (!columns[0].isEmpty()) {
-            for (uint8_t i = 0; i < nfields; ++i) {
-                if (seg->at(rowid, i) < columns[i].lastValue()) {
-                    segmentSorted = false;
-                    break;
-                } else if (seg->at(rowid, i) > columns[i].lastValue()) {
-                    break;
-                }
-            }
-        }
-    }
+  if (segmentSorted) {
+  assert(nfields > 0);
+  if (!columns[0].isEmpty()) {
+  for (uint8_t i = 0; i < nfields; ++i) {
+  if (seg->at(rowid, i) < columns[i].lastValue()) {
+  segmentSorted = false;
+  break;
+  } else if (seg->at(rowid, i) > columns[i].lastValue()) {
+  break;
+  }
+  }
+  }
+  }
 
-    for (int i = 0; i < nfields; ++i) {
-        columns[i].add(seg->at(rowid, i));
-    }
-}*/
+  for (int i = 0; i < nfields; ++i) {
+  columns[i].add(seg->at(rowid, i));
+  }
+  }*/
 
 void SegmentInserter::addRow(SegmentIterator &itr) {
     if (segmentSorted) {
@@ -756,7 +753,7 @@ bool SegmentInserter::isEmpty() const {
 }
 
 void SegmentInserter::addColumns(std::vector<std::shared_ptr<Column>> &c,
-                                 const bool sorted, const bool lastInsert) {
+        const bool sorted, const bool lastInsert) {
     assert(c.size() == nfields);
     segmentSorted = isEmpty() && sorted;
     if (nfields == 1 && isEmpty() &&
@@ -773,9 +770,9 @@ void SegmentInserter::addColumns(std::vector<std::shared_ptr<Column>> &c,
     } else {
         for (uint8_t i = 0; i < c.size(); ++i) {
             /*if (copyColumns[i] != NULL) {
-                //Concatenate first the column
-                //columns[i].concatenate(copyColumns[i].get());
-                //copyColumns[i] = std::shared_ptr<Column>();
+            //Concatenate first the column
+            //columns[i].concatenate(copyColumns[i].get());
+            //copyColumns[i] = std::shared_ptr<Column>();
             }*/
 
             columns[i].concatenate(c[i].get());
@@ -784,8 +781,8 @@ void SegmentInserter::addColumns(std::vector<std::shared_ptr<Column>> &c,
 }
 
 void SegmentInserter::addColumn(const uint8_t pos,
-                                std::shared_ptr<Column> column,
-                                const bool sorted) {
+        std::shared_ptr<Column> column,
+        const bool sorted) {
     segmentSorted = isEmpty() && sorted;
     duplicates = !(segmentSorted && nfields == 1);
 
@@ -793,9 +790,9 @@ void SegmentInserter::addColumn(const uint8_t pos,
         copyColumns[pos] = column;
     } else {
         /*if (copyColumns[pos] != std::shared_ptr<Column>()) {
-            columns[pos].concatenate(copyColumns[pos].get());
-            copyColumns[pos] = std::shared_ptr<Column>();
-        }*/
+          columns[pos].concatenate(copyColumns[pos].get());
+          copyColumns[pos] = std::shared_ptr<Column>();
+          }*/
         columns[pos].concatenate(column.get());
     }
 }
@@ -819,24 +816,24 @@ std::shared_ptr<const Segment> SegmentInserter::getSegment() {
 
 std::shared_ptr<const Segment> SegmentInserter::getSegment(const int nthreads) {
     if (nthreads <= 1 || nfields <= 1) {
-	return getSegment();
+        return getSegment();
     }
     int count = 0;
     for (int i = 0; i < nfields; ++i) {
         if (copyColumns[i] != std::shared_ptr<Column>()) {
             if (!columns[i].isEmpty()) {
-		count++;
-	    }
-	}
+                count++;
+            }
+        }
     }
     if (count <= 1) {
-	return getSegment();
+        return getSegment();
     }
 
     std::vector<std::shared_ptr<Column>> c(nfields);
 
     tbb::parallel_for(tbb::blocked_range<int>(0, nfields, 1),
-	      Concat(c, this));
+            Concat(c, this));
     return std::shared_ptr<const Segment>(new Segment(nfields, c));
 }
 
@@ -849,31 +846,31 @@ std::shared_ptr<const Segment> SegmentInserter::getSortedAndUniqueSegment(const 
         return getSegment(nthreads);
     }
 
-    //boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
     //I assume nthreads > 1
     assert(nthreads > 1);
     std::shared_ptr<const Segment> seg = getSegment(nthreads);
 
-    //boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    //BOOST_LOG_TRIVIAL(warning) << "---Time getSegment " << sec.count() * 1000;
-    //start = boost::chrono::system_clock::now();
+    //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    //LOG(WARNL) << "---Time getSegment " << sec.count() * 1000;
+    //start = std::chrono::system_clock::now();
 
     // if (seg->getNRows() > 1) {
-        /*if (!segmentSorted) {
-        }*/
-        seg = seg->sortBy(NULL, nthreads, duplicates);
+    /*if (!segmentSorted) {
+      }*/
+    seg = seg->sortBy(NULL, nthreads, duplicates);
 
-        //sec = boost::chrono::system_clock::now() - start;
-        //BOOST_LOG_TRIVIAL(warning) << "---Time sort " << sec.count() * 1000;
-        //start = boost::chrono::system_clock::now();
+    //sec = std::chrono::system_clock::now() - start;
+    //LOG(WARNL) << "---Time sort " << sec.count() * 1000;
+    //start = std::chrono::system_clock::now();
 
-        //if (duplicates) {
-        //    seg = SegmentInserter::unique(seg, nthreads);
-        //}
+    //if (duplicates) {
+    //    seg = SegmentInserter::unique(seg, nthreads);
+    //}
 
-        //sec = boost::chrono::system_clock::now() - start;
-        //BOOST_LOG_TRIVIAL(warning) << "---Time unique " << sec.count() * 1000;
+    //sec = std::chrono::system_clock::now() - start;
+    //LOG(WARNL) << "---Time unique " << sec.count() * 1000;
 
     // }
     return seg;
@@ -881,7 +878,7 @@ std::shared_ptr<const Segment> SegmentInserter::getSortedAndUniqueSegment(const 
 
 std::shared_ptr<const Segment> SegmentInserter::getSortedAndUniqueSegment() {
 #if DEBUG
-    BOOST_LOG_TRIVIAL(debug) << "getSortedAndUniqueSegment: segmentSorted = " << segmentSorted << ", duplicates = " << duplicates;
+    LOG(DEBUGL) << "getSortedAndUniqueSegment: segmentSorted = " << segmentSorted << ", duplicates = " << duplicates;
 #endif
     if (segmentSorted && !duplicates) {
         return getSegment();
@@ -915,7 +912,7 @@ std::shared_ptr<const Segment> SegmentInserter::getSortedAndUniqueSegment() {
         segments.push_back(seg1);
         segments.push_back(seg2);
         std::shared_ptr<const Segment> finalSeg = SegmentInserter::merge(
-                    segments);
+                segments);
         return finalSeg;
 
     } else {
@@ -969,9 +966,9 @@ void SegmentInserter::addAt(const uint8_t p, const Term_t v) {
 }
 
 /*void SegmentInserter::moveFrom(std::shared_ptr<Segment> seg, const bool sorted) {
-    segment = seg;
-    this->segmentSorted = sorted;
-}*/
+  segment = seg;
+  this->segmentSorted = sorted;
+  }*/
 
 void SegmentInserter::copyArray(SegmentIterator &source) {
     for (uint8_t i = 0; i < nfields; ++i) {
@@ -980,16 +977,16 @@ void SegmentInserter::copyArray(SegmentIterator &source) {
 }
 
 /*std::shared_ptr<const Segment> SegmentInserter::unique(
-    std::shared_ptr<const Segment> &segment) {
-    retain(segment, NULL);
-}*/
+  std::shared_ptr<const Segment> &segment) {
+  retain(segment, NULL);
+  }*/
 
 /*void SegmentInserter::sortSegment() {
-    if (!isSorted()) {
-        segment = segment->sortBy(NULL);
-        segmentSorted = true;
-    }
-}*/
+  if (!isSorted()) {
+  segment = segment->sortBy(NULL);
+  segmentSorted = true;
+  }
+  }*/
 
 std::shared_ptr<const Segment> SegmentInserter::retainMemMem(Column *c1,
         Column *c2) {
@@ -999,138 +996,138 @@ std::shared_ptr<const Segment> SegmentInserter::retainMemMem(Column *c1,
     Term_t v2 = (Term_t) - 1;
 
     if (c1->isBackedByVector() && c2->isBackedByVector()) {
-	const vector<Term_t> &vc1 = c1->getVectorRef();
-	const vector<Term_t> &vc2 = c2->getVectorRef();
-	int v1Index = 0;
-	int v2Index = 0;
+        const vector<Term_t> &vc1 = c1->getVectorRef();
+        const vector<Term_t> &vc2 = c2->getVectorRef();
+        int v1Index = 0;
+        int v2Index = 0;
 
-	v1 = vc1[v1Index++];
-	v2 = vc2[v2Index++];
-	if (v1 > vc2[vc2.size()-1] || vc1[vc1.size()-1] < v2) {
-	    co.add(v1);
-	    prevv1 = v1;
-	    for (int i = v1Index; i < vc1.size(); i++) {
-		v1 = vc1[i];
-		if (v1 != prevv1) {
-		    co.add(v1);
-		    prevv1 = v1;
-		}
-	    }
-	} else { 
-	    while(true) {
-		if (v1 < v2) {
-		    if (v1 != prevv1) {
-			co.add(v1);
-			prevv1 = v1;
-		    }
-		    if (v1Index < vc1.size()) {
-			v1 = vc1[v1Index++];
-		    } else {
-			v1 = (Term_t) -1;
-			break;
-		    }
-		} else if (v1 > v2) {
-		    if (v2Index < vc2.size()) {
-			v2 = vc2[v2Index++];
-		    } else {
-			v2 = (Term_t) -1;
-			break;
-		    }
-		} else {
-		    prevv1 = v1;
-		    if (v1Index < vc1.size()) {
-			v1 = vc1[v1Index++];
-		    } else {
-			v1 = (Term_t) -1;
-			break;
-		    }
-		    if (v2Index < vc2.size()) {
-			v2 = vc2[v2Index++];
-		    } else {
-			v2 = (Term_t) -1;
-			break;
-		    }
-		}
-	    }
-	    if (v1 != (Term_t) -1) {
-		if (v1 != prevv1) {
-		    co.add(v1);
-		    prevv1 = v1;
-		}
-		for (int i = v1Index; i < vc1.size(); i++) {
-		    v1 = vc1[i];
-		    if (v1 != prevv1) {
-			co.add(v1);
-			prevv1 = v1;
-		    }
-		}
-	    }
-	}
+        v1 = vc1[v1Index++];
+        v2 = vc2[v2Index++];
+        if (v1 > vc2[vc2.size()-1] || vc1[vc1.size()-1] < v2) {
+            co.add(v1);
+            prevv1 = v1;
+            for (int i = v1Index; i < vc1.size(); i++) {
+                v1 = vc1[i];
+                if (v1 != prevv1) {
+                    co.add(v1);
+                    prevv1 = v1;
+                }
+            }
+        } else {
+            while(true) {
+                if (v1 < v2) {
+                    if (v1 != prevv1) {
+                        co.add(v1);
+                        prevv1 = v1;
+                    }
+                    if (v1Index < vc1.size()) {
+                        v1 = vc1[v1Index++];
+                    } else {
+                        v1 = (Term_t) -1;
+                        break;
+                    }
+                } else if (v1 > v2) {
+                    if (v2Index < vc2.size()) {
+                        v2 = vc2[v2Index++];
+                    } else {
+                        v2 = (Term_t) -1;
+                        break;
+                    }
+                } else {
+                    prevv1 = v1;
+                    if (v1Index < vc1.size()) {
+                        v1 = vc1[v1Index++];
+                    } else {
+                        v1 = (Term_t) -1;
+                        break;
+                    }
+                    if (v2Index < vc2.size()) {
+                        v2 = vc2[v2Index++];
+                    } else {
+                        v2 = (Term_t) -1;
+                        break;
+                    }
+                }
+            }
+            if (v1 != (Term_t) -1) {
+                if (v1 != prevv1) {
+                    co.add(v1);
+                    prevv1 = v1;
+                }
+                for (int i = v1Index; i < vc1.size(); i++) {
+                    v1 = vc1[i];
+                    if (v1 != prevv1) {
+                        co.add(v1);
+                        prevv1 = v1;
+                    }
+                }
+            }
+        }
     } else {
 
-	//size_t idx1 = 0;
-	//size_t idx2 = 0;
-	std::unique_ptr<ColumnReader> c1R = c1->getReader();
-	std::unique_ptr<ColumnReader> c2R = c2->getReader();
+        //size_t idx1 = 0;
+        //size_t idx2 = 0;
+        std::unique_ptr<ColumnReader> c1R = c1->getReader();
+        std::unique_ptr<ColumnReader> c2R = c2->getReader();
 
-	if (!c1R->hasNext())
-	    throw 10;
-	else
-	    v1 = c1R->next();
-	if (!c2R->hasNext())
-	    throw 10;
-	else
-	    v2 = c2R->next();
+        if (!c1R->hasNext())
+            throw 10;
+        else
+            v1 = c1R->next();
+        if (!c2R->hasNext())
+            throw 10;
+        else
+            v2 = c2R->next();
 
-	while (true) {
-	    if (v1 < v2) {
-		if (v1 != prevv1) {
-		    co.add(v1);
-		    prevv1 = v1;
-		}
-		if (c1R->hasNext()) {
-		    v1 = c1R->next();
-		} else {
-		    v1 = (Term_t) - 1;
-		    break;
-		}
-	    } else if (v1 > v2) {
-		if (c2R->hasNext()) {
-		    v2 = c2R->next();
-		} else {
-		    v2 = (Term_t) - 1;
-		    break;
-		}
-	    } else {
-		prevv1 = v1;
-		if (c1R->hasNext()) {
-		    v1 = c1R->next();
-		} else {
-		    v1 = (Term_t) - 1;
-		    break;
-		}
-		if (c2R->hasNext()) {
-		    v2 = c2R->next();
-		} else {
-		    v2 = (Term_t) - 1;
-		    break;
-		}
-	    }
-	}
+        while (true) {
+            if (v1 < v2) {
+                if (v1 != prevv1) {
+                    co.add(v1);
+                    prevv1 = v1;
+                }
+                if (c1R->hasNext()) {
+                    v1 = c1R->next();
+                } else {
+                    v1 = (Term_t) - 1;
+                    break;
+                }
+            } else if (v1 > v2) {
+                if (c2R->hasNext()) {
+                    v2 = c2R->next();
+                } else {
+                    v2 = (Term_t) - 1;
+                    break;
+                }
+            } else {
+                prevv1 = v1;
+                if (c1R->hasNext()) {
+                    v1 = c1R->next();
+                } else {
+                    v1 = (Term_t) - 1;
+                    break;
+                }
+                if (c2R->hasNext()) {
+                    v2 = c2R->next();
+                } else {
+                    v2 = (Term_t) - 1;
+                    break;
+                }
+            }
+        }
 
-	if (v1 != (Term_t) - 1) {
-	    if (v1 != prevv1) {
-		co.add(v1);
-		prevv1 = v1;
-	    }
-	    while (c1R->hasNext()) {
-		v1 = c1R->next();
-		if (v1 != prevv1) {
-		    co.add(v1);
-		    prevv1 = v1;
-		}
-	    }
-	}
+        if (v1 != (Term_t) - 1) {
+            if (v1 != prevv1) {
+                co.add(v1);
+                prevv1 = v1;
+            }
+            while (c1R->hasNext()) {
+                v1 = c1R->next();
+                if (v1 != prevv1) {
+                    co.add(v1);
+                    prevv1 = v1;
+                }
+            }
+        }
     }
 
     std::vector<std::shared_ptr<Column>> columns;
@@ -1139,9 +1136,9 @@ std::shared_ptr<const Segment> SegmentInserter::retainMemMem(Column *c1,
 }
 
 std::shared_ptr<const Segment> SegmentInserter::retainMemEDB(
-    std::shared_ptr<const Segment> seg,
-    std::shared_ptr<const FCInternalTable > existingValues,
-    uint8_t nfields) {
+        std::shared_ptr<const Segment> seg,
+        std::shared_ptr<const FCInternalTable > existingValues,
+        uint8_t nfields) {
 
     std::shared_ptr<const Column> edbCol = existingValues->getColumn(0);
     const Literal l = ((EDBColumn*) edbCol.get())->getLiteral();
@@ -1166,21 +1163,21 @@ std::shared_ptr<const Segment> SegmentInserter::retainMemEDB(
 
     //Do an anti join on the EDB layer
     std::vector<std::shared_ptr<Column>> output = layer.checkNewIn(
-                                          valuesToCheck,
-                                          l, posColumns);
+            valuesToCheck,
+            l, posColumns);
     return std::shared_ptr<Segment>(new Segment(nfields, output));
 }
 
 std::shared_ptr<const Segment> SegmentInserter::retainEDB(
-    std::shared_ptr<const Segment> seg,
-    std::shared_ptr<const FCInternalTable> existingValues,
-    uint8_t nfields) {
+        std::shared_ptr<const Segment> seg,
+        std::shared_ptr<const FCInternalTable> existingValues,
+        uint8_t nfields) {
     //Column is an EDB column
     std::shared_ptr<Column> column = seg->getColumn(0);
     EDBLayer &layer = ((EDBColumn*)column.get())->getEDBLayer();
     const Literal &l1 = ((EDBColumn*)column.get())->getLiteral();
     uint8_t pos1 = ((EDBColumn*)column.get())
-                   ->posColumnInLiteral();
+        ->posColumnInLiteral();
     std::vector<uint8_t> posColumns1;
     posColumns1.push_back(pos1);
 
@@ -1188,7 +1185,7 @@ std::shared_ptr<const Segment> SegmentInserter::retainEDB(
     std::shared_ptr<const Column> firstCol = existingValues->getColumn(0);
     const Literal l2 = ((EDBColumn*)firstCol.get())->getLiteral();
     uint8_t pos2 = ((EDBColumn*)firstCol.get())
-                   ->posColumnInLiteral();
+        ->posColumnInLiteral();
     std::vector<uint8_t> posColumns2;
     posColumns2.push_back(pos2);
 
@@ -1197,7 +1194,7 @@ std::shared_ptr<const Segment> SegmentInserter::retainEDB(
         std::shared_ptr<Column> column12 = seg->getColumn(1);
         const Literal &l12 = ((EDBColumn*)column12.get())->getLiteral();
         uint8_t pos12 = ((EDBColumn*)column12.get())
-                        ->posColumnInLiteral();
+            ->posColumnInLiteral();
         //Chech the two literals are equivalent and that the rel. are
         //different positions
         Substitution subs[MAX_ROWSIZE];
@@ -1213,7 +1210,7 @@ std::shared_ptr<const Segment> SegmentInserter::retainEDB(
         std::shared_ptr<const Column> column22 = existingValues->getColumn(1);
         const Literal &l22 = ((EDBColumn*)column22.get())->getLiteral();
         uint8_t pos22 = ((EDBColumn*)column22.get())
-                        ->posColumnInLiteral();
+            ->posColumnInLiteral();
         if (!l2.sameVarSequenceAs(l22) || l1.subsumes(subs, l2, l22) == -1
                 || pos2 == pos22) {
             //The columns come from different literals. This is not yet
@@ -1224,16 +1221,16 @@ std::shared_ptr<const Segment> SegmentInserter::retainEDB(
     }
 
     std::vector<std::shared_ptr<Column>> columns = layer.
-                                      checkNewIn(l1, posColumns1, l2,
-                                              posColumns2);
+        checkNewIn(l1, posColumns1, l2,
+                posColumns2);
     return std::shared_ptr<Segment>(new Segment(nfields, columns));
 }
 
 std::shared_ptr<const Segment> SegmentInserter::retain(
-    std::shared_ptr<const Segment> &segment,
-    std::shared_ptr<const FCInternalTable> existingValues,
-    const bool duplicates,
-    const int nthreads) {
+        std::shared_ptr<const Segment> &segment,
+        std::shared_ptr<const FCInternalTable> existingValues,
+        const bool duplicates,
+        const int nthreads) {
 
     if (segment->isEmpty())
         return segment;
@@ -1243,10 +1240,10 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
             && existingValues != NULL && existingValues->isEDB()) {
         if (segment->isEDB()) {
             segment = retainEDB(segment, existingValues,
-                                segment->getNColumns());
+                    segment->getNColumns());
         } else  {
             segment = retainMemEDB(segment, existingValues,
-                                   segment->getNColumns());
+                    segment->getNColumns());
         }
         return segment;
     }
@@ -1285,40 +1282,40 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
 
     if (superset) {
         existingValues = existingValues->filter((uint8_t) posToCopy.size(),
-                                                posToCopy.size() > 0 ?
-                                                & (posToCopy[0]) : NULL,
-                                                (uint8_t) posConstants.size(),
-                                                &(posConstants[0]),
-                                                &(valueConstants[0]),
-                                                0, NULL, nthreads);
+                posToCopy.size() > 0 ?
+                & (posToCopy[0]) : NULL,
+                (uint8_t) posConstants.size(),
+                &(posConstants[0]),
+                &(valueConstants[0]),
+                0, NULL, nthreads);
     } else if (existingValues != NULL &&
-               posToCopy.size() < existingValues->getRowSize()) {
+            posToCopy.size() < existingValues->getRowSize()) {
         existingValues = existingValues->filter((uint8_t) posToCopy.size(),
-                                                &(posToCopy[0]), 0, NULL,
-                                                NULL, 0, NULL, nthreads);
+                &(posToCopy[0]), 0, NULL,
+                NULL, 0, NULL, nthreads);
     }
 
     const size_t nPosToCompare = posToCopy.size();
     const uint8_t *posToCompare = posToCopy.size() > 0 ? &(posToCopy[0]) : NULL;
 
     /*if (duplicates && nPosToCompare == 1) {
-        //Clean the duplicated lines
-        std::shared_ptr<Column> col = segment->getColumn(posToCompare[0])->sort();
-        uint32_t newsize = col->size();
-        //Update all other columns with the new cardinality
-        for (uint8_t i = 0; i < posConstants.size(); ++i) {
-            Column *c = segment->getColumn(posConstants[i]).get();
-            assert(c->isConstant());
-            segment->replaceColumn(posConstants[i],
-                                   std::shared_ptr<Column>(new
-                                           ColumnImpl(c->getReader()->first(),
-                                                   newsize)));
-        }
-        //duplicates = false;
+    //Clean the duplicated lines
+    std::shared_ptr<Column> col = segment->getColumn(posToCompare[0])->sort();
+    uint32_t newsize = col->size();
+    //Update all other columns with the new cardinality
+    for (uint8_t i = 0; i < posConstants.size(); ++i) {
+    Column *c = segment->getColumn(posConstants[i]).get();
+    assert(c->isConstant());
+    segment->replaceColumn(posConstants[i],
+    std::shared_ptr<Column>(new
+    ColumnImpl(c->getReader()->first(),
+    newsize)));
+    }
+    //duplicates = false;
     }*/
 
     FCInternalTableItr *itr2 = existingValues != NULL &&
-                               match ? existingValues->getSortedIterator(nthreads) : NULL;
+        match ? existingValues->getSortedIterator(nthreads) : NULL;
 
     //uint32_t idx1 = 0;
     bool toRead1 = false;
@@ -1404,7 +1401,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
         }
     }
 
-//Copy the remaining
+    //Copy the remaining
     if (!toRead1) {
         retainedValues.copyArray(*segmentIterator.get());
         toRead1 = true;
@@ -1437,7 +1434,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
             retainedValues.copyArray(*segmentIterator.get());
         }
     } else {
-        //boost::chrono::system_clock::time_point startFiltering = boost::chrono::system_clock::now();
+        //std::chrono::system_clock::time_point startFiltering = std::chrono::system_clock::now();
 
         //for (; idx1 < segment->getNRows(); ++idx1) {
         //    retainedValues.copyArray(segmentIterator);
@@ -1448,7 +1445,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
             retainedValues.copyArray(*segmentIterator.get());
         }
 
-        //boost::chrono::duration<double> secFiltering = boost::chrono::system_clock::now() - startFiltering;
+        //std::chrono::duration<double> secFiltering = std::chrono::system_clock::now() - startFiltering;
         //cout << "Time filtering " << secFiltering.count() * 1000 << endl;
     }
 
@@ -1461,211 +1458,236 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
     }
 
     return retainedValues.getSegment();
-}
-
-bool SegmentInserter::isSorted() const {
-    return segmentSorted;
-}
-
-bool SegmentInserter::containsDuplicates() const {
-    return this->duplicates;
-}
-
-std::shared_ptr<const Segment> SegmentInserter::concatenate(
-    std::vector<std::shared_ptr<const Segment>> &segments) {
-    const uint8_t nfields = segments[0]->getNColumns();
-    //Check all segments have the same size
-    for (int i = 1; i < segments.size(); ++i)
-        if (segments[i]->getNColumns() != nfields)
-            throw 10; //not possible
-
-    SegmentInserter inserter(nfields);
-
-    for (auto &segment : segments) {
-        for (uint8_t i = 0; i < nfields; ++i) {
-            inserter.addColumn(i, segment->getColumn(i), false);
-        }
     }
-    return inserter.getSegment();
-}
 
-std::shared_ptr<const Segment> SegmentInserter::concatenate(
-    std::vector<std::shared_ptr<const Segment>> &segments, const int nthreads) {
-    const uint8_t nfields = segments[0]->getNColumns();
-    //Check all segments have the same size
-    for (int i = 1; i < segments.size(); ++i)
-        if (segments[i]->getNColumns() != nfields)
-            throw 10; //not possible
-
-    SegmentInserter inserter(nfields);
-
-    for (auto &segment : segments) {
-        for (uint8_t i = 0; i < nfields; ++i) {
-            inserter.addColumn(i, segment->getColumn(i), false);
-        }
+    bool SegmentInserter::isSorted() const {
+        return segmentSorted;
     }
-    return inserter.getSegment(nthreads);
-}
 
-std::shared_ptr<const Segment> SegmentInserter::unique(
-    std::shared_ptr<const Segment> seg) {
-    boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
-    if (seg->getNColumns() == 1) {
-        std::shared_ptr<Column> c = seg->getColumn(0);
-        //I assume c is sorted
-        auto c2 = c->unique();
-        std::vector<std::shared_ptr<Column>> fields;
-        fields.push_back(c2);
-    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    BOOST_LOG_TRIVIAL(debug) << "Time SegmentInserter::unique = " << sec.count() * 1000;
-        return std::shared_ptr<const Segment>(new Segment(1, fields));
-    } else {
+    bool SegmentInserter::containsDuplicates() const {
+        return this->duplicates;
+    }
 
-        bool sameLiteral = seg->areAllColumnsPartOftheSameQuery(NULL, NULL,
-                           NULL);
-        if (sameLiteral) {
-    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    BOOST_LOG_TRIVIAL(debug) << "Time SegmentInserter::unique = " << sec.count() * 1000;
-            return seg;
-	}
+    std::shared_ptr<const Segment> SegmentInserter::concatenate(
+            std::vector<std::shared_ptr<const Segment>> &segments) {
+        const uint8_t nfields = segments[0]->getNColumns();
+        //Check all segments have the same size
+        for (int i = 1; i < segments.size(); ++i)
+            if (segments[i]->getNColumns() != nfields)
+                throw 10; //not possible
 
-        std::unique_ptr<SegmentIterator> itr = seg->iterator();
-        const uint8_t ncolumns = seg->getNColumns();
-        std::unique_ptr<Term_t[]> fields(new Term_t[ncolumns]);
-        for (int i = 0; i < ncolumns; ++i)
-            fields[i] = (Term_t) - 1;
-        std::vector<ColumnWriter> writers;
-        writers.resize(ncolumns);
-        while (itr->hasNext()) {
-            itr->next();
-            bool unq = false;
-            for (uint8_t i = 0; i < ncolumns; ++i)
-                if (itr->get(i) != fields[i]) {
-                    unq = true;
-                    break;
-                }
+        SegmentInserter inserter(nfields);
 
-            if (unq) {
-                for (uint8_t i = 0; i < ncolumns; ++i) {
-                    writers[i].add(itr->get(i));
-                    fields[i] = itr->get(i);
-                }
+        for (auto &segment : segments) {
+            for (uint8_t i = 0; i < nfields; ++i) {
+                inserter.addColumn(i, segment->getColumn(i), false);
             }
         }
-        itr->clear();
-
-        std::vector<std::shared_ptr<Column>> outputColumns;
-        for (int i = 0; i < ncolumns; ++i)
-            outputColumns.push_back(writers[i].getColumn());
-    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    BOOST_LOG_TRIVIAL(debug) << "Time SegmentInserter::unique = " << sec.count() * 1000;
-        return std::shared_ptr<const Segment>(new Segment(ncolumns,
-                                              outputColumns));
+        return inserter.getSegment();
     }
-}
 
-bool varsHasNext(std::unique_ptr<ColumnReader> *p, const uint8_t s) {
-    for (int i = 0; i < s; ++i) {
-        if (! p[i]->hasNext()) {
-            return false;
+    std::shared_ptr<const Segment> SegmentInserter::concatenate(
+            std::vector<std::shared_ptr<const Segment>> &segments, const int nthreads) {
+        const uint8_t nfields = segments[0]->getNColumns();
+        //Check all segments have the same size
+        for (int i = 1; i < segments.size(); ++i)
+            if (segments[i]->getNColumns() != nfields)
+                throw 10; //not possible
+
+        SegmentInserter inserter(nfields);
+
+        for (auto &segment : segments) {
+            for (uint8_t i = 0; i < nfields; ++i) {
+                inserter.addColumn(i, segment->getColumn(i), false);
+            }
+        }
+        return inserter.getSegment(nthreads);
+    }
+
+    std::shared_ptr<const Segment> SegmentInserter::unique(
+            std::shared_ptr<const Segment> seg) {
+        std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+        if (seg->getNColumns() == 1) {
+            std::shared_ptr<Column> c = seg->getColumn(0);
+            //I assume c is sorted
+            auto c2 = c->unique();
+            std::vector<std::shared_ptr<Column>> fields;
+            fields.push_back(c2);
+            std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+            LOG(DEBUGL) << "Time SegmentInserter::unique = " << sec.count() * 1000;
+            return std::shared_ptr<const Segment>(new Segment(1, fields));
+        } else {
+
+            bool sameLiteral = seg->areAllColumnsPartOftheSameQuery(NULL, NULL,
+                    NULL);
+            if (sameLiteral) {
+                std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+                LOG(DEBUGL) << "Time SegmentInserter::unique = " << sec.count() * 1000;
+                return seg;
+            }
+
+            std::unique_ptr<SegmentIterator> itr = seg->iterator();
+            const uint8_t ncolumns = seg->getNColumns();
+            std::unique_ptr<Term_t[]> fields(new Term_t[ncolumns]);
+            for (int i = 0; i < ncolumns; ++i)
+                fields[i] = (Term_t) - 1;
+            std::vector<ColumnWriter> writers;
+            writers.resize(ncolumns);
+            while (itr->hasNext()) {
+                itr->next();
+                bool unq = false;
+                for (uint8_t i = 0; i < ncolumns; ++i)
+                    if (itr->get(i) != fields[i]) {
+                        unq = true;
+                        break;
+                    }
+
+                if (unq) {
+                    for (uint8_t i = 0; i < ncolumns; ++i) {
+                        writers[i].add(itr->get(i));
+                        fields[i] = itr->get(i);
+                    }
+                }
+            }
+            itr->clear();
+
+            std::vector<std::shared_ptr<Column>> outputColumns;
+            for (int i = 0; i < ncolumns; ++i)
+                outputColumns.push_back(writers[i].getColumn());
+            std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+            LOG(DEBUGL) << "Time SegmentInserter::unique = " << sec.count() * 1000;
+            return std::shared_ptr<const Segment>(new Segment(ncolumns,
+                        outputColumns));
         }
     }
-    return true;
-}
 
-void varsNext(Term_t *values, std::unique_ptr<ColumnReader> *p,
-              const uint8_t s) {
-    for (int i = 0; i < s; ++i)
-        values[i] = p[i]->next();
-}
+    bool varsHasNext(std::unique_ptr<ColumnReader> *p, const uint8_t s) {
+        for (int i = 0; i < s; ++i) {
+            if (! p[i]->hasNext()) {
+                return false;
+            }
+        }
+        return true;
+    }
 
-std::shared_ptr<const Segment> SegmentInserter::merge(
-    std::vector<std::shared_ptr<const Segment>> &segments) {
+    void varsNext(Term_t *values, std::unique_ptr<ColumnReader> *p,
+            const uint8_t s) {
+        for (int i = 0; i < s; ++i)
+            values[i] = p[i]->next();
+    }
 
-    BOOST_LOG_TRIVIAL(debug) << "SegmentInserter::merge";
-    //Check all segments have the same size
-    const uint8_t nfields = segments[0]->getNColumns();
-    for (int i = 1; i < segments.size(); ++i)
-        if (segments[i]->getNColumns() != segments[i - 1]->getNColumns())
-            throw 10; //not possible
+    std::shared_ptr<const Segment> SegmentInserter::merge(
+            std::vector<std::shared_ptr<const Segment>> &segments) {
 
-    //Should I compare all fields or only a few of them?
-    std::vector<uint8_t> fieldsToCompare;
-    for (uint8_t i = 0; i < nfields; ++i) {
-        bool identical = true;
-        for (int j = 1; j < segments.size(); ++j) {
-            if (!segments[j - 1]->getColumn(i)->isConstant() ||
-                    !segments[j]->getColumn(i)->isConstant()) {
-                identical = false;
-            } else {
-                std::unique_ptr<ColumnReader> r1 = segments[j - 1]->getColumn(i)->getReader();
-                std::unique_ptr<ColumnReader> r2 = segments[j]->getColumn(i)->getReader();
+        LOG(DEBUGL) << "SegmentInserter::merge";
+        //Check all segments have the same size
+        const uint8_t nfields = segments[0]->getNColumns();
+        for (int i = 1; i < segments.size(); ++i)
+            if (segments[i]->getNColumns() != segments[i - 1]->getNColumns())
+                throw 10; //not possible
 
-                if (r1->first() != r2->first()) {
+        //Should I compare all fields or only a few of them?
+        std::vector<uint8_t> fieldsToCompare;
+        for (uint8_t i = 0; i < nfields; ++i) {
+            bool identical = true;
+            for (int j = 1; j < segments.size(); ++j) {
+                if (!segments[j - 1]->getColumn(i)->isConstant() ||
+                        !segments[j]->getColumn(i)->isConstant()) {
                     identical = false;
+                } else {
+                    std::unique_ptr<ColumnReader> r1 = segments[j - 1]->getColumn(i)->getReader();
+                    std::unique_ptr<ColumnReader> r2 = segments[j]->getColumn(i)->getReader();
+
+                    if (r1->first() != r2->first()) {
+                        identical = false;
+                    }
+                    r1->clear();
+                    r2->clear();
                 }
-                r1->clear();
-                r2->clear();
+            }
+            if (!identical) {
+                fieldsToCompare.push_back(i);
             }
         }
-        if (!identical) {
-            fieldsToCompare.push_back(i);
-        }
-    }
 
-    if (fieldsToCompare.size() == 0) {
-        //Nothing to merge. The columns are equal to the existing one
-        return segments[0];
-    }
-
-    std::shared_ptr<const Segment> lastSegment = segments[0];
-    for (int idxCurSegment = 1;
-            idxCurSegment < segments.size();
-            ++idxCurSegment) {
-        std::shared_ptr<const Segment> curSegment = segments[idxCurSegment];
-
-        std::vector<std::unique_ptr<ColumnReader>> vars1;
-        std::vector<std::unique_ptr<ColumnReader>> vars2;
-        for (auto pos : fieldsToCompare) {
-            vars1.push_back(lastSegment->getColumn(pos)->getReader());
-            vars2.push_back(curSegment->getColumn(pos)->getReader());
+        if (fieldsToCompare.size() == 0) {
+            //Nothing to merge. The columns are equal to the existing one
+            return segments[0];
         }
 
-        SegmentInserter out((uint8_t) fieldsToCompare.size());
-        /*uint32_t s1 = 0;
-        uint32_t s2 = 0;
-        const uint32_t e1 = lastSegment->getNRows();
-        const uint32_t e2 = curSegment->getNRows();*/
-        const uint8_t nvars = (uint8_t) fieldsToCompare.size();
-        //BOOST_LOG_TRIVIAL(trace) << "Segment::merge, nvars = " << (int) nvars
-        //                         << ", e1 = " << e1 << ", e2 = " << e2;
+        std::shared_ptr<const Segment> lastSegment = segments[0];
+        for (int idxCurSegment = 1;
+                idxCurSegment < segments.size();
+                ++idxCurSegment) {
+            std::shared_ptr<const Segment> curSegment = segments[idxCurSegment];
 
-        bool lastValueEOF = false;
-        Term_t lastValues[MAX_ROWSIZE];
-        bool curValueEOF = false;
-        Term_t curValues[MAX_ROWSIZE];
+            std::vector<std::unique_ptr<ColumnReader>> vars1;
+            std::vector<std::unique_ptr<ColumnReader>> vars2;
+            for (auto pos : fieldsToCompare) {
+                vars1.push_back(lastSegment->getColumn(pos)->getReader());
+                vars2.push_back(curSegment->getColumn(pos)->getReader());
+            }
 
-        long count1 = 1;
-        long count2 = 1;
+            SegmentInserter out((uint8_t) fieldsToCompare.size());
+            /*uint32_t s1 = 0;
+              uint32_t s2 = 0;
+              const uint32_t e1 = lastSegment->getNRows();
+              const uint32_t e2 = curSegment->getNRows();*/
+            const uint8_t nvars = (uint8_t) fieldsToCompare.size();
+            //LOG(DEBUGL) << "Segment::merge, nvars = " << (int) nvars
+            //                         << ", e1 = " << e1 << ", e2 = " << e2;
 
-	boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
-        if (varsHasNext(&vars1[0], nvars)) {
-            varsNext(lastValues, &vars1[0], nvars);
-            //lastValue = lastSegment->next();
+            bool lastValueEOF = false;
+            Term_t lastValues[MAX_ROWSIZE];
+            bool curValueEOF = false;
+            Term_t curValues[MAX_ROWSIZE];
 
-            if (varsHasNext(&vars2[0], nvars)) {
-                varsNext(curValues, &vars2[0], nvars);
-                //curValue = curSegment->next();
+            long count1 = 1;
+            long count2 = 1;
 
-                while (!lastValueEOF && !curValueEOF) {
-                    //Compare the columns
-                    int res = 0;
-                    for (uint8_t i = 0; i < nvars && res == 0; ++i) {
-                        Term_t v1 = lastValues[i];
-                        Term_t v2 = curValues[i];
+            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+            if (varsHasNext(&vars1[0], nvars)) {
+                varsNext(lastValues, &vars1[0], nvars);
+                //lastValue = lastSegment->next();
 
-                        if (v2 > v1) {
-                            res = -1;
+                if (varsHasNext(&vars2[0], nvars)) {
+                    varsNext(curValues, &vars2[0], nvars);
+                    //curValue = curSegment->next();
+
+                    while (!lastValueEOF && !curValueEOF) {
+                        //Compare the columns
+                        int res = 0;
+                        for (uint8_t i = 0; i < nvars && res == 0; ++i) {
+                            Term_t v1 = lastValues[i];
+                            Term_t v2 = curValues[i];
+
+                            if (v2 > v1) {
+                                res = -1;
+                                for (uint8_t j = 0; j < nvars; ++j)
+                                    out.addAt(j, lastValues[j]);
+                                if (varsHasNext(&vars1[0], nvars)) {
+                                    varsNext(lastValues, &vars1[0], nvars);
+                                    count1++;
+                                } else {
+                                    lastValueEOF = true;
+                                    break;
+                                }
+                            } else if (v2 < v1) {
+                                res = 1;
+                                for (uint8_t j = 0; j < nvars; ++j)
+                                    out.addAt(j, curValues[j]);
+                                if (varsHasNext(&vars2[0], nvars)) {
+                                    varsNext(curValues, &vars2[0], nvars);
+                                    count2++;
+                                } else {
+                                    curValueEOF = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (res == 0) {
+                            //Add only one and increment both
                             for (uint8_t j = 0; j < nvars; ++j)
                                 out.addAt(j, lastValues[j]);
                             if (varsHasNext(&vars1[0], nvars)) {
@@ -1673,12 +1695,8 @@ std::shared_ptr<const Segment> SegmentInserter::merge(
                                 count1++;
                             } else {
                                 lastValueEOF = true;
-                                break;
+                                // break; No break here, you still need to increment vars2! --Ceriel
                             }
-                        } else if (v2 < v1) {
-                            res = 1;
-                            for (uint8_t j = 0; j < nvars; ++j)
-                                out.addAt(j, curValues[j]);
                             if (varsHasNext(&vars2[0], nvars)) {
                                 varsNext(curValues, &vars2[0], nvars);
                                 count2++;
@@ -1688,134 +1706,113 @@ std::shared_ptr<const Segment> SegmentInserter::merge(
                             }
                         }
                     }
+                } else {
+                    curValueEOF = true;
+                }
+            } else {
+                lastValueEOF = true;
+            }
 
-                    if (res == 0) {
-                        //Add only one and increment both
-                        for (uint8_t j = 0; j < nvars; ++j)
-                            out.addAt(j, lastValues[j]);
-                        if (varsHasNext(&vars1[0], nvars)) {
-                            varsNext(lastValues, &vars1[0], nvars);
-                            count1++;
-                        } else {
-                            lastValueEOF = true;
-                            // break; No break here, you still need to increment vars2! --Ceriel
-                        }
-                        if (varsHasNext(&vars2[0], nvars)) {
-                            varsNext(curValues, &vars2[0], nvars);
-                            count2++;
-                        } else {
-                            curValueEOF = true;
-                            break;
-                        }
+            //Add remaining
+            while (!lastValueEOF) {
+                for (uint8_t j = 0; j < nvars; ++j)
+                    out.addAt(j, lastValues[j]);
+                lastValueEOF = !varsHasNext(&vars1[0], nvars);
+                if (!lastValueEOF) {
+                    varsNext(lastValues, &vars1[0], nvars);
+                    count1++;
+                }
+            }
+
+            while (!curValueEOF) {
+                for (uint8_t j = 0; j < nvars; ++j)
+                    out.addAt(j, curValues[j]);
+                curValueEOF = !varsHasNext(&vars2[0], nvars);
+                if (!curValueEOF) {
+                    varsNext(curValues, &vars2[0], nvars);
+                    count2++;
+                }
+            }
+            std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+            LOG(DEBUGL) << "Time merge = " << sec.count() * 1000 << ", merged segments of " << count1 << " and "
+                << count2 << " elements";
+
+            //copy remaining fields
+            uint8_t nv = 0;
+            size_t nsize = out.getNRows();
+            std::vector<std::shared_ptr<Column>> newcolumns;
+            std::shared_ptr<const Segment> outSegment = out.getSegment();
+
+            newcolumns.resize(nfields);
+            for (uint8_t i = 0; i < nfields; ++i) {
+                bool found = false;
+                for (uint8_t j = 0; j < nvars && !found; ++j) {
+                    if (fieldsToCompare[j] == i) {
+                        found = true;
                     }
                 }
-            } else {
-                curValueEOF = true;
-            }
-        } else {
-            lastValueEOF = true;
-        }
 
-        //Add remaining
-        while (!lastValueEOF) {
-            for (uint8_t j = 0; j < nvars; ++j)
-                out.addAt(j, lastValues[j]);
-            lastValueEOF = !varsHasNext(&vars1[0], nvars);
-            if (!lastValueEOF) {
-                varsNext(lastValues, &vars1[0], nvars);
-                count1++;
-            }
-        }
-
-        while (!curValueEOF) {
-            for (uint8_t j = 0; j < nvars; ++j)
-                out.addAt(j, curValues[j]);
-            curValueEOF = !varsHasNext(&vars2[0], nvars);
-            if (!curValueEOF) {
-                varsNext(curValues, &vars2[0], nvars);
-                count2++;
-            }
-        }
-	boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-	BOOST_LOG_TRIVIAL(debug) << "Time merge = " << sec.count() * 1000 << ", merged segments of " << count1 << " and "
-                                 << count2 << " elements";
-
-        //copy remaining fields
-        uint8_t nv = 0;
-        size_t nsize = out.getNRows();
-        std::vector<std::shared_ptr<Column>> newcolumns;
-        std::shared_ptr<const Segment> outSegment = out.getSegment();
-
-        newcolumns.resize(nfields);
-        for (uint8_t i = 0; i < nfields; ++i) {
-            bool found = false;
-            for (uint8_t j = 0; j < nvars && !found; ++j) {
-                if (fieldsToCompare[j] == i) {
-                    found = true;
+                if (found) {
+                    //Replace it with the merged one.
+                    newcolumns[i] = outSegment->getColumn(nv++);
+                } else {
+                    newcolumns[i] = std::shared_ptr<Column>(
+                            new CompressedColumn(
+                                lastSegment->firstInColumn(i), nsize));
                 }
             }
 
-            if (found) {
-                //Replace it with the merged one.
-                newcolumns[i] = outSegment->getColumn(nv++);
+            lastSegment = std::shared_ptr<const Segment>(
+                    new Segment(nfields, newcolumns));
+
+            LOG(DEBUGL) << "Segment::merge done";
+            for (int i = 0; i < vars1.size(); i++) {
+                if (vars1[i] != NULL) {
+                    vars1[i]->clear();
+                }
+            }
+            for (int i = 0; i < vars2.size(); i++) {
+                if (vars2[i] != NULL) {
+                    vars2[i]->clear();
+                }
+            }
+        }
+
+        return lastSegment;
+    }
+
+    std::unique_ptr<SegmentIterator> Segment::iterator() const {
+        std::vector<const std::vector<Term_t> *> vectors;
+        bool vectorSupported = true;
+        for (int i = 0; i < nfields; i++) {
+            if (! columns[i]->isBackedByVector()) {
+                vectorSupported = false;
+                break;
             } else {
-                newcolumns[i] = std::shared_ptr<Column>(
-                                    new CompressedColumn(
-                                        lastSegment->firstInColumn(i), nsize));
+                vectors.push_back(&columns[i]->getVectorRef());
             }
         }
+        if (vectorSupported) {
+            return std::unique_ptr<VectorSegmentIterator>(new VectorSegmentIterator(vectors, 0, vectors[0]->size(), NULL));
+        }
 
-        lastSegment = std::shared_ptr<const Segment>(
-                          new Segment(nfields, newcolumns));
+        return std::unique_ptr<SegmentIterator>(
+                new SegmentIterator(nfields, columns));
+    }
 
-        BOOST_LOG_TRIVIAL(trace) << "Segment::merge done";
-        for (int i = 0; i < vars1.size(); i++) {
-            if (vars1[i] != NULL) {
-                vars1[i]->clear();
+    std::unique_ptr<VectorSegmentIterator> Segment::vectorIterator() const {
+        std::vector<const std::vector<Term_t> *> vectors;
+        std::vector<bool> allocated;
+        for (int i = 0; i < nfields; i++) {
+            if (! columns[i]->isBackedByVector()) {
+                std::vector<Term_t> *v = new std::vector<Term_t>();
+                *v = columns[i]->getReader()->asVector();
+                allocated.push_back(true);
+                vectors.push_back(v);
+            } else {
+                vectors.push_back(&columns[i]->getVectorRef());
+                allocated.push_back(false);
             }
         }
-        for (int i = 0; i < vars2.size(); i++) {
-            if (vars2[i] != NULL) {
-                vars2[i]->clear();
-            }
-        }
+        return std::unique_ptr<VectorSegmentIterator>(new VectorSegmentIterator(vectors, 0, vectors[0]->size(), new std::vector<bool>(allocated)));
     }
-
-    return lastSegment;
-}
-
-std::unique_ptr<SegmentIterator> Segment::iterator() const {
-    std::vector<const std::vector<Term_t> *> vectors;
-    bool vectorSupported = true;
-    for (int i = 0; i < nfields; i++) {
-	if (! columns[i]->isBackedByVector()) {
-	    vectorSupported = false;
-	    break;
-	} else {
-	    vectors.push_back(&columns[i]->getVectorRef());
-	}
-    }
-    if (vectorSupported) {
-	return std::unique_ptr<VectorSegmentIterator>(new VectorSegmentIterator(vectors, 0, vectors[0]->size(), NULL));
-    }
-
-    return std::unique_ptr<SegmentIterator>(
-               new SegmentIterator(nfields, columns));
-}
-
-std::unique_ptr<VectorSegmentIterator> Segment::vectorIterator() const {
-    std::vector<const std::vector<Term_t> *> vectors;
-    std::vector<bool> allocated;
-    for (int i = 0; i < nfields; i++) {
-	if (! columns[i]->isBackedByVector()) {
-	    std::vector<Term_t> *v = new std::vector<Term_t>();
-	    *v = columns[i]->getReader()->asVector();
-	    allocated.push_back(true);
-	    vectors.push_back(v);
-	} else {
-	    vectors.push_back(&columns[i]->getVectorRef());
-	    allocated.push_back(false);
-	}
-    }
-    return std::unique_ptr<VectorSegmentIterator>(new VectorSegmentIterator(vectors, 0, vectors[0]->size(), new std::vector<bool>(allocated)));
-}

@@ -14,7 +14,7 @@ bool BindingsRow::operator==(const BindingsRow &other) const {
         }
         return true;
     }
-    BOOST_LOG_TRIVIAL(error) << "Should never happen";
+    LOG(ERRORL) << "Should never happen";
     return false;
 }
 
@@ -229,8 +229,8 @@ TupleTable *BindingsTable::projectAndFilter(const Literal &l, const std::vector<
 
 #if DEBUG
 	    if (! warn_done) {
-		BOOST_LOG_TRIVIAL(debug) << "Performing linear search (bindingsTable::projectAndFilter). Perhaps this should be optimized";
-		BOOST_LOG_TRIVIAL(debug) << "size = " << sizeValuesToFilter / sizePosToFilter;
+		LOG(DEBUGL) << "Performing linear search (bindingsTable::projectAndFilter). Perhaps this should be optimized";
+		LOG(DEBUGL) << "size = " << sizeValuesToFilter / sizePosToFilter;
 		warn_done = true;
 	    }
 #endif
@@ -306,8 +306,8 @@ TupleTable *BindingsTable::filter(const Literal &l, const std::vector<uint8_t> *
                 ok = false;
 #if DEBUG
 		if (! warn_done) {
-		    BOOST_LOG_TRIVIAL(debug) << "Performing linear search (bindingsTable::asTupleTable). Perhaps this should be optimized";
-		    BOOST_LOG_TRIVIAL(debug) << "size = " << valuesToFilter->size() / posToFilter->size();
+		    LOG(DEBUGL) << "Performing linear search (bindingsTable::asTupleTable). Perhaps this should be optimized";
+		    LOG(DEBUGL) << "size = " << valuesToFilter->size() / posToFilter->size();
 		    warn_done = true;
 		}
 #endif
@@ -428,7 +428,7 @@ void BindingsTable::statistics() {
     /*
     size_t nbuckets = uniqueElements.bucket_count();
     for (size_t i = 0; i < nbuckets; i++) {
-	BOOST_LOG_TRIVIAL(debug) << "Size bucket " << i << ": " << uniqueElements.bucket_size(i);
+	LOG(DEBUGL) << "Size bucket " << i << ": " << uniqueElements.bucket_size(i);
     }
     */
 }

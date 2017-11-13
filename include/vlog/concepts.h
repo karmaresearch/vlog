@@ -3,6 +3,8 @@
 
 #include <vlog/support.h>
 
+#include <kognac/logs.h>
+
 #include <string>
 #include <inttypes.h>
 #include <stdlib.h>
@@ -23,174 +25,174 @@ using namespace std;
 
 /*** TERMS ***/
 class VTerm {
-private:
-    uint8_t id; //ID != 0 => variable. ID==0 => const value
-    uint64_t value;
-public:
-    VTerm() : id(0), value(0) {}
-    VTerm(const uint8_t id, const uint64_t value) : id(id), value(value) {}
-    uint8_t getId() const {
-        return id;
-    }
-    uint64_t getValue() const {
-        return value;
-    }
-    void setId(const uint8_t i) {
-        id = i;
-    }
-    void setValue(const uint64_t v) {
-        value = v;
-    }
-    bool isVariable() const {
-        return id > 0;
-    }
-    bool operator==(const VTerm& rhs) const {
-        return id == rhs.getId() && value == rhs.getValue();
-    }
-    bool operator!=(const VTerm& rhs) const {
-        return id != rhs.getId() || value != rhs.getValue();
-    }
+    private:
+        uint8_t id; //ID != 0 => variable. ID==0 => const value
+        uint64_t value;
+    public:
+        VTerm() : id(0), value(0) {}
+        VTerm(const uint8_t id, const uint64_t value) : id(id), value(value) {}
+        uint8_t getId() const {
+            return id;
+        }
+        uint64_t getValue() const {
+            return value;
+        }
+        void setId(const uint8_t i) {
+            id = i;
+        }
+        void setValue(const uint64_t v) {
+            value = v;
+        }
+        bool isVariable() const {
+            return id > 0;
+        }
+        bool operator==(const VTerm& rhs) const {
+            return id == rhs.getId() && value == rhs.getValue();
+        }
+        bool operator!=(const VTerm& rhs) const {
+            return id != rhs.getId() || value != rhs.getValue();
+        }
 };
 
 /*** TUPLES ***/
 #define SIZETUPLE 3
 class VTuple {
-private:
-    const uint8_t sizetuple;
-    VTerm terms[SIZETUPLE];
-public:
-    VTuple(const uint8_t sizetuple) : sizetuple(sizetuple) {}
-    size_t getSize() const {
-        return sizetuple;
-    }
-    VTerm get(const int pos) const {
-        return terms[pos];
-    }
-    void set(const VTerm term, const int pos) {
-        terms[pos] = term;
-    }
+    private:
+        const uint8_t sizetuple;
+        VTerm terms[SIZETUPLE];
+    public:
+        VTuple(const uint8_t sizetuple) : sizetuple(sizetuple) {}
+        size_t getSize() const {
+            return sizetuple;
+        }
+        VTerm get(const int pos) const {
+            return terms[pos];
+        }
+        void set(const VTerm term, const int pos) {
+            terms[pos] = term;
+        }
 
-    std::vector<std::pair<uint8_t, uint8_t>> getRepeatedVars() const {
-        std::vector<std::pair<uint8_t, uint8_t>> output;
-        for (uint8_t i = 0; i < sizetuple; ++i) {
-            VTerm t1 = get(i);
-            if (t1.isVariable()) {
-                for (uint8_t j = i + 1; j < sizetuple; ++j) {
-                    VTerm t2 = get(j);
-                    if (t2.getId() == t1.getId()) {
-                        output.push_back(std::make_pair(i, j));
+        std::vector<std::pair<uint8_t, uint8_t>> getRepeatedVars() const {
+            std::vector<std::pair<uint8_t, uint8_t>> output;
+            for (uint8_t i = 0; i < sizetuple; ++i) {
+                VTerm t1 = get(i);
+                if (t1.isVariable()) {
+                    for (uint8_t j = i + 1; j < sizetuple; ++j) {
+                        VTerm t2 = get(j);
+                        if (t2.getId() == t1.getId()) {
+                            output.push_back(std::make_pair(i, j));
+                        }
                     }
                 }
             }
+            return output;
         }
-        return output;
-    }
 
-    bool operator==(const VTuple &other) const {
-	if (sizetuple == other.sizetuple) {
-	    if (terms == other.terms) {
-		return true;
-	    }
-	    for (int i = 0; i < sizetuple; i++) {
-		if (terms[i].getId() != other.terms[i].getId()) {
-		    return false;
-		}
-		if (terms[i].getId() == 0) {
-		    if (terms[i].getValue() != other.terms[i].getValue()) {
-			return false;
-		    }
-		}
-	    }
-	    return true;
-	}
-	return false;
-    }
+        bool operator==(const VTuple &other) const {
+            if (sizetuple == other.sizetuple) {
+                if (terms == other.terms) {
+                    return true;
+                }
+                for (int i = 0; i < sizetuple; i++) {
+                    if (terms[i].getId() != other.terms[i].getId()) {
+                        return false;
+                    }
+                    if (terms[i].getId() == 0) {
+                        if (terms[i].getValue() != other.terms[i].getValue()) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+            return false;
+        }
 };
 
 struct hash_VTuple {
     size_t operator()(const VTuple &v) const {
-	size_t hash = 0;
-	int sz = v.getSize();
-	for (int i = 0; i < sz; i++) {
-	    VTerm term = v.get(i);
-	    if (term.isVariable()) {
-		hash = (hash + (324723947 + term.getId())) ^93485734985;
-	    } else {
-		hash = (hash + (324723947 + term.getValue())) ^93485734985;
-	    }
-	}
-	return hash;
+        size_t hash = 0;
+        int sz = v.getSize();
+        for (int i = 0; i < sz; i++) {
+            VTerm term = v.get(i);
+            if (term.isVariable()) {
+                hash = (hash + (324723947 + term.getId())) ^93485734985;
+            } else {
+                hash = (hash + (324723947 + term.getValue())) ^93485734985;
+            }
+        }
+        return hash;
     }
 };
 
 class Predicate {
-private:
-    const PredId_t id;
-    const uint8_t type;
-    const uint8_t adornment;
-    const uint8_t card;
+    private:
+        const PredId_t id;
+        const uint8_t type;
+        const uint8_t adornment;
+        const uint8_t card;
 
-public:
-    Predicate(const Predicate &pred) : id(pred.id), type(pred.type), adornment(pred.adornment), card(pred.card) {
-    }
+    public:
+        Predicate(const Predicate &pred) : id(pred.id), type(pred.type), adornment(pred.adornment), card(pred.card) {
+        }
 
-    Predicate(const Predicate p, const uint8_t adornment) : id(p.id),
+        Predicate(const Predicate p, const uint8_t adornment) : id(p.id),
         type(p.type), adornment(adornment), card(p.card) {
-    }
+        }
 
-    Predicate(const PredId_t id, const uint8_t adornment, const uint8_t type,
-              const uint8_t card) : id(id), type(type), adornment(adornment),
+        Predicate(const PredId_t id, const uint8_t adornment, const uint8_t type,
+                const uint8_t card) : id(id), type(type), adornment(adornment),
         card(card) {
-    }
+        }
 
-    PredId_t getId() const {
-        return id;
-    }
+        PredId_t getId() const {
+            return id;
+        }
 
-    uint8_t getType() const {
-        return type & 1;
-    }
+        uint8_t getType() const {
+            return type & 1;
+        }
 
-    bool isMagic() const {
-        return (type >> 1) != 0;
-    }
+        bool isMagic() const {
+            return (type >> 1) != 0;
+        }
 
-    uint8_t getAdorment() const {
-        return adornment;
-    }
+        uint8_t getAdorment() const {
+            return adornment;
+        }
 
-    uint8_t getCardinality() const {
-        return card;
-    }
+        uint8_t getCardinality() const {
+            return card;
+        }
 
-    static bool isEDB(std::string pred) {
-        return pred.at(pred.size() - 1) == 'E';
-    }
+        static bool isEDB(std::string pred) {
+            return pred.at(pred.size() - 1) == 'E';
+        }
 
-    static uint8_t calculateAdornment(VTuple &t) {
-        uint8_t adornment = 0;
-        for (size_t i = 0; i < t.getSize(); ++i) {
-            if (!t.get(i).isVariable()) {
-                adornment += 1 << i;
+        static uint8_t calculateAdornment(VTuple &t) {
+            uint8_t adornment = 0;
+            for (size_t i = 0; i < t.getSize(); ++i) {
+                if (!t.get(i).isVariable()) {
+                    adornment += 1 << i;
+                }
             }
+            return adornment;
         }
-        return adornment;
-    }
 
-    static uint8_t changeVarToConstInAdornment(const uint8_t adornment, const uint8_t pos) {
-        uint8_t shiftedValue = (uint8_t) (1 << pos);
-        return adornment | shiftedValue;
-    }
-
-    static uint8_t getNFields(uint8_t adornment) {
-        uint8_t n = 0;
-        for (int i = 0; i < 8; ++i) {
-            if (adornment & 1)
-                n++;
-            adornment >>= 1;
+        static uint8_t changeVarToConstInAdornment(const uint8_t adornment, const uint8_t pos) {
+            uint8_t shiftedValue = (uint8_t) (1 << pos);
+            return adornment | shiftedValue;
         }
-        return n;
-    }
+
+        static uint8_t getNFields(uint8_t adornment) {
+            uint8_t n = 0;
+            for (int i = 0; i < 8; ++i) {
+                if (adornment & 1)
+                    n++;
+                adornment >>= 1;
+            }
+            return n;
+        }
 };
 
 /*** SUBSTITUTIONS ***/
@@ -204,230 +206,265 @@ struct Substitution {
 /*** LITERALS ***/
 class Program;
 class Literal {
-private:
-    const Predicate pred;
-    const VTuple tuple;
-public:
-    Literal(const Predicate pred, const VTuple tuple) : pred(pred), tuple(tuple) {}
+    private:
+        const Predicate pred;
+        const VTuple tuple;
+    public:
+        Literal(const Predicate pred, const VTuple tuple) : pred(pred), tuple(tuple) {}
 
-    Predicate getPredicate() const {
-        return pred;
-    }
+        Predicate getPredicate() const {
+            return pred;
+        }
 
-    bool isMagic() const {
-        return pred.isMagic();
-    }
+        bool isMagic() const {
+            return pred.isMagic();
+        }
 
-    VTerm getTermAtPos(const int pos) const {
-        return tuple.get(pos);
-    }
+        VTerm getTermAtPos(const int pos) const {
+            return tuple.get(pos);
+        }
 
-    size_t getTupleSize() const {
-        return tuple.getSize();
-    }
+        size_t getTupleSize() const {
+            return tuple.getSize();
+        }
 
-    VTuple getTuple() const {
-        return tuple;
-    }
+        VTuple getTuple() const {
+            return tuple;
+        }
 
-    size_t getNBoundVariables() const {
-        return pred.getNFields(pred.getAdorment());
-    }
+        size_t getNBoundVariables() const {
+            return pred.getNFields(pred.getAdorment());
+        }
 
-    static int mgu(Substitution *substitutions, const Literal &l, const Literal &m);
+        static int mgu(Substitution *substitutions, const Literal &l, const Literal &m);
 
-    static int subsumes(Substitution *substitutions, const Literal &from, const Literal &to);
+        static int subsumes(Substitution *substitutions, const Literal &from, const Literal &to);
 
-    static int getSubstitutionsA2B(
-        Substitution *substitutions, const Literal &a, const Literal &b);
+        static int getSubstitutionsA2B(
+                Substitution *substitutions, const Literal &a, const Literal &b);
 
-    Literal substitutes(Substitution *substitions, const int nsubs) const;
+        Literal substitutes(Substitution *substitions, const int nsubs) const;
 
-    bool sameVarSequenceAs(const Literal &l) const;
+        bool sameVarSequenceAs(const Literal &l) const;
 
-    uint8_t getNVars() const;
+        uint8_t getNVars() const;
 
-    uint8_t getNUniqueVars() const;
+        uint8_t getNUniqueVars() const;
 
-    bool hasRepeatedVars() const;
+        bool hasRepeatedVars() const;
 
-    std::vector<uint8_t> getPosVars() const;
+        std::vector<uint8_t> getPosVars() const;
 
-    std::vector<std::pair<uint8_t, uint8_t>> getRepeatedVars() const;
+        std::vector<std::pair<uint8_t, uint8_t>> getRepeatedVars() const;
 
-    std::vector<uint8_t> getSharedVars(const std::vector<uint8_t> &vars) const;
+        std::vector<uint8_t> getSharedVars(const std::vector<uint8_t> &vars) const;
 
-    std::vector<uint8_t> getNewVars(std::vector<uint8_t> &vars) const;
+        std::vector<uint8_t> getNewVars(std::vector<uint8_t> &vars) const;
 
-    std::vector<uint8_t> getAllVars() const;
+        std::vector<uint8_t> getAllVars() const;
 
-    std::string tostring(Program *program, EDBLayer *db) const;
+        std::string tostring(Program *program, EDBLayer *db) const;
 
-    std::string toprettystring(Program *program, EDBLayer *db) const;
+        std::string toprettystring(Program *program, EDBLayer *db) const;
 
-    std::string tostring() const;
+        std::string tostring() const;
 
-    /*Literal operator=(const Literal &other) {
-        return Literal(other.pred,other.tuple);
-    }*/
+        /*Literal operator=(const Literal &other) {
+          return Literal(other.pred,other.tuple);
+          }*/
 
-    bool operator ==(const Literal &other) const;
+        bool operator ==(const Literal &other) const;
 };
 
 class Rule {
-private:
-    const Literal head;
-    const std::vector<Literal> body;
-    const bool _isRecursive;
+    private:
+        const uint32_t ruleId;
+        const std::vector<Literal> heads;
+        const std::vector<Literal> body;
+        const bool _isRecursive;
+        const bool existential;
 
-    static bool checkRecursion(const Literal &head, const std::vector<Literal> &body);
+        static bool checkRecursion(const std::vector<Literal> &head,
+                const std::vector<Literal> &body);
 
-public:
-    bool doesVarAppearsInFollowingPatterns(int startingPattern, uint8_t value);
+    public:
+        bool doesVarAppearsInFollowingPatterns(int startingPattern, uint8_t value) const;
 
-    Rule(const Literal head, std::vector<Literal> body) : head(head),
-        body(body),
-        _isRecursive(checkRecursion(head, body)) {
-	    checkRule();
-    }
-
-    Rule createAdornment(uint8_t headAdornment);
-
-    bool isRecursive() const {
-        return this->_isRecursive;
-    }
-
-    const Literal &getHead() const {
-        return head;
-    }
-
-    const std::vector<Literal> &getBody() const {
-        return body;
-    }
-
-    uint8_t getNIDBPredicates() const {
-        uint8_t i = 0;
-        for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end();
-                ++itr) {
-            if (itr->getPredicate().getType() == IDB) {
-                i++;
+        Rule(uint32_t ruleId, const std::vector<Literal> heads,
+                std::vector<Literal> body) :
+            ruleId(ruleId),
+            heads(heads),
+            body(body),
+            _isRecursive(checkRecursion(heads, body)),
+            existential(!getVarsNotInBody().empty()) {
+                checkRule();
             }
-        }
-        return i;
-    }
 
-    uint8_t getNIDBNotMagicPredicates() const {
-        uint8_t i = 0;
-        for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end();
-                ++itr) {
-            if (itr->getPredicate().getType() == IDB && !itr->getPredicate().isMagic()) {
-                i++;
+        Rule createAdornment(uint8_t headAdornment) const;
+
+        bool isRecursive() const {
+            return this->_isRecursive;
+        }
+
+        uint32_t getId() const {
+            return ruleId;
+        }
+
+        const std::vector<Literal> &getHeads() const {
+            return heads;
+        }
+
+        Literal getFirstHead() const {
+            if (heads.size() > 0)
+                LOG(WARNL) << "This method should be called only if we handle multiple heads properly...";
+            return heads[0];
+        }
+
+        Literal getHead(uint8_t pos) const {
+            return heads[pos];
+        }
+
+        bool isExistential() const;
+
+        std::vector<uint8_t> getVarsNotInBody() const;
+
+        std::vector<uint8_t> getVarsInBody() const;
+
+        const std::vector<Literal> &getBody() const {
+            return body;
+        }
+
+        uint8_t getNIDBPredicates() const {
+            uint8_t i = 0;
+            for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end();
+                    ++itr) {
+                if (itr->getPredicate().getType() == IDB) {
+                    i++;
+                }
             }
+            return i;
         }
-        return i;
-    }
 
-    uint8_t getNEDBPredicates() const {
-        uint8_t i = 0;
-        for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end();
-                ++itr) {
-            if (itr->getPredicate().getType() == EDB) {
-                i++;
+        uint8_t getNIDBNotMagicPredicates() const {
+            uint8_t i = 0;
+            for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end();
+                    ++itr) {
+                if (itr->getPredicate().getType() == IDB && !itr->getPredicate().isMagic()) {
+                    i++;
+                }
             }
+            return i;
         }
-        return i;
-    }
-    
-    void checkRule() const;
 
-    std::string tostring(Program *program, EDBLayer *db) const;
+        uint8_t getNEDBPredicates() const {
+            uint8_t i = 0;
+            for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end();
+                    ++itr) {
+                if (itr->getPredicate().getType() == EDB) {
+                    i++;
+                }
+            }
+            return i;
+        }
 
-    std::string toprettystring(Program * program, EDBLayer *db) const;
+        void checkRule() const;
 
-    std::string tostring() const;
+        std::string tostring(Program *program, EDBLayer *db) const;
 
-    Rule normalizeVars() const;
+        std::string toprettystring(Program * program, EDBLayer *db) const;
 
-    ~Rule() {
-    }
+        std::string tostring() const;
 
-    /* How can you have an assignment operator when the fields are const? --Ceriel */
-    Rule operator=(const Rule &other) {
-        return Rule(other.head, other.body);
-    }
+        Rule normalizeVars() const;
+
+        ~Rule() {
+        }
 };
 
 class Program {
-private:
-    const uint64_t assignedIds;
-    EDBLayer *kb;
-    std::vector<Rule> rules[MAX_NPREDS];
-    Dictionary dictVariables;
+    private:
+        const uint64_t assignedIds;
+        EDBLayer *kb;
+        std::vector<uint32_t> rules[MAX_NPREDS];
+        std::vector<Rule> allrules;
+        Dictionary dictVariables;
 
-    Dictionary dictPredicates;
-    std::unordered_map<PredId_t, uint8_t> cardPredicates;
+        Dictionary dictPredicates;
+        std::unordered_map<PredId_t, uint8_t> cardPredicates;
 
-    Dictionary additionalConstants;
+        Dictionary additionalConstants;
 
-    void parseRule(std::string rule);
+        void parseRule(std::string rule);
 
-    std::string rewriteRDFOWLConstants(std::string input);
+        std::string rewriteRDFOWLConstants(std::string input);
 
-public:
-    Program(const uint64_t assignedIds,
-            EDBLayer *kb);
+    public:
+        Program(const uint64_t assignedIds,
+                EDBLayer *kb);
 
-    Literal parseLiteral(std::string literal);
+        Literal parseLiteral(std::string literal);
 
-    void readFromFile(std::string pathFile);
+        void readFromFile(std::string pathFile);
 
-    void readFromString(std::string rules);
+        void readFromString(std::string rules);
 
-    Term_t getIDVar(std::string var);
+        Term_t getIDVar(std::string var);
 
-    PredId_t getPredicateID(std::string &p, const uint8_t card);
+        PredId_t getPredicateID(std::string &p, const uint8_t card);
 
-    std::string getPredicateName(const PredId_t id);
+        std::string getPredicateName(const PredId_t id);
 
-    Predicate getPredicate(std::string &p);
+        Predicate getPredicate(std::string &p);
 
-    Predicate getPredicate(std::string &p, uint8_t adornment);
+        Predicate getPredicate(std::string &p, uint8_t adornment);
 
-    Predicate getPredicate(const PredId_t id);
+        Predicate getPredicate(const PredId_t id);
 
-    std::vector<Rule> *getAllRulesByPredicate(PredId_t predid);
+        std::vector<Rule> getAllRulesByPredicate(PredId_t predid) const;
 
-    std::string getFromAdditional(Term_t val) {
-        return additionalConstants.getRawValue(val);
-    }
+        const std::vector<uint32_t> &getRulesIDsByPredicate(PredId_t predid) const;
 
-    void sortRulesByIDBPredicates();
+        size_t getNRulesByPredicate(PredId_t predid) const;
 
-    std::vector<Rule> getAllRules();
+        const Rule &getRule(uint32_t ruleid) const;
 
-    int getNRules() const;
+        std::string getFromAdditional(Term_t val) {
+            return additionalConstants.getRawValue(val);
+        }
 
-    Program clone() const;
+        void sortRulesByIDBPredicates();
 
-    std::shared_ptr<Program> cloneNew() const;
+        std::vector<Rule> getAllRules();
 
-    void cleanAllRules();
+        int getNRules() const;
 
-    void addAllRules(std::vector<Rule> &rules);
+        Program clone() const;
 
-    bool isPredicateIDB(const PredId_t id);
+        std::shared_ptr<Program> cloneNew() const;
 
-    std::string getAllPredicates();
+        void cleanAllRules();
 
-    int getNEDBPredicates();
+        void addRule(Rule &rule);
 
-    int getNIDBPredicates();
+        void addRule(std::vector<Literal> heads, std::vector<Literal> body);
 
-    std::string tostring();
+        void addAllRules(std::vector<Rule> &rules);
 
-    static std::string compressRDFOWLConstants(std::string input);
+        bool isPredicateIDB(const PredId_t id);
 
-    ~Program() {
-    }
+        std::string getAllPredicates();
+
+        int getNEDBPredicates();
+
+        int getNIDBPredicates();
+
+        std::string tostring();
+
+        bool areExistentialRules();
+
+        static std::string compressRDFOWLConstants(std::string input);
+
+        ~Program() {
+        }
 };
 #endif

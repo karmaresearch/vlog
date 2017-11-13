@@ -5,8 +5,6 @@
 #include <vlog/segment.h>
 #include <kognac/factory.h>
 
-#include <boost/log/trivial.hpp>
-
 #include <vector>
 #include <inttypes.h>
 #include <string>

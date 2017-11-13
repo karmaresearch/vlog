@@ -109,7 +109,7 @@ public:
                 addMAPITable(table);
 #endif
             } else {
-                BOOST_LOG_TRIVIAL(error) << "Type of table is not supported";
+                LOG(ERRORL) << "Type of table is not supported";
                 throw 10;
             }
         }
@@ -135,7 +135,7 @@ public:
             auto p = dbPredicates.begin();
             return p->first;
         } else {
-            BOOST_LOG_TRIVIAL(error) << "There is no EDB Predicate!";
+            LOG(ERRORL) << "There is no EDB Predicate!";
             throw 10;
         }
     }

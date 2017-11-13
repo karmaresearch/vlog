@@ -13,7 +13,7 @@ void ODBCTable::check(SQLRETURN rc, string msg) {
     if (rc == SQL_NO_DATA) {
 	return;
     }
-    BOOST_LOG_TRIVIAL(error) << "Failed ODBC call: " << msg;
+    LOG(ERRORL) << "Failed ODBC call: " << msg;
     throw 10;
 }
 
@@ -93,13 +93,13 @@ void ODBCTable::query(QSQQuery *query, TupleTable *outputTable,
 	    sqlCreateTable += ")";
 	    SQLHANDLE stmt;
 	    check(SQLAllocHandle(SQL_HANDLE_STMT, con, &stmt), "allocate statement handle");
-	    BOOST_LOG_TRIVIAL(debug) << "SQL create temp table: " << sqlCreateTable;
+	    LOG(DEBUGL) << "SQL create temp table: " << sqlCreateTable;
 	    check(SQLExecDirectA(stmt, (SQLCHAR *) sqlCreateTable.c_str(), SQL_NTS), "create temp table");
 	    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
 
 	    // Insert values into table
 	    check(SQLAllocHandle(SQL_HANDLE_STMT, con, &stmt), "allocate statement handle");
-	    BOOST_LOG_TRIVIAL(debug) << "START TRANSACTION";
+	    LOG(DEBUGL) << "START TRANSACTION";
 	    check(SQLExecDirectA(stmt, (SQLCHAR *) "START TRANSACTION", SQL_NTS), "start transaction");
 	    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
 
@@ -111,14 +111,14 @@ void ODBCTable::query(QSQQuery *query, TupleTable *outputTable,
 		    addition += pref + to_string(*itr);
 		}
 		addition += ")";
-		BOOST_LOG_TRIVIAL(debug) << "SQL insert into temp table: " << addition;
+		LOG(DEBUGL) << "SQL insert into temp table: " << addition;
 		check(SQLAllocHandle(SQL_HANDLE_STMT, con, &stmt), "allocate statement handle");
 		check(SQLExecDirectA(stmt, (SQLCHAR *) addition.c_str(), SQL_NTS), "addition");
 		SQLFreeHandle(SQL_HANDLE_STMT, stmt);
 	    }
 
 	    check(SQLAllocHandle(SQL_HANDLE_STMT, con, &stmt), "allocate statement handle");
-	    BOOST_LOG_TRIVIAL(debug) << "COMMIT";
+	    LOG(DEBUGL) << "COMMIT";
 	    check(SQLExecDirectA(stmt, (SQLCHAR *) "COMMIT", SQL_NTS), "commit");
 	    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
 	    
@@ -132,7 +132,7 @@ void ODBCTable::query(QSQQuery *query, TupleTable *outputTable,
 	    }
 	    sqlCreateTable += ")";
 	    check(SQLAllocHandle(SQL_HANDLE_STMT, con, &stmt), "allocate statement handle");
-	    BOOST_LOG_TRIVIAL(debug) << "alter table: add primary key: " << sqlCreateTable;
+	    LOG(DEBUGL) << "alter table: add primary key: " << sqlCreateTable;
 	    check(SQLExecDirectA(stmt, (SQLCHAR *) sqlCreateTable.c_str(), SQL_NTS), "alter table");
 	    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
 	    */
@@ -183,12 +183,12 @@ void ODBCTable::query(QSQQuery *query, TupleTable *outputTable,
     }
     iter->clear();
     delete iter;
-    BOOST_LOG_TRIVIAL(debug) << "query gave " << count << " results";
+    LOG(DEBUGL) << "query gave " << count << " results";
 
     if (valuesToFilter != NULL && valuesToFilter->size() > TEMP_TABLE_THRESHOLD) {
 	SQLHANDLE stmt;
 	check(SQLAllocHandle(SQL_HANDLE_STMT, con, &stmt), "allocate statement handle");
-	BOOST_LOG_TRIVIAL(debug) << "DROP TABLE temp";
+	LOG(DEBUGL) << "DROP TABLE temp";
 	check(SQLExecDirectA(stmt, (SQLCHAR *) "DROP TABLE temp", SQL_NTS), "drop temp table");
 	SQLFreeHandle(SQL_HANDLE_STMT, stmt);
     }
@@ -202,7 +202,7 @@ size_t ODBCTable::getCardinality(const Literal &q) {
         query += " WHERE " + cond;
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SQL Query: " << query;
+    LOG(DEBUGL) << "SQL Query: " << query;
     SQLHANDLE stmt;
     check(SQLAllocHandle(SQL_HANDLE_STMT, con, &stmt), "allocate statement handle");
     check(SQLExecDirectA(stmt, (SQLCHAR *) query.c_str(), SQL_NTS), "execute query");
@@ -224,7 +224,7 @@ size_t ODBCTable::getCardinalityColumn(const Literal &q, uint8_t posColumn) {
         query += " WHERE " + cond;
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SQL Query: " << query;
+    LOG(DEBUGL) << "SQL Query: " << query;
     SQLHANDLE stmt;
     check(SQLAllocHandle(SQL_HANDLE_STMT, con, &stmt), "allocate statement handle");
     check(SQLExecDirectA(stmt, (SQLCHAR *) query.c_str(), SQL_NTS), "execute query");
@@ -259,7 +259,7 @@ bool ODBCTable::isEmpty(const Literal &q, std::vector<uint8_t> *posToFilter,
 	query += " WHERE " + cond;
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SQL Query: " << query;
+    LOG(DEBUGL) << "SQL Query: " << query;
     SQLHANDLE stmt;
     check(SQLAllocHandle(SQL_HANDLE_STMT, con, &stmt), "allocate statement handle");
     check(SQLExecDirectA(stmt, (SQLCHAR *) query.c_str(), SQL_NTS), "execute query");

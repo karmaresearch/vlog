@@ -1,7 +1,8 @@
 #include <vlog/wizard.h>
 
+#include <kognac/logs.h>
+
 #include <unordered_set>
-#include <boost/log/trivial.hpp>
 
 std::shared_ptr<Program> Wizard::getAdornedProgram(Literal &query, Program &program) {
 
@@ -19,10 +20,10 @@ std::shared_ptr<Program> Wizard::getAdornedProgram(Literal &query, Program &prog
         Literal lit = queries[idxQueries];
 
         //Go through all rules and get the ones which match the query
-        std::vector<Rule> *r = program.getAllRulesByPredicate(lit.getPredicate().getId());
-        for (std::vector<Rule>::iterator itr = r->begin(); itr != r->end();
-                ++itr) {
-            rules.push_back(itr->createAdornment(lit.getPredicate().getAdorment()));
+        auto rulesIds = program.getRulesIDsByPredicate(lit.getPredicate().getId());
+        for (auto ruleId : rulesIds) {
+            rules.push_back(program.getRule(ruleId).
+                    createAdornment(lit.getPredicate().getAdorment()));
         }
 
         //Go through all the new rules and get new queries to process
@@ -74,12 +75,12 @@ Literal Wizard::getMagicRelation(const bool hasPriority, std::shared_ptr<Program
     assert(j == tupleSize);
 
     const PredId_t newpredid = newProgram->getPredicateID(newPred, tupleSize);
-    //BOOST_LOG_TRIVIAL(debug) << "Assigning ID " << (int) newpredid << " to rel " << newPred;
+    //LOG(DEBUGL) << "Assigning ID " << (int) newpredid << " to rel " << newPred;
     uint8_t type = IDB;
     if (hasPriority)
         type += 2; //This activates the magic flag in the predicate
     return Literal(Predicate(newpredid, adornmentNewPred, type,
-                             tupleSize), newTuple);
+                tupleSize), newTuple);
 }
 
 std::shared_ptr<Program> Wizard::doMagic(const Literal &query,
@@ -94,27 +95,29 @@ std::shared_ptr<Program> Wizard::doMagic(const Literal &query,
     for (std::vector<Rule>::iterator itr = originalRules.begin();
             itr != originalRules.end(); ++itr) {
 
-        Literal head = itr->getHead();
+        for (auto head : itr->getHeads()) {
+            Literal magicLiteral = getMagicRelation(true, newProgram, head);
 
-        Literal magicLiteral = getMagicRelation(true, newProgram, head);
+            if (head.getPredicate().getId() == query.getPredicate().getId() &&
+                    head.getPredicate().getAdorment() == query.getPredicate().getAdorment()) {
+                inputOutputRelIDs.first = magicLiteral.getPredicate().getId();
+                foundPredicate = true;
+            }
 
-        if (head.getPredicate().getId() == query.getPredicate().getId() &&
-                head.getPredicate().getAdorment() == query.getPredicate().getAdorment()) {
-            inputOutputRelIDs.first = magicLiteral.getPredicate().getId();
-            foundPredicate = true;
+            std::vector<Literal> newBody;
+            newBody.push_back(magicLiteral);
+            //Add all other body literals
+            for (std::vector<Literal>::const_iterator itrBody = itr->getBody().begin();
+                    itrBody != itr->getBody().end(); ++itrBody) {
+                newBody.push_back(*itrBody);
+            }
+            assert(newBody.size() > 0);
+            std::vector<Literal> heads;
+            heads.push_back(head);
+            Rule r(newRules.size(), heads, newBody);
+            // LOG(DEBUGL) << "Adding rule " << r.tostring();
+            newRules.push_back(r.normalizeVars());
         }
-
-        std::vector<Literal> newBody;
-        newBody.push_back(magicLiteral);
-        //Add all other body literals
-        for (std::vector<Literal>::const_iterator itrBody = itr->getBody().begin();
-                itrBody != itr->getBody().end(); ++itrBody) {
-            newBody.push_back(*itrBody);
-        }
-        assert(newBody.size() > 0);
-	Rule r(head, newBody);
-	// BOOST_LOG_TRIVIAL(debug) << "Adding rule " << r.tostring();
-        newRules.push_back(r.normalizeVars());
     }
 
     //Second pass: create an additional rule for each IDB in the rules body
@@ -123,7 +126,7 @@ std::shared_ptr<Program> Wizard::doMagic(const Literal &query,
     for (std::vector<Rule>::iterator itr = newRules.begin(); itr != newRules.end();
             itr++) {
         int npreds = itr->getNIDBPredicates();
-	BOOST_LOG_TRIVIAL(debug) << "Processing rule " << itr->tostring();
+        LOG(DEBUGL) << "Processing rule " << itr->tostring();
         assert(npreds > 0);
         if (npreds > 1) { //1 is the one we added in the first step.
             for (int i = 1; i < npreds; ++i) {
@@ -145,27 +148,31 @@ std::shared_ptr<Program> Wizard::doMagic(const Literal &query,
                 Literal newHead = getMagicRelation(true, newProgram, itr->getBody()[j]);
                 assert(newBody.size() > 0);
 
-                if (newBody.size() == 1 && newBody[0].getPredicate().getId() == newHead.getPredicate().getId() &&
+                if (newBody.size() == 1 &&
+                        newBody[0].getPredicate().getId() == newHead.getPredicate().getId() &&
                         newBody[0].getPredicate().getType() == newHead.getPredicate().getType() &&
                         newBody[0].getPredicate().getAdorment() == newHead.getPredicate().getAdorment()) {
                 } else {
-		    Rule r(newHead, newBody);
-		    Rule normalized_r(r.normalizeVars());
-		    std::string s = normalized_r.tostring();
-		    bool found = false;
-		    for (auto itr : additionalRulesStrings) {
-			if (itr == s) {
-			    found = true;
-			    break;
-			}
-		    }
-		    if (! found) {
-			additionalRules.push_back(normalized_r);
-			additionalRulesStrings.push_back(s);
-		    } else {
-			BOOST_LOG_TRIVIAL(debug) << "Not adding duplicate rule " << s;
-		    }
-		    // BOOST_LOG_TRIVIAL(debug) << "Adding rule " << r.tostring();
+                    std::vector<Literal> newheads;
+                    newheads.push_back(newHead);
+                    Rule r(newRules.size() + additionalRules.size(), 
+                            newheads, newBody);
+                    Rule normalized_r(r.normalizeVars());
+                    std::string s = normalized_r.tostring();
+                    bool found = false;
+                    for (auto itr : additionalRulesStrings) {
+                        if (itr == s) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (! found) {
+                        additionalRules.push_back(normalized_r);
+                        additionalRulesStrings.push_back(s);
+                    } else {
+                        LOG(DEBUGL) << "Not adding duplicate rule " << s;
+                    }
+                    // LOG(DEBUGL) << "Adding rule " << r.tostring();
                 }
 
             }

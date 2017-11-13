@@ -4,9 +4,6 @@
 #include <vlog/trident/tridentiterator.h>
 #include <kognac/utils.h>
 
-#include <boost/log/trivial.hpp>
-#include <boost/chrono.hpp>
-
 #include <iostream>
 #include <inttypes.h>
 
@@ -20,7 +17,7 @@ bool CompressedColumn::isIn(const Term_t t) const {
 }
 
 std::shared_ptr<Column> CompressedColumn::sort() const {
-    //boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
     std::unique_ptr<ColumnReader> reader = getReader();
     std::vector<Term_t> newValues = reader->asVector();
@@ -28,27 +25,27 @@ std::shared_ptr<Column> CompressedColumn::sort() const {
 
     ColumnWriter writer(newValues);
 
-    //boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    //BOOST_LOG_TRIVIAL(debug) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
+    //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    //LOG(DEBUGL) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
 
     return writer.getColumn();
 }
 
 std::shared_ptr<Column> CompressedColumn::sort_and_unique() const {
-    //boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
     std::unique_ptr<ColumnReader> reader = getReader();
     std::vector<Term_t> newValues = reader->asVector();
     std::sort(newValues.begin(), newValues.end());
-    boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     auto last = std::unique(newValues.begin(), newValues.end());
     newValues.erase(last, newValues.end());
     newValues.shrink_to_fit();
-    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    BOOST_LOG_TRIVIAL(debug) << "Time std::unique = " << sec.count() * 1000 << " size()=" << _size;
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    LOG(DEBUGL) << "Time std::unique = " << sec.count() * 1000 << " size()=" << _size;
 
-    //boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    //BOOST_LOG_TRIVIAL(debug) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
+    //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    //LOG(DEBUGL) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
     return std::shared_ptr<Column>(new InmemoryColumn(newValues, true));
 }
 
@@ -57,7 +54,7 @@ std::shared_ptr<Column> CompressedColumn::sort(const int nthreads) const {
         return sort();
     }
 
-    //boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
     std::unique_ptr<ColumnReader> reader = getReader();
     std::vector<Term_t> newValues = reader->asVector();
@@ -69,8 +66,8 @@ std::shared_ptr<Column> CompressedColumn::sort(const int nthreads) const {
     }
 
     ColumnWriter writer(newValues);
-    //boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    //BOOST_LOG_TRIVIAL(debug) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
+    //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    //LOG(DEBUGL) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
     return writer.getColumn();
 
 }
@@ -91,7 +88,7 @@ std::shared_ptr<Column> CompressedColumn::sort_and_unique(const int nthreads) co
     }
 
     CompressedColumn *col = new CompressedColumn(newblocks, newsize);
-    //boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
     std::unique_ptr<ColumnReader> reader = col->getReader();
     std::vector<Term_t> newValues = reader->asVector();
@@ -103,21 +100,21 @@ std::shared_ptr<Column> CompressedColumn::sort_and_unique(const int nthreads) co
         std::sort(newValues.begin(), newValues.end());
     }
 
-    boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     auto last = std::unique(newValues.begin(), newValues.end());
     newValues.erase(last, newValues.end());
     newValues.shrink_to_fit();
-    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    BOOST_LOG_TRIVIAL(debug) << "Time std::unique = " << sec.count() * 1000 << " size()=" << _size;
-    //boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    //BOOST_LOG_TRIVIAL(debug) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    LOG(DEBUGL) << "Time std::unique = " << sec.count() * 1000 << " size()=" << _size;
+    //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    //LOG(DEBUGL) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
     return std::shared_ptr<Column>(new InmemoryColumn(newValues, true));
 }
 
 std::shared_ptr<Column> CompressedColumn::unique() const {
     //This method assumes the vector is already sorted
     //Therefore, I only need to reset all 0 delta blocks
-    boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     auto newblocks = blocks;
     size_t newsize = _size;
     for (auto &el : newblocks) {
@@ -126,8 +123,8 @@ std::shared_ptr<Column> CompressedColumn::unique() const {
             el.size = 0;
         }
     }
-    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    BOOST_LOG_TRIVIAL(debug) << "Time CompressedColumn::unique = " << sec.count() * 1000 << " size()=" << _size;
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    LOG(DEBUGL) << "Time CompressedColumn::unique = " << sec.count() * 1000 << " size()=" << _size;
     return std::shared_ptr<Column>(new CompressedColumn(newblocks, newsize));
 }
 
@@ -267,7 +264,7 @@ size_t EDBColumn::size() const {
         if (l.getNVars() == 2) {
             retval = layer.getCardinalityColumn(*query.getLiteral(), posColumn);
         } else {
-            BOOST_LOG_TRIVIAL(warning) << "Must go through all the column"
+            LOG(WARNL) << "Must go through all the column"
                                        " to count the size";
             retval = EDBColumnReader(l, posColumn, presortPos, layer, unq).size();
         }
@@ -275,9 +272,9 @@ size_t EDBColumn::size() const {
 #if DEBUG
     size_t sz = getReader()->asVector().size();
     if (sz != retval) {
-        BOOST_LOG_TRIVIAL(debug) << "query = " << l.tostring();
-        BOOST_LOG_TRIVIAL(debug) << "sz = " << sz << ", should be " << retval;
-        BOOST_LOG_TRIVIAL(debug) << "unq = " << unq << ", l.getNVars = " << (int) l.getNVars();
+        LOG(DEBUGL) << "query = " << l.tostring();
+        LOG(DEBUGL) << "sz = " << sz << ", should be " << retval;
+        LOG(DEBUGL) << "unq = " << unq << ", l.getNVars = " << (int) l.getNVars();
         throw 10;
     }
 #endif
@@ -388,7 +385,7 @@ std::vector<Term_t> EDBColumnReader::load(const Literal &l,
         const std::vector<uint8_t> presortPos,
         EDBLayer & layer, const bool unq) {
 
-    boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     std::vector<uint8_t> fields;
     for (int i = 0; i < presortPos.size(); ++i) {
         fields.push_back(presortPos[i]);
@@ -454,8 +451,8 @@ std::vector<Term_t> EDBColumnReader::load(const Literal &l,
     }
 
     layer.releaseIterator(itr);
-    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    BOOST_LOG_TRIVIAL(debug) << "Time loading a vector of " << values.size() << " is " << sec.count() * 1000;
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    LOG(DEBUGL) << "Time loading a vector of " << values.size() << " is " << sec.count() * 1000;
     return values;
 }
 
@@ -543,7 +540,7 @@ std::shared_ptr<Column> ColumnWriter::getColumn() {
 
 #ifdef USE_COMPRESSED_COLUMNS
     if (compressed) {
-        BOOST_LOG_TRIVIAL(debug) << "ColumnWriter::getColumn: blocks.size() = " << blocks.size() << ", _size = " << _size;
+        LOG(DEBUGL) << "ColumnWriter::getColumn: blocks.size() = " << blocks.size() << ", _size = " << _size;
 
         if (blocks.size() < _size / 5) {
             cachedColumn = std::shared_ptr<Column>(new CompressedColumn(
@@ -642,7 +639,7 @@ void Column::intersection(std::shared_ptr<Column> c1,
     // long count2 = ok2 ? 1 : 0;
     // long countout = 0;
 
-    //boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
 
     for (;;) {
@@ -673,8 +670,8 @@ void Column::intersection(std::shared_ptr<Column> c1,
             // count2++;
         }
     }
-    //boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    //BOOST_LOG_TRIVIAL(info) << "Count1=" << count1 << " Count2=" << count2 <<
+    //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    //LOG(INFOL) << "Count1=" << count1 << " Count2=" << count2 <<
     //                        " countout=" << countout << " " << sec.count() * 1000;
 }
 
@@ -738,7 +735,7 @@ uint64_t Column::countMatches(
 
     long countout = 0;
 
-    //boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
     while (ok1 && ok2) {
         if (v1 < v2) {
@@ -756,7 +753,7 @@ uint64_t Column::countMatches(
             }
         }
     }
-    //boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
+    //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     return countout;
 }
 
@@ -776,9 +773,9 @@ bool Column::subsumes(
         v2 = r2->next();
 
     while (ok1 && ok2) {
-        // BOOST_LOG_TRIVIAL(debug) << "v1 = " << v1 << ", v2 = " << v2;
+        // LOG(DEBUGL) << "v1 = " << v1 << ", v2 = " << v2;
         if (v1 > v2) {
-            // BOOST_LOG_TRIVIAL(debug) << "subsumes returns false";
+            // LOG(DEBUGL) << "subsumes returns false";
             return false;
         }
         if (v1 == v2) {
@@ -797,6 +794,6 @@ bool Column::subsumes(
             }
         }
     }
-    // BOOST_LOG_TRIVIAL(debug) << "subsumes returns: ok2 = " << ok2 << ", return " << (! ok2);
+    // LOG(DEBUGL) << "subsumes returns: ok2 = " << ok2 << ", return " << (! ok2);
     return ! ok2;
 }

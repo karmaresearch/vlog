@@ -8,7 +8,7 @@
 TridentTupleItr::TridentTupleItr() {}
 
 void TridentTupleItr::init(Querier *querier, const VTuple *t,
-                           const std::vector<uint8_t> *fieldsToSort, bool onlyVars, boost::mutex *mutex) {
+        const std::vector<uint8_t> *fieldsToSort, bool onlyVars, std::mutex *mutex) {
 
     this->mutex = mutex;
     // this->onlyVars = onlyVars;
@@ -47,15 +47,15 @@ void TridentTupleItr::init(Querier *querier, const VTuple *t,
         for (std::vector<uint8_t>::const_iterator itr = fieldsToSort->begin();
                 itr != fieldsToSort->end(); ++itr) {
             switch (*itr) {
-            case 0:
-                s = varid--;
-                break;
-            case 1:
-                p = varid--;
-                break;
-            case 2:
-                o = varid--;
-                break;
+                case 0:
+                    s = varid--;
+                    break;
+                case 1:
+                    p = varid--;
+                    break;
+                case 2:
+                    o = varid--;
+                    break;
             }
         }
         idx = querier->getIndex(s, p, o);
@@ -101,7 +101,7 @@ void TridentTupleItr::init(Querier *querier, const VTuple *t,
 
 bool TridentTupleItr::checkFields() {
     for (std::vector<std::pair<uint8_t, uint8_t>>::const_iterator itr =
-                equalFields.begin();
+            equalFields.begin();
             itr != equalFields.end(); ++itr) {
         if (getElementAt(itr->first) != getElementAt(itr->second)) {
             return false;
@@ -150,21 +150,21 @@ uint64_t TridentTupleItr::getElementAt(const int p) {
     const uint8_t pos = varsPos[p];
 
     switch (pos) {
-    case 0:
-        return physIterator->getKey();
-    case 1:
-        return physIterator->getValue1();
-    case 2:
-        return physIterator->getValue2();
+        case 0:
+            return physIterator->getKey();
+        case 1:
+            return physIterator->getValue1();
+        case 2:
+            return physIterator->getValue2();
     }
-    BOOST_LOG_TRIVIAL(error) << "This should not happen";
+    LOG(ERRORL) << "This should not happen";
     throw 10;
 }
 
 TridentTupleItr::~TridentTupleItr() {
     if (querier != NULL) {
         if (mutex != NULL) {
-            boost::mutex::scoped_lock lock(*mutex);
+            std::lock_guard<std::mutex> lock(*mutex);
             querier->releaseItr(physIterator);
         } else {
             querier->releaseItr(physIterator);
@@ -174,7 +174,7 @@ TridentTupleItr::~TridentTupleItr() {
 
 void TridentTupleItr::clear() {
     if (mutex != NULL) {
-        boost::mutex::scoped_lock lock(*mutex);
+        std::lock_guard<std::mutex> lock(*mutex);
         if (querier != NULL) {
             querier->releaseItr(physIterator);
         }
@@ -192,22 +192,22 @@ const char* TridentTupleItr::getUnderlyingArray(uint8_t column) {
     // return NULL;
     const uint8_t pos = varsPos[column];
     if (pos == 0 || nvars == 3) {
-    // Can happen if asking for TE(?,?,?)
-	return NULL;
+        // Can happen if asking for TE(?,?,?)
+        return NULL;
     }
     switch (pos) {
-    case 1:
-	return ((NewColumnTable*)physIterator)->getUnderlyingArray(1);
-    case 2:
-	return ((NewColumnTable*)physIterator)->getUnderlyingArray(2);
+        case 1:
+            return ((NewColumnTable*)physIterator)->getUnderlyingArray(1);
+        case 2:
+            return ((NewColumnTable*)physIterator)->getUnderlyingArray(2);
     }
-    BOOST_LOG_TRIVIAL(error) << "This should not happen";
+    LOG(ERRORL) << "This should not happen";
     throw 10;
 }
 
 size_t TridentTupleItr::getCardinality() {
     if (mutex != NULL) {
-        boost::mutex::scoped_lock lock(*mutex);
+        std::lock_guard<std::mutex> lock(*mutex);
         NewColumnTable *nct = (NewColumnTable*) physIterator;
         return nct->getCardinality();
     }
@@ -220,13 +220,13 @@ std::pair<uint8_t, std::pair<uint8_t, uint8_t>> TridentTupleItr::getSizeElemUnde
     const uint8_t pos = varsPos[column];
     NewColumnTable *nct = (NewColumnTable*) physIterator;
     switch (pos) {
-    case 0:
-	throw 10;
-    case 1:
-	return make_pair(nct->getReaderSize1(), std::make_pair(nct->getReaderCountSize(), nct->getReaderStartingPointSize()));
-    case 2:
-	return make_pair(nct->getReaderSize2(), std::make_pair(0, 0));
+        case 0:
+            throw 10;
+        case 1:
+            return make_pair(nct->getReaderSize1(), std::make_pair(nct->getReaderCountSize(), nct->getReaderStartingPointSize()));
+        case 2:
+            return make_pair(nct->getReaderSize2(), std::make_pair(0, 0));
     }
-    BOOST_LOG_TRIVIAL(error) << "This should not happen";
+    LOG(ERRORL) << "This should not happen";
     throw 10;
 }

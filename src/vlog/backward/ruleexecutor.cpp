@@ -5,7 +5,7 @@
 
 #include <trident/model/table.h>
 
-RuleExecutor::RuleExecutor(Rule &rule, uint8_t headAdornment
+RuleExecutor::RuleExecutor(const Rule &rule, uint8_t headAdornment
                            , Program *program,
                            EDBLayer &layer
                           ) :
@@ -29,7 +29,7 @@ void RuleExecutor::calculateJoinsSizeIntermediateRelations() {
 
     int nBoundInAdornment = 0;
     int nBoundVarInAdornment = 0;
-    Literal head = adornedRule.getHead();
+    Literal head = adornedRule.getFirstHead();
     uint8_t headAdornment = head.getPredicate().getAdorment();
     for (size_t i = 0; i < head.getTupleSize(); ++i) {
         if (headAdornment >> i & 1) {
@@ -161,7 +161,7 @@ void RuleExecutor::calculateJoinsSizeIntermediateRelations() {
                 k++;
             }
             if (!found) {
-                BOOST_LOG_TRIVIAL(error) << "Variable not found!";
+                LOG(ERRORL) << "Variable not found!";
                 throw 10;
             }
         }
@@ -196,24 +196,24 @@ bool RuleExecutor::isUnifiable(const Term_t * const value, const size_t sizeTupl
                                const size_t *posInAdorment, const EDBLayer &layer) {
     //Check with the head of the rule to see whether there is a match
 
-    // BOOST_LOG_TRIVIAL(debug) << "isUnifiable: adornedRule = " << adornedRule.tostring();
+    // LOG(DEBUGL) << "isUnifiable: adornedRule = " << adornedRule.tostring();
     for (size_t i = 0; i < sizeTuple; ++i) {
         size_t pos = posInAdorment[i];
-        VTerm t = adornedRule.getHead().getTermAtPos(pos);
+        VTerm t = adornedRule.getFirstHead().getTermAtPos(pos);
         if (!t.isVariable()) {
-            // BOOST_LOG_TRIVIAL(debug) << "isUnifiable: value check: " << t.getValue() << ", " << value[i];
+            // LOG(DEBUGL) << "isUnifiable: value check: " << t.getValue() << ", " << value[i];
             if (t.getValue() != value[i]) {
-                // BOOST_LOG_TRIVIAL(debug) << "not unifiable";
+                // LOG(DEBUGL) << "not unifiable";
                 return false;
             }
         } else {
 #ifdef PRUNING_QSQR
             for (std::vector<std::pair<uint8_t, std::pair<uint8_t, uint8_t>>>::iterator itr = headVarsInEDB.begin();
                     itr != headVarsInEDB.end(); ++itr) {
-                // BOOST_LOG_TRIVIAL(debug) << "isUnifiable: pruning check, itr->first = " << (int) itr->first << ", pos = " << (int) pos;
+                // LOG(DEBUGL) << "isUnifiable: pruning check, itr->first = " << (int) itr->first << ", pos = " << (int) pos;
                 if (itr->first == pos && !layer.checkValueInTmpRelation(itr->second.first,
                         itr->second.second, value[i])) {
-                    // BOOST_LOG_TRIVIAL(debug) << "not unifiable";
+                    // LOG(DEBUGL) << "not unifiable";
                     return false;
                 }
             }
@@ -224,18 +224,18 @@ bool RuleExecutor::isUnifiable(const Term_t * const value, const size_t sizeTupl
     //If the head has repeated variables, and these are not instantiated
     //correctly by the tuple, then this is not instantiable.
     if (repeatedBoundVarsInHead.size() != 0) {
-        // BOOST_LOG_TRIVIAL(debug) << "isUnifiable: repeatedbounds check";
+        // LOG(DEBUGL) << "isUnifiable: repeatedbounds check";
         for (size_t i = 0; i < repeatedBoundVarsInHead.size(); ++i) {
             std::pair<int, int> pair = repeatedBoundVarsInHead[i];
-            // BOOST_LOG_TRIVIAL(debug) << "value1 = " << value[pair.first] << ", value2 = " << value[pair.second];
+            // LOG(DEBUGL) << "value1 = " << value[pair.first] << ", value2 = " << value[pair.second];
             if (value[pair.first] != value[pair.second]) {
-                // BOOST_LOG_TRIVIAL(debug) << "not unifiable";
+                // LOG(DEBUGL) << "not unifiable";
                 return false;
             }
         }
     }
 
-    // BOOST_LOG_TRIVIAL(debug) << "unifiable!";
+    // LOG(DEBUGL) << "unifiable!";
     return true;
 }
 
@@ -356,7 +356,7 @@ size_t RuleExecutor::estimateRule(const int depth, const uint8_t bodyAtom,
                 supplRelations[bodyAtom + 1]->addTuple(retrievedBindings->getRow(i));
             }
         } else {
-            BOOST_LOG_TRIVIAL(error) << "Need to perform the cardinal product. Not yet supported";
+            LOG(ERRORL) << "Need to perform the cardinal product. Not yet supported";
             throw 10;
         }
     }
@@ -373,7 +373,7 @@ void RuleExecutor::evaluateRule(const uint8_t bodyAtom,
 
     Literal l(adornedRule.getBody()[bodyAtom]);
 
-    // BOOST_LOG_TRIVIAL(debug) << "evaluateRule: literal = " << l.tostring(program, &layer);
+    // LOG(DEBUGL) << "evaluateRule: literal = " << l.tostring(program, &layer);
 
     //Do the computation to produce bindings for the next suppl. relation.
     uint8_t nCurrentJoins = this->njoins[bodyAtom];
@@ -391,10 +391,10 @@ void RuleExecutor::evaluateRule(const uint8_t bodyAtom,
 
     QSQQuery query(l);
     if (l.getPredicate().getType() == EDB) {
-        //BOOST_LOG_TRIVIAL(debug) << "Atom " << (int)bodyAtom << " is EDB";
+        //LOG(DEBUGL) << "Atom " << (int)bodyAtom << " is EDB";
         retrievedBindings = new TupleTable(l.getNVars());
-        //boost::chrono::system_clock::time_point startEDB =
-        //    boost::chrono::system_clock::now();
+        //std::chrono::system_clock::time_point startEDB =
+        //    std::chrono::system_clock::now();
         if (nCurrentJoins > 0) {
             std::vector<Term_t> bindings = supplRelations[bodyAtom]->
                                            getUniqueSortedProjection(
@@ -410,12 +410,12 @@ void RuleExecutor::evaluateRule(const uint8_t bodyAtom,
         } else {
             layer.query(&query, retrievedBindings, NULL, NULL);
         }
-        //durationEDB += boost::chrono::system_clock::now() - startEDB;
-        // BOOST_LOG_TRIVIAL(debug) << "EDB, query " << query.tostring() << ", retrieved " << retrievedBindings->getNRows();
+        //durationEDB += std::chrono::system_clock::now() - startEDB;
+        // LOG(DEBUGL) << "EDB, query " << query.tostring() << ", retrieved " << retrievedBindings->getNRows();
     } else {
         //Copy in input the query that we are about to launch
         BindingsTable *table = qsqr->getInputTable(query.getLiteral()->getPredicate());
-        //BOOST_LOG_TRIVIAL(debug) << "ENRICH TABLE " << table->getNTuples();
+        //LOG(DEBUGL) << "ENRICH TABLE " << table->getNTuples();
         size_t offsetInput = table->getNTuples();
         if (posFromSupplRelation[bodyAtom].size() == 0) {
             if (posFromLiteral[bodyAtom].size() == 0) {
@@ -499,7 +499,7 @@ void RuleExecutor::evaluateRule(const uint8_t bodyAtom,
                 supplRelations[bodyAtom + 1]->addTuple(retrievedBindings->getRow(i));
             }
         } else {
-            BOOST_LOG_TRIVIAL(error) << "Need to perform the cardinal product. Not yet supported";
+            LOG(ERRORL) << "Need to perform the cardinal product. Not yet supported";
             throw 10;
         }
     }
@@ -532,7 +532,7 @@ void RuleExecutor::printLineage(std::vector<LineageInfo> &lineage) {
 
 size_t RuleExecutor::estimate(const int depth, BindingsTable * input,/* size_t offsetInput,*/ QSQR * qsqr,
                               EDBLayer &layer) {
-    BOOST_LOG_TRIVIAL(debug) << "Estimating rule " << adornedRule.tostring(NULL,NULL) << ", depth = " << depth;
+    LOG(DEBUGL) << "Estimating rule " << adornedRule.tostring(NULL,NULL) << ", depth = " << depth;
     size_t output = 0;
     //if (input->getNTuples() > offsetInput) {
     //Get the new tuples. All the tuples that merge with the head of the
@@ -552,7 +552,7 @@ size_t RuleExecutor::estimate(const int depth, BindingsTable * input,/* size_t o
         uint8_t bodyAtomIdx = 0;
 	output = 1;
         do {
-            //BOOST_LOG_TRIVIAL(info) << "Atom " << (int) bodyAtomIdx;
+            //LOG(INFOL) << "Atom " << (int) bodyAtomIdx;
 	    uint8_t nCurrentJoins = this->njoins[bodyAtomIdx];
 	    size_t r = estimateRule(depth, bodyAtomIdx, supplRelations, qsqr, layer);
             if (nCurrentJoins != 0) {
@@ -560,7 +560,7 @@ size_t RuleExecutor::estimate(const int depth, BindingsTable * input,/* size_t o
             } else {
                 output *= r;
             }
-	    BOOST_LOG_TRIVIAL(debug) << "Atom: " << (int) bodyAtomIdx << ", estimate: " << r << ", output: " << output;
+	    LOG(DEBUGL) << "Atom: " << (int) bodyAtomIdx << ", estimate: " << r << ", output: " << output;
 	    bodyAtomIdx++;
         } while (output != 0 && bodyAtomIdx < adornedRule.getBody().size()
                  && supplRelations[bodyAtomIdx]->getNTuples() > 0);
@@ -573,7 +573,7 @@ size_t RuleExecutor::estimate(const int depth, BindingsTable * input,/* size_t o
     // Leaked supplRelations. Added line below. --Ceriel
     deleteSupplRelations(supplRelations);
     //}
-    BOOST_LOG_TRIVIAL(debug) << "Estimate for rule " << adornedRule.tostring(program,&layer) << ", depth = " << depth << " = " << output;
+    LOG(DEBUGL) << "Estimate for rule " << adornedRule.tostring(program,&layer) << ", depth = " << depth << " = " << output;
     return output;
 }
 
@@ -582,15 +582,15 @@ void RuleExecutor::copyLastRelInAnswers(QSQR *qsqr,
                                         BindingsTable **supplRelations,
                                         BindingsTable *lastSupplRelation) {
     if (nTuples > 0) {
-        Literal l = adornedRule.getHead();
+        Literal l = adornedRule.getFirstHead();
         BindingsTable *answer = qsqr->getAnswerTable(&l);
 
         //Copy the head in the tuple
         Term_t tuple[SIZETUPLE];
         uint8_t nvars = 0;
         uint8_t posVars[SIZETUPLE];
-        for (uint8_t i = 0; i < adornedRule.getHead().getTupleSize(); ++i) {
-            VTerm t = adornedRule.getHead().getTermAtPos(i);
+        for (uint8_t i = 0; i < adornedRule.getFirstHead().getTupleSize(); ++i) {
+            VTerm t = adornedRule.getFirstHead().getTermAtPos(i);
             if (t.isVariable()) {
                 posVars[nvars++] = i;
             } else {
@@ -645,7 +645,7 @@ void RuleExecutor::evaluate(BindingsTable * input, size_t offsetInput,
             BindingsTable *lastSupplRelation = supplRelations[adornedRule.getBody().size()];
             size_t nTuples = lastSupplRelation->getNTuples();
             if (nTuples > 10000) {
-                BOOST_LOG_TRIVIAL(warning) << "The last supplRelation contains " << nTuples;
+                LOG(WARNL) << "The last supplRelation contains " << nTuples;
             }
 
             copyLastRelInAnswers(qsqr, nTuples, supplRelations,
@@ -690,7 +690,7 @@ void RuleExecutor::processTask(QSQR_Task *t) {
             BindingsTable *lastSupplRelation = task.supplRelations[sz];
             size_t nTuples = lastSupplRelation->getNTuples();
             if (nTuples > 10000) {
-                BOOST_LOG_TRIVIAL(debug) << "The last supplRelation contains " << nTuples;
+                LOG(DEBUGL) << "The last supplRelation contains " << nTuples;
             }
             copyLastRelInAnswers(task.qsqr, nTuples, task.supplRelations,
                                  lastSupplRelation);
@@ -698,7 +698,7 @@ void RuleExecutor::processTask(QSQR_Task *t) {
         }
         break;
     case RULE_QUERY: {
-        //BOOST_LOG_TRIVIAL(debug) << "Process RULE_QUERY";
+        //LOG(DEBUGL) << "Process RULE_QUERY";
         Literal l(adornedRule.getBody()[task.currentRuleIndex]);
         QSQQuery query(l);
         BindingsTable *answer = task.qsqr->getAnswerTable(query.getLiteral());

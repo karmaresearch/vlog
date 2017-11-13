@@ -9,7 +9,7 @@ std::vector<std::shared_ptr<Column>> SQLTable::checkNewIn(const Literal &l1,
                                   const Literal &l2,
 std::vector<uint8_t> &posInL2) {
 
-    BOOST_LOG_TRIVIAL(debug) << "checkNewIn version 1";
+    LOG(DEBUGL) << "checkNewIn version 1";
     std::vector<uint8_t> posVars1 = l1.getPosVars();
     std::vector<uint8_t> fieldsToSort1;
     for (int i = 0; i < posInL1.size(); i++) {
@@ -107,7 +107,7 @@ std::vector<std::shared_ptr<Column>> SQLTable::checkNewIn(
                                       const Literal &l,
 std::vector<uint8_t> &posInL) {
 
-    BOOST_LOG_TRIVIAL(debug) << "checkNewIn version 2";
+    LOG(DEBUGL) << "checkNewIn version 2";
 
     std::vector<uint8_t> posVars = l.getPosVars();
     std::vector<uint8_t> fieldsToSort;
@@ -262,7 +262,7 @@ std::shared_ptr<Column> SQLTable::checkIn(
     size_t &sizeOutput) {
 
     if (l.getNVars() == 0 || l.getNVars() == l.getTupleSize()) {
-	BOOST_LOG_TRIVIAL(error) << "SQLTable::checkIn() with getNVars() == " << l.getNVars() << " is not supported.";
+	LOG(ERRORL) << "SQLTable::checkIn() with getNVars() == " << l.getNVars() << " is not supported.";
 	throw 10;
     }
 

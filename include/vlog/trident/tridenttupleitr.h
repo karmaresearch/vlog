@@ -4,13 +4,13 @@
 #include <trident/iterators/tupleiterators.h>
 #include <trident/iterators/pairitr.h>
 
-#include <boost/thread/mutex.hpp>
+#include <mutex>
 
 class VTuple;
 class Querier;
 class TridentTupleItr : public TupleIterator {
 private:
-    boost::mutex *mutex;
+    std::mutex *mutex;
     Querier *querier;
     PairItr *physIterator;
     int idx;
@@ -46,12 +46,12 @@ public:
     }
 
     void init(Querier *querier, const VTuple *literal,
-              const std::vector<uint8_t> *fieldsToSort, boost::mutex *mutex) {
+              const std::vector<uint8_t> *fieldsToSort, std::mutex *mutex) {
         init(querier, literal, fieldsToSort, false, mutex);
     }
 
     void init(Querier *querier, const VTuple *literal,
-              const std::vector<uint8_t> *fieldsToSort, bool onlyVars, boost::mutex *mutex);
+              const std::vector<uint8_t> *fieldsToSort, bool onlyVars, std::mutex *mutex);
 
     bool hasNext();
 

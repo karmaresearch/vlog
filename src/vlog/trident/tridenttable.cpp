@@ -110,7 +110,7 @@ std::vector<uint8_t> &pos2) {
 
     //Do some checks
     if (l1.getNVars() == 0 || l1.getNVars() == 3) {
-        BOOST_LOG_TRIVIAL(error) << "These cases are not supported.";
+        LOG(ERRORL) << "These cases are not supported.";
         throw 10;
     }
 
@@ -635,7 +635,7 @@ std::shared_ptr<Column> TridentTable::checkIn(
 
 //Do some checks
     if (l.getNVars() == 0 || l.getNVars() == 3) {
-        BOOST_LOG_TRIVIAL(error) << "These cases are not supported.";
+        LOG(ERRORL) << "These cases are not supported.";
         throw 10;
     }
 
@@ -735,7 +735,7 @@ size_t TridentTable::getCardinality(const Literal &query) {
     if (query.getNUniqueVars() < query.getNVars()) {
         result = result / 10;   // ???
     }
-    // BOOST_LOG_TRIVIAL(debug) << "getCardinality, query = " << query.tostring(NULL, NULL) << ", result = " << result;
+    // LOG(DEBUGL) << "getCardinality, query = " << query.tostring(NULL, NULL) << ", result = " << result;
     return result;
 }
 
@@ -771,7 +771,7 @@ size_t TridentTable::estimateCardinality(const Literal &query) {
     if (query.getNUniqueVars() < query.getNVars()) {
         result = result / 10;   // ???
     }
-    // BOOST_LOG_TRIVIAL(debug) << "EstimateCardinality, query = " << query.tostring(NULL, NULL) << ", result = " << result;
+    // LOG(DEBUGL) << "EstimateCardinality, query = " << query.tostring(NULL, NULL) << ", result = " << result;
     return result;
 }
 
@@ -822,7 +822,7 @@ bool TridentTable::isEmpty(const Literal &query,
         mutex.unlock();
     }
     /*
-    BOOST_LOG_TRIVIAL(debug) << "isEmpty, query = " << query.tostring(NULL, NULL)
+    LOG(DEBUGL) << "isEmpty, query = " << query.tostring(NULL, NULL)
                              << "posToFilter, s, p, o = " << (posToFilter != NULL) << ", " << s << ", " << p << ", " << o
                              << ", result = " << retval;
     */
@@ -869,7 +869,7 @@ size_t TridentTable::getCardinalityColumn(const Literal &query,
     if (multithreaded) {
         mutex.unlock();
     }
-    // BOOST_LOG_TRIVIAL(debug) << "getCardinalityColumn, query = " << query.tostring(NULL, NULL)
+    // LOG(DEBUGL) << "getCardinalityColumn, query = " << query.tostring(NULL, NULL)
     //                          << ", posColumn = " << (int) posColumn << ", result = " << result;
     return result;
 }
@@ -879,7 +879,7 @@ void TridentTable::query(QSQQuery *query, TupleTable *outputTable,
                          std::vector<Term_t> *valuesToFilter) {
     if (query->getNRepeatedVars() > 0 && posToFilter != 0 &&
             posToFilter->size() > 0) {
-        BOOST_LOG_TRIVIAL(error) << "Not (yet) supported";
+        LOG(ERRORL) << "Not (yet) supported";
         throw 10;
     }
     if (posToFilter == NULL || posToFilter->size() == 0) {
@@ -891,7 +891,7 @@ void TridentTable::query(QSQQuery *query, TupleTable *outputTable,
         getQueryFromEDBRelation3(query, outputTable,
                                  valuesToFilter);
     }
-    // BOOST_LOG_TRIVIAL(debug) << "query, query = " << query->tostring()
+    // LOG(DEBUGL) << "query, query = " << query->tostring()
     //                          << ", positionsToFilter = " << (posToFilter != NULL && posToFilter->size() > 0)
     //                          << ", result size = " << outputTable->getNRows();
 }
@@ -909,7 +909,7 @@ TridentIterator *TridentTable::getTridentIter() {
 
 EDBIterator *TridentTable::getIterator(const Literal &query) {
     const Literal *literal = &query;
-    // BOOST_LOG_TRIVIAL(debug) << "Get iterator for query " << literal->tostring(NULL, NULL);
+    // LOG(DEBUGL) << "Get iterator for query " << literal->tostring(NULL, NULL);
     TridentIterator *itr = getTridentIter();
     itr->init(query.getPredicate().getId(), q, *literal, multithreaded ? &mutex : NULL);
     return itr;
@@ -918,7 +918,7 @@ EDBIterator *TridentTable::getIterator(const Literal &query) {
 EDBIterator *TridentTable::getSortedIterator(const Literal &query,
         const std::vector<uint8_t> &fields) {
     const Literal *literal = &query;
-    // BOOST_LOG_TRIVIAL(debug) << "Get sorted iterator for query " << literal->tostring(NULL, NULL);
+    // LOG(DEBUGL) << "Get sorted iterator for query " << literal->tostring(NULL, NULL);
     TridentIterator *itr = getTridentIter();
     itr->init(query.getPredicate().getId(), q, *literal, fields, multithreaded ? &mutex : NULL);
     return itr;

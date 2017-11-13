@@ -21,31 +21,29 @@ struct RuleExecutionDetails {
     std::vector<std::pair<uint8_t,
         std::vector<std::pair<uint8_t, uint8_t>>>> edbLiteralPerHeadVars;
 
+
     RuleExecutionDetails(Rule rule, size_t ruleid) : rule(rule), ruleid(ruleid) {}
 
     void createExecutionPlans();
 
     void calculateNVarsInHeadFromEDB();
 
-    static void checkWhetherEDBsRedundantHead(RuleExecutionPlan &plan, const Literal &head);
+    //static void checkWhetherEDBsRedundantHead(RuleExecutionPlan &plan,
+    //        const Literal &head);
 
-    static void checkFilteringStrategy(RuleExecutionPlan &outputPlan, const Literal &lastLiteral, const Literal &head);
+    static void checkFilteringStrategy(const Literal &lastLiteral,
+            const Literal &head, RuleExecutionPlan &hv);
 
-private:
+    private:
 
     void rearrangeLiterals(std::vector<const Literal*> &vector, const size_t idx);
 
     void groupLiteralsBySharedVariables(std::vector<uint8_t> &startVars,
-                                        std::vector<const Literal *> &set, std::vector<const Literal*> &leftelements);
+            std::vector<const Literal *> &set,
+            std::vector<const Literal*> &leftelements);
 
-    void extractAllEDBPatterns(std::vector<const Literal*> &output, const std::vector<Literal> &input);
-
-/*
-  Commented out. It is private, and does not assign! --Ceriel
-    RuleExecutionDetails operator=(const RuleExecutionDetails &other) {
-        return RuleExecutionDetails(other.rule, other.ruleid);
-    }
-*/
+    void extractAllEDBPatterns(std::vector<const Literal*> &output,
+            const std::vector<Literal> &input);
 };
 
 

@@ -78,7 +78,7 @@ ODBCIterator::ODBCIterator(SQLHANDLE con, string tableName,
 	posFirstVar = -1;
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SQL query: " << sqlQuery;
+    LOG(DEBUGL) << "SQL query: " << sqlQuery;
 
     ODBCTable::check(SQLAllocHandle(SQL_HANDLE_STMT, con, &stmt), "allocate statement handle");
     ODBCTable::check(SQLExecDirectA(stmt, (SQLCHAR *) sqlQuery.c_str(), SQL_NTS), "execute query");
@@ -117,7 +117,7 @@ ODBCIterator::ODBCIterator(SQLHANDLE con, string sqlQuery,
 	posFirstVar = -1;
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "SQL query: " << sqlQuery;
+    LOG(DEBUGL) << "SQL query: " << sqlQuery;
 
     ODBCTable::check(SQLAllocHandle(SQL_HANDLE_STMT, con, &stmt), "allocate statement handle");
     ODBCTable::check(SQLExecDirectA(stmt, (SQLCHAR *) sqlQuery.c_str(), SQL_NTS), "execute query");
@@ -161,16 +161,16 @@ bool ODBCIterator::hasNext() {
 	hasNextValue = stop;
     }
     hasNextChecked = true;
-    // BOOST_LOG_TRIVIAL(debug) << "ODBCIterator::hasNext(): skipDuplicatedFirst = " << skipDuplicatedFirst << ", returns " << hasNextValue;
+    // LOG(DEBUGL) << "ODBCIterator::hasNext(): skipDuplicatedFirst = " << skipDuplicatedFirst << ", returns " << hasNextValue;
     return hasNextValue;
 }
 
 void ODBCIterator::next() {
     if (! hasNextChecked) {
-	BOOST_LOG_TRIVIAL(error) << "ODBCIterator::next called without hasNext check";
+	LOG(ERRORL) << "ODBCIterator::next called without hasNext check";
 	throw 10;
     }
-    // BOOST_LOG_TRIVIAL(debug) << "ODBCIterator::next()";
+    // LOG(DEBUGL) << "ODBCIterator::next()";
     if (isFirst) {
         isFirst = false;
     }
@@ -194,7 +194,7 @@ void ODBCIterator::skipDuplicatedFirstColumn() {
 }
 
 Term_t ODBCIterator::getElementAt(const uint8_t p) {
-    // BOOST_LOG_TRIVIAL(debug) << "ODBCIterator::getElementAt()";
+    // LOG(DEBUGL) << "ODBCIterator::getElementAt()";
     if (indicator[p] != SQL_NULL_DATA) {
 	return values[p];
     }

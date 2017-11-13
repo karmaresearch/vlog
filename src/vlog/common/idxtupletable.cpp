@@ -13,7 +13,7 @@ IndexedTupleTable::IndexedTupleTable(TupleTable *table) : sizeTuple((uint8_t) ta
     spo = pos = osp = NULL;
 
     if (sizeTuple == 0 || sizeTuple > 3) {
-        BOOST_LOG_TRIVIAL(error) << "Not supported";
+        LOG(ERRORL) << "Not supported";
         throw 10;
     }
 

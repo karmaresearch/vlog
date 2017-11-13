@@ -5,9 +5,6 @@
 
 #include <trident/model/table.h>
 
-#include <boost/thread.hpp>
-#include <boost/tokenizer.hpp>
-
 #include <fstream>
 #include <string>
 #include <unistd.h>
@@ -15,8 +12,6 @@
 
 #include <sys/types.h>
 #include <sys/wait.h>
-
-namespace timens = boost::chrono;
 
 void Materialization::loadLiteralsFromFile(Program &p, std::string filePath) {
     std::ifstream stream(filePath);
@@ -29,27 +24,27 @@ void Materialization::loadLiteralsFromFile(Program &p, std::string filePath) {
 }
 
 void Materialization::loadLiteralsFromString(Program &p, std::string queries) {
-    boost::char_separator<char> sep("\n");
-    boost::tokenizer<boost::char_separator<char>> tokens(queries, sep);
-    for (const auto& t : tokens) {
+    stringstream ss(queries);
+    string t;
+    while (getline(ss, t)) {
         Literal l = p.parseLiteral(t);
         prematerializedLiterals.push_back(l);
     }
 }
 
 bool atomSorterCriterion(const std::pair<Literal, int> *el1,
-                         const std::pair<Literal, int> *el2) {
+        const std::pair<Literal, int> *el2) {
     if (el1->first.getPredicate().getId() !=
             el2->first.getPredicate().getId()) {
         //Choose the one with smaller card
         if (el1->first.getPredicate().getCardinality() !=
                 el2->first.getPredicate().getCardinality()) {
             return el1->first.getPredicate().getCardinality() <
-                   el2->first.getPredicate().getCardinality();
+                el2->first.getPredicate().getCardinality();
         } else {
             //Order by ID
             return el1->first.getPredicate().getId() <
-                   el2->first.getPredicate().getId();
+                el2->first.getPredicate().getId();
         }
     } else {
         //Choose first the ones with most constants
@@ -63,19 +58,19 @@ bool atomSorterCriterion(const std::pair<Literal, int> *el1,
 }
 
 bool Materialization::cardIsTooLarge(const Literal &lit, Program &p,
-                                     EDBLayer &layer) {
+        EDBLayer &layer) {
     //Search among the rules is there is one without IDB and whose head matches
     //lit
     Substitution subs[10];
     for (auto &rule : p.getAllRules()) {
         if (rule.getNIDBPredicates() == 0 && rule.getBody().size() == 1) {
-            int nsubs = Literal::subsumes(subs, rule.getHead(), lit);
+            int nsubs = Literal::subsumes(subs, rule.getFirstHead(), lit);
             if (nsubs != -1) {
                 Literal query = rule.getBody()[0].substitutes(subs, nsubs);
                 size_t card = layer.estimateCardinality(query);
-                BOOST_LOG_TRIVIAL(debug) << "Card for literal " << query.tostring(NULL, NULL) << " is " << card;
+                LOG(DEBUGL) << "Card for literal " << query.tostring(NULL, NULL) << " is " << card;
                 if (card > 10000) {
-                    BOOST_LOG_TRIVIAL(debug) << "Query " << query.tostring(NULL, NULL) << " is ignored";
+                    LOG(DEBUGL) << "Query " << query.tostring(NULL, NULL) << " is ignored";
                     return true;
                 }
             }
@@ -99,7 +94,7 @@ void Materialization::guessLiteralsFromRules(Program &p, EDBLayer &layer) {
                     bool isNew = true;
                     for (auto &existingLit : allLiterals) {
                         if (Literal::subsumes(subs, literal,
-                                              existingLit.first) != -1 &&
+                                    existingLit.first) != -1 &&
                                 literal.getNUniqueVars() ==
                                 existingLit.first.getNUniqueVars()) {
                             isNew = false;
@@ -134,14 +129,14 @@ void Materialization::guessLiteralsFromRules(Program &p, EDBLayer &layer) {
         prematerializedLiterals.push_back(p->first);
     }
     repeatPrematerialization = false;
-    BOOST_LOG_TRIVIAL(debug) << "Ignored queries because too large: "
-                             << nIgnoredQueries;
+    LOG(DEBUGL) << "Ignored queries because too large: "
+        << nIgnoredQueries;
 
 #ifdef DEBUG
     for (auto &l : pointers) {
-        BOOST_LOG_TRIVIAL(debug) << "Literal " <<
-                                 l->first.tostring(&p, &layer) <<
-                                 " " << l->second;
+        LOG(DEBUGL) << "Literal " <<
+            l->first.tostring(&p, &layer) <<
+            " " << l->second;
     }
 #endif
 }
@@ -149,10 +144,10 @@ void Materialization::guessLiteralsFromRules(Program &p, EDBLayer &layer) {
 int *myPipe;
 
 void alrmHandler(int signal) {
-    BOOST_LOG_TRIVIAL(debug) << "Got alarm signal";
+    LOG(DEBUGL) << "Got alarm signal";
     // close(myPipe[0]);
     // close(myPipe[1]);
-    BOOST_LOG_TRIVIAL(debug) << "Exiting ...";
+    LOG(DEBUGL) << "Exiting ...";
     exit(1);
 }
 
@@ -175,7 +170,7 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
         // Could not set alarm signal handler
         // exit(1);
         // }
-        BOOST_LOG_TRIVIAL(debug) << "Installed alarm signal handler; Now setting alarm over " << timeoutMicros << " usec";
+        LOG(DEBUGL) << "Installed alarm signal handler; Now setting alarm over " << timeoutMicros << " usec";
         ualarm((useconds_t)timeoutMicros, (useconds_t)timeoutMicros); //Wait one second
         TupleTable *tmpTable = qsqr->evaluateQuery(QSQR_EVAL, q, NULL, NULL, true);
         //After the query is computed, I don't care anymore of the alarm
@@ -200,11 +195,11 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
             write(pipeID[1], buffer, 8 * rowSize);
         }
         close(pipeID[1]);
-	delete qsqr;
+        delete qsqr;
 
         exit(EXIT_SUCCESS);
     } else if (pid < (pid_t)0) {
-        BOOST_LOG_TRIVIAL(error) << "The fork has failed!";
+        LOG(ERRORL) << "The fork has failed!";
         exit(1);
     } else { //Parent
         while (waitpid(pid, &status, 0) != pid) {
@@ -238,7 +233,7 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
             close(pipeID[0]);
             //Process was terminated
             if (!WIFSIGNALED(status) || (WTERMSIG(status) != SIGALRM)) {
-                BOOST_LOG_TRIVIAL(warning) << "The process terminated with a weird return code";
+                LOG(WARNL) << "The process terminated with a weird return code";
             }
             return false;
         }
@@ -247,35 +242,35 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
 }
 
 bool Materialization::execMatQuery(Literal &l, bool timeout, EDBLayer &kb,
-                                   Program &p, int &predIdx,
-                                   long timeoutMicros) {
+        Program &p, int &predIdx,
+        long timeoutMicros) {
     bool failed = false;
     QSQQuery q(l);
-    BOOST_LOG_TRIVIAL(debug) << "Getting query " << l.tostring(&p, &kb);
-    timens::system_clock::time_point start = timens::system_clock::now();
+    LOG(DEBUGL) << "Getting query " << l.tostring(&p, &kb);
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     TupleTable *output = NULL;
 
     if (!timeout || timeoutMicros == 0) {
         QSQR *qsqr = new QSQR(kb, &p);
         output = qsqr->evaluateQuery(QSQR_EVAL, &q, NULL, NULL,
-                                     true);
+                true);
         delete qsqr;
     } else {
         failed = !evaluateQueryThreadedVersion(&kb, &p, &q,
-                                               &output,
-                                               timeoutMicros);
+                &output,
+                timeoutMicros);
     }
 
-    boost::chrono::duration<double> sec =
-        boost::chrono::system_clock::now() - start;
+    std::chrono::duration<double> sec =
+        std::chrono::system_clock::now() - start;
     if (failed) {
-        BOOST_LOG_TRIVIAL(debug) << "Query " << l.tostring(&p, &kb) <<
-                                 " failed after " <<
-                                 sec.count() * 1000 << " ms";
+        LOG(DEBUGL) << "Query " << l.tostring(&p, &kb) <<
+            " failed after " <<
+            sec.count() * 1000 << " ms";
     } else { // Not failed
-        BOOST_LOG_TRIVIAL(debug) << "Got " << output->getNRows() <<
-                                 " results in " << sec.count() *
-                                 1000 << " ms";
+        LOG(DEBUGL) << "Got " << output->getNRows() <<
+            " results in " << sec.count() *
+            1000 << " ms";
         IndexedTupleTable *idxOutput = new IndexedTupleTable(output);
         VTuple newTuple(l.getNVars());
         int j = 0;
@@ -286,7 +281,7 @@ bool Materialization::execMatQuery(Literal &l, bool timeout, EDBLayer &kb,
             }
         }
         std::string predName = std::string("TSP") + std::to_string(predIdx)
-                               + std::string("E");
+            + std::string("E");
         try {
             PredId_t pi = p.getPredicateID(predName, (uint8_t) newTuple.getSize());
             Predicate newPred(pi, 0, EDB, (uint8_t) newTuple.getSize());
@@ -294,8 +289,8 @@ bool Materialization::execMatQuery(Literal &l, bool timeout, EDBLayer &kb,
             predIdx++;
 
             Predicate pred = edbLiterals.back().getPredicate();
-            BOOST_LOG_TRIVIAL(debug) << "Add results to relation " <<
-                                     p.getPredicateName(pred.getId());
+            LOG(DEBUGL) << "Add results to relation " <<
+                p.getPredicateName(pred.getId());
             kb.addTmpRelation(pred, idxOutput);
             delete output;
         } catch (int v) {
@@ -325,14 +320,14 @@ void Materialization::getAndStorePrematerialization(EDBLayer & kb, Program & p,
     }
 
     while (repeatPrematerialization && failedQueries.size() > 0) {
-        BOOST_LOG_TRIVIAL(debug) <<
-                                 "Try to rerun " << failedQueries.size() <<
-                                 " queries";
+        LOG(DEBUGL) <<
+            "Try to rerun " << failedQueries.size() <<
+            " queries";
         bool success = false;
         std::vector<Literal> newFailedQueries;
         for (auto &el : failedQueries) {
             bool failed = execMatQuery(el, timeout, kb, p, predIdx,
-                                       timeoutMicros);
+                    timeoutMicros);
             if (!failed) {
                 rewriteLiteralInProgram(el, edbLiterals.back(), kb, p);
                 success = true;
@@ -349,17 +344,17 @@ void Materialization::getAndStorePrematerialization(EDBLayer & kb, Program & p,
         }
     }
     if (timeout) {
-        BOOST_LOG_TRIVIAL(debug) << "Failed Queries: " << failedQueries.size()
-                                 << " Preprocessed Queries: "
-                                 << successQueries;
+        LOG(DEBUGL) << "Failed Queries: " << failedQueries.size()
+            << " Preprocessed Queries: "
+            << successQueries;
     }
 
     for (auto &rule : p.getAllRules()) {
-        BOOST_LOG_TRIVIAL(debug) << "Rule: " << rule.tostring(&p, &kb);
+        LOG(DEBUGL) << "Rule: " << rule.tostring(&p, &kb);
     }
     // } catch (int v) {
     //   if (v == OUT_OF_PREDICATES) {
-    //     BOOST_LOG_TRIVIAL(debug) << "Aborted prematerialization, out of predicates";
+    //     LOG(DEBUGL) << "Aborted prematerialization, out of predicates";
     //  } else {
     //     throw v;
     //  }
@@ -369,52 +364,52 @@ void Materialization::getAndStorePrematerialization(EDBLayer & kb, Program & p,
 void Materialization::rewriteLiteralInProgram(Literal & prematLiteral, Literal & rewrittenLiteral, EDBLayer & kb, Program & p) {
     std::vector<Rule> rewrittenRules;
     Substitution subs[3];
-    for (PredId_t m = 0; m < MAX_NPREDS; ++m) {
-        for (int i = 0; i < p.getAllRulesByPredicate(m)->size(); ++i ) {
-            Rule r = p.getAllRulesByPredicate(m)->at(i);
+    for (Rule r : p.getAllRules()) {
+        bool toBeAdded = true;
 
-            bool toBeAdded = true;
-
-            //If head is precomputed toBeAdded = false
-            if (Literal::subsumes(subs, prematLiteral, r.getHead()) != -1) {
-                toBeAdded = false;
-                continue;
-            }
-
-            //Replace the literals in the body
-            std::vector<Literal> newBody;
-            for (std::vector<Literal>::const_iterator itr1 = r.getBody().begin();
-                    itr1 != r.getBody().end(); itr1++) {
-                int nsubs = 0;
-                bool toRewrite = false;
-                nsubs = Literal::subsumes(subs, prematLiteral, *itr1);
-                if (nsubs != -1) {
-                    toRewrite = true;
-                    Predicate pred = rewrittenLiteral.getPredicate();
-                    if (kb.isTmpRelationEmpty(pred)) {
-                        toBeAdded = false;
-                        break;
-                    }
-                }
-                if (!toRewrite) {
-                    newBody.push_back(*itr1);
-                } else {
-                    newBody.push_back(rewrittenLiteral.substitutes(subs, nsubs));
-                }
-            }
-
-            if (toBeAdded)
-                rewrittenRules.push_back(Rule(r.getHead(), newBody));
+        if (r.getHeads().size() > 1) {
+            LOG(WARNL) << "The prematerialization procedure is tested only with"
+                "rules that have one atom in the head. This is not the case...";
+            throw 10;
         }
+
+        //If head is precomputed toBeAdded = false
+        if (Literal::subsumes(subs, prematLiteral, r.getFirstHead()) != -1) {
+            toBeAdded = false;
+            continue;
+        }
+
+        //Replace the literals in the body
+        std::vector<Literal> newBody;
+        for (std::vector<Literal>::const_iterator itr1 = r.getBody().begin();
+                itr1 != r.getBody().end(); itr1++) {
+            int nsubs = 0;
+            bool toRewrite = false;
+            nsubs = Literal::subsumes(subs, prematLiteral, *itr1);
+            if (nsubs != -1) {
+                toRewrite = true;
+                Predicate pred = rewrittenLiteral.getPredicate();
+                if (kb.isTmpRelationEmpty(pred)) {
+                    toBeAdded = false;
+                    break;
+                }
+            }
+            if (!toRewrite) {
+                newBody.push_back(*itr1);
+            } else {
+                newBody.push_back(rewrittenLiteral.substitutes(subs, nsubs));
+            }
+        }
+
+        if (toBeAdded)
+            rewrittenRules.push_back(Rule(r.getId(), r.getHeads(), newBody));
     }
 
-    for (PredId_t m = 0; m < MAX_NPREDS; ++m) {
-        p.getAllRulesByPredicate(m)->clear();
-    }
+    p.cleanAllRules();
 
     for (std::vector<Rule>::iterator itr = rewrittenRules.begin(); itr != rewrittenRules.end();
             ++itr) {
-        p.getAllRulesByPredicate(itr->getHead().getPredicate().getId())->push_back(*itr);
+        p.addRule(*itr);
     }
 
     //Add all rules that map the new edb relations
@@ -434,15 +429,16 @@ void Materialization::rewriteLiteralInProgram(Literal & prematLiteral, Literal &
         if (newTuples) {
             std::vector<Literal> body;
             body.push_back(rewrittenLiteral);
-            Rule r(prematLiteral, body);
-            p.getAllRulesByPredicate(prematLiteral.getPredicate().getId())->push_back(r);
+            std::vector<Literal> heads;
+            heads.push_back(prematLiteral);
+            p.addRule(heads, body);
         }
     }
 #if DEBUG
-    BOOST_LOG_TRIVIAL(debug) << "rewritten program:";
+    LOG(DEBUGL) << "rewritten program:";
     std::vector<Rule> newRules = p.getAllRules();
     for (std::vector<Rule>::iterator itr = newRules.begin(); itr != newRules.end(); ++itr) {
-        BOOST_LOG_TRIVIAL(debug) << itr->tostring(&p, &kb);
+        LOG(DEBUGL) << itr->tostring(&p, &kb);
     }
 #endif
 }

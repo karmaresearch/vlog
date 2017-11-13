@@ -14,14 +14,11 @@
 #include <rts/operator/ResultsPrinter.hpp>
 
 #include <kognac/utils.h>
+#include <trident/utils/json.h>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/filesystem.hpp>
-
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
 
 #include <curl/curl.h>
 
@@ -29,10 +26,6 @@
 #include <fstream>
 #include <chrono>
 #include <thread>
-
-using boost::property_tree::ptree;
-using boost::property_tree::read_json;
-using boost::property_tree::write_json;
 
 WebInterface::WebInterface(std::shared_ptr<SemiNaiver> sn, string htmlfiles,
         string cmdArgs, string edbfile) : sn(sn),
@@ -74,24 +67,24 @@ void WebInterface::startThread(string address, string port) {
 }
 
 void WebInterface::start(string address, string port) {
-    t = boost::thread(&WebInterface::startThread, this, address, port);
+    t = std::thread(&WebInterface::startThread, this, address, port);
 }
 
 void WebInterface::stop() {
-    BOOST_LOG_TRIVIAL(info) << "Stopping server ...";
+    LOG(INFOL) << "Stopping server ...";
     while (isActive) {
         std::this_thread::sleep_for(chrono::milliseconds(100));
     }
     acceptor.cancel();
     acceptor.close();
     io.stop();
-    BOOST_LOG_TRIVIAL(info) << "Done";
+    LOG(INFOL) << "Done";
 }
 
 long WebInterface::getDurationExecMs() {
-    boost::chrono::system_clock::time_point start = sn->getStartingTimeMs();
-    boost::chrono::duration<double> sec = boost::chrono::system_clock::now() - start;
-    return boost::chrono::duration_cast<boost::chrono::milliseconds>(sec).count();
+    std::chrono::system_clock::time_point start = sn->getStartingTimeMs();
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    return std::chrono::duration_cast<std::chrono::milliseconds>(sec).count();
 }
 
 void WebInterface::connect() {
@@ -175,9 +168,9 @@ void WebInterface::execSPARQLQuery(string sparqlquery,
         DBLayer &db,
         bool printstdout,
         bool jsonoutput,
-        boost::property_tree::ptree *jsonvars,
-        boost::property_tree::ptree *jsonresults,
-        boost::property_tree::ptree *jsonstats) {
+        JSON *jsonvars,
+        JSON *jsonresults,
+        JSON *jsonstats) {
     std::unique_ptr<QueryDict> queryDict = std::unique_ptr<QueryDict>(new QueryDict(nterms));
     std::unique_ptr<QueryGraph> queryGraph = std::unique_ptr<QueryGraph>(new QueryGraph());
     bool parsingOk;
@@ -186,13 +179,13 @@ void WebInterface::execSPARQLQuery(string sparqlquery,
         std::unique_ptr<SPARQLLexer>(new SPARQLLexer(sparqlquery));
     std::unique_ptr<SPARQLParser> parser = std::unique_ptr<SPARQLParser>(
             new SPARQLParser(*lexer.get()));
-    boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     parseQuery(parsingOk, *parser.get(), *queryGraph.get(), *queryDict.get(), db);
     if (!parsingOk) {
-        boost::chrono::duration<double> duration = boost::chrono::system_clock::now() - start;
-        BOOST_LOG_TRIVIAL(info) << "Runtime query: 0ms.";
-        BOOST_LOG_TRIVIAL(info) << "Runtime total: " << duration.count() * 1000 << "ms.";
-        BOOST_LOG_TRIVIAL(info) << "# rows = 0";
+        std::chrono::duration<double> duration = std::chrono::system_clock::now() - start;
+        LOG(INFOL) << "Runtime query: 0ms.";
+        LOG(INFOL) << "Runtime total: " << duration.count() * 1000 << "ms.";
+        LOG(INFOL) << "# rows = 0";
         return;
     }
 
@@ -201,9 +194,9 @@ void WebInterface::execSPARQLQuery(string sparqlquery,
         for (QueryGraph::projection_iterator itr = queryGraph->projectionBegin();
                 itr != queryGraph->projectionEnd(); ++itr) {
             string namevar = parser->getVariableName(*itr);
-            boost::property_tree::ptree var;
+            JSON var;
             var.put("", namevar);
-            jsonvars->push_back(std::make_pair("", var));
+            jsonvars->push_back(var);
         }
     }
 
@@ -239,18 +232,18 @@ void WebInterface::execSPARQLQuery(string sparqlquery,
         ResultsPrinter *p = (ResultsPrinter*) operatorTree;
         p->setSilent(!printstdout);
         if (jsonoutput) {
-	    std::vector<std::string> jsonvars;
+            std::vector<std::string> jsonvars;
             p->setJSONOutput(jsonresults, jsonvars);
         }
 
-        boost::chrono::system_clock::time_point startQ = boost::chrono::system_clock::now();
+        std::chrono::system_clock::time_point startQ = std::chrono::system_clock::now();
         if (operatorTree->first()) {
             while (operatorTree->next());
         }
-        boost::chrono::duration<double> durationQ = boost::chrono::system_clock::now() - startQ;
-        boost::chrono::duration<double> duration = boost::chrono::system_clock::now() - start;
-        BOOST_LOG_TRIVIAL(info) << "Runtime query: " << durationQ.count() * 1000 << "ms.";
-        BOOST_LOG_TRIVIAL(info) << "Runtime total: " << duration.count() * 1000 << "ms.";
+        std::chrono::duration<double> durationQ = std::chrono::system_clock::now() - startQ;
+        std::chrono::duration<double> duration = std::chrono::system_clock::now() - start;
+        LOG(INFOL) << "Runtime query: " << durationQ.count() * 1000 << "ms.";
+        LOG(INFOL) << "Runtime total: " << duration.count() * 1000 << "ms.";
         if (jsonstats) {
             jsonstats->put("runtime", to_string(durationQ.count()));
             jsonstats->put("nresults", to_string(p->getPrintedRows()));
@@ -258,7 +251,7 @@ void WebInterface::execSPARQLQuery(string sparqlquery,
         }
         if (printstdout) {
             long nElements = p->getPrintedRows();
-            BOOST_LOG_TRIVIAL(info) << "# rows = " << nElements;
+            LOG(INFOL) << "# rows = " << nElements;
         }
         delete operatorTree;
     }
@@ -315,13 +308,13 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             curl_easy_cleanup(curl);
 
             //Execute the SPARQL query
-            ptree pt;
-            ptree vars;
-            ptree bindings;
-            ptree stats;
+            JSON pt;
+            JSON vars;
+            JSON bindings;
+            JSON stats;
             bool jsonoutput = printresults == string("true");
             if (inter->program) {
-                BOOST_LOG_TRIVIAL(info) << "Answering the SPARQL query with VLog ...";
+                LOG(INFOL) << "Answering the SPARQL query with VLog ...";
                 WebInterface::execSPARQLQuery(sparqlquery,
                         false,
                         inter->edb->getNTerms(),
@@ -332,7 +325,7 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
                         &bindings,
                         &stats);
             } else {
-                BOOST_LOG_TRIVIAL(info) << "Answering the SPARQL query with Trident ...";
+                LOG(INFOL) << "Answering the SPARQL query with Trident ...";
                 WebInterface::execSPARQLQuery(sparqlquery,
                         false,
                         inter->edb->getNTerms(),
@@ -348,7 +341,8 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             pt.add_child("stats", stats);
 
             std::ostringstream buf;
-            write_json(buf, pt, false);
+            JSON::write(buf, pt);
+            //write_json(buf, pt, false);
             page = buf.str();
             isjson = true;
         } else if (path == "/lookup") {
@@ -356,10 +350,11 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             string id = _getValueParam(form, "id");
             //Lookup the value
             string value = lookup(id, *(inter->tridentlayer.get()));
-            ptree pt;
+            JSON pt;
             pt.put("value", value);
             std::ostringstream buf;
-            write_json(buf, pt, false);
+            JSON::write(buf, pt);
+            //write_json(buf, pt, false);
             page = buf.str();
             isjson = true;
         } else if (path == "/setup") {
@@ -391,7 +386,7 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             }
             curl_easy_cleanup(curl);
 
-            BOOST_LOG_TRIVIAL(info) << "Setting up the KB with the given rules ...";
+            LOG(INFOL) << "Setting up the KB with the given rules ...";
 
             //Cleanup and install the EDB layer
             EDBConf conf(inter->edbFile);
@@ -406,27 +401,27 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             //Set up the ruleset and perform the pre-materialization if necessary
             if (sauto != "") {
                 //Automatic prematerialization
-                timens::system_clock::time_point start = timens::system_clock::now();
+                std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
                 Materialization *mat = new Materialization();
                 mat->guessLiteralsFromRules(*inter->program, *inter->edb.get());
                 mat->getAndStorePrematerialization(*inter->edb.get(),
                         *inter->program,
                         true, automatThreshold);
                 delete mat;
-                boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+                std::chrono::duration<double> sec = std::chrono::system_clock::now()
                     - start;
-                BOOST_LOG_TRIVIAL(info) << "Runtime pre-materialization = " <<
+                LOG(INFOL) << "Runtime pre-materialization = " <<
                     sec.count() * 1000 << " milliseconds";
             } else if (spremat != "") {
-                timens::system_clock::time_point start = timens::system_clock::now();
+                std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
                 Materialization *mat = new Materialization();
                 mat->loadLiteralsFromString(*inter->program, spremat);
                 mat->getAndStorePrematerialization(*inter->edb.get(), *inter->program, false, ~0l);
                 inter->program->sortRulesByIDBPredicates();
                 delete mat;
-                boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+                std::chrono::duration<double> sec = std::chrono::system_clock::now()
                     - start;
-                BOOST_LOG_TRIVIAL(info) << "Runtime pre-materialization = " <<
+                LOG(INFOL) << "Runtime pre-materialization = " <<
                     sec.count() * 1000 << " milliseconds";
             }
 
@@ -444,7 +439,7 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
         string path = req.substr(4, pos - 5);
         if (path == "/refresh") {
             //Create JSON object
-            ptree pt;
+            JSON pt;
             long usedmem = (long)Utils::get_max_mem(); //Already in MB
             long totmem = Utils::getSystemMemory() / 1024 / 1024;
             long ramperc = (((double)usedmem / totmem) * 100);
@@ -475,12 +470,13 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             pt.put("outputrules", outrules);
 
             std::ostringstream buf;
-            write_json(buf, pt, false);
+            JSON::write(buf, pt);
+            //write_json(buf, pt, false);
             page = buf.str();
             isjson = true;
 
         } else if (path == "/refreshmem") {
-            ptree pt;
+            JSON pt;
             long usedmem = (long)Utils::get_max_mem(); //Already in MB
             long totmem = Utils::getSystemMemory() / 1024 / 1024;
             long ramperc = (((double)usedmem / totmem) * 100);
@@ -488,12 +484,13 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             pt.put("usedmem", to_string(usedmem));
 
             std::ostringstream buf;
-            write_json(buf, pt, false);
+            JSON::write(buf, pt);
+            //write_json(buf, pt, false);
             page = buf.str();
             isjson = true;
 
         } else if (path == "/genopts") {
-            ptree pt;
+            JSON pt;
             long totmem = Utils::getSystemMemory() / 1024 / 1024;
             pt.put("totmem", to_string(totmem));
             pt.put("commandline", inter->getCommandLineArgs());
@@ -502,12 +499,13 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             pt.put("nedbs", inter->getSemiNaiver()->getProgram()->getNEDBPredicates());
             pt.put("nidbs", inter->getSemiNaiver()->getProgram()->getNIDBPredicates());
             std::ostringstream buf;
-            write_json(buf, pt, false);
+            JSON::write(buf, pt);
+            //write_json(buf, pt, false);
             page = buf.str();
             isjson = true;
 
         } else if (path == "/getmemcmd") {
-            ptree pt;
+            JSON pt;
             long totmem = Utils::getSystemMemory() / 1024 / 1024;
             pt.put("totmem", to_string(totmem));
             pt.put("commandline", inter->getCommandLineArgs());
@@ -520,12 +518,13 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             }
 
             std::ostringstream buf;
-            write_json(buf, pt, false);
+            JSON::write(buf, pt);
+            //write_json(buf, pt, false);
             page = buf.str();
             isjson = true;
 
         } else if (path == "/getprograminfo") {
-            ptree pt;
+            JSON pt;
             if (inter->program) {
                 pt.put("nrules", inter->program->getNRules());
                 pt.put("nedb", inter->program->getNEDBPredicates());
@@ -536,12 +535,13 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
                 pt.put("nidb", 0);
             }
             std::ostringstream buf;
-            write_json(buf, pt, false);
+            JSON::write(buf, pt);
+            //write_json(buf, pt, false);
             page = buf.str();
             isjson = true;
 
         } else if (path == "/sizeidbs") {
-            ptree pt;
+            JSON pt;
             std::vector<std::pair<string, std::vector<StatsSizeIDB>>> sizeIDBs = inter->getSemiNaiver()->getSizeIDBs();
             //Construct the string
             string flat = "";
@@ -560,7 +560,8 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             flat = flat.substr(0, flat.size() - 1);
             pt.put("sizeidbs", flat);
             std::ostringstream buf;
-            write_json(buf, pt, false);
+            JSON::write(buf, pt);
+            //write_json(buf, pt, false);
             page = buf.str();
             isjson = true;
 
@@ -605,9 +606,9 @@ string WebInterface::getPage(string f) {
 
     //Read the file (if any) and return it to the user
     string pathfile = dirhtmlfiles + "/" + f;
-    if (boost::filesystem::exists(boost::filesystem::path(pathfile))) {
+    if (Utils::exists(pathfile)) {
         //Read the content of the file
-        BOOST_LOG_TRIVIAL(debug) << "Reading the content of " << pathfile;
+        LOG(DEBUGL) << "Reading the content of " << pathfile;
         ifstream ifs(pathfile);
         stringstream sstr;
         sstr << ifs.rdbuf();

@@ -238,7 +238,7 @@ double VLogLayer::getScanCost(DBLayer::DataOrder order,
 
 #ifdef DEBUG
     Literal query(Predicate(predQueries, Predicate::calculateAdornment(tuple)), tuple);
-    BOOST_LOG_TRIVIAL(debug) << "Literal: " << query.tostring(&(this->p), &edb) << ", cost = " << cost;
+    LOG(DEBUGL) << "Literal: " << query.tostring(&(this->p), &edb) << ", cost = " << cost;
 #endif
     return cost;
 }
@@ -324,7 +324,7 @@ double VLogLayer::getJoinSelectivity(bool value1L,
         }
         // Same variables, so resulting cardinality not higher than smallest one.
         double retval = cardl < cardr ? cardl/max : cardr/max;
-        BOOST_LOG_TRIVIAL(debug) << "joinselectivity = " << retval;
+        LOG(DEBUGL) << "joinselectivity = " << retval;
         return retval;
     }
 

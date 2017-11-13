@@ -7,21 +7,10 @@
 #include <trident/kb/kbconfig.h>
 #include <trident/kb/updater.h>
 
-#include <boost/log/trivial.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/chrono.hpp>
-#include <boost/iostreams/filtering_stream.hpp>
-#include <boost/iostreams/filter/gzip.hpp>
-#include <boost/interprocess/file_mapping.hpp>
-#include <boost/interprocess/mapped_region.hpp>
-
 #include <inttypes.h>
 #include <vector>
 #include <fstream>
-
-namespace fs = boost::filesystem;
-namespace bip = boost::interprocess;
+#include <zstr/zstr.hpp>
 
 struct AggrIndex {
     uint64_t first, second;
@@ -60,10 +49,14 @@ void Exporter::extractTriples(std::vector <uint64_t> &all_s,
             } else {
                 pred.triple[2] = t.get(2).getValue();
             }
-            pred.id = it->getHead().getPredicate().getId();
             pred.ruleid = ruleid;
-            BOOST_LOG_TRIVIAL(debug) << "Pred.id " << pred.id << " rule: " << it->toprettystring(sn->getProgram(), &sn->getEDBLayer()) << " triple " << pred.triple[0] << " " << pred.triple[1] << " " << pred.triple[2] << " npostocopy: " << (int)pred.nPosToCopy << " pos1: " << (int)pred.posToCopy[0] << " pos2:" << (int)pred.posToCopy[1];
-            predicatesToExtract.push_back(pred);
+
+            for(const auto &h : it->getHeads()) {
+                _EDBPredicates pnew = pred;
+                pnew.id = h.getPredicate().getId();
+                LOG(DEBUGL) << "Pred.id " << pnew.id << " rule: " << it->toprettystring(sn->getProgram(), &sn->getEDBLayer()) << " triple " << pred.triple[0] << " " << pred.triple[1] << " " << pred.triple[2] << " npostocopy: " << (int)pred.nPosToCopy << " pos1: " << (int)pred.posToCopy[0] << " pos2:" << (int)pred.posToCopy[1];
+                predicatesToExtract.push_back(pnew);
+            }
         }
         ruleid++;
     }
@@ -74,7 +67,7 @@ void Exporter::extractTriples(std::vector <uint64_t> &all_s,
             ++it) {
         count += sn->getSizeTable(it->id);
     }
-    BOOST_LOG_TRIVIAL(debug) << "Copying up to " << count << " triples ...";
+    LOG(DEBUGL) << "Copying up to " << count << " triples ...";
 
     //Get tables for all such predicates, put the subjects in a large array
     all_s.reserve(count);
@@ -84,7 +77,7 @@ void Exporter::extractTriples(std::vector <uint64_t> &all_s,
     long ntables = 0;
     for (auto it = predicatesToExtract.begin(); it != predicatesToExtract.end();
             ++it) {
-        BOOST_LOG_TRIVIAL(debug) << "Get table for pred " << it->id;
+        LOG(DEBUGL) << "Get table for pred " << it->id;
         FCIterator tableItr = sn->getTable(it->id);
         long triple[3];
         triple[0] = it->triple[0];
@@ -99,14 +92,14 @@ void Exporter::extractTriples(std::vector <uint64_t> &all_s,
                 isFirst = false;
                 if (tableItr.getCurrentBlock()->rule->ruleid == it->ruleid) {
                     //Skip the first table since they are all duplicates
-		    BOOST_LOG_TRIVIAL(debug) << "Skipping table of " << nrows << " nrows, iter = " << tableItr.getCurrentIteration();
+                    LOG(DEBUGL) << "Skipping table of " << nrows << " nrows, iter = " << tableItr.getCurrentIteration();
                     tableItr.moveNextCount();
                     continue;
                 }
             }
 
             ntables++;
-            BOOST_LOG_TRIVIAL(debug) << "Copying table of " << nrows << " nrows, iter = " << tableItr.getCurrentIteration();
+            LOG(DEBUGL) << "Copying table of " << nrows << " nrows, iter = " << tableItr.getCurrentIteration();
 
             uint8_t currentPosToCopy = 0;
             for (int i = 0; i < 3; ++i) {
@@ -122,18 +115,18 @@ void Exporter::extractTriples(std::vector <uint64_t> &all_s,
                     if (it->posToCopy[currentPosToCopy] == i) {
                         auto column = intTable->getColumn(currentPosToCopy);
                         if (column->isBackedByVector()) {
-                            //timens::system_clock::time_point start = timens::system_clock::now();
+                            //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
                             const std::vector<Term_t> &vec = column->getVectorRef();
                             assert(sizeof(Term_t) == sizeof(uint64_t));
                             assert(vec.size() == nrows);
                             out->resize(out->size() + nrows);
                             memcpy(&(out->at(out->size() - nrows)), &(vec[0]), sizeof(Term_t) * nrows);
-                            //boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+                            //std::chrono::duration<double> sec = std::chrono::system_clock::now()
                             //                                      - start;
-                            //BOOST_LOG_TRIVIAL(info) << "Runtime memcpy = " << sec.count() * 1000 << "-" << nrows;
+                            //LOG(INFOL) << "Runtime memcpy = " << sec.count() * 1000 << "-" << nrows;
                         } else {
                             //Copy one by one
-                            //timens::system_clock::time_point start = timens::system_clock::now();
+                            //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 #if INCORRECT_CODE
                             // Unfortunately, this code is not correct, but I don't know why yet,
                             // but I think the rawarray pointer is wrong. TODO!
@@ -184,9 +177,9 @@ void Exporter::extractTriples(std::vector <uint64_t> &all_s,
                                     out->push_back(value);
                                 }
                             }
-                            //boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+                            //std::chrono::duration<double> sec = std::chrono::system_clock::now()
                             //                                      - start;
-                            //BOOST_LOG_TRIVIAL(info) << "Runtime copy one-by-one = " << sec.count() * 1000 << "-" << nrows;
+                            //LOG(INFOL) << "Runtime copy one-by-one = " << sec.count() * 1000 << "-" << nrows;
                         }
 
                         currentPosToCopy++;
@@ -195,16 +188,16 @@ void Exporter::extractTriples(std::vector <uint64_t> &all_s,
                 }
 
                 //Copy a constant value
-                //timens::system_clock::time_point start = timens::system_clock::now();
+                //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
                 out->resize(out->size() + nrows);
                 uint64_t *begin = &(out->at(out->size() - nrows));
                 uint64_t j = 0;
                 while (j < nrows) {
                     begin[j++] = triple[i];
                 }
-                //boost::chrono::duration<double> sec = boost::chrono::system_clock::now()
+                //std::chrono::duration<double> sec = std::chrono::system_clock::now()
                 //                                      - start;
-                //BOOST_LOG_TRIVIAL(info) << "Runtime constant = " << sec.count() * 1000 << "-" << nrows;
+                //LOG(INFOL) << "Runtime constant = " << sec.count() * 1000 << "-" << nrows;
             }
             assert(all_s.size() == all_p.size());
             assert(all_p.size() == all_o.size());
@@ -212,7 +205,7 @@ void Exporter::extractTriples(std::vector <uint64_t> &all_s,
             tableItr.moveNextCount();
         }
     }
-    BOOST_LOG_TRIVIAL(debug) << "Merged " << ntables << " tables";
+    LOG(DEBUGL) << "Merged " << ntables << " tables";
 }
 
 /*void Exporter::generateTridentDiffIndexTabByTab(string outputdir) {
@@ -266,7 +259,7 @@ for (auto it = predicatesToExtract.begin(); it != predicatesToExtract.end();
 ++it) {
 count += sn->getSizeTable(it->id);
 }
-BOOST_LOG_TRIVIAL(debug) << "Copying up to " << count << " triples ...";
+LOG(DEBUGL) << "Copying up to " << count << " triples ...";
 
 //Get tables for all such predicates, put the subjects in a large array
 all_s.reserve(count);
@@ -276,7 +269,7 @@ all_o.reserve(count);
 long ntables = 0;
 for (auto it = predicatesToExtract.begin(); it != predicatesToExtract.end();
 ++it) {
-BOOST_LOG_TRIVIAL(debug) << "Get table for pred " << it->id;
+LOG(DEBUGL) << "Get table for pred " << it->id;
 FCIterator tableItr = sn->getTable(it->id);
 long triple[3];
 triple[0] = it->triple[0];
@@ -297,13 +290,13 @@ if (tableItr.getCurrentBlock()->rule->ruleid == it->ruleid) {
 ntables++;
 std::shared_ptr<const FCInternalTable> intTable = tableItr.getCurrentTable();
 size_t nrows = intTable->getNRows();
-BOOST_LOG_TRIVIAL(info) << "Copying table of " << nrows <<
+LOG(INFOL) << "Copying table of " << nrows <<
 " postocopy " << (int)it->nPosToCopy;
 copyTable(all_s, all_p, all_o, it, intTable, nrows, triple);
 
 string diffdir = outputdir + string("/") + to_string(idxUpdate++);
 fs::create_directories(diffdir);
-BOOST_LOG_TRIVIAL(info) << "Creating the index " << diffdir
+LOG(INFOL) << "Creating the index " << diffdir
 << " posToCopy=" << (int)it->nPosToCopy;
 
 if (it->nPosToCopy == 1) {
@@ -413,62 +406,54 @@ void Exporter::generateNTTriples(string outputdir, bool decompress) {
     std::vector<uint64_t> all_o;
     extractTriples(all_s, all_p, all_o);
 
-    BOOST_LOG_TRIVIAL(info) << "Exporting the materialization in N-Triples format ...";
+    LOG(INFOL) << "Exporting the materialization in N-Triples format ...";
     EDBLayer &edb = sn->getEDBLayer();
 
     //Store the raw dataset in a text file for debug purposes
-    fs::create_directories(fs::path(outputdir));
-    ofstream ntFile;
-    boost::iostreams::filtering_stream<boost::iostreams::output> out;
+    Utils::create_directories(outputdir);
+    std::unique_ptr<zstr::ofstream> out;
 
     char supportBuffer[MAX_TERM_SIZE];
     size_t idx = 0;
     for (int i = 0; i < all_s.size(); ++i) {
         if (i % 10000000 == 0) {
             if (i > 0) {
-                BOOST_LOG_TRIVIAL(info) << "So far exported " << i << " triples ...";
-                out.flush();
-                out.reset();
-                ntFile.close();
+                LOG(INFOL) << "So far exported " << i << " triples ...";
             }
             //Create the file. Close the previous one
             string filename = outputdir + "/out-" + to_string(idx++) + ".nt.gz";
-            BOOST_LOG_TRIVIAL(debug) << "Creating file " << filename;
-            ntFile.open(filename, std::ios_base::out);
-            out.push(boost::iostreams::gzip_compressor());
-            out.push(ntFile);
+            LOG(DEBUGL) << "Creating file " << filename;
+            out = std::unique_ptr<zstr::ofstream>(new zstr::ofstream(filename));
         }
         if (decompress) {
             if (edb.getDictText(all_s[i], supportBuffer)) {
-                out << supportBuffer << " ";
+                *out << supportBuffer << " ";
             } else {
                 std::string t = sn->getProgram()->getFromAdditional(all_s[i]);
                 if (t == std::string("")) t = std::to_string(all_s[i]);
-                out << t << " ";
+                *out << t << " ";
             }
             if (edb.getDictText(all_p[i], supportBuffer)) {
-                out << supportBuffer << " ";
+                *out << supportBuffer << " ";
             } else {
                 std::string t = sn->getProgram()->getFromAdditional(all_p[i]);
                 if (t == std::string("")) t = std::to_string(all_p[i]);
-                out << t << " ";
+                *out << t << " ";
             }
             if (edb.getDictText(all_o[i], supportBuffer)) {
-                out << supportBuffer << " ." << endl;
+                *out << supportBuffer << " ." << endl;
             } else {
                 std::string t = sn->getProgram()->getFromAdditional(all_o[i]);
                 if (t == std::string("")) t = std::to_string(all_o[i]);
-                out << t << " ." << endl;
+                *out << t << " ." << endl;
             }
         } else {
-            out << all_s[i];
-            out << " ";
-            out << all_p[i];
-            out << " ";
-            out << all_o[i];
-            out << endl;
+            *out << all_s[i];
+            *out << " ";
+            *out << all_p[i];
+            *out << " ";
+            *out << all_o[i];
+            *out << endl;
         }
     }
-    //out.flush();
-    //ntFile.close();
 }
