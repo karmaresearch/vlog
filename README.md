@@ -5,7 +5,7 @@
 In order to compile VLog, first you need trident. 
 
 ```
-git clone https://github.com/jrbn/trident.git
+git clone https://github.com/karmaresearch/trident.git
 ```
 
 should get it. Then, go to the trident directory and follow the README instructions there.
@@ -27,7 +27,7 @@ make TRIDENT=<location of trident>
 should compile everything (replace <location of trident>). If you want to create a debug version of the program, run
 
 ```
-make DEBUG=1
+make TRIDENT=<location of trident> DEBUG=1
 ```
 
 instead.
