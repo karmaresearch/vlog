@@ -45,6 +45,7 @@ class SingleHeadFinalRuleProcessor: public ResultJoinProcessor {
 
         SingleHeadFinalRuleProcessor(
                 Term_t *row,
+                bool deleteRow,
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
                 FCTable *t,
@@ -161,7 +162,6 @@ class SingleHeadFinalRuleProcessor: public ResultJoinProcessor {
 class SemiNaiver;
 class FinalRuleProcessor: public ResultJoinProcessor {
     private:
-        bool addToEndTable;
         //std::vector<FCBlock> &listDerivations;
         //const uint8_t ruleExecOrder;
         //const size_t iteration;
@@ -171,6 +171,7 @@ class FinalRuleProcessor: public ResultJoinProcessor {
     protected:
         std::vector<std::unique_ptr<SingleHeadFinalRuleProcessor>> atomTables;
         const RuleExecutionDetails *ruleDetails;
+        bool addToEndTable;
 
     public:
         FinalRuleProcessor(
@@ -224,8 +225,9 @@ class FinalRuleProcessor: public ResultJoinProcessor {
 
         bool isBlockEmpty(const int blockId, const bool unique) const;
 
-        //uint32_t getRowsInBlock(const int blockId, const bool unique) const;
+        void consolidate(const bool isFinished);
 
+        ~FinalRuleProcessor() {}
 };
 
 #endif

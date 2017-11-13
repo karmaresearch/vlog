@@ -47,6 +47,7 @@ class ResultJoinProcessor {
     protected:
         const uint8_t rowsize;
         Term_t *row;
+        bool deleteRow;
         const uint8_t nCopyFromFirst;
         const uint8_t nCopyFromSecond;
         std::pair<uint8_t, uint8_t> posFromFirst[MAX_MAPPINGS];
@@ -58,7 +59,8 @@ class ResultJoinProcessor {
 #endif
 
     private:
-        virtual void processResults(const int blockid, const bool unique, std::mutex *m) = 0;
+        virtual void processResults(const int blockid,
+                const bool unique, std::mutex *m) = 0;
 
     protected:
         void copyRawRow(const Term_t *first, const Term_t* second);
@@ -66,17 +68,27 @@ class ResultJoinProcessor {
         void copyRawRow(const Term_t *first, FCInternalTableItr* second);
 
     public:
-        ResultJoinProcessor(const uint8_t rowsize, const uint8_t nCopyFromFirst,
-                const uint8_t nCopyFromSecond, const std::pair<uint8_t, uint8_t> *posFromFirst,
-                const std::pair<uint8_t, uint8_t> *posFromSecond, const int nthreads) :
-            ResultJoinProcessor(rowsize, new Term_t[rowsize], nCopyFromFirst,
+        ResultJoinProcessor(const uint8_t rowsize,
+                const uint8_t nCopyFromFirst,
+                const uint8_t nCopyFromSecond,
+                const std::pair<uint8_t, uint8_t> *posFromFirst,
+                const std::pair<uint8_t, uint8_t> *posFromSecond,
+                const int nthreads) :
+            ResultJoinProcessor(rowsize, new Term_t[rowsize], true, nCopyFromFirst,
                     nCopyFromSecond, posFromFirst, posFromSecond, nthreads) {
-}
+            }
 
-        ResultJoinProcessor(const uint8_t rowsize, Term_t *row, const uint8_t nCopyFromFirst,
-                const uint8_t nCopyFromSecond, const std::pair<uint8_t, uint8_t> *posFromFirst,
-                const std::pair<uint8_t, uint8_t> *posFromSecond, const int nthreads) :
-            rowsize(rowsize), nCopyFromFirst(nCopyFromFirst), nCopyFromSecond(nCopyFromSecond), nthreads(nthreads) {
+        ResultJoinProcessor(const uint8_t rowsize, Term_t *row,
+                bool deleteRow,
+                const uint8_t nCopyFromFirst,
+                const uint8_t nCopyFromSecond,
+                const std::pair<uint8_t, uint8_t> *posFromFirst,
+                const std::pair<uint8_t, uint8_t> *posFromSecond,
+                const int nthreads) :
+            rowsize(rowsize), row(row), deleteRow(deleteRow),
+            nCopyFromFirst(nCopyFromFirst),
+            nCopyFromSecond(nCopyFromSecond),
+            nthreads(nthreads) {
                 for (uint8_t i = 0; i < nCopyFromFirst; ++i) {
                     this->posFromFirst[i] = posFromFirst[i];
                 }
@@ -159,7 +171,8 @@ class ResultJoinProcessor {
         virtual void consolidate(const bool isFinished) {}
 
         virtual ~ResultJoinProcessor() {
-            delete[] row;
+            if (deleteRow)
+                delete[] row;
 #if USE_DUPLICATE_DETECTION
             if (rowsHash != NULL) {
                 delete rowsHash;

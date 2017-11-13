@@ -48,15 +48,17 @@ SingleHeadFinalRuleProcessor::SingleHeadFinalRuleProcessor(
         const uint8_t ruleExecOrder,
         const size_t iteration,
         const bool addToEndTable,
-        const int nthreads) : SingleHeadFinalRuleProcessor(new Term_t[table->getSizeRow()],
+        const int nthreads) : SingleHeadFinalRuleProcessor(
+            new Term_t[table->getSizeRow()], true,
             posFromFirst, posFromSecond, table, head,
             posHeadInRule, ruleDetails, ruleExecOrder, iteration, addToEndTable,
             nthreads)
-            {
+{
 }
 
 SingleHeadFinalRuleProcessor::SingleHeadFinalRuleProcessor(
         Term_t *row,
+        bool deleteRow,
         std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
         std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
         FCTable *table, Literal &head,
@@ -66,7 +68,7 @@ SingleHeadFinalRuleProcessor::SingleHeadFinalRuleProcessor(
         const size_t iteration,
         const bool addToEndTable,
         const int nthreads) :
-    ResultJoinProcessor(table->getSizeRow(), row,
+    ResultJoinProcessor(table->getSizeRow(), row, deleteRow,
             (uint8_t) posFromFirst.size(),
             (uint8_t) posFromSecond.size(),
             posFromFirst.size() > 0 ? & (posFromFirst[0]) : NULL,
@@ -77,7 +79,6 @@ SingleHeadFinalRuleProcessor::SingleHeadFinalRuleProcessor(
     t(table),
     ruleDetails(ruleDetails),
     literal(head), posLiteralInRule(posHeadInRule) {
-
         for (int i = 0; i < head.getTupleSize(); ++i) {
             VTerm t = head.getTermAtPos(i);
             if (!t.isVariable()) {
@@ -197,14 +198,14 @@ bool SingleHeadFinalRuleProcessor::isEmpty() const {
 }
 
 /*uint32_t SingleHeadFinalRuleProcessor::getRowsInBlock(const int blockId,
-        const bool unique) const {
-    if (!unique) {
-        return tmpt[blockId] == NULL ? 0 : tmpt[blockId]->getNRows();
-    } else {
-        return utmpt[blockId] == NULL ? 0 : utmpt[blockId]->getNRows();
-    }
+  const bool unique) const {
+  if (!unique) {
+  return tmpt[blockId] == NULL ? 0 : tmpt[blockId]->getNRows();
+  } else {
+  return utmpt[blockId] == NULL ? 0 : utmpt[blockId]->getNRows();
+  }
 
-}*/
+  }*/
 
 void SingleHeadFinalRuleProcessor::addColumns(const int blockid,
         std::vector<std::shared_ptr<Column>> &columns,
@@ -736,46 +737,48 @@ FinalRuleProcessor::FinalRuleProcessor(
     //ruleExecOrder(ruleExecOrder),
     //iteration(iteration),
     //newDerivation(false),
-    ruleDetails(ruleDetails)
+    ruleDetails(ruleDetails),
+    addToEndTable(addToEndTable)
     //heads(heads)
 {
-        uint8_t headID = 0;
-        uint8_t currentTupleSize = 0;
-        for(auto &h : heads) {
-            std::vector<std::pair<uint8_t, uint8_t>> newPosFromFirst;
-            std::vector<std::pair<uint8_t, uint8_t>> newPosFromSecond;
-            for(auto &pair : posFromFirst) {
-                if (pair.first >= currentTupleSize &&
-                        pair.first < currentTupleSize + h.getTupleSize()) {
-                    newPosFromFirst.push_back(make_pair(pair.first - currentTupleSize,
-                                pair.second));
-                }
+    uint8_t headID = 0;
+    uint8_t currentTupleSize = 0;
+    for(auto &h : heads) {
+        std::vector<std::pair<uint8_t, uint8_t>> newPosFromFirst;
+        std::vector<std::pair<uint8_t, uint8_t>> newPosFromSecond;
+        for(auto &pair : posFromFirst) {
+            if (pair.first >= currentTupleSize &&
+                    pair.first < currentTupleSize + h.getTupleSize()) {
+                newPosFromFirst.push_back(make_pair(pair.first - currentTupleSize,
+                            pair.second));
             }
-            for(auto &pair : posFromSecond) {
-                if (pair.first >= currentTupleSize &&
-                        pair.first < currentTupleSize + h.getTupleSize()) {
-                    newPosFromSecond.push_back(make_pair(pair.first - currentTupleSize,
-                                pair.second));
-                }
-            }
-            FCTable *table = sn->getTable(h.getPredicate().getId(),
-                    h.getPredicate().getCardinality());
-            atomTables.push_back(std::unique_ptr<SingleHeadFinalRuleProcessor>
-                    (new SingleHeadFinalRuleProcessor(row + currentTupleSize,
-                                                      newPosFromFirst,
-                                                      newPosFromSecond,
-                                                      table,
-                                                      h,
-                                                      headID,
-                                                      ruleDetails,
-                                                      ruleExecOrder,
-                                                      iteration,
-                                                      addToEndTable,
-                                                      nthreads)));
-            headID++;
-            currentTupleSize += h.getTupleSize();
         }
+        for(auto &pair : posFromSecond) {
+            if (pair.first >= currentTupleSize &&
+                    pair.first < currentTupleSize + h.getTupleSize()) {
+                newPosFromSecond.push_back(make_pair(pair.first - currentTupleSize,
+                            pair.second));
+            }
+        }
+        FCTable *table = sn->getTable(h.getPredicate().getId(),
+                h.getPredicate().getCardinality());
+        atomTables.push_back(std::unique_ptr<SingleHeadFinalRuleProcessor>
+                (new SingleHeadFinalRuleProcessor(row + currentTupleSize,
+                                                  false,
+                                                  newPosFromFirst,
+                                                  newPosFromSecond,
+                                                  table,
+                                                  h,
+                                                  headID,
+                                                  ruleDetails,
+                                                  ruleExecOrder,
+                                                  iteration,
+                                                  addToEndTable,
+                                                  nthreads)));
+        headID++;
+        currentTupleSize += h.getTupleSize();
     }
+}
 
 bool FinalRuleProcessor::isEmpty() const {
     bool out = true;
@@ -886,6 +889,12 @@ bool FinalRuleProcessor::isBlockEmpty(const int blockId, const bool unique) cons
     return out;
 }
 
-/*uint32_t FinalRuleProcessor::getRowsInBlock(const int blockId, const bool unique) const {
-    throw 10;
-}*/
+void FinalRuleProcessor::consolidate(const bool isFinished) {
+    if (!addToEndTable) {
+        //do nothing. We'll consolidate later on.
+        return;
+    }
+    for(auto &t : atomTables) {
+        t->consolidate(isFinished);
+    }
+}
