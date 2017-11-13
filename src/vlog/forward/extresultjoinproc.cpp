@@ -61,14 +61,14 @@ void ExistentialRuleProcessor::filterDerivations(const Literal &literal,
         auto t = literal.getTermAtPos(i);
         if (!t.isVariable()) {
             tobeRetained.push_back(std::shared_ptr<Column>(
-                        new CompressedColumn(row[i],
+                        new CompressedColumn(row[initialCount + i],
                             c[0]->size())));
             columnsToCheck.push_back(i);
         } else {
             bool found = false;
             uint64_t posToCopy;
             for(int j = 0; j < nCopyFromSecond; ++j) {
-                if (posFromSecond[j].first == i) {
+                if (posFromSecond[j].first == initialCount + i) {
                     found = true;
                     posToCopy = posFromSecond[j].second;
                     break;
