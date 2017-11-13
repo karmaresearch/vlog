@@ -75,7 +75,7 @@ uname_S := $(shell uname -s)
 #ifeq ($(uname_S), Darwin)
 #endif
 ifeq ($(uname_S), Linux)
-	LDFLAGS = $(LDFLAGS) -fopenmp
+	LDFLAGS += -fopenmp
 endif
 
 
