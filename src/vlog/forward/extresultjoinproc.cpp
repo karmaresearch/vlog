@@ -132,11 +132,7 @@ void ExistentialRuleProcessor::filterDerivations(const Literal &literal,
 void ExistentialRuleProcessor::addColumns(const int blockid,
         FCInternalTableItr *itr, const bool unique,
         const bool sorted, const bool lastInsert) {
-    uint8_t columns[128];
-    for (uint32_t i = 0; i < nCopyFromSecond; ++i) {
-        columns[i] = posFromSecond[i].second;
-    }
-    std::vector<std::shared_ptr<Column>> c = itr->getColumn(nCopyFromSecond, columns);
+    std::vector<std::shared_ptr<Column>> c = itr->getAllColumns();
     uint64_t sizecolumns = 0;
     if (c.size() > 0) {
         sizecolumns = c[0]->size();
@@ -232,7 +228,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
             if (t.isVariable()) {
                 bool found = false;
                 for(int j = 0; j < nCopyFromSecond; ++j) { //Does it exist in the body?
-                    if (posFromSecond[j].first == i) {
+                    if (posFromSecond[j].first == count + i) {
                         found = true;
                         break;
                     }
@@ -250,32 +246,9 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         count += literal.getTupleSize();
     }
 
-    if (nCopyFromSecond > 1) { //Rearrange the columns depending on the order
-        //in the head
-        std::vector<std::shared_ptr<Column>> c2;
-        int rowID = 0;
-        int largest = -1;
-        for (int i = 0; i < nCopyFromSecond; ++i) {
-            //Get the row with the smallest ID
-            int minID = INT_MAX;
-            for (int j = 0; j <  nCopyFromSecond; ++j) {
-                if (posFromSecond[j].first > largest &&
-                        posFromSecond[j].first < minID) {
-                    rowID = j;
-                    minID = posFromSecond[j].first;
-                }
-            }
-            c2.push_back(c[rowID]);
-            largest = posFromSecond[rowID].first;
-        }
-        assert(c2.size() == c.size());
-        c = c2;
-    }
-
     if (c.size() < rowsize) {
         //The heads contain also constants or ext vars.
         std::vector<std::shared_ptr<Column>> newc;
-        int idxVar = 0;
         uint8_t count = 0;
         for(const auto &at : atomTables) {
             const auto &literal = at->getLiteral();
@@ -284,13 +257,19 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                 if (!t.isVariable()) {
                     newc.push_back(std::shared_ptr<Column>(
                                 new CompressedColumn(row[count + i],
-                                    c[0]->size())));
+                                    sizecolumns)));
                 } else {
                     //Does the variable appear in the body? Then copy it
-                    if (idxVar < nCopyFromSecond &&
-                            posFromSecond[idxVar].first == i) {
-                        newc.push_back(c[idxVar++]);
-                    } else {
+                    bool found = false;
+                    for(uint8_t j = 0; j < nCopyFromSecond; ++j) {
+                        if (posFromSecond[j].first == count + i) {
+                            found = true;
+                            uint8_t pos = posFromSecond[j].second;
+                            newc.push_back(c[pos]);
+                            break;
+                        }
+                    }
+                    if (!found) {
                         newc.push_back(extvars[t.getId()]);
                     }
                 }

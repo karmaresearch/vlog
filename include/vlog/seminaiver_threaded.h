@@ -109,7 +109,8 @@ class SemiNaiverThreaded: public SemiNaiver {
 
         bool executeUntilSaturation(
                 std::vector<RuleExecutionDetails> &ruleset,
-                std::vector<StatIteration> &costRules);
+                std::vector<StatIteration> &costRules,
+                bool fixpoint);
 };
 
 #endif

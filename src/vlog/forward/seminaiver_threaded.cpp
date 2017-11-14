@@ -6,7 +6,8 @@
 
 bool SemiNaiverThreaded::executeUntilSaturation(
         std::vector<RuleExecutionDetails> &ruleset,
-        std::vector<StatIteration> &costRules) {
+        std::vector<StatIteration> &costRules,
+        bool fixpoint) {
 
     //Create n threads
     std::vector<std::thread> threads(interRuleThreads);

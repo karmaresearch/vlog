@@ -197,7 +197,8 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
 
 bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
         std::vector<RuleExecutionDetails> &ruleset,
-        std::vector<StatIteration> &costRules) {
+        std::vector<StatIteration> &costRules,
+        bool fixpoint) {
 #if DEBUG
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 #endif
@@ -212,7 +213,7 @@ bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
 #endif
 
     if (ruleset.size() > 0) {
-        newDer |= executeUntilSaturation(ruleset, costRules);
+        newDer |= executeUntilSaturation(ruleset, costRules, fixpoint);
     }
     return newDer;
 }
@@ -309,21 +310,21 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
         while (true) {
             bool resp1;
             if (loopNr == 0)
-                resp1 = executeRules(tmpEDBRules, tmpIDBRules, costRules);
+                resp1 = executeRules(tmpEDBRules, tmpIDBRules, costRules, true);
             else
-                resp1 = executeRules(emptyRuleset, tmpIDBRules, costRules);
+                resp1 = executeRules(emptyRuleset, tmpIDBRules, costRules, true);
             bool resp2;
             if (loopNr == 0)
-                resp2 = executeRules(tmpExtEDBRules, tmpExtIDBRules, costRules);
+                resp2 = executeRules(tmpExtEDBRules, tmpExtIDBRules, costRules, false);
             else
-                resp2 = executeRules(emptyRuleset, tmpExtIDBRules, costRules);
+                resp2 = executeRules(emptyRuleset, tmpExtIDBRules, costRules, false);
             if (!resp1 && !resp2) {
                 break; //Fix-point
             }
             loopNr++;
         }
     } else {
-        executeRules(allEDBRules, allIDBRules, costRules);
+        executeRules(allEDBRules, allIDBRules, costRules, true);
     }
 
     running = false;
@@ -352,7 +353,8 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
 
 bool SemiNaiver::executeUntilSaturation(
         std::vector<RuleExecutionDetails> &ruleset,
-        std::vector<StatIteration> &costRules) {
+        std::vector<StatIteration> &costRules,
+        bool fixpoint) {
     size_t currentRule = 0;
     uint32_t rulesWithoutDerivation = 0;
 
@@ -437,6 +439,8 @@ bool SemiNaiver::executeUntilSaturation(
             LOG(DEBUGL) << "Rules with the highest cost\n\n" << out;
             lastIteration = iteration;
             //END CODE STATISTICS
+            if (!fixpoint)
+                break;
 #endif
         }
     } while (rulesWithoutDerivation != ruleset.size());
@@ -959,14 +963,14 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             } else {
                 if (ruleDetails.rule.isExistential()) {
                     joinOutput = new ExistentialRuleProcessor(
-                      plan.posFromFirst[optimalOrderIdx],
-                      plan.posFromSecond[optimalOrderIdx],
-                      heads, &ruleDetails,
-                      (uint8_t) orderExecution, iteration,
-                      finalResultContainer == NULL,
-                      !multithreaded ? -1 : nthreads,
-                      this,
-                      chaseMgmt);
+                            plan.posFromFirst[optimalOrderIdx],
+                            plan.posFromSecond[optimalOrderIdx],
+                            heads, &ruleDetails,
+                            (uint8_t) orderExecution, iteration,
+                            finalResultContainer == NULL,
+                            !multithreaded ? -1 : nthreads,
+                            this,
+                            chaseMgmt);
                 } else {
                     joinOutput = new FinalRuleProcessor(
                             plan.posFromFirst[optimalOrderIdx],

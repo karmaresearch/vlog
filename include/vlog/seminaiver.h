@@ -99,7 +99,8 @@ class SemiNaiver {
 
         bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
                 std::vector<RuleExecutionDetails> &allIDBRules,
-                std::vector<StatIteration> &costRules);
+                std::vector<StatIteration> &costRules,
+                bool fixpoint);
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
                 std::vector<Literal> &heads,
@@ -132,7 +133,8 @@ class SemiNaiver {
 
         virtual bool executeUntilSaturation(
                 std::vector<RuleExecutionDetails> &ruleset,
-                std::vector<StatIteration> &costRules);
+                std::vector<StatIteration> &costRules,
+                bool fixpoint);
 
     public:
         SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,

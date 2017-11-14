@@ -62,20 +62,13 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
     std::vector<uint8_t> existingVariables;
 
     //Get all variables in the head, and dependencies if they are existential
-    std::map<uint8_t,uint8_t> variablesNeededForHead;
+    std::map<uint8_t,std::vector<uint8_t>> variablesNeededForHead;
     uint32_t countVars = 0;
     for (auto &headLiteral : heads) {
         for (uint8_t headPos = 0; headPos < headLiteral.getTupleSize(); ++headPos) {
             const VTerm headTerm = headLiteral.getTermAtPos(headPos);
             if (headTerm.isVariable()) {
-                variablesNeededForHead.insert(std::make_pair(headTerm.getId(), countVars + headPos));
-                if (dependenciesExtVars.count(headTerm.getId())) {
-                    for(auto v : dependenciesExtVars[headTerm.getId()]) {
-                        uint8_t notfoundvalue = 0;
-                        notfoundvalue = ~notfoundvalue;
-                        variablesNeededForHead.insert(std::make_pair(v, notfoundvalue));
-                    }
-                }
+                variablesNeededForHead[headTerm.getId()].push_back(countVars + headPos);
             }
         }
         countVars += headLiteral.getTupleSize();
@@ -95,7 +88,8 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
             for (uint8_t m = 0; m < existingVariables.size(); ++m) {
                 if (variablesNeededForHead.count(existingVariables[m])) {
                     auto p = variablesNeededForHead.find(existingVariables[m]);
-                    pf.push_back(make_pair(p->second, m));
+                    for (auto &el : p->second)
+                        pf.push_back(make_pair(el, m));
                 }
             }
         } else {
@@ -175,7 +169,8 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                             // the variable number in the pattern.
                             if (!varSoFar.count(t.getId())) {
                                 auto p = variablesNeededForHead.find(t.getId());
-                                ps.push_back(make_pair(p->second, litVars));
+                                for(auto &el : p->second)
+                                    ps.push_back(make_pair(el, litVars));
                             }
                             varSoFar.insert(t.getId());
                         } else {
