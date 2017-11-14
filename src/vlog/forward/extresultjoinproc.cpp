@@ -52,11 +52,12 @@ void ExistentialRuleProcessor::filterDerivations(const Literal &literal,
         std::pair<uint8_t, uint8_t> *posFromSecond,
         std::vector<std::shared_ptr<Column>> c,
         uint64_t sizecolumns,
-        std::vector<uint64_t> &output) {
+        std::vector<uint64_t> &outputProc) {
     //Filter out all substitutions are are already existing...
     std::vector<std::shared_ptr<Column>> tobeRetained;
     std::vector<uint8_t> columnsToCheck;
     const uint8_t rowsize = literal.getTupleSize();
+    std::vector<uint64_t> output;
     for (int i = 0; i < rowsize; ++i) {
         auto t = literal.getTermAtPos(i);
         if (!t.isVariable()) {
@@ -121,8 +122,11 @@ void ExistentialRuleProcessor::filterDerivations(const Literal &literal,
         tableItr.moveNextCount();
     }
     std::sort(output.begin(), output.end());
-    auto last = std::unique(output.begin(), output.end());
-    output.resize(last - output.begin());
+    auto end = std::unique(output.begin(), output.end());
+    output.resize(end - output.begin());
+    for(auto el : output)
+        outputProc.push_back(el);
+
 }
 
 void ExistentialRuleProcessor::addColumns(const int blockid,
@@ -151,45 +155,70 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         }
     }
 
-    if (filterRows.size() == sizecolumns) {
-        return; //no new info
+    if (filterRows.size() == sizecolumns * atomTables.size()) {
+        return; //every substitution already exists in the database. Nothing
+        //new can be derived.
     }
 
     //Filter out the potential values for the derivation
     if (!filterRows.empty()) {
-        std::vector<ColumnWriter> writers;
-        std::vector<std::unique_ptr<ColumnReader>> readers;
-        for(uint8_t i = 0; i < rowsize; ++i) {
-            readers.push_back(c[i]->getReader());
-        }
-        writers.resize(c.size());
-        uint64_t idxs = 0;
-        uint64_t nextid = filterRows[idxs];
-        for(uint64_t i = 0; i < sizecolumns; ++i) {
-            if (i < nextid) {
-                //Copy
-                for(uint8_t j = 0; j < rowsize; ++j) {
-                    if (!readers[j]->hasNext()) {
-                        throw 10;
-                    }
-                    writers[j].add(readers[j]->next());
-                }
+        std::sort(filterRows.begin(), filterRows.end());
+        std::vector<uint64_t> newFilterRows; //Remember only the rows where all
+        //atoms were found
+        uint8_t count = 0;
+        uint64_t prevIdx = ~0lu;
+        for(uint64_t i = 0; i < filterRows.size(); ++i) {
+            if (filterRows[i] == prevIdx) {
+                count++;
             } else {
-                //Move to the next ID if any
-                if (idxs < filterRows.size()) {
-                    nextid = filterRows[++idxs];
-                } else {
-                    nextid = ~0lu; //highest value -- copy the rest
+                if (prevIdx != ~0lu && count == atomTables.size()) {
+                    newFilterRows.push_back(prevIdx);
                 }
+                prevIdx = filterRows[i];
+                count = 1;
             }
         }
-        //Copy back the retricted columns
-        for(uint8_t i = 0; i < rowsize; ++i) {
-            c[i] = writers[i].getColumn();
+        if (prevIdx != ~0lu && count == atomTables.size()) {
+            newFilterRows.push_back(prevIdx);
         }
-        sizecolumns = 0;
-        if (rowsize > 0) {
-            sizecolumns = c[0]->size();
+        filterRows = newFilterRows;
+
+        if (!filterRows.empty()) {
+            //Now I can filter the columns
+            std::vector<ColumnWriter> writers;
+            std::vector<std::unique_ptr<ColumnReader>> readers;
+            for(uint8_t i = 0; i < c.size(); ++i) {
+                readers.push_back(c[i]->getReader());
+            }
+            writers.resize(c.size());
+            uint64_t idxs = 0;
+            uint64_t nextid = filterRows[idxs];
+            for(uint64_t i = 0; i < sizecolumns; ++i) {
+                if (i < nextid) {
+                    //Copy
+                    for(uint8_t j = 0; j < c.size(); ++j) {
+                        if (!readers[j]->hasNext()) {
+                            throw 10;
+                        }
+                        writers[j].add(readers[j]->next());
+                    }
+                } else {
+                    //Move to the next ID if any
+                    if (idxs < filterRows.size()) {
+                        nextid = filterRows[++idxs];
+                    } else {
+                        nextid = ~0lu; //highest value -- copy the rest
+                    }
+                }
+            }
+            //Copy back the retricted columns
+            for(uint8_t i = 0; i < c.size(); ++i) {
+                c[i] = writers[i].getColumn();
+            }
+            sizecolumns = 0;
+            if (rowsize > 0) {
+                sizecolumns = c[0]->size();
+            }
         }
     }
 
