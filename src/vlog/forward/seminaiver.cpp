@@ -972,13 +972,29 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                             this,
                             chaseMgmt);
                 } else {
-                    joinOutput = new FinalRuleProcessor(
-                            plan.posFromFirst[optimalOrderIdx],
-                            plan.posFromSecond[optimalOrderIdx],
-                            heads, &ruleDetails,
-                            (uint8_t) orderExecution, iteration,
-                            finalResultContainer == NULL,
-                            !multithreaded ? -1 : nthreads, this);
+                    if (heads.size() == 1) {
+                        FCTable *table = getTable(heads[0].getPredicate().getId(),
+                                heads[0].getPredicate().getCardinality());
+                        joinOutput = new SingleHeadFinalRuleProcessor(
+                                plan.posFromFirst[optimalOrderIdx],
+                                plan.posFromSecond[optimalOrderIdx],
+                                table,
+                                heads[0],
+                                0,
+                                &ruleDetails,
+                                (uint8_t) orderExecution,
+                                iteration,
+                                finalResultContainer == NULL,
+                                !multithreaded ? -1 : nthreads);
+                    } else {
+                        joinOutput = new FinalRuleProcessor(
+                                plan.posFromFirst[optimalOrderIdx],
+                                plan.posFromSecond[optimalOrderIdx],
+                                heads, &ruleDetails,
+                                (uint8_t) orderExecution, iteration,
+                                finalResultContainer == NULL,
+                                !multithreaded ? -1 : nthreads, this);
+                    }
                 }
             }
             //END --  Determine where to put the results of the query
