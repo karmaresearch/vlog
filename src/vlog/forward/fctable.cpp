@@ -258,12 +258,12 @@ std::shared_ptr<const Segment> FCTable::retainFrom(
             ++itr) {
         sz += itr->table->getNRows();
     }
-    LOG(DEBUGL) << "retainFrom: t.size() = " << t->getNRows() << ", blocks.size() = " << blocks.size() << ", sz = " << sz;
+    //    LOG(DEBUGL) << "retainFrom: t.size() = " << t->getNRows() << ", blocks.size() = " << blocks.size() << ", sz = " << sz;
     for (std::vector<FCBlock>::const_iterator itr = blocks.cbegin();
             itr != blocks.cend();
             ++itr) {
         t = SegmentInserter::retain(t, itr->table, dupl, nthreads);
-        LOG(DEBUGL) << "after retain: t.size() = " << t->getNRows() << ", table size was " << itr->table->getNRows();
+        //        LOG(DEBUGL) << "after retain: t.size() = " << t->getNRows() << ", table size was " << itr->table->getNRows();
         passed = true;
     }
 
@@ -328,7 +328,7 @@ bool FCTable::add(std::shared_ptr<const FCInternalTable> t,
         throw 10;
     }
 
-    FCBlock block(iteration, t, literal, posLiteralInRule, 
+    FCBlock block(iteration, t, literal, posLiteralInRule,
             rule, ruleExecOrder, isCompleted);
     blocks.push_back(block);
     return true;
@@ -362,7 +362,7 @@ size_t FCTable::getNRows(const size_t iteration) const {
 size_t FCTable::getNAllRows() const {
     size_t output = 0;
     for (std::vector<FCBlock>::const_iterator itr = blocks.begin(); itr != blocks.end(); ++itr) {
-        LOG(DEBUGL) << "getNAllRows: block of " << itr->table->getNRows() << ", from iteration " << itr->iteration;
+        //LOG(DEBUGL) << "getNAllRows: block of " << itr->table->getNRows() << ", from iteration " << itr->iteration;
         output += itr->table->getNRows();
     }
     return output;

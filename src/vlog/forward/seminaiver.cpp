@@ -332,6 +332,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
 
     //DEBUGGING CODE -- needed to see which rules cost the most
     //Sort the iteration costs
+#ifdef DEBUG
     std::sort(costRules.begin(), costRules.end());
     int i = 0;
     double sum = 0;
@@ -349,6 +350,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
     }
     LOG(DEBUGL) << "Sum first 20 rules: " << sum
         << " first 10:" << sum10;
+#endif
 }
 
 bool SemiNaiver::executeUntilSaturation(
@@ -364,7 +366,6 @@ bool SemiNaiver::executeUntilSaturation(
 
     std::chrono::system_clock::time_point round_start = std::chrono::system_clock::now();
     do {
-        //LOG(INFOL) << "Iteration " << iteration;
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         bool response = executeRule(ruleset[currentRule],
                 iteration,
@@ -413,10 +414,10 @@ bool SemiNaiver::executeUntilSaturation(
         currentRule = (currentRule + 1) % ruleset.size();
 
         if (currentRule == 0) {
+#ifdef DEBUG
             std::chrono::duration<double> sec = std::chrono::system_clock::now() - round_start;
             LOG(DEBUGL) << "--Time round " << sec.count() * 1000 << " " << iteration;
             round_start = std::chrono::system_clock::now();
-#ifdef DEBUG
             //CODE FOR Statistics
             LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". RulesWithDerivation=" <<
                 nRulesOnePass << " out of " << ruleset.size() << " Derivations so far " << countAllIDBs();
@@ -439,9 +440,9 @@ bool SemiNaiver::executeUntilSaturation(
             LOG(DEBUGL) << "Rules with the highest cost\n\n" << out;
             lastIteration = iteration;
             //END CODE STATISTICS
+#endif
             if (!fixpoint)
                 break;
-#endif
         }
     } while (rulesWithoutDerivation != ruleset.size());
                     return newDer;
