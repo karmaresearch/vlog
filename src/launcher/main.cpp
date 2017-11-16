@@ -170,6 +170,9 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
 
         } else if (cmd == "mat") {
             string path = vm["rules"].as<string>();
+            if (path == "") {
+                printErrorMsg(string("You must set up the 'rules' parameter to launch the materialization").c_str());
+            }
             if (path != "" && !Utils::exists(path)) {
                 printErrorMsg((string("The rule file '") +
                             path + string("' does not exists")).c_str());
