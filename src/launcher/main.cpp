@@ -917,6 +917,7 @@ int main(int argc, const char** argv) {
             p.timeoutStats = 0;
             p.storeDicts = true;
             p.relsOwnIDs = false;
+            p.flatTree = false;
 
             loader->load(p);
 
@@ -966,6 +967,7 @@ int main(int argc, const char** argv) {
             p.timeoutStats = 0;
             p.storeDicts = true;
             p.relsOwnIDs = false;
+            p.flatTree = false;
 
             loader->load(p);
 
