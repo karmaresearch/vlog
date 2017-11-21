@@ -914,7 +914,7 @@ int main(int argc, const char** argv) {
             p.remoteLocation = "";
             p.limitSpace = 0;
             p.graphTransformation = "";
-            p.timeoutStats = 0;
+            p.timeoutStats = -1;
             p.storeDicts = true;
             p.relsOwnIDs = false;
             p.flatTree = false;
@@ -964,7 +964,7 @@ int main(int argc, const char** argv) {
             p.remoteLocation = "";
             p.limitSpace = 0;
             p.graphTransformation = "";
-            p.timeoutStats = 0;
+            p.timeoutStats = -1;
             p.storeDicts = true;
             p.relsOwnIDs = false;
             p.flatTree = false;
