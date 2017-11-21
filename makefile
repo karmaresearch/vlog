@@ -6,9 +6,7 @@ OUTPUTDIR = .
 
 # where is trident? Default below, but can be overriden on the commandline.
 TRIDENT = ../trident
-# KOGNAC = ../kognac
-KOGNAC = $(TRIDENT)/build/kognac
-KOGNACLIB = $(KOGNAC)
+KOGNAC = ../kognac
 RDF3X = $(TRIDENT)/rdf3x
 CPLUS = g++
 
@@ -60,13 +58,13 @@ ifeq ($(DEBUG),1)
 	CPPFLAGS+=$(DEBUGFLAGS)
 	VLOG=$(PRGNAME_DEBUG)
 	BUILDDIR=$(BUILDDIR_DEBUG)
-	# KOGNACLIB=$(KOGNAC)/build_debug
+	KOGNACLIB=$(KOGNAC)/build_debug
 	TRIDENTLIB=$(TRIDENT)/build_debug
 else
 	CPPFLAGS+=$(RELEASEFLAGS)
 	VLOG=$(PRGNAME_RELEASE)
 	BUILDDIR=$(BUILDDIR_RELEASE)
-	# KOGNACLIB=$(KOGNAC)/build
+	KOGNACLIB=$(KOGNAC)/build
 	TRIDENTLIB=$(TRIDENT)/build
 endif
 
