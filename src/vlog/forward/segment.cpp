@@ -1381,7 +1381,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
             toRead2 = false;
         }
 
-        int res = 0;
+        long res = 0;
         for (uint8_t i = 0; i < nPosToCompare; ++i) {
             if (segmentIterator->get(posToCompare[i]) != itr2->getCurrentValue(i)) {
                 res = segmentIterator->get(posToCompare[i]) - itr2->getCurrentValue(i);
