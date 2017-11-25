@@ -98,7 +98,7 @@ void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
     infot.id = (PredId_t) predDictionary.getOrAdd(pn);
     infot.type = tableConf.type;
     InmemoryTable *table = new InmemoryTable(tableConf.params[0],
-            tableConf.params[1]);
+            tableConf.params[1], infot.id);
     infot.manager = std::shared_ptr<EDBTable>(table);
     infot.arity = table->getArity();
     dbPredicates.insert(make_pair(infot.id, infot));

@@ -55,16 +55,19 @@ class VTerm {
 };
 
 /*** TUPLES ***/
-#define SIZETUPLE 5
+#define SIZETUPLE 10
 class VTuple {
     private:
         const uint8_t sizetuple;
         VTerm terms[SIZETUPLE];
     public:
-        VTuple(const uint8_t sizetuple) : sizetuple(sizetuple) { if (sizetuple > SIZETUPLE) {
-            LOG(ERRORL) << "Need to recompile the program to support larger cardinalities " << sizetuple;
-            throw 10;
-        }}
+        VTuple(const uint8_t sizetuple) : sizetuple(sizetuple) {
+            if (sizetuple > SIZETUPLE) {
+                LOG(ERRORL) << "Need to recompile the program to support larger "
+                    "cardinalities " << sizetuple;
+                throw 10;
+            }
+        }
         size_t getSize() const {
             return sizetuple;
         }

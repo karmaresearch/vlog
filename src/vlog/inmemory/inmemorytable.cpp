@@ -47,7 +47,8 @@ bool InmemoryDict::getText(uint64_t id, char *text) {
     }
 }
 
-InmemoryTable::InmemoryTable(string repository, string tablename) {
+InmemoryTable::InmemoryTable(string repository, string tablename,
+        PredId_t predid) {
     arity = 0;
     string schemaFile = repository + "/" + tablename + ".schema";
     ifstream ifs;
@@ -67,9 +68,28 @@ InmemoryTable::InmemoryTable(string repository, string tablename) {
     }
 
     //Load the table in the database
-    ifs.open(repository + "/" + tablename + ".csv");
-
-    ifs.close();
+    string tablefile = repository + "/" + tablename + ".csv";
+    if (Utils::exists(tablefile)) {
+        SegmentInserter inserter(arity);
+        ifs.open(tablefile);
+        string line;
+        std::unique_ptr<Term_t> row = std::unique_ptr<Term_t>(
+                new Term_t[arity]);
+        while(std::getline(ifs, line)) {
+            //Parse the row
+            for(uint8_t i = 0; i < arity; ++i) {
+                auto delim = line.find(',');
+                string sn = line.substr(0, delim);
+                row.get()[i] = stol(sn);
+                line = line.substr(delim + 1);
+            }
+            inserter.addRow(row.get());
+        }
+        segment = inserter.getSegment();
+        ifs.close();
+    } else {
+        segment = NULL;
+    }
 }
 
 void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
@@ -79,9 +99,31 @@ void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
     throw 10;
 }
 
+bool InmemoryTable::isEmpty(const Literal &q, std::vector<uint8_t> *posToFilter,
+        std::vector<Term_t> *valuesToFilter) {
+    if (posToFilter == NULL) {
+        return segment == NULL;
+    } else {
+        LOG(ERRORL) << "Not implemented yet";
+        throw 10;
+    }
+}
+
 size_t InmemoryTable::getCardinality(const Literal &q) {
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
+    if (q.getNUniqueVars() == q.getTupleSize()) {
+        if (segment == NULL) {
+            return 0;
+        } else {
+            if (arity == 0) {
+                return 1;
+            } else {
+                return segment->getNRows();
+            }
+        }
+    } else {
+        LOG(ERRORL) << "Not implemented yet";
+        throw 10;
+    }
 }
 
 size_t InmemoryTable::getCardinalityColumn(const Literal &q, uint8_t posColumn) {
@@ -89,21 +131,24 @@ size_t InmemoryTable::getCardinalityColumn(const Literal &q, uint8_t posColumn) 
     throw 10;
 }
 
-bool InmemoryTable::isEmpty(const Literal &q, std::vector<uint8_t> *posToFilter,
-        std::vector<Term_t> *valuesToFilter) {
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
-}
-
-EDBIterator *InmemoryTable::getIterator(const Literal &query) {
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
+EDBIterator *InmemoryTable::getIterator(const Literal &q) {
+    if (q.getNUniqueVars() == q.getTupleSize()) {
+        return new InmemoryIterator(segment, predid);
+    } else {
+        LOG(ERRORL) << "Not implemented yet";
+        throw 10;
+    }
 }
 
 EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
         const std::vector<uint8_t> &fields) {
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
+    if (query.getNUniqueVars() == query.getTupleSize()) {
+        auto sortedSegment = segment->sortBy(&fields);
+        return new InmemoryIterator(sortedSegment, predid);
+    } else {
+        LOG(ERRORL) << "Not implemented yet";
+        throw 10;
+    }
 }
 
 std::vector<std::shared_ptr<Column>> InmemoryTable::checkNewIn(const Literal &l1,
@@ -133,13 +178,11 @@ std::shared_ptr<Column> InmemoryTable::checkIn(
 }
 
 void InmemoryTable::releaseIterator(EDBIterator *itr) {
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
+    delete itr;
 }
 
 size_t InmemoryTable::estimateCardinality(const Literal &query) {
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
+    return getCardinality(query);
 }
 
 bool InmemoryTable::getDictNumber(const char *text, const size_t sizeText,
@@ -160,4 +203,28 @@ uint8_t InmemoryTable::getArity() const {
 }
 
 InmemoryTable::~InmemoryTable() {
+}
+
+bool InmemoryIterator::hasNext() {
+    return iterator->hasNext();
+}
+
+void InmemoryIterator::next() {
+    iterator->next();
+}
+
+Term_t InmemoryIterator::getElementAt(const uint8_t p) {
+    return iterator->get(p);
+}
+
+PredId_t InmemoryIterator::getPredicateID() {
+    return predid;
+}
+
+void InmemoryIterator::skipDuplicatedFirstColumn() {
+    LOG(ERRORL) << "Not implemented yet";
+    throw 10;
+}
+
+void InmemoryIterator::clear() {
 }

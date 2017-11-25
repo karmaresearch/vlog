@@ -3,6 +3,8 @@
 
 #include <vlog/column.h>
 #include <vlog/edbtable.h>
+#include <vlog/edbiterator.h>
+#include <vlog/segment.h>
 
 class InmemoryDict {
     private:
@@ -34,13 +36,39 @@ class InmemoryDict {
         void load(string pathfile);
 };
 
+class InmemoryIterator : public EDBIterator {
+    private:
+        std::shared_ptr<const Segment> segment;
+        std::unique_ptr<SegmentIterator> iterator;
+        PredId_t predid;
+
+    public:
+        InmemoryIterator(std::shared_ptr<const Segment> segment, PredId_t predid) :
+            segment(segment), iterator(segment->iterator()), predid(predid) {
+            }
+
+        bool hasNext();
+
+        void next();
+
+        Term_t getElementAt(const uint8_t p);
+
+        PredId_t getPredicateID();
+
+        void skipDuplicatedFirstColumn();
+
+        void clear();
+};
+
 class InmemoryTable : public EDBTable {
     private:
         std::vector<string> varnames;
+        PredId_t predid;
         uint8_t arity;
+        std::shared_ptr<const Segment> segment;
 
     public:
-        InmemoryTable(string repository, string tablename);
+        InmemoryTable(string repository, string tablename, PredId_t predid);
 
         uint8_t getArity() const;
 
