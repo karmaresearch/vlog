@@ -55,13 +55,16 @@ class VTerm {
 };
 
 /*** TUPLES ***/
-#define SIZETUPLE 3
+#define SIZETUPLE 5
 class VTuple {
     private:
         const uint8_t sizetuple;
         VTerm terms[SIZETUPLE];
     public:
-        VTuple(const uint8_t sizetuple) : sizetuple(sizetuple) {}
+        VTuple(const uint8_t sizetuple) : sizetuple(sizetuple) { if (sizetuple > SIZETUPLE) {
+            LOG(ERRORL) << "Need to recompile the program to support larger cardinalities " << sizetuple;
+            throw 10;
+        }}
         size_t getSize() const {
             return sizetuple;
         }
@@ -165,9 +168,9 @@ class Predicate {
             return card;
         }
 
-        static bool isEDB(std::string pred) {
-            return pred.at(pred.size() - 1) == 'E';
-        }
+        /*static bool isEDB(std::string pred) {
+          return pred.at(pred.size() - 1) == 'E';
+          }*/
 
         static uint8_t calculateAdornment(VTuple &t) {
             uint8_t adornment = 0;

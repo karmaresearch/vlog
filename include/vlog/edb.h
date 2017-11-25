@@ -89,6 +89,10 @@ private:
 #ifdef MAPI
     void addMAPITable(const EDBConf::Table &tableConf);
 #endif
+#ifdef MDLITE
+    void addMDLiteTable(const EDBConf::Table &tableConf);
+#endif
+    void addInmemoryTable(const EDBConf::Table &tableConf);
 
 public:
     EDBLayer(EDBConf &conf, bool multithreaded) {
@@ -108,6 +112,12 @@ public:
             } else if (table.type == "MAPI") {
                 addMAPITable(table);
 #endif
+#ifdef MDLITE
+            } else if (table.type == "MDLITE") {
+                addMDLiteTable(table);
+#endif
+            } else if (table.type == "INMEMORY") {
+                addInmemoryTable(table);
             } else {
                 LOG(ERRORL) << "Type of table is not supported";
                 throw 10;
@@ -129,6 +139,8 @@ public:
     const Dictionary &getPredDictionary() {
         return predDictionary;
     }
+
+    bool doesPredExists(PredId_t id) const;
 
     PredId_t getFirstEDBPredicate() {
         if (!dbPredicates.empty()) {

@@ -31,6 +31,7 @@ SRC_FILES = \
 			$(wildcard $(SRCDIR)/vlog/forward/*.cpp) \
 			$(wildcard $(SRCDIR)/vlog/magic/*.cpp) \
 			$(wildcard $(SRCDIR)/vlog/web/*.cpp) \
+			$(wildcard $(SRCDIR)/vlog/inmemory/*.cpp) \
 			$(wildcard $(SRCDIR)/vlog/trident/*.cpp)
 
 #Add also the launcher with the main() file. This file depends on RDF3X (for querying)
@@ -49,6 +50,12 @@ endif
 ifeq ($(MAPI),1)
 	SRC_FILES+=$(wildcard $(SRCDIR)/vlog/mapi/*.cpp)
 	CPPFLAGS+=-DMAPI
+endif
+
+ifeq ($(MDLITE),1)
+	MDLITE_ROOT= #To be fixed
+	SRC_FILES+=$(wildcard $(SRCDIR)/vlog/mdlite/*.cpp)
+	CPPFLAGS+=-I$(MDLITE_ROOT)/src/embedded -DMDLITE
 endif
 
 RELEASEFLAGS = -O3 -DNDEBUG=1 -gdwarf-2
@@ -90,8 +97,13 @@ ifeq ($(ODBC),1)
 endif
 
 #MAPI integration
-ifeq ($(ODBC),1)
+ifeq ($(MAPI),1)
 	LDFLAGS += -lmapi
+endif
+
+#MDLite integration
+ifeq ($(MDLITE),1)
+	LDFLAGS += -lmonetdb5
 endif
 
 OFILES = \

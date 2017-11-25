@@ -13,6 +13,10 @@
 #ifdef MAPI
 #include <vlog/mapi/mapitable.h>
 #endif
+#ifdef MDLITE
+#include <vlog/mdlite/mdlitetable.h>
+#endif
+#include <vlog/inmemory/inmemorytable.h>
 
 #include <unordered_map>
 #include <climits>
@@ -74,6 +78,35 @@ void EDBLayer::addMAPITable(const EDBConf::Table &tableConf) {
     dbPredicates.insert(make_pair(infot.id, infot));
 }
 #endif
+
+#ifdef MDLITE
+void EDBLayer::addMDLiteTable(const EDBConf::Table &tableConf) {
+    EDBInfoTable infot;
+    const string pn = tableConf.predname;
+    infot.id = (PredId_t) predDictionary.getOrAdd(pn);
+    infot.type = tableConf.type;
+    MDLiteTable *table = new MDLiteTable(tableConf.params[0], tableConf.params[1]);
+    infot.manager = std::shared_ptr<EDBTable>(table);
+    infot.arity = table->getArity();
+    dbPredicates.insert(make_pair(infot.id, infot));
+}
+#endif
+
+void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
+    EDBInfoTable infot;
+    const string pn = tableConf.predname;
+    infot.id = (PredId_t) predDictionary.getOrAdd(pn);
+    infot.type = tableConf.type;
+    InmemoryTable *table = new InmemoryTable(tableConf.params[0],
+            tableConf.params[1]);
+    infot.manager = std::shared_ptr<EDBTable>(table);
+    infot.arity = table->getArity();
+    dbPredicates.insert(make_pair(infot.id, infot));
+}
+
+bool EDBLayer::doesPredExists(PredId_t id) const {
+    return dbPredicates.count(id);
+}
 
 void EDBLayer::query(QSQQuery *query, TupleTable *outputTable,
         std::vector<uint8_t> *posToFilter,

@@ -13,6 +13,9 @@ void EDBConf::parse(string f) {
     std::ifstream file(f);
     std::string line;
     while (std::getline(file, line)) {
+        if (line == "" || (line.size() > 0 && line[0] == '#')) {
+            continue;
+        }
         if (Utils::starts_with(line, "EDB")) {
             //Read the ID of the edb
             std::size_t found = line.find("_");

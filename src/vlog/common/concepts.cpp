@@ -833,7 +833,7 @@ Literal Program::parseLiteral(std::string l) {
             throw 10;
         }
     }
-    Predicate pred(predid, Predicate::calculateAdornment(t1), Predicate::isEDB(predicate) ? EDB : IDB, (uint8_t) t.size());
+    Predicate pred(predid, Predicate::calculateAdornment(t1), kb->doesPredExists(predid) ? EDB : IDB, (uint8_t) t.size());
 
     Literal literal(pred, t1);
     return literal;
@@ -909,13 +909,13 @@ void Program::addAllRules(std::vector<Rule> &rules) {
 }
 
 bool Program::isPredicateIDB(const PredId_t id) {
-    return !Predicate::isEDB(getPredicateName(id));
+    return !kb->doesPredExists(id);
 }
 
 int Program::getNEDBPredicates() {
     int n = 0;
     for (const auto &el : dictPredicates.getMap()) {
-        if (Predicate::isEDB(el.first)) {
+        if (kb->doesPredExists(el.second)) {
             n++;
         }
     }
@@ -925,7 +925,7 @@ int Program::getNEDBPredicates() {
 int Program::getNIDBPredicates() {
     int n = 0;
     for (const auto &el : dictPredicates.getMap()) {
-        if (!Predicate::isEDB(el.first)) {
+        if (!kb->doesPredExists(el.second)) {
             n++;
         }
     }
@@ -1021,13 +1021,13 @@ Predicate Program::getPredicate(std::string & p) {
 
 Predicate Program::getPredicate(const PredId_t id) {
     uint8_t card = cardPredicates.find(id)->second;
-    return Predicate(id, 0, Predicate::isEDB(dictPredicates.getRawValue(id)) ? EDB : IDB,
+    return Predicate(id, 0, kb->doesPredExists(id) ? EDB : IDB,
             card);
 }
 
 Predicate Program::getPredicate(std::string & p, uint8_t adornment) {
     PredId_t id = (PredId_t) dictPredicates.getOrAdd(p);
-    return Predicate(id, adornment, Predicate::isEDB(p) ? EDB : IDB,
+    return Predicate(id, adornment, kb->doesPredExists(id) ? EDB : IDB,
             cardPredicates.find(id)->second);
 }
 

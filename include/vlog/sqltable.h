@@ -2,7 +2,6 @@
 #define _SQL_TABLE_H
 
 #include <vlog/column.h>
-#include <vlog/sqltable.h>
 #include <vlog/edbiterator.h>
 
 class SQLTable : public EDBTable {
