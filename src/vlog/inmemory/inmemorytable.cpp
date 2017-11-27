@@ -187,7 +187,25 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
             }
         }
     } else {
-        auto sortedSegment = segment->sortBy(&fields);
+        std::shared_ptr<const Segment> sortedSegment;
+        if (fields.size() >=8) {
+            sortedSegment = segment->sortBy(&fields);
+        } else {
+            //See if I have it in the cache
+            uint64_t sortedKey = 0;
+            for(uint8_t i = 0; i < fields.size(); ++i) {
+                uint8_t field = fields[i];
+                sortedKey += ((uint64_t)(field+1)) << 8;
+            }
+            if (cachedSortedSegments.count(sortedKey)) {
+                sortedSegment = cachedSortedSegments[sortedKey];
+            } else {
+                sortedSegment = segment->sortBy(&fields);
+                cachedSortedSegments[sortedKey] = sortedSegment;
+            }
+        }
+
+
         //Filter the table
         InmemoryFCInternalTable t(arity, 0, false, segment);
         std::vector<uint8_t> posVarsToCopy;
