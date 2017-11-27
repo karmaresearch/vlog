@@ -8,8 +8,8 @@
 #include <inttypes.h>
 
 /*CompressedColumn::CompressedColumn(const CompressedColumn &o) : blocks(o.blocks), offsetsize(o.offsetsize),
-    deltas(o.deltas), _size(o._size) {
-}*/
+  deltas(o.deltas), _size(o._size) {
+  }*/
 
 bool CompressedColumn::isIn(const Term_t t) const {
     //Not implemented yet. Assume the element is there.
@@ -26,7 +26,7 @@ std::shared_ptr<Column> CompressedColumn::sort() const {
     ColumnWriter writer(newValues);
 
     //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    //LOG(DEBUGL) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
+    //LOG(TRACEL) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
 
     return writer.getColumn();
 }
@@ -42,10 +42,10 @@ std::shared_ptr<Column> CompressedColumn::sort_and_unique() const {
     newValues.erase(last, newValues.end());
     newValues.shrink_to_fit();
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    LOG(DEBUGL) << "Time std::unique = " << sec.count() * 1000 << " size()=" << _size;
+    LOG(TRACEL) << "Time std::unique = " << sec.count() * 1000 << " size()=" << _size;
 
     //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    //LOG(DEBUGL) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
+    //LOG(TRACEL) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
     return std::shared_ptr<Column>(new InmemoryColumn(newValues, true));
 }
 
@@ -67,7 +67,7 @@ std::shared_ptr<Column> CompressedColumn::sort(const int nthreads) const {
 
     ColumnWriter writer(newValues);
     //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    //LOG(DEBUGL) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
+    //LOG(TRACEL) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
     return writer.getColumn();
 
 }
@@ -105,9 +105,9 @@ std::shared_ptr<Column> CompressedColumn::sort_and_unique(const int nthreads) co
     newValues.erase(last, newValues.end());
     newValues.shrink_to_fit();
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    LOG(DEBUGL) << "Time std::unique = " << sec.count() * 1000 << " size()=" << _size;
+    LOG(TRACEL) << "Time std::unique = " << sec.count() * 1000 << " size()=" << _size;
     //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    //LOG(DEBUGL) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
+    //LOG(TRACEL) << "Time sorting = " << sec.count() * 1000 << " size()=" << _size;
     return std::shared_ptr<Column>(new InmemoryColumn(newValues, true));
 }
 
@@ -124,13 +124,13 @@ std::shared_ptr<Column> CompressedColumn::unique() const {
         }
     }
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    LOG(DEBUGL) << "Time CompressedColumn::unique = " << sec.count() * 1000 << " size()=" << _size;
+    LOG(TRACEL) << "Time CompressedColumn::unique = " << sec.count() * 1000 << " size()=" << _size;
     return std::shared_ptr<Column>(new CompressedColumn(newblocks, newsize));
 }
 
 std::unique_ptr<ColumnReader> CompressedColumn::getReader() const {
     return std::unique_ptr<ColumnReader>(new ColumnReaderImpl(
-            blocks, _size));
+                blocks, _size));
 }
 
 Term_t CompressedColumn::getValue(const size_t pos) const {
@@ -148,7 +148,7 @@ Term_t CompressedColumn::getValue(const size_t pos) const {
 
 bool ColumnReaderImpl::hasNext() {
     return currentBlock < blocks.size() - 1 ||
-           posInBlock < blocks.back().size + 1;
+        posInBlock < blocks.back().size + 1;
 }
 
 Term_t ColumnReaderImpl::next() {
@@ -164,42 +164,42 @@ Term_t ColumnReaderImpl::next() {
             return blocks[currentBlock].value;
         } else {
             return blocks[currentBlock].value + blocks[currentBlock].delta *
-                   posInBlock++;
+                posInBlock++;
         }
     }
 }
 
 /*Term_t ColumnReaderImpl::get(const size_t pos) {
 
-    if (pos >= beginRange && pos < endRange) {
-        if (lastDelta == NULL || pos == beginRange) {
-            return lastBasePos;
-        } else {
-            return lastBasePos + lastDelta[pos - beginRange - 1];
-        }
-    }
+  if (pos >= beginRange && pos < endRange) {
+  if (lastDelta == NULL || pos == beginRange) {
+  return lastBasePos;
+  } else {
+  return lastBasePos + lastDelta[pos - beginRange - 1];
+  }
+  }
 
-    const uint32_t blockIdx = pos / offsetsize;
-    const uint32_t offset = pos % offsetsize;
-    Term_t returnedValue;
-    if (offset == 0 || blocks[blockIdx].idxDelta == -1) {
-        returnedValue = blocks[blockIdx].value;
-    } else {
-        //Delta - 32bit
-        returnedValue = (Term_t)((int64_t)blocks[blockIdx].value +
-                                   (int32_t)deltas[blocks[blockIdx].idxDelta + offset - 1]);
-    }
+  const uint32_t blockIdx = pos / offsetsize;
+  const uint32_t offset = pos % offsetsize;
+  Term_t returnedValue;
+  if (offset == 0 || blocks[blockIdx].idxDelta == -1) {
+  returnedValue = blocks[blockIdx].value;
+  } else {
+//Delta - 32bit
+returnedValue = (Term_t)((int64_t)blocks[blockIdx].value +
+(int32_t)deltas[blocks[blockIdx].idxDelta + offset - 1]);
+}
 
-    beginRange = blockIdx * offsetsize;
-    endRange = beginRange + offsetsize;
-    lastBasePos = blocks[blockIdx].value;
-    if (blocks[blockIdx].idxDelta == -1) {
-        lastDelta = NULL;
-    } else {
-        lastDelta = &(deltas[blocks[blockIdx].idxDelta]);
-    }
+beginRange = blockIdx * offsetsize;
+endRange = beginRange + offsetsize;
+lastBasePos = blocks[blockIdx].value;
+if (blocks[blockIdx].idxDelta == -1) {
+lastDelta = NULL;
+} else {
+lastDelta = &(deltas[blocks[blockIdx].idxDelta]);
+}
 
-    return returnedValue;
+return returnedValue;
 }*/
 
 std::vector<Term_t> ColumnReaderImpl::asVector() {
@@ -209,14 +209,14 @@ std::vector<Term_t> ColumnReaderImpl::asVector() {
     for (std::vector<CompressedColumnBlock>::const_iterator itr = blocks.begin();
             itr != blocks.end(); ++itr) {
         output.push_back(itr->value);
-	if (itr->delta == 0) {
-	    for (int32_t i = 1; i <= itr->size; ++i) {
-		output.push_back(itr->value);
-	    }
-	} else {
-	    for (int32_t i = 1; i <= itr->size; ++i) {
-		output.push_back(itr->value + itr->delta * i);
-	    }
+        if (itr->delta == 0) {
+            for (int32_t i = 1; i <= itr->size; ++i) {
+                output.push_back(itr->value);
+            }
+        } else {
+            for (int32_t i = 1; i <= itr->size; ++i) {
+                output.push_back(itr->value + itr->delta * i);
+            }
         }
     }
     return output;
@@ -231,14 +231,14 @@ Term_t ColumnReaderImpl::first() {
 }
 
 EDBColumn::EDBColumn(EDBLayer &edb, const Literal &lit, uint8_t posColumn,
-                     const std::vector<uint8_t> presortPos, const bool unq) :
+        const std::vector<uint8_t> presortPos, const bool unq) :
     layer(edb),
     l(lit),
     posColumn(posColumn),
     presortPos(presortPos),
     unq(unq) {
-    assert(!unq || presortPos.empty());
-}
+        assert(!unq || presortPos.empty());
+    }
 
 size_t EDBColumn::estimateSize() const {
     QSQQuery query(l);
@@ -265,16 +265,16 @@ size_t EDBColumn::size() const {
             retval = layer.getCardinalityColumn(*query.getLiteral(), posColumn);
         } else {
             LOG(WARNL) << "Must go through all the column"
-                                       " to count the size";
+                " to count the size";
             retval = EDBColumnReader(l, posColumn, presortPos, layer, unq).size();
         }
     }
 #if DEBUG
     size_t sz = getReader()->asVector().size();
     if (sz != retval) {
-        LOG(DEBUGL) << "query = " << l.tostring();
-        LOG(DEBUGL) << "sz = " << sz << ", should be " << retval;
-        LOG(DEBUGL) << "unq = " << unq << ", l.getNVars = " << (int) l.getNVars();
+        LOG(TRACEL) << "query = " << l.tostring();
+        LOG(TRACEL) << "sz = " << sz << ", should be " << retval;
+        LOG(TRACEL) << "unq = " << unq << ", l.getNVars = " << (int) l.getNVars();
         throw 10;
     }
 #endif
@@ -287,7 +287,7 @@ std::shared_ptr<Column> EDBColumn::sort(const int nthreads) const {
         return clone(); //Should be always sorted
     } else {
         return std::shared_ptr<Column>(new EDBColumn(layer, l, posColumn,
-                                       std::vector<uint8_t>(), unq));
+                    std::vector<uint8_t>(), unq));
     }
 }
 
@@ -296,7 +296,7 @@ std::shared_ptr<Column> EDBColumn::sort() const {
         return clone(); //Should be always sorted
     } else {
         return std::shared_ptr<Column>(new EDBColumn(layer, l, posColumn,
-                                       std::vector<uint8_t>(), unq));
+                    std::vector<uint8_t>(), unq));
     }
 }
 
@@ -307,7 +307,7 @@ std::shared_ptr<Column> EDBColumn::unique() const {
     } else {
         std::vector<uint8_t> presortPos;
         return std::shared_ptr<Column>(new EDBColumn(layer, l, posColumn,
-                                       presortPos, true));
+                    presortPos, true));
     }
 }
 
@@ -323,12 +323,12 @@ bool EDBColumn::isIn(const Term_t t) const {
     VTuple tuple = l.getTuple();
     tuple.set(VTerm(0, t), posColumn);
     return layer.getCardinalityColumn(Literal(l.getPredicate(), tuple),
-                                      posColumn) > 0;
+            posColumn) > 0;
 }
 
 std::unique_ptr<ColumnReader> EDBColumn::getReader() const {
     return std::unique_ptr<ColumnReader>(new EDBColumnReader(l, posColumn,
-                                         presortPos, layer, unq));
+                presortPos, layer, unq));
 }
 
 const char *EDBColumn::getUnderlyingArray() const {
@@ -342,14 +342,14 @@ std::pair<uint8_t, std::pair<uint8_t, uint8_t>> EDBColumn::getSizeElemUnderlying
 }
 
 EDBColumnReader::EDBColumnReader(const Literal &l, const uint8_t posColumn,
-                                 const std::vector<uint8_t> presortPos,
-                                 EDBLayer &layer, const bool unq)
+        const std::vector<uint8_t> presortPos,
+        EDBLayer &layer, const bool unq)
     : l(l), layer(layer), posColumn(posColumn), presortPos(presortPos),
-      unq(unq), //posInItr((l.getTupleSize() - l.getNVars()) + presortPos.size()),
-      posInItr(l.getPosVars()[posColumn]),
-      itr(NULL), firstCached((Term_t) - 1),
-      lastCached((Term_t) - 1) {
-}
+    unq(unq), //posInItr((l.getTupleSize() - l.getNVars()) + presortPos.size()),
+    posInItr(l.getPosVars()[posColumn]),
+    itr(NULL), firstCached((Term_t) - 1),
+    lastCached((Term_t) - 1) {
+    }
 
 const char *EDBColumnReader::getUnderlyingArray() {
     if (hasNext()) {
@@ -400,7 +400,7 @@ std::vector<Term_t> EDBColumnReader::load(const Literal &l,
     const char *rawarray = itr->getUnderlyingArray(posInItr);
     if (rawarray != NULL) {
         std::pair<uint8_t, std::pair<uint8_t, uint8_t>> sizeelements
-                = itr->getSizeElemUnderlyingArray(posInItr);
+            = itr->getSizeElemUnderlyingArray(posInItr);
         const int totalsize = sizeelements.first + sizeelements.second.first + sizeelements.second.second;
 
         size_t nrows = ((TridentIterator *) itr)->getCardinality();
@@ -452,7 +452,7 @@ std::vector<Term_t> EDBColumnReader::load(const Literal &l,
 
     layer.releaseIterator(itr);
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    LOG(DEBUGL) << "Time loading a vector of " << values.size() << " is " << sec.count() * 1000;
+    LOG(TRACEL) << "Time loading a vector of " << values.size() << " is " << sec.count() * 1000;
     return values;
 }
 
@@ -540,11 +540,11 @@ std::shared_ptr<Column> ColumnWriter::getColumn() {
 
 #ifdef USE_COMPRESSED_COLUMNS
     if (compressed) {
-        LOG(DEBUGL) << "ColumnWriter::getColumn: blocks.size() = " << blocks.size() << ", _size = " << _size;
+        LOG(TRACEL) << "ColumnWriter::getColumn: blocks.size() = " << blocks.size() << ", _size = " << _size;
 
         if (blocks.size() < _size / 5) {
             cachedColumn = std::shared_ptr<Column>(new CompressedColumn(
-                    blocks, _size));
+                        blocks, _size));
         } else {
             CompressedColumn col(blocks, /*offsetsize, deltas,*/ _size);
             std::vector<Term_t> values = col.getReader()->asVector();
@@ -574,44 +574,44 @@ std::shared_ptr<Column> ColumnWriter::getColumn(std::vector<Term_t> &values, boo
     if (shouldCompress) {
         return std::shared_ptr<Column>(new CompressedColumn(values.front(), values.size()));
         /*std::vector<CompressedColumnBlock> blocks;
-        uint32_t offsetsize = 1;
-        std::vector<int32_t> deltas;
+          uint32_t offsetsize = 1;
+          std::vector<int32_t> deltas;
 
-        for (size_t xxx = 0; xxx < values.size(); ++xxx) {
-            Term_t v = values[xxx];
-            int32_t currentSize = xxx % offsetsize;
-            if (currentSize == 0) {
-                assert(offsetsize >= COLCOMPRB || blocks.size() == 0);
-                //Create new block and add element as first
-                blocks.push_back(CompressedColumnBlock(v, -1));
-            } else {
-                //Add the value in the current block
-                //Ceriel: What if v - beginvalue does not fit in an uint32_t?
-                const Term_t beginValue = blocks.back().value;
-                if (blocks.back().idxDelta == -1) {
-                    if (v != beginValue) {
-                        blocks.back().idxDelta = deltas.size();
-                        //Convert the block to deltas
-                        //Add all existing values
-                        while (currentSize > 1) { //Insert all minus one
-                            deltas.push_back(0);
-                            currentSize--;
-                        }
-                        deltas.push_back(v - beginValue);
-                    }
-                } else {
-                    deltas.push_back(v - beginValue);
-                }
-            }
+          for (size_t xxx = 0; xxx < values.size(); ++xxx) {
+          Term_t v = values[xxx];
+          int32_t currentSize = xxx % offsetsize;
+          if (currentSize == 0) {
+          assert(offsetsize >= COLCOMPRB || blocks.size() == 0);
+        //Create new block and add element as first
+        blocks.push_back(CompressedColumnBlock(v, -1));
+        } else {
+        //Add the value in the current block
+        //Ceriel: What if v - beginvalue does not fit in an uint32_t?
+        const Term_t beginValue = blocks.back().value;
+        if (blocks.back().idxDelta == -1) {
+        if (v != beginValue) {
+        blocks.back().idxDelta = deltas.size();
+        //Convert the block to deltas
+        //Add all existing values
+        while (currentSize > 1) { //Insert all minus one
+        deltas.push_back(0);
+        currentSize--;
+        }
+        deltas.push_back(v - beginValue);
+        }
+        } else {
+        deltas.push_back(v - beginValue);
+        }
+        }
 
-            if (offsetsize < COLCOMPRB || (blocks.size() == 1
-                                           && blocks[0].idxDelta == -1)) {
-                offsetsize++;
-            }
+        if (offsetsize < COLCOMPRB || (blocks.size() == 1
+        && blocks[0].idxDelta == -1)) {
+        offsetsize++;
+        }
         }
 
         return std::shared_ptr<Column>(new CompressedColumn(blocks, offsetsize,
-                                       deltas, values.size()));*/
+        deltas, values.size()));*/
     } else {
         //swap the values. After, "values" is empty
         return std::shared_ptr<Column>(new InmemoryColumn(values, true));
@@ -622,7 +622,7 @@ std::shared_ptr<Column> ColumnWriter::getColumn(std::vector<Term_t> &values, boo
 }
 
 void Column::intersection(std::shared_ptr<Column> c1,
-                          std::shared_ptr<Column> c2, ColumnWriter &writer) {
+        std::shared_ptr<Column> c2, ColumnWriter &writer) {
     std::unique_ptr<ColumnReader> r1 = c1->getReader();
     std::unique_ptr<ColumnReader> r2 = c2->getReader();
     Term_t v1, v2;
@@ -678,7 +678,7 @@ void Column::intersection(std::shared_ptr<Column> c1,
 // The parallel version may very well be slower than the sequential one, because the parallel
 // version has to actually obtain the complete columns.
 void Column::intersection(std::shared_ptr<Column> c1,
-                          std::shared_ptr<Column> c2, ColumnWriter &writer, int nthreads) {
+        std::shared_ptr<Column> c2, ColumnWriter &writer, int nthreads) {
     if (nthreads <= 1 || c1->size() < 1024 || c2->size() < 1024) {
         return intersection(c1, c2, writer);
     }
@@ -720,8 +720,8 @@ void Column::intersection(std::shared_ptr<Column> c1,
 }
 
 uint64_t Column::countMatches(
-    std::shared_ptr<Column> c1,
-    std::shared_ptr<Column> c2) {
+        std::shared_ptr<Column> c1,
+        std::shared_ptr<Column> c2) {
 
     std::unique_ptr<ColumnReader> r1 = c1->getReader();
     std::unique_ptr<ColumnReader> r2 = c2->getReader();
@@ -759,8 +759,8 @@ uint64_t Column::countMatches(
 
 // Assumes both columns are sorted
 bool Column::subsumes(
-    std::shared_ptr<Column> subsumer,
-    std::shared_ptr<Column> subsumed) {
+        std::shared_ptr<Column> subsumer,
+        std::shared_ptr<Column> subsumed) {
 
     std::unique_ptr<ColumnReader> r1 = subsumer->getReader();
     std::unique_ptr<ColumnReader> r2 = subsumed->getReader();
@@ -773,9 +773,9 @@ bool Column::subsumes(
         v2 = r2->next();
 
     while (ok1 && ok2) {
-        // LOG(DEBUGL) << "v1 = " << v1 << ", v2 = " << v2;
+        // LOG(TRACEL) << "v1 = " << v1 << ", v2 = " << v2;
         if (v1 > v2) {
-            // LOG(DEBUGL) << "subsumes returns false";
+            // LOG(TRACEL) << "subsumes returns false";
             return false;
         }
         if (v1 == v2) {
@@ -794,6 +794,6 @@ bool Column::subsumes(
             }
         }
     }
-    // LOG(DEBUGL) << "subsumes returns: ok2 = " << ok2 << ", return " << (! ok2);
+    // LOG(TRACEL) << "subsumes returns: ok2 = " << ok2 << ", return " << (! ok2);
     return ! ok2;
 }

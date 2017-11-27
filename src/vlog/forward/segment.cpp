@@ -172,7 +172,7 @@ bool Segment::areAllColumnsPartOftheSameQuery(EDBLayer **edb, const Literal **l,
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         auto newlim = std::unique(test.begin(), test.end());
         std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-        LOG(DEBUGL) << "Time std::unique = " << sec.count() * 1000;
+        LOG(TRACEL) << "Time std::unique = " << sec.count() * 1000;
         // assert(newlim == test.end());
         if (newlim != test.end()) {
             return false;
@@ -319,7 +319,7 @@ std::shared_ptr<Segment> Segment::intsort(
                 }
 
                 std::sort(rows.begin(), rows.end(), std::ref(sorter));
-                // LOG(DEBUGL) << "Sort done.";
+                // LOG(TRACEL) << "Sort done.";
 
                 //Reconstruct the fields
                 const uint8_t nvarColumns = (uint8_t) varColumns.size();
@@ -569,7 +569,7 @@ std::shared_ptr<Segment> Segment::intsort(
                 } else {
                     std::sort(idxs.begin(), idxs.end(), std::ref(sorter));
                 }
-                // LOG(DEBUGL) << "Sort done.";
+                // LOG(TRACEL) << "Sort done.";
                 //
                 if (! filterDupl) {
                     std::vector<std::vector<Term_t>> out(varColumns.size());
@@ -878,7 +878,7 @@ std::shared_ptr<const Segment> SegmentInserter::getSortedAndUniqueSegment(const 
 
 std::shared_ptr<const Segment> SegmentInserter::getSortedAndUniqueSegment() {
 #if DEBUG
-    LOG(DEBUGL) << "getSortedAndUniqueSegment: segmentSorted = " << segmentSorted << ", duplicates = " << duplicates;
+    LOG(TRACEL) << "getSortedAndUniqueSegment: segmentSorted = " << segmentSorted << ", duplicates = " << duplicates;
 #endif
     if (segmentSorted && !duplicates) {
         return getSegment();
@@ -1514,7 +1514,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
             std::vector<std::shared_ptr<Column>> fields;
             fields.push_back(c2);
             std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-            LOG(DEBUGL) << "Time SegmentInserter::unique = " << sec.count() * 1000;
+            LOG(TRACEL) << "Time SegmentInserter::unique = " << sec.count() * 1000;
             return std::shared_ptr<const Segment>(new Segment(1, fields));
         } else {
 
@@ -1522,7 +1522,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
                     NULL);
             if (sameLiteral) {
                 std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-                LOG(DEBUGL) << "Time SegmentInserter::unique = " << sec.count() * 1000;
+                LOG(TRACEL) << "Time SegmentInserter::unique = " << sec.count() * 1000;
                 return seg;
             }
 
@@ -1555,7 +1555,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
             for (int i = 0; i < ncolumns; ++i)
                 outputColumns.push_back(writers[i].getColumn());
             std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-            LOG(DEBUGL) << "Time SegmentInserter::unique = " << sec.count() * 1000;
+            LOG(TRACEL) << "Time SegmentInserter::unique = " << sec.count() * 1000;
             return std::shared_ptr<const Segment>(new Segment(ncolumns,
                         outputColumns));
         }
@@ -1579,7 +1579,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
     std::shared_ptr<const Segment> SegmentInserter::merge(
             std::vector<std::shared_ptr<const Segment>> &segments) {
 
-        LOG(DEBUGL) << "SegmentInserter::merge";
+        LOG(TRACEL) << "SegmentInserter::merge";
         //Check all segments have the same size
         const uint8_t nfields = segments[0]->getNColumns();
         for (int i = 1; i < segments.size(); ++i)
@@ -1634,7 +1634,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
               const uint32_t e1 = lastSegment->getNRows();
               const uint32_t e2 = curSegment->getNRows();*/
             const uint8_t nvars = (uint8_t) fieldsToCompare.size();
-            //LOG(DEBUGL) << "Segment::merge, nvars = " << (int) nvars
+            //LOG(TRACEL) << "Segment::merge, nvars = " << (int) nvars
             //                         << ", e1 = " << e1 << ", e2 = " << e2;
 
             bool lastValueEOF = false;
@@ -1734,7 +1734,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
                 }
             }
             std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-            LOG(DEBUGL) << "Time merge = " << sec.count() * 1000 << ", merged segments of " << count1 << " and "
+            LOG(TRACEL) << "Time merge = " << sec.count() * 1000 << ", merged segments of " << count1 << " and "
                 << count2 << " elements";
 
             //copy remaining fields
@@ -1765,7 +1765,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
             lastSegment = std::shared_ptr<const Segment>(
                     new Segment(nfields, newcolumns));
 
-            LOG(DEBUGL) << "Segment::merge done";
+            LOG(TRACEL) << "Segment::merge done";
             for (int i = 0; i < vars1.size(); i++) {
                 if (vars1[i] != NULL) {
                     vars1[i]->clear();

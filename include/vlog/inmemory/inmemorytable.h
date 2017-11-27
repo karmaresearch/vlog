@@ -65,7 +65,9 @@ class InmemoryTable : public EDBTable {
         std::vector<string> varnames;
         PredId_t predid;
         uint8_t arity;
+
         std::shared_ptr<const Segment> segment;
+        std::map<uint64_t, std::shared_ptr<const Segment>> cachedSortedSegments;
 
     public:
         InmemoryTable(string repository, string tablename, PredId_t predid);

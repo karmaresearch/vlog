@@ -1,4 +1,5 @@
 #include <vlog/inmemory/inmemorytable.h>
+#include <vlog/fcinttable.h>
 
 #include <kognac/utils.h>
 
@@ -131,6 +132,31 @@ size_t InmemoryTable::getCardinalityColumn(const Literal &q, uint8_t posColumn) 
     throw 10;
 }
 
+void _literal2filter(const Literal &query, std::vector<uint8_t> &posVarsToCopy,
+        std::vector<uint8_t> &posConstantsToFilter,
+        std::vector<Term_t> &valuesConstantsToFilter,
+        std::vector<std::pair<uint8_t, uint8_t>> &repeatedVars) {
+    for(uint8_t i = 0; i < query.getTupleSize(); ++i) {
+        auto term = query.getTermAtPos(i);
+        if (term.isVariable()) {
+            bool unique = true;
+            for(uint8_t j = 0; j < posVarsToCopy.size(); ++j) {
+                auto var = query.getTermAtPos(j);
+                if (var.getId() == term.getId()) {
+                    repeatedVars.push_back(std::make_pair(i, j));
+                    unique = false;
+                    break;
+                }
+            }
+            if (unique)
+                posVarsToCopy.push_back(i);
+        } else { //constant
+            posConstantsToFilter.push_back(i);
+            valuesConstantsToFilter.push_back(term.getValue());
+        }
+    }
+}
+
 EDBIterator *InmemoryTable::getIterator(const Literal &q) {
     if (q.getNUniqueVars() == q.getTupleSize()) {
         return new InmemoryIterator(segment, predid);
@@ -143,11 +169,39 @@ EDBIterator *InmemoryTable::getIterator(const Literal &q) {
 EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
         const std::vector<uint8_t> &fields) {
     if (query.getNUniqueVars() == query.getTupleSize()) {
-        auto sortedSegment = segment->sortBy(&fields);
-        return new InmemoryIterator(sortedSegment, predid);
+        if (fields.size() >= 8) {
+            auto sortedSegment = segment->sortBy(&fields);
+            return new InmemoryIterator(sortedSegment, predid);
+        } else {
+            uint64_t sortedKey = 0;
+            for(uint8_t i = 0; i < fields.size(); ++i) {
+                uint8_t field = fields[i];
+                sortedKey += ((uint64_t)(field+1)) << 8;
+            }
+            if (cachedSortedSegments.count(sortedKey)) {
+                return new InmemoryIterator(cachedSortedSegments[sortedKey], predid);
+            } else {
+                auto sortedSegment = segment->sortBy(&fields);
+                cachedSortedSegments[sortedKey] = sortedSegment;
+                return new InmemoryIterator(sortedSegment, predid);
+            }
+        }
     } else {
-        LOG(ERRORL) << "Not implemented yet";
-        throw 10;
+        auto sortedSegment = segment->sortBy(&fields);
+        //Filter the table
+        InmemoryFCInternalTable t(arity, 0, false, segment);
+        std::vector<uint8_t> posVarsToCopy;
+        std::vector<uint8_t> posConstantsToFilter;
+        std::vector<Term_t> valuesConstantsToFilter;
+        std::vector<std::pair<uint8_t, uint8_t>> repeatedVars;
+        _literal2filter(query, posVarsToCopy, posConstantsToFilter,
+                valuesConstantsToFilter, repeatedVars);
+        auto fTable = t.filter(posVarsToCopy.size(), posVarsToCopy.data(),
+                posConstantsToFilter.size(), posConstantsToFilter.data(),
+                valuesConstantsToFilter.data(), repeatedVars.size(),
+                repeatedVars.data(), 1); //no multithread
+        auto filteredSegment = ((InmemoryFCInternalTable*)fTable.get())->getUnderlyingSegment();
+        return new InmemoryIterator(filteredSegment, predid);
     }
 }
 
