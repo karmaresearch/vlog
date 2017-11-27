@@ -205,7 +205,6 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
             }
         }
 
-
         //Filter the table
         InmemoryFCInternalTable t(arity, 0, false, segment);
         std::vector<uint8_t> posVarsToCopy;

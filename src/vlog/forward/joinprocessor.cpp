@@ -32,7 +32,7 @@ void _joinTwoToOne_cur(std::shared_ptr<Column> firstColumn,
     assert(hv.joinCoordinates[currentLiteral].size() == 1);
     FCInternalTableItr *itr;
     itr = table->sortBy(joinFields, nthreads);
-    LOG(DEBUGL) << "sorted joinfields";
+    LOG(TRACEL) << "sorted joinfields";
 
     //Get the second columns. One is for joining and the other for the
     //output.
@@ -44,11 +44,11 @@ void _joinTwoToOne_cur(std::shared_ptr<Column> firstColumn,
             columns);
 
     cols.push_back(firstColumn);
-    LOG(DEBUGL) << "Getting all vectors";
+    LOG(TRACEL) << "Getting all vectors";
 
     std::vector<const std::vector<Term_t> *> vectors = Segment::getAllVectors(cols, nthreads);
 
-    LOG(DEBUGL) << "Got all vectors";
+    LOG(TRACEL) << "Got all vectors";
 
     //Merge join
     Term_t v1, v2, vout;
@@ -99,7 +99,7 @@ void _joinTwoToOne_cur(std::shared_ptr<Column> firstColumn,
 #endif
     std::chrono::duration<double> d =
         std::chrono::system_clock::now() - startC;
-    LOG(DEBUGL) << "Time joining the two columns " << d.count() * 1000;
+    LOG(TRACEL) << "Time joining the two columns " << d.count() * 1000;
 }
 
 void JoinExecutor::joinTwoToOne(
@@ -121,14 +121,14 @@ void JoinExecutor::joinTwoToOne(
     firstColumn = firstColumn->sort_and_unique(nthreads);
     std::chrono::duration<double> d =
         std::chrono::system_clock::now() - startC;
-    LOG(DEBUGL) << "Time sorting and unique " << d.count() * 1000;
+    LOG(TRACEL) << "Time sorting and unique " << d.count() * 1000;
 
     FCIterator tableItr = naiver->getTable(literal, min, max);
     while (!tableItr.isEmpty()) {
         std::shared_ptr<const FCInternalTable> table = tableItr.
             getCurrentTable();
 
-        LOG(DEBUGL) << "Calling _joinTwoToOne_cur";
+        LOG(TRACEL) << "Calling _joinTwoToOne_cur";
         //Newer faster version. It is not completely tested. I leave the old
         //version commented in case we still need it.
         _joinTwoToOne_cur(firstColumn, table, hv, currentLiteral, output,
@@ -172,12 +172,12 @@ void JoinExecutor::verificativeJoinOneColumnSameOutput(
     //std::chrono::system_clock::time_point startC = std::chrono::system_clock::now();
     firstColumn = firstColumn->sort_and_unique(nthreads);
 
-    // LOG(DEBUGL) << "firstColumn: size = " << firstColumn->size();
+    // LOG(TRACEL) << "firstColumn: size = " << firstColumn->size();
 
     //Get the second column to join
     FCIterator tableItr = naiver->getTable(literal, min, max);
     if (tableItr.getNTables() == 1) {
-        // LOG(DEBUGL) << "tableItr.getNTables() == 1";
+        // LOG(TRACEL) << "tableItr.getNTables() == 1";
         ColumnWriter writer;
         while (!tableItr.isEmpty()) {
             std::shared_ptr<const FCInternalTable> table = tableItr.
@@ -192,7 +192,7 @@ void JoinExecutor::verificativeJoinOneColumnSameOutput(
             std::vector<std::shared_ptr<Column>> cols = itr->getColumn(1,
                     columns);
             std::shared_ptr<Column> secondColumn = cols[0]->sort_and_unique(nthreads);
-            // LOG(DEBUGL) << "secondColumn: size = " << cols[0]->size();
+            // LOG(TRACEL) << "secondColumn: size = " << cols[0]->size();
 
             //Now I have two columns
             Column::intersection(firstColumn, secondColumn, writer, nthreads);
@@ -202,7 +202,7 @@ void JoinExecutor::verificativeJoinOneColumnSameOutput(
             tableItr.moveNextCount();
         }
         if (!writer.isEmpty()) {
-            LOG(DEBUGL) << "writer not empty, size = " << writer.getColumn()->size();
+            LOG(TRACEL) << "writer not empty, size = " << writer.getColumn()->size();
             // Intersection of sorted-and-unique columns; result does not need sorting. --Ceriel
             output->addColumn(0, 0, writer.getColumn()/*->sort_and_unique(nthreads)*/, false,  true);
         }
@@ -226,11 +226,11 @@ void JoinExecutor::verificativeJoinOneColumnSameOutput(
         }
         std::shared_ptr<Column> secondColumn =
             secondColumnCreator.getColumn()->sort_and_unique(nthreads);
-        LOG(DEBUGL) << "Finished sorting the columns";
+        LOG(TRACEL) << "Finished sorting the columns";
         /*
            bool isSubsumed = secondColumn->size() >= firstColumn->size() && Column::subsumes(secondColumn, firstColumn);
            if (isSubsumed) {
-           LOG(DEBUGL) << "Subsumed!";
+           LOG(TRACEL) << "Subsumed!";
            output->addColumn(0, 0, firstColumn, false,  true);
            } else
            */
@@ -241,7 +241,7 @@ void JoinExecutor::verificativeJoinOneColumnSameOutput(
             // Column::intersection(firstColumn, secondColumn, writer, nthreads);
             Column::intersection(firstColumn, secondColumn, writer);
             if (!writer.isEmpty()) {
-                LOG(DEBUGL) << "writer not empty, size = " << writer.getColumn()->size();
+                LOG(TRACEL) << "writer not empty, size = " << writer.getColumn()->size();
                 // Intersection of sorted-and-unique columns; result does not need sorting. --Ceriel
                 output->addColumn(0, 0, writer.getColumn()/*->sort_and_unique(nthreads)*/, false,  true);
             }
@@ -315,13 +315,13 @@ void JoinExecutor::verificativeJoinOneColumn(
         //to the EDB layer
         shared_ptr<const Column> column = table->
             getColumn(hv.joinCoordinates[currentLiteral][0].second);
-        LOG(DEBUGL) << "Count = " << count;
+        LOG(TRACEL) << "Count = " << count;
         FCInternalTableItr *itr = intermediateResults->sortBy(joinField /*, nthreads */);
         EDBLayer &layer = naiver->getEDBLayer();
         if (column->isEDB() && layer.supportsCheckIn(((EDBColumn*) column.get())->getLiteral())) {
             //Offload a merge join to the EDB layer
             EDBColumn *edbColumn = (EDBColumn*)column.get();
-            LOG(DEBUGL) << "EDBcolumn: literal = " << edbColumn->getLiteral().tostring(naiver->getProgram(), &layer);
+            LOG(TRACEL) << "EDBcolumn: literal = " << edbColumn->getLiteral().tostring(naiver->getProgram(), &layer);
             size_t sizeColumn = 0;
             std::vector<Term_t> possibleKeys;
             for (auto v : keys) {
@@ -354,7 +354,7 @@ void JoinExecutor::verificativeJoinOneColumn(
 
                 if (matchedKeysR->hasNext()) {
                     Term_t matchedKeyValue = matchedKeysR->next();
-                    // LOG(DEBUGL) << "matchedKeyValue = " << matchedKeyValue;
+                    // LOG(TRACEL) << "matchedKeyValue = " << matchedKeyValue;
 
                     while (idx1 < keys.size()) {
                         if (keys[idx1].first < matchedKeyValue) {
@@ -497,7 +497,7 @@ void JoinExecutor::verificativeJoinOneColumn(
         keys.swap(newKeys);
         tableItr.moveNextCount();
     }
-    LOG(DEBUGL) << "Loop executed " << count << " times";
+    LOG(TRACEL) << "Loop executed " << count << " times";
 }
 
 void JoinExecutor::verificativeJoin(
@@ -511,7 +511,7 @@ void JoinExecutor::verificativeJoin(
         const int currentLiteral,
         int nthreads) {
 
-    //LOG(DEBUGL) << "plan.posFromFirst[currentLiteral][0].second = "
+    //LOG(TRACEL) << "plan.posFromFirst[currentLiteral][0].second = "
     //  << plan.posFromFirst[currentLiteral][0].second
     //  << ", plan.joinCoordinates[currentLiteral][0].first = "
     //       << plan.joinCoordinates[currentLiteral][0].first;
@@ -521,12 +521,12 @@ void JoinExecutor::verificativeJoin(
             hv.joinCoordinates[currentLiteral][0].first &&
             hv.sizeOutputRelation[currentLiteral] == 1 &&
             currentLiteral == hv.posFromFirst.size() - 1) { //The last literal checks that this is the last join we execute
-        LOG(DEBUGL) << "Verificative join one column same output";
+        LOG(TRACEL) << "Verificative join one column same output";
         verificativeJoinOneColumnSameOutput(naiver, intermediateResults,
                 literal, min,
                 max, output, hv, currentLiteral, nthreads);
     } else if (hv.joinCoordinates[currentLiteral].size() == 1) {
-        LOG(DEBUGL) << "Verificative join one column";
+        LOG(TRACEL) << "Verificative join one column";
         verificativeJoinOneColumn(naiver, intermediateResults, literal, min,
                 max, output, hv, currentLiteral, nthreads);
     } else {
@@ -549,12 +549,12 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
 
     //First I calculate whether the join is verificative or explorative.
     if (JoinExecutor::isJoinVerificative(t1, hv, currentLiteral)) {
-        LOG(DEBUGL) << "Executing verificativeJoin. t1->getNRows()=" << t1->getNRows();
+        LOG(TRACEL) << "Executing verificativeJoin. t1->getNRows()=" << t1->getNRows();
         verificativeJoin(naiver, t1, literal, min, max, output, hv,
                 currentLiteral, nthreads);
     } else if (JoinExecutor::isJoinTwoToOneJoin(hv, currentLiteral)) {
         //Is the join of the like (A),(A,B)=>(A|B). Then we can speed up the merge join
-        LOG(DEBUGL) << "Executing joinTwoToOne";
+        LOG(TRACEL) << "Executing joinTwoToOne";
         joinTwoToOne(naiver, t1, literal, min, max, output, hv,
                 currentLiteral, nthreads);
     } else {
@@ -565,7 +565,7 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
                 && (joinsCoordinates.size() > 1 ||
                     joinsCoordinates[0].first != joinsCoordinates[0].second ||
                     joinsCoordinates[0].first != 0)) {
-            LOG(DEBUGL) << "Executing hashjoin. t1->getNRows()=" << t1->getNRows();
+            LOG(TRACEL) << "Executing hashjoin. t1->getNRows()=" << t1->getNRows();
             hashjoin(t1, naiver, outputLiterals, literal, min, max, filterValueVars,
                     joinsCoordinates, output,
                     lastLiteral, ruleDetails, hv, processedTables, nthreads);
@@ -573,7 +573,7 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
             output->checkSizes();
 #endif
         } else {
-            LOG(DEBUGL) << "Executing mergejoin. t1->getNRows()=" << t1->getNRows();
+            LOG(TRACEL) << "Executing mergejoin. t1->getNRows()=" << t1->getNRows();
             mergejoin(t1, naiver, outputLiterals, literal, min, max,
                     joinsCoordinates, output, nthreads);
 #ifdef DEBUG
@@ -596,7 +596,7 @@ bool JoinExecutor::isJoinSelective(JoinHashMap & map, const Literal & literal,
     }
 
     double ratio = (double)filteringCardinality / totalCardinality;
-    // LOG(DEBUGL) << "Optimizer: Total cardinality " << totalCardinality
+    // LOG(TRACEL) << "Optimizer: Total cardinality " << totalCardinality
     //                          << " Filtering Cardinality " << filteringCardinality << " ratio " << ratio;
     return ratio < 0.5;
 }
@@ -735,11 +735,11 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                 FCIterator tableItr = naiver->getTable(literalToQuery, min, max, &queryFilterer);
 #if DEBUG
                 std::chrono::duration<double> secRetr = std::chrono::system_clock::now() - startRetr;
-                LOG(DEBUGL) << "Time retrieving table " << secRetr.count() * 1000;
-                LOG(DEBUGL) << "literal to query = " << literal.tostring();
+                LOG(TRACEL) << "Time retrieving table " << secRetr.count() * 1000;
+                LOG(TRACEL) << "literal to query = " << literal.tostring();
 #endif
                 if (tableItr.isEmpty()) {
-                    LOG(DEBUGL) << "Empty table!";
+                    LOG(TRACEL) << "Empty table!";
                     //Move to the next entry in the hashmap
                     if (njoinfields < 2) {
                         itr1++;
@@ -752,7 +752,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                 }
 
                 std::vector<std::pair<const FCBlock *, uint32_t>> tables;
-                LOG(DEBUGL) << "rowSize = " << (int) rowSize << ", start = " << start << ", end = " << end;
+                LOG(TRACEL) << "rowSize = " << (int) rowSize << ", start = " << start << ", end = " << end;
                 const size_t nderivations = (end - start) / rowSize;
                 while (!tableItr.isEmpty()) {
                     tables.push_back(std::make_pair(tableItr.getCurrentBlock(), nderivations));
@@ -763,7 +763,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                 //std::chrono::system_clock::time_point startD = std::chrono::system_clock::now();
                 bool emptyIterals = true;
 #if DEBUG
-                LOG(DEBUGL) << "Check " << (end - start) / rowSize << " duplicates";
+                LOG(TRACEL) << "Check " << (end - start) / rowSize << " duplicates";
 #endif
                 /*while (outputLiteral != NULL && start < end) {
                     VTuple t = outputLiteral->getTuple();
@@ -817,7 +817,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                     //std::chrono::duration<double> secD = std::chrono::system_clock::now() - startD;
 
 #if DEBUG
-                    LOG(DEBUGL) << "Start actual join...";
+                    LOG(TRACEL) << "Start actual join...";
 #endif
                     //std::chrono::system_clock::time_point startJ = std::chrono::system_clock::now();
                     {
@@ -828,11 +828,11 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                                 &literalToQuery, true, false, (emptyIterals) ? NULL : &existingTuples,
                                 0, NULL, NULL); //The last three parameters are
                         //not set because the flag 'isDerivationUnique' is set to false
-                        LOG(DEBUGL) << "Retained table size = " << retainedTables.size();
+                        LOG(TRACEL) << "Retained table size = " << retainedTables.size();
                         if (retainedTables.size() > 0) {
                             if (njoinfields == 1) {
-                                // LOG(DEBUGL) << "first = " << (int) itr1->second.first << ", second = " << (int) itr1->second.second;
-                                // LOG(DEBUGL) << "idxJoinField = " << (int) idxJoinField1;
+                                // LOG(TRACEL) << "first = " << (int) itr1->second.first << ", second = " << (int) itr1->second.second;
+                                // LOG(TRACEL) << "idxJoinField = " << (int) idxJoinField1;
                                 exec.run(retainedTables, true, itr1->second.first, itr1->second.second,
                                         newPosToSort, processedTables,
                                         valuesToFilterOut.size() > 0 ? &valuesToFilterOut : NULL,
@@ -869,7 +869,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                    sMapValues += to_string(values[i]) + " ";
                    }
                    */
-                //LOG(DEBUGL) << "HashJoin: ntables=" << tableItr.getNTables() << " exitingTuples=" << existingTuples.size() << " GetRetrTime=" << secRetr.count() * 1000 << " GetDuplTime=" << secD.count() * 1000 << " JoinTime=" << secJ.count() * 1000 << "ms ConsolidationTime=" << secC.count() * 1000 << "ms. Input=" << exec.getProcessedElements() << " Output(f)=" << uniqueDerivation << " Output(nf)=" << unfilteredDerivation << " JoinKey=" << itr->first << " MapValues=" << sMapValues;
+                //LOG(TRACEL) << "HashJoin: ntables=" << tableItr.getNTables() << " exitingTuples=" << existingTuples.size() << " GetRetrTime=" << secRetr.count() * 1000 << " GetDuplTime=" << secD.count() * 1000 << " JoinTime=" << secJ.count() * 1000 << "ms ConsolidationTime=" << secC.count() * 1000 << "ms. Input=" << exec.getProcessedElements() << " Output(f)=" << uniqueDerivation << " Output(nf)=" << unfilteredDerivation << " JoinKey=" << itr->first << " MapValues=" << sMapValues;
                 /*** END LOGGING ***/
 #endif
 
@@ -1026,9 +1026,9 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
 
 #if DEBUG
     if (joinsCoordinates.size() < 2) {
-        LOG(DEBUGL) << "Hashmap size = " << map.size();
+        LOG(TRACEL) << "Hashmap size = " << map.size();
     } else {
-        LOG(DEBUGL) << "Hashmap size = " << doublemap.size();
+        LOG(TRACEL) << "Hashmap size = " << doublemap.size();
     }
 #endif
     //Perform as many joins as the rows in the hashmap
@@ -1092,7 +1092,7 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
     for (uint32_t i = 0; i < joinsCoordinates.size(); ++i) {
         std::vector<Term_t> distinctValues =
             ((InmemoryFCInternalTable*)t1)->getDistinctValues(joinsCoordinates[i].first, 20);
-        LOG(DEBUGL) << "distinctValues.size() = " << distinctValues.size();
+        LOG(TRACEL) << "distinctValues.size() = " << distinctValues.size();
         if (distinctValues.size() < 20) {
             //std::sort(distinctValues.begin(), distinctValues.end());
             idxColumnsLowCardInMap.push_back(joinsCoordinates[i].first);
@@ -1103,7 +1103,7 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
             fields2.push_back(joinsCoordinates[i].second);
         }
     }
-    //LOG(DEBUGL) << "MergeJoin: ExistingResults " << t1->getNRows()
+    //LOG(TRACEL) << "MergeJoin: ExistingResults " << t1->getNRows()
     //                         << " SizeRowsT1=" << (int)t1->getRowSize() << " Number columns to filter: "
     //                         << idxColumnsLowCardInMap.size() << " literalToQuery="
     //                         << literalToQuery.tostring(NULL, NULL);
@@ -1131,7 +1131,7 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
 
     //Do the join
     if (idxColumnsLowCardInMap.size() == 0) {
-        LOG(DEBUGL) << "Calling do_mergejoin";
+        LOG(TRACEL) << "Calling do_mergejoin";
 
         TableFilterer filterer(naiver);
         std::vector<std::shared_ptr<const FCInternalTable>> tablesToMergeJoin;
@@ -1208,7 +1208,7 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
                     &(posToCopy[0]), (uint8_t) idxColumnsLowCardInMap.size(), &(idxColumnsLowCardInMap[0]),
                     &(valuesToFilterInFirstSide[0]), 0, NULL, nthreads);
             std::chrono::duration<double> secFiltering = std::chrono::system_clock::now() - startFiltering;
-            LOG(DEBUGL) << "Time filtering " << secFiltering.count() * 1000;
+            LOG(TRACEL) << "Time filtering " << secFiltering.count() * 1000;
 
             if (filteredT1 != NULL  && !filteredT1->isEmpty()) {
                 //Look for additional variables that have a low cardinality in this set
@@ -1265,7 +1265,7 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
 
 #if DEBUG
                 std::chrono::duration<double> secGI = std::chrono::system_clock::now() - startGI;
-                LOG(DEBUGL) << "Time getting iterator " << secGI.count() * 1000;
+                LOG(TRACEL) << "Time getting iterator " << secGI.count() * 1000;
 #endif
 
                 //std::chrono::system_clock::time_point startJ = std::chrono::system_clock::now();
@@ -1286,7 +1286,7 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
 
                 /*** LOGGING ***/
                 //#if DEBUG
-                //                LOG(DEBUGL) << "MergeJoin: JoinTime=" << secJ.count() * 1000 << "ms. ConsTime="
+                //                LOG(TRACEL) << "MergeJoin: JoinTime=" << secJ.count() * 1000 << "ms. ConsTime="
                 //                                         << secC.count() * 1000 << "ms. Output(f)=" << uniqueDerivation
                 //                                         << " Output(nf)=" << unfilteredDerivation;// << " keys=" << keys;
                 //#endif
@@ -1428,7 +1428,7 @@ void JoinExecutor::do_merge_join_classicalgo(FCInternalTableItr * sortedItr1,
             total += count;
 
             while (total >= max) {
-                LOG(DEBUGL) << "Count = " << count << ", total = " << total;
+                LOG(TRACEL) << "Count = " << count << ", total = " << total;
                 max = max + max;
             }
 
@@ -1439,10 +1439,10 @@ void JoinExecutor::do_merge_join_classicalgo(FCInternalTableItr * sortedItr1,
             }
         } while (JoinExecutor::cmp(rowsToJoin, sortedItr2, fields1, fields2) == 0);
     }
-    LOG(DEBUGL) << "Total = " << total;
+    LOG(TRACEL) << "Total = " << total;
 #if DEBUG
     std::chrono::duration<double> secL = std::chrono::system_clock::now() - startL;
-    LOG(DEBUGL) << "do_merge_join: time loop: " << secL.count() * 1000 << ", fields.size()=" << fields1.size();
+    LOG(TRACEL) << "do_merge_join: time loop: " << secL.count() * 1000 << ", fields.size()=" << fields1.size();
 #endif
 }
 
@@ -1481,7 +1481,7 @@ void JoinExecutor::do_merge_join_classicalgo(const std::vector<const std::vector
         const Term_t *valBlocks,
         Output * output) {
 
-    LOG(DEBUGL) << "mergejoin classical, vector version, l1 = " << l1 << ", u1 = " << u1 << ", l2 = " << l2 << ", u2 = " << u2 << ", fields1.size = " << fields1.size() << ", fields2.size = " << fields2.size();
+    LOG(TRACEL) << "mergejoin classical, vector version, l1 = " << l1 << ", u1 = " << u1 << ", l2 = " << l2 << ", u2 = " << u2 << ", fields1.size = " << fields1.size() << ", fields2.size = " << fields2.size();
 
     if (l1 >= u1 || l2 >= u2) {
         return;
@@ -1492,10 +1492,10 @@ void JoinExecutor::do_merge_join_classicalgo(const std::vector<const std::vector
         uint8_t p2 = fields2[0];
 
         if ((*vectors1[p1])[l1] > (*vectors2[p2])[u2 - 1]) {
-            LOG(DEBUGL) << "No possible results: begin value of range larger than end value of vector2";
+            LOG(TRACEL) << "No possible results: begin value of range larger than end value of vector2";
             return;
         } else if ((*vectors1[p1])[u1 - 1] < (*vectors2[p2])[l2]) {
-            LOG(DEBUGL) << "No possible results: end value of range smaller than first value of vector2";
+            LOG(TRACEL) << "No possible results: end value of range smaller than first value of vector2";
             return;
         }
 
@@ -1546,7 +1546,7 @@ void JoinExecutor::do_merge_join_classicalgo(const std::vector<const std::vector
                 u = m;
             }
         }
-        LOG(DEBUGL) << "found start points, l1 = " << l1 << ", l2 = " << l2;
+        LOG(TRACEL) << "found start points, l1 = " << l1 << ", l2 = " << l2;
     }
 
     int res = 0;
@@ -1629,17 +1629,17 @@ void JoinExecutor::do_merge_join_classicalgo(const std::vector<const std::vector
             total += count1;
 
             while (total >= max) {
-                LOG(DEBUGL) << "Count = " << count1 << ", total = " << total;
+                LOG(TRACEL) << "Count = " << count1 << ", total = " << total;
                 max = max + max;
             }
         }
         l1 += count1;
         l2 += count2;
     }
-    LOG(DEBUGL) << "Total = " << total;
+    LOG(TRACEL) << "Total = " << total;
 #if DEBUG
     std::chrono::duration<double> secL = std::chrono::system_clock::now() - startL;
-    LOG(DEBUGL) << "do_merge_join: time loop: " << secL.count() * 1000 << ", fields.size()=" << fields1.size();
+    LOG(TRACEL) << "do_merge_join: time loop: " << secL.count() * 1000 << ", fields.size()=" << fields1.size();
 #endif
 }
 
@@ -1773,7 +1773,7 @@ struct CreateParallelMergeJoiner {
         }
 
     void operator()(const tbb::blocked_range<int>& r) const {
-        LOG(DEBUGL) << "Parallel merge joiner: r.begin = " << r.begin() << ", r.end = " << r.end();
+        LOG(TRACEL) << "Parallel merge joiner: r.begin = " << r.begin() << ", r.end = " << r.end();
         FCInternalTableItr *itr1 = new VectorFCInternalTableItr(vectors, r.begin(), r.end());
         Output out(output, m);
         FCInternalTableItr *itr2 = sortedItr2->copy();
@@ -1813,7 +1813,7 @@ struct CreateParallelMergeJoinerVectors {
         }
 
     void operator()(const tbb::blocked_range<int>& r) const {
-        LOG(DEBUGL) << "Parallel vector merge joiner: r.begin = " << r.begin() << ", r.end = " << r.end();
+        LOG(TRACEL) << "Parallel vector merge joiner: r.begin = " << r.begin() << ", r.end = " << r.end();
         Output out(output, m);
 
         JoinExecutor::do_merge_join_classicalgo(vectors, r.begin(), r.end(),
@@ -1856,7 +1856,7 @@ void JoinExecutor::do_mergejoin(const FCInternalTable * filteredT1,
     size_t totalsize2 = 0;
     for (auto t2 : tables2) {
         size_t sz = t2->getNRows();
-        LOG(DEBUGL) << "tables2 entry size = " << sz;
+        LOG(TRACEL) << "tables2 entry size = " << sz;
         totalsize2 += sz;
     }
 
@@ -1903,8 +1903,8 @@ void JoinExecutor::do_mergejoin(const FCInternalTable * filteredT1,
     secS = std::chrono::system_clock::now() - startS;
 
 #if DEBUG
-    LOG(DEBUGL) << "do_merge_join: time sorting the left relation: " << secS.count() * 1000;
-    LOG(DEBUGL) << "filteredT1->size = " << totalsize1 << ", tables2.size() = " << tables2.size() << ", total t2 size = " << totalsize2;
+    LOG(TRACEL) << "do_merge_join: time sorting the left relation: " << secS.count() * 1000;
+    LOG(TRACEL) << "filteredT1->size = " << totalsize1 << ", tables2.size() = " << tables2.size() << ", total t2 size = " << totalsize2;
 #endif
 
     bool faster = (fields1.size() == 1 && valBlocks != NULL && output->getNCopyFromFirst() == 1
@@ -1917,7 +1917,7 @@ void JoinExecutor::do_mergejoin(const FCInternalTable * filteredT1,
             itr1->reset();
         }
         first = false;
-        LOG(DEBUGL) << "Main loop of do_mergejoin";
+        LOG(TRACEL) << "Main loop of do_mergejoin";
         processedTables++;
 
         //Sort t2
@@ -1925,7 +1925,7 @@ void JoinExecutor::do_mergejoin(const FCInternalTable * filteredT1,
         //Also in this case, there might be no join fields
         FCInternalTableItr *sortedItr2 = NULL;
         if (fields2.size() > 0) {
-            LOG(DEBUGL) << "t2->sortBy";
+            LOG(TRACEL) << "t2->sortBy";
             sortedItr2 = t2->sortBy(fields2, nthreads);
         } else {
             sortedItr2 = t2->getIterator();
@@ -1952,7 +1952,7 @@ void JoinExecutor::do_mergejoin(const FCInternalTable * filteredT1,
         size_t t2Size = t2->getNRows();
         if (faster) {
             sortedItr2 = new VectorFCInternalTableItr(vectors2, 0, t2Size);
-            LOG(DEBUGL) << "Faster algo";
+            LOG(TRACEL) << "Faster algo";
             JoinExecutor::do_merge_join_fasteralgo(itr1, sortedItr2, fields1,
                     fields2, posBlocks, nValBlocks,
                     valBlocks, output);
@@ -1961,10 +1961,10 @@ void JoinExecutor::do_mergejoin(const FCInternalTable * filteredT1,
             output->checkSizes();
 #endif
         } else {
-            LOG(DEBUGL) << "Classical algo";
-            LOG(DEBUGL) << "totalsize1 = " << totalsize1 << ", t2Size = " << t2Size;
+            LOG(TRACEL) << "Classical algo";
+            LOG(TRACEL) << "totalsize1 = " << totalsize1 << ", t2Size = " << t2Size;
             if (/* vectorSupported && */ nthreads > 1 && totalsize1 > 1 && (totalsize1 + t2Size) > 4096 /* ? */) {
-                LOG(DEBUGL) << "Chunk size = " << chunks << ", t2->getNRows() = " << t2Size;
+                LOG(TRACEL) << "Chunk size = " << chunks << ", t2->getNRows() = " << t2Size;
                 if (vector2Supported) {
                     tbb::parallel_for(tbb::blocked_range<int>(0, totalsize1, chunks),
                             CreateParallelMergeJoinerVectors(vectors, vectors2, fields1, fields2, posBlocks, nValBlocks, valBlocks, output, &m));
@@ -1990,7 +1990,7 @@ void JoinExecutor::do_mergejoin(const FCInternalTable * filteredT1,
     filteredT1->releaseIterator(sortedItr1);
     delete out;
 #if DEBUG
-    LOG(DEBUGL) << "Processed tables: " << processedTables;
+    LOG(TRACEL) << "Processed tables: " << processedTables;
 #endif
 }
 

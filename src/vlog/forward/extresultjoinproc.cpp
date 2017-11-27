@@ -17,6 +17,8 @@ ExistentialRuleProcessor::ExistentialRuleProcessor(
             heads, detailsRule, ruleExecOrder, iteration,
             addToEndTable, nthreads, sn), chaseMgmt(chaseMgmt) {
         this->sn = sn;
+        //if (posFromFirst.size() > 0)
+        //    throw 10;
     }
 
 void ExistentialRuleProcessor::processResults(const int blockid,
@@ -111,7 +113,7 @@ void ExistentialRuleProcessor::filterDerivations(const Literal &literal,
                 itr2Ok = itr2->hasNext();
                 if (itr2Ok)
                     itr2->next();
-            } else if (cmp >= 0) {
+            } else if (cmp <= 0) {
                 if (cmp == 0)
                     output.push_back(idx);
                 itr1Ok = itr1->hasNext();
@@ -234,10 +236,15 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     }
                 }
                 if (!found && !extvars.count(t.getId())) { //Must be existential
+                    //The body might contain more variables than what is needed to create existential columns
+                    std::vector<std::shared_ptr<Column>> depc;
+                    for(uint8_t i = 0; i < nCopyFromSecond; ++i) {
+                        depc.push_back(c[posFromSecond[i].second]);
+                    }
                     auto extcolumn = chaseMgmt->getNewOrExistingIDs(
                             ruleDetails->rule.getId(),
                             t.getId(),
-                            c,
+                            depc,
                             sizecolumns);
                     extvars.insert(std::make_pair(t.getId(), extcolumn));
                 }
