@@ -62,12 +62,33 @@ class InmemoryIterator : public EDBIterator {
 
 class InmemoryTable : public EDBTable {
     private:
+        struct Coordinates {
+            uint64_t offset;
+            uint64_t len;
+            Coordinates(uint64_t offset, uint64_t len) :
+            offset(offset), len(len) {
+            }
+        };
+        typedef std::unordered_map<uint64_t, Coordinates> HashMap;
+        struct HashMapEntry {
+            HashMap map;
+            std::shared_ptr<const Segment> segment;
+            HashMapEntry(std::shared_ptr<const Segment> segment) :
+                segment(segment) {
+                }
+        };
+
         std::vector<string> varnames;
         PredId_t predid;
         uint8_t arity;
 
         std::shared_ptr<const Segment> segment;
         std::map<uint64_t, std::shared_ptr<const Segment>> cachedSortedSegments;
+        std::map<uint64_t, HashMapEntry> cacheHashes;
+
+        std::shared_ptr<const Segment> getSortedCachedSegment(
+                std::shared_ptr<const Segment> segment,
+                const std::vector<uint8_t> &filterBy);
 
     public:
         InmemoryTable(string repository, string tablename, PredId_t predid);

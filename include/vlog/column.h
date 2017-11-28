@@ -291,10 +291,16 @@ class InmemColumnReader : public ColumnReader {
     private:
         const std::vector<Term_t> &col;
         size_t currentPos;
+        size_t end;
 
     public:
         InmemColumnReader(const std::vector<Term_t> &vals) : col(vals),
-        currentPos(0) {
+        currentPos(0), end(vals.size()) {
+        }
+
+        InmemColumnReader(const std::vector<Term_t> &vals,
+                uint64_t start, uint64_t len) : col(vals),
+        currentPos(start), end(start + len) {
         }
 
         Term_t first() {
@@ -310,7 +316,7 @@ class InmemColumnReader : public ColumnReader {
         }
 
         bool hasNext() {
-            return currentPos < col.size();
+            return currentPos < end;
         }
 
         Term_t next() {
@@ -451,6 +457,136 @@ class InmemoryColumn : public Column {
         }
 };
 //----- END INMEMORY COLUMN ----------
+
+// START SUBCOLUMN (contains a subrange of an inmemory column)
+class SubColumn : public Column {
+    private:
+        std::shared_ptr<Column> parentColumn;
+        const std::vector<Term_t> &values;
+        const uint64_t start, len;
+    public:
+        SubColumn(std::shared_ptr<Column> parentColumn,
+                uint64_t start, uint64_t len) : parentColumn(parentColumn),
+        values(parentColumn->getVectorRef()),
+        start(start), len(len) {
+        }
+
+        size_t size() const {
+            return len;
+        }
+
+        size_t estimateSize() const {
+            return len;
+        }
+
+        bool isEmpty() const {
+            return len == 0;
+        }
+
+        Term_t getValue(const size_t pos) const {
+            return values[start + pos];
+        }
+
+        bool supportsDirectAccess() const {
+            return true;
+        }
+
+        bool isBackedByVector() {
+            return false;
+        }
+
+        bool isEDB() const {
+            return false;
+        }
+
+        bool containsDuplicates() const {
+            return len > 1;
+        }
+
+        std::unique_ptr<ColumnReader> getReader() const {
+            return std::unique_ptr<ColumnReader>(new InmemColumnReader(
+                        this->values, start, len));
+        }
+
+        std::shared_ptr<Column> sort() const {
+            std::vector<Term_t> newvals;
+            for(uint64_t i = start; i < start + len; ++i) {
+                newvals.push_back(values[i]);
+            }
+            std::sort(newvals.begin(), newvals.end());
+            return std::shared_ptr<Column>(new InmemoryColumn(newvals, true));
+        }
+
+        std::shared_ptr<Column> sort_and_unique() const {
+            std::vector<Term_t> newvals;
+            for(uint64_t i = start; i < start + len; ++i) {
+                newvals.push_back(values[i]);
+            }
+            std::sort(newvals.begin(), newvals.end());
+            auto last = std::unique(newvals.begin(), newvals.end());
+            newvals.erase(last, newvals.end());
+            newvals.shrink_to_fit();
+            return std::shared_ptr<Column>(new InmemoryColumn(newvals, true));
+        }
+
+        std::shared_ptr<Column> sort(const int nthreads) const {
+            if (nthreads <= 1) {
+                return sort();
+            }
+            std::vector<Term_t> newvals;
+            for(uint64_t i = start; i < start + len; ++i) {
+                newvals.push_back(values[i]);
+            }
+            //TBB is configured at the beginning to use nthreads to parallelize
+            //the computation
+            tbb::parallel_sort(newvals.begin(), newvals.end());
+            return std::shared_ptr<Column>(new InmemoryColumn(newvals, true));
+        }
+
+        std::shared_ptr<Column> sort_and_unique(const int nthreads) const {
+            if (nthreads <= 1) {
+                return sort_and_unique();
+            }
+            std::vector<Term_t> newvals;
+            for(uint64_t i = start; i < start + len; ++i) {
+                newvals.push_back(values[i]);
+            }
+            //TBB is configured at the beginning to use nthreads to parallelize
+            //the computation
+            tbb::parallel_sort(newvals.begin(), newvals.end());
+            auto last = std::unique(newvals.begin(), newvals.end());
+            newvals.erase(last, newvals.end());
+            newvals.shrink_to_fit();
+            return std::shared_ptr<Column>(new InmemoryColumn(newvals, true));
+        }
+
+        std::shared_ptr<Column> unique() const {
+            //I assume the column is already sorted
+            std::vector<Term_t> newvals;
+            newvals.reserve(len);
+            Term_t prev = (Term_t) - 1;
+            for (size_t i = start; i < start + len; i++) {
+                Term_t v = values[i];
+                if (v != prev) {
+                    newvals.push_back(v);
+                    prev = v;
+                }
+            }
+            newvals.shrink_to_fit();
+            return std::shared_ptr<Column>(new InmemoryColumn(newvals, true));
+        }
+
+        bool isConstant() const {
+            return len < 2;
+        }
+
+        bool isIn(const Term_t t) const {
+            return std::binary_search(values.begin() + start,
+                    values.begin() + start + len, t);
+        }
+};
+//----- END SUBCOLUMN ----------
+
 
 //----- EDB COLUMN ----------
 class EDBColumnReader : public ColumnReader {
