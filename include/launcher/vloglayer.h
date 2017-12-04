@@ -39,6 +39,13 @@ class VLogLayer : public DBLayer {
                 ::Type::ID& type,
                 unsigned& subType);
 
+        bool lookupById(uint64_t id,
+                char* start,
+                size_t& len,
+                ::Type::ID& type,
+                unsigned& subType);
+
+
         uint64_t getNextId();
 
         double getScanCost(DBLayer::DataOrder order,
