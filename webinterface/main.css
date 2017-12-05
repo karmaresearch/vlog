@@ -98,6 +98,10 @@ body {
 	background-color: white;
 }
 
+#frameBox {
+    margin-top: 20px;
+}
+
 #finishedBox {
     color: green;
 }
@@ -105,6 +109,22 @@ body {
 #wrapper {
 	width:1024px;
 	margin:0px auto 0px auto;
+}
+
+.msgSuccess {
+    color: green;
+    font-size: Large;
+    width: 100%;
+    text-align: center;
+    font-weight: bold;
+}
+
+.msgError {
+    color: red;
+    font-size: Large;
+    width: 100%;
+    text-align: center;
+    font-weight: bold;
 }
 
 #header {
@@ -127,6 +147,7 @@ body {
 	padding:0px;
 	font-family:Arial, Helvetica, sans-serif;
 	font-size:28px;
+    text-align: center;
 }
 
 #leftcolumn {
@@ -135,6 +156,7 @@ body {
 	width:270px;
 	float:left;
 	margin:10px;
+    margin-bottom: 0px;
 	padding:0;
 }
 
@@ -216,11 +238,11 @@ body {
 }
 
 #rulebox {
-    width: 650px;
+    width: 720px;
 }
 
 #premat {
-    width: 650px;
+    width: 720px;
 }
 
 #querybox {
@@ -231,6 +253,24 @@ body {
     margin-top: 10px;
     margin-bottom: 30px;
     border-size: 1;
+}
+
+#detailsprogram td {
+    font-size: 10pt;
+}
+
+#detailsedb td {
+    font-size: 10pt;
+}
+
+#containerSubmit {
+    border-top: 1px solid;
+    width: 710px;
+    margin: 0px;
+    margin-top: 10px;
+    font-size: large;
+    text-align: center;
+    padding: 5px;
 }
 
 #sparqlbox {

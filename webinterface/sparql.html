@@ -1,0 +1,21 @@
+        <div class="block" id="sparqlbox">
+            <form name="query" method="get" action="/query" id="query">
+                <div class="block">
+                    <h3>Launch SPARQL query</h3>
+
+                    <textarea id="querybox" rows="10" cols="80">
+</textarea><br>
+                    Load from file: <input type="file" id="sparqlfile" onchange="loadfile(this, 'querybox')"> <input id="printresults" type="checkbox">Print results<br>
+                    <input type="button" onclick="launchquery(this);" id="submitquery" name="submitquery" value="Execute SPARQL query">
+                </div>
+            </form>
+        </div>
+
+
+        <div id="sparqlresults">
+        </div>
+
+
+        <div style="height: 200px">
+        </div>
+

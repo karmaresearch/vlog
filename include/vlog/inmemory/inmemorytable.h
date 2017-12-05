@@ -139,6 +139,8 @@ class InmemoryTable : public EDBTable {
                 uint8_t posInL2,
                 size_t &sizeOutput);
 
+        uint64_t getSize();
+
         ~InmemoryTable();
 };
 

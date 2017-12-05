@@ -140,7 +140,6 @@ bool Segment::areAllColumnsPartOftheSameQuery(EDBLayer **edb, const Literal **l,
     for (int i = 0; i < nfields; ++i) {
         if (columns[i]->isEDB()) {
             EDBColumn *edbC = (EDBColumn*) columns[i].get();
-            // assert(edbC->containsDuplicates()); Why??? --Ceriel
             if (i == 0) {
                 lit = &(edbC->getLiteral());
                 posInLiteral.push_back(edbC->posColumnInLiteral());
@@ -163,8 +162,7 @@ bool Segment::areAllColumnsPartOftheSameQuery(EDBLayer **edb, const Literal **l,
         }
     }
 
-    if (sameLiteral) {
-        assert(lit->getNVars() <= posInLiteral.size());
+    if (sameLiteral && lit->getNVars() <= posInLiteral.size()) {
         //I check also that every posInLiteral is unique because the
         //procedure below does not work for repeated fields
         std::vector<uint8_t> test = posInLiteral;
@@ -183,9 +181,9 @@ bool Segment::areAllColumnsPartOftheSameQuery(EDBLayer **edb, const Literal **l,
             *l = lit;
             *outputpos = posInLiteral;
         }
+        return true;
     }
-
-    return sameLiteral;
+    return false;
 }
 
 std::shared_ptr<Segment> Segment::sortBy(const std::vector<uint8_t> *fields) const {

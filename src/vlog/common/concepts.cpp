@@ -669,6 +669,7 @@ std::string Rule::toprettystring(Program * program, EDBLayer *db) const {
     for(const auto& head : heads) {
         output += head.toprettystring(program, db) + " AND ";
     }
+    output = output.substr(0, output.length() - 5);
     output += ":-";
     for (int i = 0; i < body.size(); ++i) {
         output += body[i].toprettystring(program, db) + std::string(",");

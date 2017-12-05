@@ -49,6 +49,8 @@ public:
     virtual bool getDictText(const uint64_t id, char *text) = 0;
 
     virtual uint64_t getNTerms() = 0;
+
+    virtual uint64_t getSize() = 0;
 };
 
 

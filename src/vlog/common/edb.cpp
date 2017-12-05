@@ -697,6 +697,42 @@ Predicate EDBLayer::getDBPredicate(int idPredicate) {
     return Predicate(idPredicate, 0, EDB, info.arity);
 }
 
+std::vector<PredId_t> EDBLayer::getAllPredicateIDs() {
+    std::vector<PredId_t> out;
+    for(auto &t : dbPredicates) {
+        out.push_back(t.first);
+    }
+    return out;
+}
+
+uint64_t EDBLayer::getPredSize(PredId_t id) {
+    if (dbPredicates.count(id)) {
+        return dbPredicates[id].manager->getSize();
+    }
+    return 0;
+}
+
+string EDBLayer::getPredType(PredId_t id) {
+    if (dbPredicates.count(id)) {
+        return dbPredicates[id].type;
+    }
+    return 0;
+}
+
+string EDBLayer::getPredName(PredId_t id) {
+    if (dbPredicates.count(id)) {
+        return predDictionary.getRawValue(id);
+    }
+    return 0;
+}
+
+uint8_t EDBLayer::getPredArity(PredId_t id) {
+    if (dbPredicates.count(id)) {
+        return dbPredicates[id].arity;
+    }
+    return 0;
+}
+
 void EDBMemIterator::init1(PredId_t id, std::vector<Term_t>* v, const bool c1, const Term_t vc1) {
     predid = id;
     nfields = 1;

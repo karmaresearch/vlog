@@ -2,6 +2,8 @@
 var ruleOutputs = [];
 var allrules = [];
 var port = "WEB_PORT";
+var timeouts = {}
+var intervals = {}
 
 function getProgramInfo() {
     var info;
@@ -13,16 +15,54 @@ function getProgramInfo() {
             info = JSON.parse(http_request.responseText);
             content = "<table>";
             content += "<tr><td>N. Rules: <\/td><td>" + info.nrules + "<\/td><\/tr>";
-            content += "<tr><td>N. EBD Pred: <\/td><td>" + info.nedb+ "<\/td><\/tr>";
-            content += "<tr><td>N. IDB Pred: <\/td><td>" + info.nidb+ "<\/td><\/tr>";
+            /*content += "<tr><td>Used EBD Pred: <\/td><td>" + info.nedb+ "<\/td><\/tr>";
+            content += "<tr><td>Used IDB Pred: <\/td><td>" + info.nidb+ "<\/td><\/tr>";*/
             content += "<\/table";
             document.getElementById('detailsprogram').innerHTML = content;
+            allrules = info.rules;
         }
     };
     http_request.send(null);
-    }
+}
 
-    function loadfile(el,dest) {
+function msgbox(typ, container, msg, timeout) {
+    var clazz = 'msgSuccess';
+    if (typ != 'ok') {
+        clazz = 'msgError';
+    }
+    cnt = '<p class="' + clazz + '">' + msg + '</p>';
+    $(container).html(cnt);
+    $(container).show();
+    var id = setTimeout(function() { $(container).fadeOut(); }, timeout);
+    timeouts[container] = id;
+}
+
+function getEDBInfo() {
+    var info;
+    var http_request = new XMLHttpRequest();
+    http_request.open("GET", "http://" + window.location.hostname + ":" + port + "/getedbinfo", true);
+    http_request.onreadystatechange = function () {
+        var done = 4, ok = 200;
+        if (http_request.readyState === done && http_request.status === ok) {
+            info = JSON.parse(http_request.responseText);
+            content = "<table>";
+            for(var i = 0; i < info.length; ++i) {
+                content += "<tr><td>";
+                content += "<b>Name:</b></td><td>" + info[i].name;
+                content += "</td></tr>";
+                content += "<tr><td>&nbsp;&nbsp;&nbsp;<em>Arity</em></td><td>" + info[i].arity + "</td></tr>"
+                content += "<tr><td>&nbsp;&nbsp;&nbsp;<em>Size</em></td><td>" + info[i].size + "</td></tr>"
+                content += "<tr><td>&nbsp;&nbsp;&nbsp;<em>Type</em></td><td>" + info[i].type + "</td></tr>"
+            }
+            content += "<\/table";
+            document.getElementById('detailsedb').innerHTML = content;
+        }
+    };
+    http_request.send(null);
+}
+
+
+function loadfile(el,dest) {
     var f = el.files;
     var reader = new FileReader();
     reader.onloadend = function(evt) {
@@ -31,9 +71,34 @@ function getProgramInfo() {
         }
     }
     reader.readAsText(f[0]);
-    }
+}
 
-    function setupProgram() {
+function launchMat() {
+    //Populate the framebox with the content of newmat.html
+    clearTimeout(timeouts["messageBox"]);
+    $('#buttonMat').prop("disabled", true);
+    //Clean the graphs
+    ruleOutputs = [];
+    var http_request = new XMLHttpRequest();
+    http_request.open("GET", "http://" + window.location.hostname + ":" + port + "/launchMat", true);
+    http_request.onreadystatechange = function () {
+        var done = 4, ok = 200;
+        if (http_request.readyState === done) {
+            var content = http_request.responseText;
+            if (http_request.status === ok) {
+                $('#frameBox').html(content);
+                $('#frameBox').show();
+                setRefresh(refreshMat);
+            } else {
+                msgbox('error',"#messageBox", content, 2000);
+            }
+            $('#buttonMat').prop("disabled", false);
+        }
+    };
+    http_request.send(null);
+}
+
+function setupProgram() {
     var info;
 
     //Create the data for the form
@@ -42,48 +107,52 @@ function getProgramInfo() {
     contentform += 'rules=' + encodeURIComponent(srule);
     if (document.getElementById('automat').checked == true) {
         contentform += "&automat=on";
-    } else { 
+    } else {
         var spremat = document.getElementById('premat').value;
         contentform += '&queries=' + encodeURIComponent(spremat);
     }
     contentform = contentform.replace('/%20/g', '+');
 
     var http_request = new XMLHttpRequest();
+    document.getElementById('buttonSetup').disabled = true;
     http_request.open("POST", "http://" + window.location.hostname + ":" + port + "/setup", true);
     http_request.onreadystatechange = function () {
         var done = 4, ok = 200;
-        if (http_request.readyState === done && http_request.status === ok) {
-            //Refresh the program details
-            document.getElementById('buttonSubmit').value='Setup program';
-            document.getElementById('buttonSubmit').disabled = false;         
-            getProgramInfo(); 
+        if (http_request.readyState === done) {
+            if (http_request.status === ok) {
+                //Refresh the program details
+                getProgramInfo();
+                msgbox('ok', '#messageBox','Program loaded!', 1500);
+            }
+            document.getElementById('buttonSetup').value='Load Rules';
+            document.getElementById('buttonSetup').disabled = false;
         }
     };
     http_request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
     http_request.setRequestHeader('Content-Length', contentform.length);
 
-    document.getElementById('buttonSubmit').value='The program is loading ...';
-    document.getElementById('buttonSubmit').disabled = true;
+    document.getElementById('buttonSetup').value='The program is loading ...';
+    document.getElementById('buttonSetup').disabled = true;
     // And finally, We send our data.
-    http_request.send(contentform);    
-    }
+    http_request.send(contentform);
+}
 
-    function disablepremat() {
-        var val = document.getElementById('premat').disabled;
-        document.getElementById('premat').disabled = !val;
-        document.getElementById('queryrule').disabled = !val;
-    }
+function disablepremat() {
+    var val = document.getElementById('premat').disabled;
+    document.getElementById('premat').disabled = !val;
+    document.getElementById('queryrule').disabled = !val;
+}
 
 var timestartquery;
 function launchquery(button) {
-        timestartquery = new Date().getTime();
-        button.value = 'Executing query ...';
-        button.disabled = true;
-        var results;
-        var http_request = new XMLHttpRequest();
-        var uri = "http://" + window.location.hostname + ":" + port + "/sparql";
-        http_request.open("POST", uri, true);
-        http_request.onreadystatechange = function () {
+    timestartquery = new Date().getTime();
+    button.value = 'Executing query ...';
+    button.disabled = true;
+    var results;
+    var http_request = new XMLHttpRequest();
+    var uri = "http://" + window.location.hostname + ":" + port + "/sparql";
+    http_request.open("POST", uri, true);
+    http_request.onreadystatechange = function () {
         var done = 4, ok = 200;
         if (http_request.readyState === done && http_request.status === ok) {
             var timestopquery = new Date().getTime();
@@ -95,30 +164,30 @@ function launchquery(button) {
             var stats = results.stats;
 
             if (printresults == true) {
-            var headvars = results.head.vars;
-            for(var i = 0; i < headvars.length; ++i) {
-            con += '<td><strong><center>' + headvars[i] + '</center></strong></td>';
-            }
-            con += '</tr>';
-
-            var bindings = results.results.bindings;
-            for(var i = 0; i < bindings.length; ++i) {
-                var bin = bindings[i];
-                con += '<tr>';
-                for(var j = 0; j < bin.length; ++j) {
-                    //sanitize the string
-                    var stringtoprint = bin[j].value;
-                    stringtoprint = stringtoprint.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-                    con += '<td>' + stringtoprint + '</td>';
+                var headvars = results.head.vars;
+                for(var i = 0; i < headvars.length; ++i) {
+                    con += '<td><strong><center>' + headvars[i] + '</center></strong></td>';
                 }
                 con += '</tr>';
-            }
-            con += '</table>';
+
+                var bindings = results.results.bindings;
+                for(var i = 0; i < bindings.length; ++i) {
+                    var bin = bindings[i];
+                    con += '<tr>';
+                    for(var j = 0; j < bin.length; ++j) {
+                        //sanitize the string
+                        var stringtoprint = bin[j].value;
+                        stringtoprint = stringtoprint.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                        con += '<td>' + stringtoprint + '</td>';
+                    }
+                    con += '</tr>';
+                }
+                con += '</table>';
             }
 
             //Add headers
             var timequery = (timestopquery - timestartquery)/1000;
-            
+
             var nresults = '';
             if (printresults == true)
                 nresults = bindings.length;
@@ -140,15 +209,15 @@ function launchquery(button) {
     http_request.send(sparqlquery);
 
 
-    }
+}
 
 
 function draw(ramperc) {
-        var rp1 = radialProgress(document.getElementById('divRAM'))
-            .label("")
-                .diameter(150)
-                .value(ramperc)
-                .render();
+    var rp1 = radialProgress(document.getElementById('divRAM'))
+        .label("")
+        .diameter(150)
+        .value(ramperc)
+        .render();
 }
 
 function updateOutputGraph() {
@@ -188,11 +257,13 @@ function refreshMem() {
             stats = JSON.parse(http_request.responseText);
             var ramperc = stats.ramperc;
             draw(ramperc);
-            //Update the several fields            
+            //Update the several fields
             document.getElementById('usedram').innerHTML = stats.usedmem;
-         } else {
+        } else {
             if (http_request.status != ok) {
-                clearInterval(interID);
+                if (refreshMem in intervals) {
+                    clearInterval(intervals['refreshMem']);
+                }
                 document.getElementById('finished').innerHTML= 'Lost connection. No more refreshing.';
             }
         }
@@ -200,7 +271,7 @@ function refreshMem() {
     http_request.send(null);
 }
 
-function refresh() {
+function refreshMat() {
     //Get the various stats
     var stats;
     var http_request = new XMLHttpRequest();
@@ -209,10 +280,7 @@ function refresh() {
         var done = 4, ok = 200;
         if (http_request.readyState === done && http_request.status === ok) {
             stats = JSON.parse(http_request.responseText);
-            var ramperc = stats.ramperc;
-            draw(ramperc);
-            //Update the several fields            
-            document.getElementById('usedram').innerHTML = stats.usedmem;
+            //Update the several fields
             document.getElementById('runtime').innerHTML = stats.runtime;
             var milli = +stats.runtime;
             var hours = parseInt(milli / (3600 * 1000));
@@ -239,20 +307,22 @@ function refresh() {
             document.getElementById('rule').innerHTML = stats.rule;
 
             //Update the data for the rules output graph
-	    if (stats.outputrules != '') {
-		var iterations = stats.outputrules.split(';');
-		//updates are incremental
-		//ruleOutputs = [];            
-		for(var i = 0; i < iterations.length; i++) {
-		    var el = iterations[i].split(',');
-		    ruleOutputs.push({it: +el[0], der: +el[1], rule: +el[2], timeexec: +el[3] });
-		}
-	    }
+            if (stats.outputrules != '') {
+                var iterations = stats.outputrules.split(';');
+                //updates are incremental
+                //ruleOutputs = [];
+                for(var i = 0; i < iterations.length; i++) {
+                    var el = iterations[i].split(',');
+                    ruleOutputs.push({it: +el[0], der: +el[1], rule: +el[2], timeexec: +el[3] });
+                }
+            }
 
             if (stats.finished == 'true') {
                 get_size_IDBs();
-                document.getElementById('finished').innerHTML= 'Computation is finished. No more refreshing.';
-                clearInterval(interID);
+                msgbox('ok', '#messageBox', 'Materialization is finished!', 5000);
+                if (refreshMat in intervals) {
+                    clearInterval(intervals[refreshMat]);
+                }
             }
 
             updateOutputGraph();
@@ -271,10 +341,10 @@ function showDetailIDBWindow(e, predicate) {
     var a = stats_IDB[predicate];
     var hc = '';
     for(var i = 0; i < a.length; ++i) {
-       hc += 'Iteration: ' + a[i].it;
-       hc += '<br/>Rule: ' + allrules[a[i].ruleid];
-       hc += '<br/>Derivation: ' + Number(a[i].der).toLocaleString('en');
-       hc += '<hr/>';
+        hc += 'Iteration: ' + a[i].it;
+        hc += '<br/>Rule: ' + allrules[a[i].ruleid];
+        hc += '<br/>Derivation: ' + Number(a[i].der).toLocaleString('en');
+        hc += '<hr/>';
     }
 
     document.getElementById('detailsIDB').innerHTML = hc;
@@ -292,9 +362,9 @@ function showDetailIDBWindow(e, predicate) {
         posx = e.clientX;
         posy = e.clientY;
     }
-	document.getElementById('detailsIDB').style.position = 'absolute';
-	document.getElementById('detailsIDB').style.left = posx + 30;
-	document.getElementById('detailsIDB').style.top = posy - 5;
+    document.getElementById('detailsIDB').style.position = 'absolute';
+    document.getElementById('detailsIDB').style.left = posx + 30;
+    document.getElementById('detailsIDB').style.top = posy - 5;
     document.getElementById('detailsIDB').style.display = 'block';
 }
 
@@ -315,7 +385,7 @@ function get_size_IDBs() {
             stats = JSON.parse(http_request.responseText);
             //Get size IDB predicates
             var allsizes = '<table><th>Predicate</th><th>#Rows</th>';
-            var sIDBs = stats.sizeidbs.split(';');            
+            var sIDBs = stats.sizeidbs.split(';');
             var totalsize = 0;
             for (var i = 0; i < sIDBs.length; i+=2) {
                 //Parse the second string
@@ -353,7 +423,7 @@ function get_generic_stats() {
             stats = JSON.parse(http_request.responseText);
             var ramperc = stats.ramperc;
             draw(ramperc);
-            //Update the several fields            
+            //Update the several fields
             document.getElementById('totalram').innerHTML = stats.totmem;
             document.getElementById('commandline').innerHTML = stats.commandline;
             document.getElementById('nrules').innerHTML = stats.nrules;
@@ -380,24 +450,23 @@ function get_mem_commandline() {
             stats = JSON.parse(http_request.responseText);
             var ramperc = stats.ramperc;
             draw(ramperc);
-            //Update the several fields            
+            //Update the several fields
             document.getElementById('totalram').innerHTML = stats.totmem;
             document.getElementById('commandline').innerHTML = stats.commandline;
-            document.getElementById('tripleskb').innerHTML = new Intl.NumberFormat().format(Number(stats.tripleskb));
-            document.getElementById('termskb').innerHTML = new Intl.NumberFormat().format(Number(stats.termskb));
+            //document.getElementById('tripleskb').innerHTML = new Intl.NumberFormat().format(Number(stats.tripleskb));
+            //document.getElementById('termskb').innerHTML = new Intl.NumberFormat().format(Number(stats.termskb));
         }
     };
     http_request.send(null);
 }
 
-
-var interID = -1;
 function setRefresh(inputfunct) {
-    if (interID != -1) {
+    if (inputfunct in intervals) {
         //Clear the previous interval
-        clearInterval(interID);
+        clearInterval(intervals[inputfunct]);
     }
     //Get the value in the box
     var refRate = document.getElementById('refreshRate').value;
-    interID = setInterval(inputfunct, refRate)
+    interID = setInterval(inputfunct, refRate);
+    intervals[inputfunct] = interID;
 }

@@ -61,7 +61,6 @@ class SemiNaiver {
         long statsLastIteration;
         string currentRule;
         PredId_t currentPredicate;
-        string allRules;
 #endif
 
     private:
@@ -222,8 +221,6 @@ class SemiNaiver {
         std::vector<std::pair<string, std::vector<StatsSizeIDB>>> getSizeIDBs();
 
         std::vector<StatsRule> getOutputNewIterations();
-
-        string getListAllRulesForJSONSerialization();
 #endif
 
         std::chrono::system_clock::time_point getStartingTimeMs() {

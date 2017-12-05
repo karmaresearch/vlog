@@ -13,6 +13,8 @@
 #include <trident/kb/kb.h>
 #include <trident/utils/json.h>
 
+#include <kognac/progargs.h>
+
 #include <dblayer.hpp>
 #include <cts/infra/QueryGraph.hpp>
 #include <cts/parser/SPARQLParser.hpp>
@@ -25,108 +27,117 @@
 #include <boost/shared_ptr.hpp>
 
 #include <map>
+#include <condition_variable>
+#include <mutex>
 
 class VLogLayer;
-class TridentLayer;
+//class TridentLayer;
 class WebInterface {
-protected:
-    //program details
-    std::unique_ptr<Program> program;
-    std::unique_ptr<EDBLayer> edb;
-    std::unique_ptr<VLogLayer> vloglayer;
-    std::unique_ptr<TridentLayer> tridentlayer;
+    protected:
+        //program details
+        ProgramArgs &vm;
+        std::unique_ptr<Program> program;
+        std::unique_ptr<EDBLayer> edb;
+        std::unique_ptr<VLogLayer> vloglayer;
+        std::unique_ptr<TridentLayer> tridentlayer;
 
-    void setupTridentLayer();
+        void setupTridentLayer();
 
-private:
-    std::shared_ptr<SemiNaiver> sn;
-    string dirhtmlfiles;
-    std::thread t;
-    string cmdArgs;
-
-    boost::asio::io_service io;
-    boost::asio::ip::tcp::acceptor acceptor;
-    boost::asio::ip::tcp::resolver resolver;
-
-    bool isActive;
-    string edbFile;
-    string webport;
-
-    map<string, string> cachehtml;
-
-    class Server: public boost::enable_shared_from_this<Server> {
     private:
-        std::string res, req;
-        WebInterface *inter;
+        std::shared_ptr<SemiNaiver> sn;
+        std::thread matRunner;
+        std::mutex mtxMatRunner;
+        std::condition_variable cvMatRunner;
+        string dirhtmlfiles;
+        std::thread t;
+        string cmdArgs;
 
-        std::ostringstream ss;
-        std::unique_ptr<char[]> data_;
 
+        boost::asio::io_service io;
+        boost::asio::ip::tcp::acceptor acceptor;
+        boost::asio::ip::tcp::resolver resolver;
+
+        bool isActive;
+        string edbFile;
+        string webport;
+
+        map<string, string> cachehtml;
+
+        class Server: public boost::enable_shared_from_this<Server> {
+            private:
+                std::string res, req;
+                WebInterface *inter;
+
+                std::ostringstream ss;
+                std::unique_ptr<char[]> data_;
+
+            public:
+                boost::asio::ip::tcp::socket socket;
+                Server(boost::asio::io_service &io, WebInterface *inter):
+                    inter(inter), socket(io) {
+                        data_ = std::unique_ptr<char[]>(new char[4096]);
+                    }
+                void writeHandler(const boost::system::error_code &err, std::size_t bytes);
+                void readHeader(boost::system::error_code const &err, size_t bytes);
+                void acceptHandler(const boost::system::error_code &err);
+        };
+
+        void startThread(string address, string port);
+
+        void processMaterialization();
+
+        static void parseQuery(bool &success,
+                SPARQLParser &parser,
+                std::shared_ptr<QueryGraph> &queryGraph,
+                QueryDict &queryDict,
+                DBLayer &db);
     public:
-        boost::asio::ip::tcp::socket socket;
-        Server(boost::asio::io_service &io, WebInterface *inter):
-            inter(inter), socket(io) {
-            data_ = std::unique_ptr<char[]>(new char[4096]);
+        WebInterface(ProgramArgs &vm, std::shared_ptr<SemiNaiver> sn, string htmlfiles,
+                string cmdArgs, string edbfile);
+
+        void start(string address, string port);
+
+        void connect();
+
+        void stop();
+
+        string getDefaultPage();
+
+        string getPage(string page);
+
+        long getDurationExecMs();
+
+        void setActive() {
+            isActive = true;
         }
-        void writeHandler(const boost::system::error_code &err, std::size_t bytes);
-        void readHeader(boost::system::error_code const &err, size_t bytes);
-        void acceptHandler(const boost::system::error_code &err);
-    };
 
-    void startThread(string address, string port);
+        void setInactive() {
+            isActive = false;
+        }
 
-    static void parseQuery(bool &success,
-                           SPARQLParser &parser,
-                           std::shared_ptr<QueryGraph> &queryGraph,
-                           QueryDict &queryDict,
-                           DBLayer &db);
-public:
-    WebInterface(std::shared_ptr<SemiNaiver> sn, string htmlfiles,
-                 string cmdArgs, string edbfile);
+        void join() {
+            t.join();
+        }
 
-    void start(string address, string port);
+        std::shared_ptr<SemiNaiver> getSemiNaiver() {
+            return sn;
+        }
 
-    void connect();
+        string getCommandLineArgs() {
+            return cmdArgs;
+        }
 
-    void stop();
+        static string lookup(string sId, DBLayer &db);
 
-    string getDefaultPage();
-
-    string getPage(string page);
-
-    long getDurationExecMs();
-
-    void setActive() {
-        isActive = true;
-    }
-
-    void setInactive() {
-        isActive = false;
-    }
-
-    void join() {
-        t.join();
-    }
-
-    std::shared_ptr<SemiNaiver> getSemiNaiver() {
-        return sn;
-    }
-
-    string getCommandLineArgs() {
-        return cmdArgs;
-    }
-
-    static string lookup(string sId, DBLayer &db);
-
-    static void execSPARQLQuery(string sparqlquery,
-                                bool explain,
-                                long nterms,
-                                DBLayer &db,
-                                bool printstdout,
-                                bool jsonoutput,
-                                JSON *jsonvars,
-                                JSON *jsonresults,
-                                JSON *jsonstats);
+        static void execSPARQLQuery(string sparqlquery,
+                bool explain,
+                long nterms,
+                DBLayer &db,
+                bool printstdout,
+                bool jsonoutput,
+                JSON *jsonvars,
+                JSON *jsonresults,
+                JSON *jsonstats);
 };
 #endif
 #endif

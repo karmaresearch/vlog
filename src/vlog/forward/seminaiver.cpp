@@ -224,8 +224,6 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
     startTime = std::chrono::system_clock::now();
 #ifdef WEBINTERFACE
     statsLastIteration = -1;
-    allRules = "";
-    allRules = getListAllRulesForJSONSerialization();
 #endif
     listDerivations.clear();
 
@@ -1413,26 +1411,6 @@ std::vector<StatsRule> SemiNaiver::getOutputNewIterations() {
         }
     }
     return out;
-}
-
-string SemiNaiver::getListAllRulesForJSONSerialization() {
-    if (allRules != "") {
-        return allRules;
-    }
-    map<int, string> map;
-    for (auto const &el : allEDBRules) {
-        map.insert(make_pair(el.ruleid, el.rule.toprettystring(program, &layer)));
-    }
-    for (auto const &el : allIDBRules) {
-        map.insert(make_pair(el.ruleid, el.rule.toprettystring(program, &layer)));
-    }
-
-    string out = "";
-    for (auto const &el : map) {
-        out += el.second + ";";
-    }
-    allRules = out.substr(0, out.size() - 1);
-    return allRules;
 }
 
 bool SemiNaiver::isRunning() {

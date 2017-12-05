@@ -936,3 +936,7 @@ bool TridentTable::getDictText(const uint64_t id, char *text) {
 uint64_t TridentTable::getNTerms() {
     return kb->getNTerms();
 }
+
+uint64_t TridentTable::getSize() {
+    return kb->getSize();
+}

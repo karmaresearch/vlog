@@ -5,75 +5,139 @@
     <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
     <meta name="author" content="Jacopo Urbani">
     <meta name="description" content="VLog">
-
-    <script type="text/javascript" src="d3/d3.min.js"></script>
-    <script type="text/javascript" src="d3/radial.js"></script>
-    <script type="text/javascript" src="d3/d3-tip.js"></script>
-    <script type="text/javascript" src="scripts.js"></script>
-    <script type="text/javascript" src="functions.js"></script>    
-
+    <script type="text/javascript" src="d3/d3.min.js">
+</script>
+    <script type="text/javascript" src="d3/radial.js">
+</script>
+    <script type="text/javascript" src="d3/d3-tip.js">
+</script>
+    <script type="text/javascript" src="scripts.js">
+</script>
+    <script type="text/javascript" src="functions.js">
+</script>
+    <script type="text/javascript" src="jquery-min.js">
+</script>
     <link href="main.css" rel="stylesheet" type="text/css">
     <link href="d3/radial.css" rel="stylesheet" type="text/css">
-    <title>VLog Web Interface</title>
+
+    <title>VLog</title>
 </head>
 
 <body>
-
     <script type="text/javascript">
-       get_mem_commandline(); 
+    get_mem_commandline(); 
+        getEDBInfo();
         getProgramInfo();
+
+        //Code for collapsing elements
+                $(document).ready(function() {
+                  $('.nav-toggle').click(function(){
+                        //get collapse content selector
+                        var collapse_content_selector = $(this).attr('href');
+
+                        //make the collapse content to be shown or hide
+                        var toggle_switch = $(this);
+                        $(collapse_content_selector).toggle(function(){
+                          if($(this).css('display')=='none'){
+                                //change the button label to be 'Show'
+                                toggle_switch.html('Show Content');
+                          }else{
+                                //change the button label to be 'Hide'
+                                toggle_switch.html('Hide Content');
+                          }
+                        });
+                  });
+                });
     </script>
 
     <div id="wrapper">
         <div id="header" class="block">
-            <h1>VLog Web Interface</h1>
+            <h1>VLog</h1>
         </div>
-        
+
+
+        <div>
+            <button type="button" href="#leftcolumnblock" class="nav-toggle">Hide Content</button>
+        </div>
+
+
         <div id="leftcolumn">
-                    <h3>Resource Monitor</h3>
-                    <div id="rambox">
-                        <p><i>Occupied RAM: </i><label id="usedram"></label>/<label id="totalram"></label> MB</p>
-                        <div id="divRAM" class="radial"></div>
-                    </div>
-                    <p><i>Refresh rate (ms): </i><input id="refreshRate" size="5" text="1000" value="1000" onchange="setRefresh(refreshMem);" /></p>
-                    <p><i>Command line arguments:</i></p>
-                    <p><small><label id="commandline"></label></small></p>
-                    <p><i># Triples </i><label id="tripleskb"></label></p>
-                    <p><i># Terms </i><label id="termskb"></label></p>
+            <div id="leftcolumnblock">
+                <h3>Memory Monitor</h3>
 
-                    <div id="detailsprogramblock">
-                        <h3>Details current program</h3>
-                        <div id="detailsprogram"></div>
+
+                <div id="rambox">
+                    <p><i>Occupied RAM:</i> <label id="usedram"></label>/<label id="totalram"></label> MB</p>
+
+
+                    <div id="divRAM" class="radial">
                     </div>
+                </div>
+
+
+                <p><i>Refresh rate (ms):</i> <input id="refreshRate" size="5" text="1000" value="1000" onchange="setRefresh(refreshMem);"></p>
+
+
+                <p><i>Command line:</i>
+                </p>
+
+
+                <p><small><label id="commandline"></label></small>
+                </p>
+                <br>
+
+
+                <div id="detailsedbblock">
+                    <h3>Details EDB predicates</h3>
+
+
+                    <div id="detailsedb">
+                    </div>
+                </div>
+
+
+                <div id="detailsprogramblock">
+                    <h3>Details current program</h3>
+
+
+                    <div id="detailsprogram">
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="block" id="setupdatalog">
-            <div id="finishedBox"><h3><label id="finished"></h3></label></div>
-            <h3>Setup new Datalog program</h3>
 
-            <form name="setup" method="post" id="setup">
+        <form name="setup" method="post" id="setup">
+            <div class="block" id="setupdatalog">
+                <div id="finishedBox">
+                    <h3><label id="finished"></label>
+                    </h3>
+                </div>
+
+
+                <h3>Rules</h3>
+
+
                 <table>
                     <tr>
-                        <td>Rules</td>
-
                         <td>
-                        <textarea id="rulebox" name="rules" rows="7">
+                        <textarea id="rulebox" name="rules" rows="30">
 </textarea>
                         </td>
                     </tr>
 
 
                     <tr>
-                        <td>
-                        </td>
-
                         <td>Load from file: <input type="file" id="filerule" onchange="loadfile(this, 'rulebox')"></td>
                     </tr>
+                </table>
 
 
+                <p>Queries to prematerialize <button type="button" href="#tableQueries" class="nav-toggle">Show Content</button></p>
+
+
+                <table id="tableQueries" style="display:none">
                     <tr>
-                        <td>Queries</td>
-
                         <td>
                         <textarea id="premat" name="queries" rows="7">
 </textarea>
@@ -82,50 +146,32 @@
 
 
                     <tr>
-                        <td>
-                        </td>
-
                         <td>Load from file: <input type="file" id="queryrule" onchange="loadfile(this, 'premat')"></td>
                     </tr>
 
 
                     <tr>
-                        <td>Auto premat.</td>
-
-                        <td><input id="automat" name="automat" type="checkbox" onclick="disablepremat()">
-                        </td>
+                        <td>Auto premat. <input id="automat" name="automat" type="checkbox" onclick="disablepremat()"></td>
                     </tr>
                 </table>
-                <input type="button" onclick="setupProgram();" id="buttonSubmit" name="submit" value="Setup program">
-            </form> 
+
+
+                <table id="containerSubmit">
+                    <tr>
+                        <td><input type="button" onclick="setupProgram();" id="buttonSetup" name="submit" value="Load Rules"> <input type="button" onclick="launchMat();" id="buttonMat" name="submit" value="Launch Materialization"></td>
+                    </tr>
+                </table>
+            </div>
+        </form>
+
+        <div id="messageBox">
         </div>
 
-
-        <div class="block" id="sparqlbox">
-            <form name="query" method="get" action="/query" id="query">
-                <div class="block">
-                    <h3>Launch SPARQL query</h3>
-
-                    <textarea id="querybox" rows="10" cols="80">
-</textarea><br>
-                    Load from file: <input type="file" id="sparqlfile" onchange="loadfile(this, 'querybox')"> <input id="printresults" type="checkbox">Print results<br>
-                    <input type="button" onclick="launchquery(this);" id="submitquery" name="submitquery" value="Execute SPARQL query">
-                </div>
-            </form>
-        </div>
-
-
-        <div id="sparqlresults">
-        </div>
-
-
-        <div style="height: 200px">
+        <div id="frameBox">
         </div>
     </div>
-</body>
-
-<script>
+    <script type="text/javascript">
 setRefresh(refreshMem);
-</script>
-
+    </script>
+</body>
 </html>

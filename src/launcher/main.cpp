@@ -327,7 +327,7 @@ void startServer(int argc,
     std::unique_ptr<WebInterface> webint;
     int port = vm["port"].as<int>();
     webint = std::unique_ptr<WebInterface>(
-            new WebInterface(NULL, pathExec + "/webinterface",
+            new WebInterface(vm, NULL, pathExec + "/webinterface",
                 flattenAllArgs(argc, argv),
                 vm["edb"].as<string>()));
     webint->start("0.0.0.0", to_string(port));
@@ -399,7 +399,7 @@ void launchFullMat(int argc,
         std::unique_ptr<WebInterface> webint;
         if (vm["webinterface"].as<bool>()) {
             webint = std::unique_ptr<WebInterface>(
-                    new WebInterface(sn, pathExec + "/webinterface",
+                    new WebInterface(vm, sn, pathExec + "/webinterface",
                         flattenAllArgs(argc, argv),
                         vm["edb"].as<string>()));
             int port = vm["port"].as<int>();
@@ -781,7 +781,7 @@ int main(int argc, const char** argv) {
     if (!initParams(argc, argv, vm)) {
         return EXIT_FAILURE;
     }
-    string full_path(argv[0]);
+    string full_path = Utils::getFullPathExec();
     //Set logging level
     string ll = vm["logLevel"].as<string>();
     if (ll == "debug") {
@@ -818,13 +818,6 @@ int main(int argc, const char** argv) {
     // Allow for older tbb versions: don't use global_control.
     // tbb::global_control c(tbb::global_control::max_allowed_parallelism, parallelism);
     tbb::task_scheduler_init init(parallelism);
-    /*if (!vm["multithreaded"].empty()) {
-      const size_t parallelism = vm["nthreads"].as<int>();
-      if (parallelism > 1) {
-    //tbb::global_control c(tbb::global_control::max_allowed_parallelism, parallelism);
-    c.max_allowed_parallelism = parallelism;
-    }
-    }*/
 
     // For profiling:
     int seconds = vm["sleep"].as<int>();
@@ -921,18 +914,6 @@ int main(int argc, const char** argv) {
 
             loader->load(p);
 
-            /*loader->load("rdf", onlyCompress, true, vm["comprinput"].as<string>(),
-              vm["comprdict"].as<string>() , vm["output"].as<string>(),
-              vm["output"].as<string>(),
-              dictMethod, sampleMethod,
-              popArg,
-              vm["maxThreads"].as<int>(), vm["readThreads"].as<int>(),
-              ndicts, nindices,
-              true,
-              aggrIndices, canSkipTables, enableFixedStrat,
-              fixedStrat, storePlainList,
-              sample, sampleRate, thresholdSkipTable, NULL, "", 0, "");*/
-
         } else {
             LOG(INFOL) << "Creating the KB from " << vm["input"].as<string>();
 
@@ -970,18 +951,6 @@ int main(int argc, const char** argv) {
             p.flatTree = false;
 
             loader->load(p);
-
-
-            /*loader->load("rdf", onlyCompress, false, vm["input"].as<string>(), "", vm["output"].as<string>(),
-              vm["output"].as<string>(),
-              dictMethod, sampleMethod,
-              popArg,
-              vm["maxThreads"].as<int>(), vm["readThreads"].as<int>(),
-              ndicts, nindices,
-              true,
-              aggrIndices, canSkipTables, enableFixedStrat,
-              fixedStrat, storePlainList,
-              sample, sampleRate, thresholdSkipTable, NULL, "", 0, "");*/
         }
         delete loader;
     } else if (cmd == "server") {
