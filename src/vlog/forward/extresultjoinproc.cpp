@@ -5,6 +5,7 @@
 ExistentialRuleProcessor::ExistentialRuleProcessor(
         std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
         std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
+        std::vector<FCBlock> &listDerivations,
         std::vector<Literal> &heads,
         const RuleExecutionDetails *detailsRule,
         const uint8_t ruleExecOrder,
@@ -13,7 +14,7 @@ ExistentialRuleProcessor::ExistentialRuleProcessor(
         const int nthreads,
         SemiNaiver *sn,
         std::shared_ptr<ChaseMgmt> chaseMgmt) :
-    FinalRuleProcessor(posFromFirst, posFromSecond,
+    FinalRuleProcessor(posFromFirst, posFromSecond, listDerivations,
             heads, detailsRule, ruleExecOrder, iteration,
             addToEndTable, nthreads, sn), chaseMgmt(chaseMgmt) {
         this->sn = sn;

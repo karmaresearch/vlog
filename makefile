@@ -20,7 +20,7 @@ CPPFLAGS+= -isystem /usr/local/include
 
 #Other flags
 CPPFLAGS += -c -MD -MF $(patsubst %.o,%.d,$@) -std=c++1z
-CPPFLAGS += -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1 # -DWEBINTERFACE=0
+CPPFLAGS += -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1 
 
 SRCDIR=src
 
@@ -36,6 +36,10 @@ SRC_FILES = \
 
 #Add also the launcher with the main() file. This file depends on RDF3X (for querying)
 SRC_FILES+= $(wildcard $(SRCDIR)/launcher/*.cpp)
+
+ifeq ($(WEBINTERFACE),1)
+	CPPFLAGS +=-DWEBINTERFACE=1	
+endif
 
 ifeq ($(MYSQL),1)
 	SRC_FILES+=$(wildcard $(SRCDIR)/vlog/mysql/*.cpp)
@@ -78,6 +82,11 @@ endif
 #Set up libs and other linking flags
 CLIBS=-Wl,-rpath,$(KOGNACLIB) -L$(KOGNACLIB) -Wl,-rpath,$(TRIDENTLIB) -L$(TRIDENTLIB)
 LDFLAGS= -lkognac-log -lkognac -ltrident-core -ltrident-sparql -lz -ltbb -lpthread
+
+ifeq ($(WEBINTERFACE),1)
+	LDFLAGS+=-lcurl -lboost_system
+endif
+
 uname_S := $(shell uname -s)
 #ifeq ($(uname_S), Darwin)
 #endif

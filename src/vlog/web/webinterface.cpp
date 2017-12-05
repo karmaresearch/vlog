@@ -120,7 +120,7 @@ static string _getValueParam(string req, string param) {
 
 void WebInterface::parseQuery(bool &success,
         SPARQLParser &parser,
-        QueryGraph &queryGraph,
+        std::shared_ptr<QueryGraph> &queryGraph,
         QueryDict &queryDict,
         DBLayer &db) {
 
@@ -133,16 +133,18 @@ void WebInterface::parseQuery(bool &success,
         return;
     }
 
+    queryGraph = std::shared_ptr<QueryGraph>(new QueryGraph(parser.getVarCount()));
+
     // And perform the semantic anaylsis
     try {
         SemanticAnalysis semana(db, queryDict);
-        semana.transform(parser, queryGraph);
+        semana.transform(parser, *queryGraph.get());
     } catch (const SemanticAnalysis::SemanticException& e) {
         cerr << "semantic error: " << e.message << endl;
         success = false;
         return;
     }
-    if (queryGraph.knownEmpty()) {
+    if (queryGraph->knownEmpty()) {
         cout << "<empty result -- known empty>" << endl;
         success = false;
         return;
@@ -172,7 +174,6 @@ void WebInterface::execSPARQLQuery(string sparqlquery,
         JSON *jsonresults,
         JSON *jsonstats) {
     std::unique_ptr<QueryDict> queryDict = std::unique_ptr<QueryDict>(new QueryDict(nterms));
-    std::unique_ptr<QueryGraph> queryGraph = std::unique_ptr<QueryGraph>(new QueryGraph());
     bool parsingOk;
 
     std::unique_ptr<SPARQLLexer> lexer =
@@ -180,7 +181,8 @@ void WebInterface::execSPARQLQuery(string sparqlquery,
     std::unique_ptr<SPARQLParser> parser = std::unique_ptr<SPARQLParser>(
             new SPARQLParser(*lexer.get()));
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    parseQuery(parsingOk, *parser.get(), *queryGraph.get(), *queryDict.get(), db);
+    std::shared_ptr<QueryGraph> queryGraph;
+    parseQuery(parsingOk, *parser.get(), queryGraph, *queryDict.get(), db);
     if (!parsingOk) {
         std::chrono::duration<double> duration = std::chrono::system_clock::now() - start;
         LOG(INFOL) << "Runtime query: 0ms.";

@@ -5,7 +5,7 @@
 
 class SingleHeadFinalRuleProcessor: public ResultJoinProcessor {
     private:
-        //std::vector<FCBlock> &listDerivations;
+        std::vector<FCBlock> &listDerivations;
         const uint8_t ruleExecOrder;
 
         const size_t iteration;
@@ -35,6 +35,7 @@ class SingleHeadFinalRuleProcessor: public ResultJoinProcessor {
         SingleHeadFinalRuleProcessor(
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
+                std::vector<FCBlock> &listDerivations,
                 FCTable *t,
                 Literal &head, const uint8_t posHeadInRule,
                 const RuleExecutionDetails *detailsRule,
@@ -48,6 +49,7 @@ class SingleHeadFinalRuleProcessor: public ResultJoinProcessor {
                 bool deleteRow,
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
+                std::vector<FCBlock> &listDerivations,
                 FCTable *t,
                 Literal &head, const uint8_t posHeadInRule,
                 const RuleExecutionDetails *detailsRule,
@@ -162,11 +164,11 @@ class SingleHeadFinalRuleProcessor: public ResultJoinProcessor {
 class SemiNaiver;
 class FinalRuleProcessor: public ResultJoinProcessor {
     private:
-        //std::vector<FCBlock> &listDerivations;
-        //const uint8_t ruleExecOrder;
-        //const size_t iteration;
-        //bool newDerivation;
-        //std::vector<Literal> &heads;
+        std::vector<FCBlock> &listDerivations;
+        const uint8_t ruleExecOrder;
+        const size_t iteration;
+        bool newDerivation;
+        std::vector<Literal> &heads;
 
     protected:
         std::vector<std::unique_ptr<SingleHeadFinalRuleProcessor>> atomTables;
@@ -177,7 +179,8 @@ class FinalRuleProcessor: public ResultJoinProcessor {
         FinalRuleProcessor(
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
-                std::vector<Literal> &head,
+                std::vector<FCBlock> &listDerivations,
+                std::vector<Literal> &heads,
                 const RuleExecutionDetails *detailsRule,
                 const uint8_t ruleExecOrder,
                 const size_t iteration,

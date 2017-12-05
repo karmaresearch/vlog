@@ -42,6 +42,7 @@ void SingleHeadFinalRuleProcessor::processResults(std::vector<int> &blockid, Ter
 SingleHeadFinalRuleProcessor::SingleHeadFinalRuleProcessor(
         std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
         std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
+        std::vector<FCBlock> &listDerivations,
         FCTable *table, Literal &head,
         const uint8_t posHeadInRule,
         const RuleExecutionDetails *ruleDetails,
@@ -50,7 +51,7 @@ SingleHeadFinalRuleProcessor::SingleHeadFinalRuleProcessor(
         const bool addToEndTable,
         const int nthreads) : SingleHeadFinalRuleProcessor(
             new Term_t[table->getSizeRow()], true,
-            posFromFirst, posFromSecond, table, head,
+            posFromFirst, posFromSecond, listDerivations, table, head,
             posHeadInRule, ruleDetails, ruleExecOrder, iteration, addToEndTable,
             nthreads)
 {
@@ -61,6 +62,7 @@ SingleHeadFinalRuleProcessor::SingleHeadFinalRuleProcessor(
         bool deleteRow,
         std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
         std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
+        std::vector<FCBlock> &listDerivations,
         FCTable *table, Literal &head,
         const uint8_t posHeadInRule,
         const RuleExecutionDetails *ruleDetails,
@@ -73,6 +75,7 @@ SingleHeadFinalRuleProcessor::SingleHeadFinalRuleProcessor(
             (uint8_t) posFromSecond.size(),
             posFromFirst.size() > 0 ? & (posFromFirst[0]) : NULL,
             posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads),
+    listDerivations(listDerivations),
     ruleExecOrder(ruleExecOrder),
     iteration(iteration),
     newDerivation(false),
@@ -722,6 +725,7 @@ int __totLengthHeadAtoms(std::vector<Literal> &heads) {
 FinalRuleProcessor::FinalRuleProcessor(
         std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
         std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
+        std::vector<FCBlock> &listDerivations,
         std::vector<Literal> &heads,
         const RuleExecutionDetails *ruleDetails,
         const uint8_t ruleExecOrder,
@@ -734,13 +738,13 @@ FinalRuleProcessor::FinalRuleProcessor(
             (uint8_t) posFromSecond.size(),
             posFromFirst.size() > 0 ? & (posFromFirst[0]) : NULL,
             posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads),
-    //listDerivations(listDerivations),
-    //ruleExecOrder(ruleExecOrder),
-    //iteration(iteration),
-    //newDerivation(false),
+    listDerivations(listDerivations),
+    ruleExecOrder(ruleExecOrder),
+    iteration(iteration),
+    newDerivation(false),
     ruleDetails(ruleDetails),
-    addToEndTable(addToEndTable)
-    //heads(heads)
+    addToEndTable(addToEndTable),
+    heads(heads)
 {
     uint8_t headID = 0;
     uint8_t currentTupleSize = 0;
@@ -768,6 +772,7 @@ FinalRuleProcessor::FinalRuleProcessor(
                                                   false,
                                                   newPosFromFirst,
                                                   newPosFromSecond,
+                                                  listDerivations,
                                                   table,
                                                   h,
                                                   headID,

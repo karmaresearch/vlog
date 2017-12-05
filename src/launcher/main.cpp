@@ -987,6 +987,9 @@ int main(int argc, const char** argv) {
     } else if (cmd == "server") {
 #ifdef WEBINTERFACE
         startServer(argc, argv, full_path, vm);
+#else
+        cerr << "The program is not compiled with the web interface activated." << endl;
+        return 1;
 #endif
     }
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;

@@ -77,7 +77,7 @@ private:
 
     static void parseQuery(bool &success,
                            SPARQLParser &parser,
-                           QueryGraph &queryGraph,
+                           std::shared_ptr<QueryGraph> &queryGraph,
                            QueryDict &queryDict,
                            DBLayer &db);
 public:

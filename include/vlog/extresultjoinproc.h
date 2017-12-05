@@ -22,8 +22,10 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 std::vector<uint64_t> &output);
 
     public:
-        ExistentialRuleProcessor(std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
+        ExistentialRuleProcessor(
+                std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
+                std::vector<FCBlock> &listDerivations,
                 std::vector<Literal> &heads,
                 const RuleExecutionDetails *detailsRule,
                 const uint8_t ruleExecOrder,

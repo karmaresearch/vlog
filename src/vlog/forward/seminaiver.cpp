@@ -857,12 +857,9 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
 
-    //PredId_t idHeadPredicate = headLiteral.getPredicate().getId();
-
 #ifdef WEBINTERFACE
     // Cannot run multithreaded in this case.
     currentRule = rule.tostring(program, &layer);
-    currentPredicate = idHeadPredicate;
 #endif
 
     LOG(DEBUGL) << "Iteration: " << iteration <<
@@ -966,6 +963,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                     joinOutput = new ExistentialRuleProcessor(
                             plan.posFromFirst[optimalOrderIdx],
                             plan.posFromSecond[optimalOrderIdx],
+                            listDerivations,
                             heads, &ruleDetails,
                             (uint8_t) orderExecution, iteration,
                             finalResultContainer == NULL,
@@ -979,6 +977,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                         joinOutput = new SingleHeadFinalRuleProcessor(
                                 plan.posFromFirst[optimalOrderIdx],
                                 plan.posFromSecond[optimalOrderIdx],
+                                listDerivations,
                                 table,
                                 heads[0],
                                 0,
@@ -991,6 +990,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                         joinOutput = new FinalRuleProcessor(
                                 plan.posFromFirst[optimalOrderIdx],
                                 plan.posFromSecond[optimalOrderIdx],
+                                listDerivations,
                                 heads, &ruleDetails,
                                 (uint8_t) orderExecution, iteration,
                                 finalResultContainer == NULL,
@@ -1420,10 +1420,10 @@ string SemiNaiver::getListAllRulesForJSONSerialization() {
         return allRules;
     }
     map<int, string> map;
-    for (auto const &el : edbRuleset) {
+    for (auto const &el : allEDBRules) {
         map.insert(make_pair(el.ruleid, el.rule.toprettystring(program, &layer)));
     }
-    for (auto const &el : ruleset) {
+    for (auto const &el : allIDBRules) {
         map.insert(make_pair(el.ruleid, el.rule.toprettystring(program, &layer)));
     }
 
