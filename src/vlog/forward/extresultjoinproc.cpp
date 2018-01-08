@@ -159,7 +159,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         //new can be derived.
     }
 
-    //Filter out the potential values for the derivation
+    //Filter out the potential values for the derivation (only restricted chase can do it)
     if (!filterRows.empty()) {
         std::sort(filterRows.begin(), filterRows.end());
         std::vector<uint64_t> newFilterRows; //Remember only the rows where all

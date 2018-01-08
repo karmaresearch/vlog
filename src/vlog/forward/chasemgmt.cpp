@@ -108,7 +108,7 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
             row[j] = readers[j]->next();
         }
         uint64_t value;
-        if (!rows->existingRow(row, value))
+        if (restricted || !rows->existingRow(row, value))
             value = rows->addRow(row);
         functerms.push_back(value);
     }
