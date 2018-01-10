@@ -67,6 +67,21 @@ MAPITable::MAPITable(string host, int port, string user, string pwd, string dbna
     }
 }
 
+uint64_t MAPITable::getSize() {
+
+    string query = "SELECT COUNT(*) as c from " + tablename;
+
+    LOG(DEBUGL) << "SQL Query: " << query;
+
+    MapiHdl handle = doquery(con, query);
+    mapi_fetch_row(handle);
+    char *res = mapi_fetch_field(handle, 0);
+    char *p;
+    size_t result = strtol(res, &p, 10);
+    mapi_close_handle(handle);
+    return result;
+}
+
 // If valuesToFilter is larger than this, use a temporary table instead of a test on the individual values
 #define TEMP_TABLE_THRESHOLD (2*3*4*5*7*11)
 

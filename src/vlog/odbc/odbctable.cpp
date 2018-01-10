@@ -194,6 +194,24 @@ void ODBCTable::query(QSQQuery *query, TupleTable *outputTable,
     }
 }
 
+uint64_t ODBCTable::getSize() {
+
+    string query = "SELECT COUNT(*) as c from " + tablename;
+
+    LOG(DEBUGL) << "SQL Query: " << query;
+
+    SQLHANDLE stmt;
+    check(SQLAllocHandle(SQL_HANDLE_STMT, con, &stmt), "allocate statement handle");
+    check(SQLExecDirectA(stmt, (SQLCHAR *) query.c_str(), SQL_NTS), "execute query");
+    SQLRETURN res = SQLFetch(stmt);
+    check(res, "fetch result");
+    SQLLEN numBytes;
+    SQLUBIGINT result;
+    check(SQLGetData(stmt, 1, SQL_C_UBIGINT, &result, sizeof(SQLUBIGINT), &numBytes), "get result");
+    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+    return (uint64_t) result;
+}
+
 size_t ODBCTable::getCardinality(const Literal &q) {
     string query = "SELECT COUNT(*) as c from " + tablename;
 

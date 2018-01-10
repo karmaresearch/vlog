@@ -173,6 +173,24 @@ void MySQLTable::query(QSQQuery *query, TupleTable *outputTable,
     }
 }
 
+uint64_t MySQLTable::getSize() {
+
+    string query = "SELECT COUNT(*) as c from " + tablename;
+
+    LOG(DEBUGL) << "SQL Query: " << query;
+
+    sql::Statement *stmt;
+    stmt = con->createStatement();
+    sql::ResultSet *res = stmt->executeQuery(query);
+    uint64_t result = 0;
+    if (res->first()) {
+        result = res->getInt(1);
+    }
+    delete res;
+    delete stmt;
+    return result;
+}
+
 size_t MySQLTable::getCardinality(const Literal &q) {
     string query = "SELECT COUNT(*) as c from " + tablename;
 

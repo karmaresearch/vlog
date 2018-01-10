@@ -42,6 +42,8 @@ public:
 
     uint64_t getNTerms();
 
+    uint64_t getSize();
+
     ~ODBCTable();
 };
 

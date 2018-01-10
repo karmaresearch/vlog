@@ -55,6 +55,8 @@ public:
 
     uint64_t getNTerms();
 
+    uint64_t getSize();
+
     ~MySQLTable() {
         if (con) {
 	    con->close();

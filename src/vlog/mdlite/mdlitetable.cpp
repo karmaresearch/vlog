@@ -86,6 +86,11 @@ uint64_t MDLiteTable::getNTerms() {
     return singletonDict.getNTerms();
 }
 
+uint64_t MDLiteTable::getSize() {
+    LOG(ERRORL) << "Not implemented yet";
+    throw 10;
+}
+
 uint8_t MDLiteTable::getArity() const {
     return arity;
 }

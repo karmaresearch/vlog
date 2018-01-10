@@ -58,6 +58,8 @@ class MDLiteTable : public SQLTable {
 
         uint64_t getNTerms();
 
+        uint64_t getSize();
+
         ~MDLiteTable();
 };
 
