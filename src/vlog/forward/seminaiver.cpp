@@ -616,7 +616,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
             firstEndTable->getSizeRow() == literalItr.getCurrentTable()->getRowSize() &&
             firstHeadLiteral.sameVarSequenceAs(*bodyLiteral) &&
             bodyLiteral->getTupleSize() == firstHeadLiteral.getTupleSize() &&
-            ((FinalRuleProcessor*)joinOutput)->shouldAddToEndTable();
+            ((SingleHeadFinalRuleProcessor*)joinOutput)->shouldAddToEndTable();
     }
 
     if (rawCopy) { //The previous check was successful
