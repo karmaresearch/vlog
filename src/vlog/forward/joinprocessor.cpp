@@ -765,12 +765,15 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
 #if DEBUG
                 LOG(TRACEL) << "Check " << (end - start) / rowSize << " duplicates";
 #endif
-                /*while (outputLiteral != NULL && start < end) {
-                    VTuple t = outputLiteral->getTuple();
+		// This block was commented out. WHY???
+		// Fixed now for when outputLiterals has length 1.
+		// Note that this code is essential for correct functioning ... --Ceriel
+                while (outputLiterals != NULL && outputLiterals->size() == 1 &&  start < end) {
+                    VTuple t = (*outputLiterals)[0].getTuple();
                     for (uint8_t i = 0; i < nPosFromFirst; ++i) {
                         t.set(VTerm(0, values[start + posFromFirst[i].second]), posFromFirst[i].first);
                     }
-                    Literal l(outputLiteral->getPredicate(), t);
+                    Literal l((*outputLiterals)[0].getPredicate(), t);
 
                     //Filter the tables in input checking whether the input query produced
                     //by the rule can have produced output tuples in following derivations
@@ -800,7 +803,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                         existingTuples.push_back(DuplicateContainers());
                     }
                     start += rowSize;
-                }*/
+                }
 
 
                 {

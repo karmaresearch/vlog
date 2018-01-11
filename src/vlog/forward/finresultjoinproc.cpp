@@ -1,26 +1,6 @@
 #include <vlog/finalresultjoinproc.h>
 #include <vlog/seminaiver.h>
 
-void SingleHeadFinalRuleProcessor::processResults(const int blockid, const bool unique,
-        std::mutex *m) {
-    enlargeBuffers(blockid + 1);
-    if (!unique) {
-        if (tmpt[blockid] == NULL) {
-            tmpt[blockid] = new SegmentInserter(rowsize);
-        }
-
-        tmpt[blockid]->addRow(row);
-        if (tmpt[blockid]->getNRows() > TMPT_THRESHOLD) {
-            mergeTmpt(blockid, unique, m);
-        }
-    } else {
-        if (utmpt[blockid] == NULL) {
-            utmpt[blockid] = new SegmentInserter(rowsize);
-        }
-        utmpt[blockid]->addRow(row);
-    }
-}
-
 void SingleHeadFinalRuleProcessor::processResults(std::vector<int> &blockid, Term_t *p,
         std::vector<bool> &unique, std::mutex *m) {
 
@@ -446,6 +426,27 @@ void SingleHeadFinalRuleProcessor::processResults(const int blockid, const bool 
 }
 
 #else
+
+void SingleHeadFinalRuleProcessor::processResults(const int blockid, const bool unique,
+        std::mutex *m) {
+    enlargeBuffers(blockid + 1);
+    if (!unique) {
+        if (tmpt[blockid] == NULL) {
+            tmpt[blockid] = new SegmentInserter(rowsize);
+        }
+
+        tmpt[blockid]->addRow(row);
+        if (tmpt[blockid]->getNRows() > TMPT_THRESHOLD) {
+            mergeTmpt(blockid, unique, m);
+        }
+    } else {
+        if (utmpt[blockid] == NULL) {
+            utmpt[blockid] = new SegmentInserter(rowsize);
+        }
+        utmpt[blockid]->addRow(row);
+    }
+}
+
 void SingleHeadFinalRuleProcessor::mergeTmpt(const int blockid, const bool unique, std::mutex *m) {
     if (tmptseg[blockid] != NULL && tmptseg[blockid]->getNRows() > tmpt[blockid]->getNRows()) {
         // Only start sorting and merging if it is large enough.
@@ -514,7 +515,6 @@ void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
                         t->add(ptrTable, literal, posLiteralInRule, ruleDetails, ruleExecOrder,
                                 iteration, isFinished, nthreads);
 #if 0
-                        char buffer[16384];
                         FCInternalTableItr *test = ptrTable->getIterator();
                         int ncols = test->getNColumns();
                         while (test->hasNext()) {
@@ -527,7 +527,7 @@ void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
                                 }
                                 s += std::to_string(t);
                             }
-                            LOG(DEBUGL) << "Tuple: <" << s << ">";
+                            LOG(DEBUGL) << "Tuple (utmpt, forcecheck): <" << s << ">";
                         }
                         ptrTable->releaseIterator(test);
 #endif
@@ -543,7 +543,6 @@ void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
 
                         std::shared_ptr<const FCInternalTable> ptrTable(new InmemoryFCInternalTable(rowsize, iteration, true, sortedSegment));
 #if 0
-                        char buffer[16384];
                         FCInternalTableItr *test = ptrTable->getIterator();
                         int ncols = test->getNColumns();
                         while (test->hasNext()) {
@@ -556,7 +555,7 @@ void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
                                 }
                                 s += std::to_string(t);
                             }
-                            LOG(DEBUGL) << "Tuple: <" << s << ">";
+                            LOG(DEBUGL) << "Tuple(utmpt, noforcecheck, not sorted): <" << s << ">";
                         }
                         ptrTable->releaseIterator(test);
 #endif
@@ -565,7 +564,6 @@ void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
                     } else {
                         std::shared_ptr<const FCInternalTable> ptrTable(new InmemoryFCInternalTable(rowsize, iteration, true, utmpt[i]->getSegment()));
 #if 0
-                        char buffer[16384];
                         FCInternalTableItr *test = ptrTable->getIterator();
                         int ncols = test->getNColumns();
                         while (test->hasNext()) {
@@ -578,7 +576,7 @@ void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
                                 }
                                 s += std::to_string(t);
                             }
-                            LOG(DEBUGL) << "Tuple: <" << s << ">";
+                            LOG(DEBUGL) << "Tuple(utmpt, noforcecheck, sorted): <" << s << ">";
                         }
                         ptrTable->releaseIterator(test);
 #endif
@@ -618,7 +616,6 @@ void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
 
 
 #if 0
-                    char buffer[16384];
                     FCInternalTableItr *test = ptrTable->getIterator();
                     int ncols = test->getNColumns();
                     while (test->hasNext()) {
@@ -631,7 +628,7 @@ void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
                             }
                             s += std::to_string(t);
                         }
-                        LOG(DEBUGL) << "Tuple: <" << s << ">";
+                        LOG(DEBUGL) << "Tuple(tmpt): <" << s << ">";
                     }
                     ptrTable->releaseIterator(test);
 #endif
