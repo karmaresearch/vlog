@@ -14,6 +14,8 @@ uint64_t ChaseMgmt::Rows::addRow(uint64_t* row) {
     for(uint8_t i = 0; i < sizerow; ++i) {
         currentblock[i] = row[i];
     }
+    ChaseRow r(sizerow, currentblock);
+    rows[r] = currentcounter;
     currentblock += sizerow;
     blockCounter++;
     if (startCounter == UINT32_MAX) {
@@ -26,26 +28,33 @@ uint64_t ChaseMgmt::Rows::addRow(uint64_t* row) {
 bool ChaseMgmt::Rows::existingRow(uint64_t *row, uint64_t &value) {
     //Linear search among the blocks. If I find one equivalent to row, then I add
     //its ID and return true
-    uint64_t i = startCounter;
-    for(auto &b : blocks) {
-        uint64_t *start = b.get();
-        uint64_t *end = start + sizerow * SIZE_BLOCK;
-        while (i < currentcounter && start < end) {
-            //Compare a row
-            bool found = true;
-            for(uint32_t j = 0; j < sizerow; ++j) {
-                if (start[j] != row[j]) {
-                    found = false;
-                    break;
-                }
-            }
-            if (found) {
-                value = i;
-                return true;
-            }
-            start += sizerow;
-            i++;
-        }
+//    uint64_t i = startCounter;
+//    for(auto &b : blocks) {
+//        uint64_t *start = b.get();
+//        uint64_t *end = start + sizerow * SIZE_BLOCK;
+//        while (i < currentcounter && start < end) {
+//            //Compare a row
+//            bool found = true;
+//            for(uint32_t j = 0; j < sizerow; ++j) {
+//                if (start[j] != row[j]) {
+//                    found = false;
+//                    break;
+//                }
+//            }
+//            if (found) {
+//                value = i;
+//                return true;
+//            }
+//            start += sizerow;
+//            i++;
+//        }
+//    }
+//    return false;
+    ChaseRow r(sizerow, row);
+    auto search = rows.find(r);
+    if (search != rows.end()) {
+	value = search->second;
+	return true;
     }
     return false;
 }

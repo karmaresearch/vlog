@@ -6,8 +6,37 @@
 
 #include <vector>
 #include <map>
+#include <unordered_map>
 
 #define SIZE_BLOCK 1000
+
+struct ChaseRow {
+    uint8_t sz;
+    uint64_t *row;
+
+    ChaseRow() : sz(0), row(NULL) {}
+
+    ChaseRow(const uint8_t s, uint64_t *r) : sz(s), row(r) {}
+
+    bool operator == (const ChaseRow &other) const {
+        for (int i = 0; i < sz; i++) {
+            if (row[i] != other.row[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+};
+
+struct hash_ChaseRow {
+    size_t operator() (const ChaseRow &x) const {
+        uint64_t result = 0;
+        for (int i = 0; i < x.sz; i++) {
+	    result = (result + (324723947 + x.row[i])) ^93485734985;
+        }
+        return (size_t) result;
+    }
+};
 
 class ChaseMgmt {
     private:
@@ -19,6 +48,7 @@ class ChaseMgmt {
                 std::vector<std::unique_ptr<uint64_t>> blocks;
                 uint32_t blockCounter;
                 uint64_t *currentblock;
+		std::unordered_map<ChaseRow, uint64_t, hash_ChaseRow> rows;
 
             public:
                 Rows(uint64_t startCounter, uint8_t sizerow) :
