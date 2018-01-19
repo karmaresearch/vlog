@@ -71,7 +71,7 @@ uint64_t MAPITable::getSize() {
 
     string query = "SELECT COUNT(*) as c from " + tablename;
 
-    LOG(DEBUGL) << "SQL Query: " << query;
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
     MapiHdl handle = doquery(con, query);
     mapi_fetch_row(handle);
@@ -79,6 +79,11 @@ uint64_t MAPITable::getSize() {
     char *p;
     size_t result = strtol(res, &p, 10);
     mapi_close_handle(handle);
+
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+
+    LOG(DEBUGL) << "SQL Query (getSize): " << query << " took " << sec.count();
+
     return result;
 }
 
@@ -236,7 +241,7 @@ size_t MAPITable::getCardinality(const Literal &q) {
         query += " WHERE " + cond;
     }
 
-    LOG(DEBUGL) << "SQL Query: " << query;
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
     MapiHdl handle = doquery(con, query);
     mapi_fetch_row(handle);
@@ -244,6 +249,10 @@ size_t MAPITable::getCardinality(const Literal &q) {
     char *p;
     size_t result = strtol(res, &p, 10);
     mapi_close_handle(handle);
+
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+
+    LOG(DEBUGL) << "SQL Query (getCardinality): " << query << " took " << sec.count();
 
     return (size_t) result;
 }
@@ -257,13 +266,18 @@ size_t MAPITable::getCardinalityColumn(const Literal &q, uint8_t posColumn) {
         query += " WHERE " + cond;
     }
 
-    LOG(DEBUGL) << "SQL Query: " << query;
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+
     MapiHdl handle = doquery(con, query);
     mapi_fetch_row(handle);
     char *res = mapi_fetch_field(handle, 0);
     char *p;
     size_t result = strtol(res, &p, 10);
     mapi_close_handle(handle);
+
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+
+    LOG(DEBUGL) << "SQL Query (getCardinalityColumn): " << query << " took " << sec.count();
 
     return (size_t) result;
 }
@@ -290,7 +304,7 @@ bool MAPITable::isEmpty(const Literal &q, std::vector<uint8_t> *posToFilter,
 	query += " WHERE " + cond;
     }
 
-    LOG(DEBUGL) << "SQL Query: " << query;
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
     MapiHdl handle = doquery(con, query);
     mapi_fetch_row(handle);
@@ -298,6 +312,10 @@ bool MAPITable::isEmpty(const Literal &q, std::vector<uint8_t> *posToFilter,
     char *p;
     size_t result = strtol(res, &p, 10);
     mapi_close_handle(handle);
+
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+
+    LOG(DEBUGL) << "SQL Query (isEmpty): " << query << " took " << sec.count();
 
     return result == 0;
 }

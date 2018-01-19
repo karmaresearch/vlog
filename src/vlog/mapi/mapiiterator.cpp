@@ -82,7 +82,7 @@ MAPIIterator::MAPIIterator(Mapi con, string tableName,
 	posFirstVar = -1;
     }
 
-    LOG(DEBUGL) << "SQL query: " << sqlQuery;
+    LOG(DEBUGL) << "SQL query (MAPIIterator): " << sqlQuery;
 
     handle = MAPITable::doquery(con, sqlQuery);
 
@@ -118,7 +118,7 @@ MAPIIterator::MAPIIterator(Mapi con, string sqlQuery,
 	posFirstVar = -1;
     }
 
-    LOG(DEBUGL) << "SQL query: " << sqlQuery;
+    LOG(DEBUGL) << "SQL query (MAPIIterator): " << sqlQuery;
 
     handle = MAPITable::doquery(con, sqlQuery);
 
