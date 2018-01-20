@@ -85,6 +85,19 @@ IF (${sparsehash} STREQUAL "sparsehash-NOTFOUND")
     include_directories(${CMAKE_BINARY_DIR}/trident/kognac/external/sparsehash/src/)
 ENDIF()
 
+#LZ4
+find_library(lz4 lz4)
+find_path (lz4h lz4.h)
+IF ((${lz4} STREQUAL "lz4-NOTFOUND") OR (${lz4h} STREQUAL "lz4h-NOTFOUND"))
+    message("Could not find LZ4. I'm going to use the version from kognac")
+    include_directories(${CMAKE_BINARY_DIR}/trident/kognac/external/lz4/lib/)
+    LINK_DIRECTORIES(${CMAKE_BINARY_DIR}/trident/kognac/external/lz4/lib)
+    add_library(lz4 STATIC IMPORTED)
+    set_property(TARGET lz4 PROPERTY IMPORTED_LOCATION trident/kognac/external/lz4/lib/liblz4.a)
+ELSE()
+    include_directories(lz4h)
+    message("-- Found LZ4")
+ENDIF()
 
 #add files to compile
 file(GLOB vlog_SRC
