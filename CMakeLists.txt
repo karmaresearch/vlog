@@ -78,6 +78,14 @@ ELSE()
     set_property(TARGET kognac-log PROPERTY IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/trident/kognac/libkognac-log${CMAKE_SHARED_LIBRARY_SUFFIX}")
 ENDIF()
 
+#SPARSEHASH
+find_path (sparsehash sparsehash/sparse_hash_map)
+IF (${sparsehash} STREQUAL "sparsehash-NOTFOUND")
+    message("Could not find sparsehash. I'm going to use the version from kognac ...")
+    include_directories(${CMAKE_BINARY_DIR}/trident/kognac/external/sparsehash/src/)
+ENDIF()
+
+
 #add files to compile
 file(GLOB vlog_SRC
     "src/vlog/*.cpp"
