@@ -116,6 +116,15 @@ file(GLOB vlog_SRC
 add_library(vlog STATIC ${vlog_SRC})
 add_executable(vlog_exec src/launcher/main.cpp)
 
+#PTHREADS
+find_package(Threads REQUIRED)
+if (THREADS_HAVE_PTHREAD_ARG)
+    target_compile_options(PUBLIC vlog "-pthread")
+endif()
+if (CMAKE_THREAD_LIBS_INIT)
+    target_link_libraries(vlog "${CMAKE_THREAD_LIBS_INIT}")
+endif()
+
 #Set compiler options
 set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
