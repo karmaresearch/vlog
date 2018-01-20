@@ -1,5 +1,6 @@
 #include <vlog/finalresultjoinproc.h>
 #include <vlog/seminaiver.h>
+#include <climits>
 
 void SingleHeadFinalRuleProcessor::processResults(std::vector<int> &blockid, Term_t *p,
         std::vector<bool> &unique, std::mutex *m) {
