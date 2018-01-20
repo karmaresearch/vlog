@@ -60,7 +60,7 @@ std::shared_ptr<Column> CompressedColumn::sort(const int nthreads) const {
     std::vector<Term_t> newValues = reader->asVector();
 
     if (newValues.size() > 4096) {
-        tbb::parallel_sort(newValues.begin(), newValues.end());
+        ParallelTasks::sort_int(newValues.begin(), newValues.end());
     } else {
         std::sort(newValues.begin(), newValues.end());
     }
@@ -95,7 +95,7 @@ std::shared_ptr<Column> CompressedColumn::sort_and_unique(const int nthreads) co
     delete col;
 
     if (newValues.size() > 4096) {
-        tbb::parallel_sort(newValues.begin(), newValues.end());
+        ParallelTasks::sort_int(newValues.begin(), newValues.end());
     } else {
         std::sort(newValues.begin(), newValues.end());
     }

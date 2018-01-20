@@ -5,8 +5,15 @@ OUTPUTDIR = .
 # To enable MAPI we must add the parameter MAPI=1
 
 # where is trident? Default below, but can be overriden on the commandline.
-TRIDENT = ../trident
-KOGNAC = ../kognac
+ifndef $(KOGNAC)
+ KOGNAC = ../trident
+endif
+
+ifndef $(TRIDENT)
+ TRIDENT = ../trident
+endif
+
+
 RDF3X = $(TRIDENT)/rdf3x
 CPLUS = g++
 

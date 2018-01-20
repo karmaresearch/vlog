@@ -21,14 +21,14 @@ struct CreateColumns2 {
     std::vector<Term_t> &out2;
 
     CreateColumns2(const std::vector<size_t> &idxs,
-                  const Term_t *v1,
-                  const Term_t *v2,
-                  std::vector<Term_t> &out1,
-                  std::vector<Term_t> &out2) : idxs(idxs), v1(v1), v2(v2),
-        out1(out1), out2(out2) {
+            const Term_t *v1,
+            const Term_t *v2,
+            std::vector<Term_t> &out1,
+            std::vector<Term_t> &out2) : idxs(idxs), v1(v1), v2(v2),
+    out1(out1), out2(out2) {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& r) const {
+    void operator()(const ParallelRange& r) const {
         for (size_t i = r.begin(); i != r.end(); ++i) {
             out1[i] = v1[idxs[i]];
             out2[i] = v2[idxs[i]];
@@ -36,9 +36,9 @@ struct CreateColumns2 {
 
         //LOG(WARNL) << "Created columns from " << r.begin() << " " << r.end();
         /*m.lock();
-        out1.push_back(std::make_pair(r.begin(), sortedColumnsInserters[0].getColumn()));
-        out2.push_back(std::make_pair(r.begin(), sortedColumnsInserters[1].getColumn()));
-        m.unlock();*/
+          out1.push_back(std::make_pair(r.begin(), sortedColumnsInserters[0].getColumn()));
+          out2.push_back(std::make_pair(r.begin(), sortedColumnsInserters[1].getColumn()));
+          m.unlock();*/
     }
 };
 
@@ -48,15 +48,15 @@ struct CreateColumns {
     std::vector<std::vector<Term_t>> &out;
 
     CreateColumns(const std::vector<size_t> &idxs,
-                  const std::vector<const std::vector<Term_t> *> &vectors,
-		  std::vector<std::vector<Term_t>> &out) : idxs(idxs), vectors(vectors), out(out) {
+            const std::vector<const std::vector<Term_t> *> &vectors,
+            std::vector<std::vector<Term_t>> &out) : idxs(idxs), vectors(vectors), out(out) {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& r) const {
+    void operator()(const ParallelRange& r) const {
         for (size_t i = r.begin(); i != r.end(); ++i) {
-	    for (int j = 0; j < out.size(); j++) {
-		out[j][i] = (*vectors[j])[idxs[i]];
-	    }
+            for (int j = 0; j < out.size(); j++) {
+                out[j][i] = (*vectors[j])[idxs[i]];
+            }
         }
     }
 };
@@ -70,16 +70,16 @@ struct CreateColumnsNoDupl2 {
     std::mutex &m;
 
     CreateColumnsNoDupl2(const std::vector<size_t> &idxs,
-                        const Term_t *v1,
-                        const Term_t *v2,
-                        std::vector<std::pair<size_t, std::vector<Term_t>>> &ranges1,
-                        std::vector<std::pair<size_t, std::vector<Term_t>>> &ranges2,
-                        std::mutex &m) :
+            const Term_t *v1,
+            const Term_t *v2,
+            std::vector<std::pair<size_t, std::vector<Term_t>>> &ranges1,
+            std::vector<std::pair<size_t, std::vector<Term_t>>> &ranges2,
+            std::mutex &m) :
         idxs(idxs), v1(v1), v2(v2),
         ranges1(ranges1), ranges2(ranges2), m(m) {
-    }
+        }
 
-    void operator()(const tbb::blocked_range<size_t>& r) const {
+    void operator()(const ParallelRange& r) const {
         std::vector<Term_t> out1;
         std::vector<Term_t> out2;
 
@@ -116,12 +116,12 @@ struct CopyPairs {
     std::vector<std::pair<Term_t, Term_t>> &out;
 
     CopyPairs(const std::vector<Term_t> &v1,
-              const std::vector<Term_t> &v2,
-              std::vector<std::pair<Term_t, Term_t>> &out) : v1(v1), v2(v2),
-        out(out) {
+            const std::vector<Term_t> &v2,
+            std::vector<std::pair<Term_t, Term_t>> &out) : v1(v1), v2(v2),
+    out(out) {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& r) const {
+    void operator()(const ParallelRange& r) const {
         for (size_t i = r.begin(); i != r.end(); ++i) {
             out[i].first = v1[i];
             out[i].second = v2[i];
@@ -134,7 +134,7 @@ struct InitArray {
     InitArray(std::vector<size_t> &out) : out(out) {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& r) const {
+    void operator()(const ParallelRange& r) const {
         for (size_t i = r.begin(); i != r.end(); ++i) {
             out[i] = i;
         }
@@ -146,9 +146,9 @@ struct PairComparator {
     const Term_t *v2;
 
     PairComparator(const Term_t *v1,
-                   const Term_t *v2)
+            const Term_t *v2)
         : v1(v1), v2(v2) {
-    }
+        }
 
     bool operator()(const size_t &x, const size_t &y) const {
         if (v1[x] == v1[y]) {

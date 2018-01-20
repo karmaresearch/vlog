@@ -4,12 +4,11 @@
 #include <vlog/concepts.h>
 #include <vlog/edb.h>
 
-#include <tbb/parallel_sort.h>
+#include <trident/utils/parallel.h>
 
 #include <inttypes.h>
 #include <assert.h>
 #include <algorithm>
-//#include <trident/storage/pairhandler.h>
 
 #include <memory>
 #include <cstring>
@@ -404,7 +403,7 @@ class InmemoryColumn : public Column {
             }
             std::vector<Term_t> newvals = values;
             //TBB is configured at the beginning to use nthreads to parallelize the computation
-            tbb::parallel_sort(newvals.begin(), newvals.end());
+            ParallelTasks::sort_int(newvals.begin(), newvals.end());
             return std::shared_ptr<Column>(new InmemoryColumn(newvals, true));
         }
 
@@ -413,8 +412,7 @@ class InmemoryColumn : public Column {
                 return sort_and_unique();
             }
             std::vector<Term_t> newvals = values;
-            //TBB is configured at the beginning to use nthreads to parallelize the computation
-            tbb::parallel_sort(newvals.begin(), newvals.end());
+            ParallelTasks::sort_int(newvals.begin(), newvals.end());
             auto last = std::unique(newvals.begin(), newvals.end());
             newvals.erase(last, newvals.end());
             newvals.shrink_to_fit();
@@ -537,9 +535,8 @@ class SubColumn : public Column {
             for(uint64_t i = start; i < start + len; ++i) {
                 newvals.push_back(values[i]);
             }
-            //TBB is configured at the beginning to use nthreads to parallelize
-            //the computation
-            tbb::parallel_sort(newvals.begin(), newvals.end());
+            //Uses all cores!
+            ParallelTasks::sort_int(newvals.begin(), newvals.end());
             return std::shared_ptr<Column>(new InmemoryColumn(newvals, true));
         }
 
@@ -551,9 +548,8 @@ class SubColumn : public Column {
             for(uint64_t i = start; i < start + len; ++i) {
                 newvals.push_back(values[i]);
             }
-            //TBB is configured at the beginning to use nthreads to parallelize
-            //the computation
-            tbb::parallel_sort(newvals.begin(), newvals.end());
+            //Uses all cores!
+            ParallelTasks::sort_int(newvals.begin(), newvals.end());
             auto last = std::unique(newvals.begin(), newvals.end());
             newvals.erase(last, newvals.end());
             newvals.shrink_to_fit();

@@ -765,9 +765,9 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
 #if DEBUG
                 LOG(TRACEL) << "Check " << (end - start) / rowSize << " duplicates";
 #endif
-		// This block was commented out. WHY???
-		// Fixed now for when outputLiterals has length 1.
-		// Note that this code is essential for correct functioning ... --Ceriel
+                // This block was commented out. WHY???
+                // Fixed now for when outputLiterals has length 1.
+                // Note that this code is essential for correct functioning ... --Ceriel
                 while (outputLiterals != NULL && outputLiterals->size() == 1 &&  start < end) {
                     VTuple t = (*outputLiterals)[0].getTuple();
                     for (uint8_t i = 0; i < nPosFromFirst; ++i) {
@@ -1775,7 +1775,7 @@ struct CreateParallelMergeJoiner {
         nValBlocks(nValBlocks), valBlocks(valBlocks), output(output), m(m) {
         }
 
-    void operator()(const tbb::blocked_range<int>& r) const {
+    void operator()(const ParallelRange& r) const {
         LOG(TRACEL) << "Parallel merge joiner: r.begin = " << r.begin() << ", r.end = " << r.end();
         FCInternalTableItr *itr1 = new VectorFCInternalTableItr(vectors, r.begin(), r.end());
         Output out(output, m);
@@ -1815,7 +1815,7 @@ struct CreateParallelMergeJoinerVectors {
         nValBlocks(nValBlocks), valBlocks(valBlocks), output(output), m(m) {
         }
 
-    void operator()(const tbb::blocked_range<int>& r) const {
+    void operator()(const ParallelRange& r) const {
         LOG(TRACEL) << "Parallel vector merge joiner: r.begin = " << r.begin() << ", r.end = " << r.end();
         Output out(output, m);
 
@@ -1969,11 +1969,19 @@ void JoinExecutor::do_mergejoin(const FCInternalTable * filteredT1,
             if (/* vectorSupported && */ nthreads > 1 && totalsize1 > 1 && (totalsize1 + t2Size) > 4096 /* ? */) {
                 LOG(TRACEL) << "Chunk size = " << chunks << ", t2->getNRows() = " << t2Size;
                 if (vector2Supported) {
-                    tbb::parallel_for(tbb::blocked_range<int>(0, totalsize1, chunks),
-                            CreateParallelMergeJoinerVectors(vectors, vectors2, fields1, fields2, posBlocks, nValBlocks, valBlocks, output, &m));
+                    //tbb::parallel_for(tbb::blocked_range<int>(0, totalsize1, chunks),
+                    //        CreateParallelMergeJoinerVectors(vectors, vectors2, fields1, fields2, posBlocks, nValBlocks, valBlocks, output, &m));
+                    ParallelTasks::parallel_for(0, totalsize1, chunks,
+                            CreateParallelMergeJoinerVectors(vectors, vectors2,
+                                fields1, fields2, posBlocks, nValBlocks,
+                                valBlocks, output, &m));
                 } else {
-                    tbb::parallel_for(tbb::blocked_range<int>(0, totalsize1, chunks),
-                            CreateParallelMergeJoiner(vectors, sortedItr2, fields1, fields2, posBlocks, nValBlocks, valBlocks, output, &m));
+                    //tbb::parallel_for(tbb::blocked_range<int>(0, totalsize1, chunks),
+                    //        CreateParallelMergeJoiner(vectors, sortedItr2, fields1, fields2, posBlocks, nValBlocks, valBlocks, output, &m));
+                    ParallelTasks::parallel_for(0, totalsize1, chunks,
+                            CreateParallelMergeJoiner(vectors, sortedItr2,
+                                fields1, fields2, posBlocks, nValBlocks,
+                                valBlocks, output, &m));
                 }
             } else {
                 JoinExecutor::do_merge_join_classicalgo(vectors, 0, totalsize1,

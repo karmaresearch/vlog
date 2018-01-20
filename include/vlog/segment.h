@@ -3,6 +3,8 @@
 
 #include <vlog/column.h>
 
+//#include <tbb/parallel_for.h>
+
 #include <cstdio>
 #include <algorithm>
 #include <memory>
@@ -16,7 +18,7 @@ struct GetVectors {
     GetVectors(const std::vector<std::shared_ptr<Column>> &cols, std::vector<const std::vector<Term_t> *> &vectors) : cols(cols), vectors(vectors) {
     }
 
-    void operator()(const tbb::blocked_range<int>& r) const {
+    void operator()(const ParallelRange& r) const {
         for (int i = r.begin(); i != r.end(); ++i) {
             if (! cols[i]->isBackedByVector()) {
                 std::vector<Term_t> *v = new std::vector<Term_t>();
@@ -302,7 +304,9 @@ class Segment {
             }
 
             if (count > 1 && nthreads > 1) {
-                tbb::parallel_for(tbb::blocked_range<int>(0, cols.size(), 1),
+                //tbb::parallel_for(tbb::blocked_range<int>(0, cols.size(), 1),
+                //        GetVectors(cols, vectors));
+                ParallelTasks::parallel_for(0, cols.size(), 1,
                         GetVectors(cols, vectors));
             } else {
                 for (int i = 0; i < cols.size(); i++) {
@@ -390,7 +394,7 @@ class SegmentInserter {
                 Concat(std::vector<std::shared_ptr<Column>> &c, SegmentInserter *s) : c(c), s(s) {
                 }
 
-                void operator()(const tbb::blocked_range<int>& r) const {
+                void operator()(const ParallelRange& r) const {
                     for (int i = r.begin(); i != r.end(); ++i) {
                         if (s->copyColumns[i] != std::shared_ptr<Column>()) {
                             if (!s->columns[i].isEmpty()) {

@@ -3,7 +3,7 @@
 #include <vlog/support.h>
 #include <vlog/fcinttable.h>
 
-#include <tbb/parallel_for.h>
+//#include <tbb/parallel_for.h>
 
 #include <random>
 #include <memory>
@@ -465,7 +465,7 @@ std::shared_ptr<Segment> Segment::intsort(
                 PairComparator pc(rawv1, rawv2);
 
                 if (idxs.size() > 1000) {
-                    tbb::parallel_sort(idxs.begin(), idxs.end(), pc);
+                    ParallelTasks::sort_int(idxs.begin(), idxs.end(), pc, nthreads);
                 } else {
                     std::sort(idxs.begin(), idxs.end(), pc);
                 }
@@ -490,7 +490,9 @@ std::shared_ptr<Segment> Segment::intsort(
                         // Parallel version
                         out1.resize(sz);
                         out2.resize(sz);
-                        tbb::parallel_for(tbb::blocked_range<size_t>(0, idxs.size(), chunks),
+                        //tbb::parallel_for(tbb::blocked_range<size_t>(0, idxs.size(), chunks),
+                        //        CreateColumns2(idxs, rawv1, rawv2, out1, out2));
+                        ParallelTasks::parallel_for(0, idxs.size(), chunks,
                                 CreateColumns2(idxs, rawv1, rawv2, out1, out2));
                     }
                     sortedColumns.push_back(ColumnWriter::getColumn(out1, true));
@@ -520,7 +522,10 @@ std::shared_ptr<Segment> Segment::intsort(
                         std::vector<std::pair<size_t, std::vector<Term_t>>> ranges1;
                         std::vector<std::pair<size_t, std::vector<Term_t>>> ranges2;
                         std::mutex m;
-                        tbb::parallel_for(tbb::blocked_range<size_t>(0, idxs.size(), chunks),
+                        //tbb::parallel_for(tbb::blocked_range<size_t>(0, idxs.size(), chunks),
+                        //        CreateColumnsNoDupl2(idxs, rawv1, rawv2,
+                        //            ranges1, ranges2, m));
+                        ParallelTasks::parallel_for(0, idxs.size(), chunks,
                                 CreateColumnsNoDupl2(idxs, rawv1, rawv2,
                                     ranges1, ranges2, m));
 
@@ -563,7 +568,7 @@ std::shared_ptr<Segment> Segment::intsort(
                 SegmentSorter sorter(vectors);
 
                 if (nthreads > 1 && idxs.size() > 1000) {
-                    tbb::parallel_sort(idxs.begin(), idxs.end(), std::ref(sorter));
+                    ParallelTasks::sort_int(idxs.begin(), idxs.end(), std::ref(sorter), nthreads);
                 } else {
                     std::sort(idxs.begin(), idxs.end(), std::ref(sorter));
                 }
@@ -584,7 +589,9 @@ std::shared_ptr<Segment> Segment::intsort(
                         for (int i = 0; i < out.size(); i++) {
                             out[i].resize(idxs.size());
                         }
-                        tbb::parallel_for(tbb::blocked_range<size_t>(0, idxs.size(), chunks),
+                        //tbb::parallel_for(tbb::blocked_range<size_t>(0, idxs.size(), chunks),
+                        //        CreateColumns(idxs, vectors, out));
+                        ParallelTasks::parallel_for(0, idxs.size(), chunks,
                                 CreateColumns(idxs, vectors, out));
                     }
                     sortedColumns.push_back(ColumnWriter::getColumn(out[0], true));
@@ -830,8 +837,9 @@ std::shared_ptr<const Segment> SegmentInserter::getSegment(const int nthreads) {
 
     std::vector<std::shared_ptr<Column>> c(nfields);
 
-    tbb::parallel_for(tbb::blocked_range<int>(0, nfields, 1),
-            Concat(c, this));
+    //tbb::parallel_for(tbb::blocked_range<int>(0, nfields, 1),
+    //        Concat(c, this));
+    ParallelTasks::parallel_for(0, nfields, 1, Concat(c, this));
     return std::shared_ptr<const Segment>(new Segment(nfields, c));
 }
 

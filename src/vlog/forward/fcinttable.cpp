@@ -441,7 +441,7 @@ struct RowFilterer {
         nRepeatedVars(nRepeatedVars), repeatedVars(repeatedVars) {
         }
 
-    void operator()(const tbb::blocked_range<int>& r) const {
+    void operator()(const ParallelRange& r) const {
         for (int i = r.begin(); i != r.end(); ++i) {
             SegmentInserter inserter(iterators[i]->getNColumns());
             segments[i] = InmemoryFCInternalTable::filter_row(iterators[i], nConstantsToFilter, posConstantsToFilter,
@@ -468,8 +468,12 @@ std::shared_ptr<const Segment> InmemoryFCInternalTable::filter_row(std::shared_p
                 iterators.push_back(new VectorSegmentIterator(vectors, index, index + chunk, NULL));
                 index += chunk;
             }
-            tbb::parallel_for(tbb::blocked_range<int>(0, nthreads, 1),
-                    RowFilterer(iterators, segments, nConstantsToFilter, posConstantsToFilter, valuesConstantsToFilter, nRepeatedVars, repeatedVars));
+            //tbb::parallel_for(tbb::blocked_range<int>(0, nthreads, 1),
+            //        RowFilterer(iterators, segments, nConstantsToFilter, posConstantsToFilter, valuesConstantsToFilter, nRepeatedVars, repeatedVars));
+            ParallelTasks::parallel_for(0, nthreads, 1,
+                    RowFilterer(iterators, segments, nConstantsToFilter,
+                        posConstantsToFilter, valuesConstantsToFilter,
+                        nRepeatedVars, repeatedVars));
             for (int i = 0; i < nthreads; i++) {
                 delete iterators[i];
             }

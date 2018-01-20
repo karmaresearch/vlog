@@ -555,7 +555,7 @@ struct CreateParallelFirstAtom {
             }
         }
 
-    void operator()(const tbb::blocked_range<int>& r) const {
+    void operator()(const ParallelRange& r) const {
 
         for (int i = r.begin(); i != r.end(); i++) {
             size_t begin = r.begin() * chunksz;
@@ -697,8 +697,11 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
                     for (int i = 0; i < nthreads; i++) {
                         outputs.push_back(new Output(joinOutput, &m));
                     }
-                    tbb::parallel_for(tbb::blocked_range<int>(0, nthreads, 1),
-                            CreateParallelFirstAtom(vectors, fv, outputs, chunksz, sz, uniqueResults));
+                    //tbb::parallel_for(tbb::blocked_range<int>(0, nthreads, 1),
+                    //        CreateParallelFirstAtom(vectors, fv, outputs, chunksz, sz, uniqueResults));
+                    ParallelTasks::parallel_for(0, nthreads, 1,
+                            CreateParallelFirstAtom(vectors, fv, outputs,
+                                chunksz, sz, uniqueResults));
                     // Maintain order of outputs, so:
                     for (int i = 0; i < nthreads; i++) {
                         outputs[i]->flush();

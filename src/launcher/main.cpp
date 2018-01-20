@@ -32,7 +32,7 @@
 //TBB
 // Don't use global_control, to allow for older TBB versions.
 // #define TBB_PREVIEW_GLOBAL_CONTROL 1
-#include <tbb/task_scheduler_init.h>
+//#include <tbb/task_scheduler_init.h>
 // #include <tbb/global_control.h>
 
 #include <iostream>
@@ -209,8 +209,8 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "Run multithreaded (currently only supported for <mat>).", false);
     query_options.add<bool>("","restrictedChase", false,
             "Use the restricted chase if there are existential rules.", false);
-    query_options.add<int>("", "nthreads", tbb::task_scheduler_init::default_num_threads() / 2,
-            string("Set maximum number of threads to use when run in multithreaded mode. Default is " + to_string(tbb::task_scheduler_init::default_num_threads() / 2)).c_str(), false);
+    query_options.add<int>("", "nthreads", std::max((unsigned int)1, std::thread::hardware_concurrency() / 2),
+            string("Set maximum number of threads to use when run in multithreaded mode. Default is " + to_string(std::max((unsigned int)1, std::thread::hardware_concurrency() / 2))).c_str(), false);
     query_options.add<int>("", "interRuleThreads", 0,
             "Set maximum number of threads to use for inter-rule parallelism. Default is 0", false);
 
@@ -817,7 +817,8 @@ int main(int argc, const char** argv) {
     }
     // Allow for older tbb versions: don't use global_control.
     // tbb::global_control c(tbb::global_control::max_allowed_parallelism, parallelism);
-    tbb::task_scheduler_init init(parallelism);
+    ParallelTasks::setNThreads(parallelism);
+    //tbb::task_scheduler_init init(parallelism);
 
     // For profiling:
     int seconds = vm["sleep"].as<int>();
