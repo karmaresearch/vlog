@@ -7,7 +7,7 @@
 
 // Note: When running multithreaded, mutex != NULL.
 
-FCTable::FCTable(std::shared_mutex *mutex, const uint8_t sizeRow) :
+FCTable::FCTable(std::mutex *mutex, const uint8_t sizeRow) :
     sizeRow(sizeRow), mutex(mutex) {
     }
 

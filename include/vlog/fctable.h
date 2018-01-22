@@ -9,7 +9,6 @@
 #include <string>
 #include <unordered_map>
 #include <mutex>
-#include <shared_mutex>
 
 struct RuleExecutionDetails;
 class FCTable;
@@ -89,13 +88,13 @@ class FCTable {
         FCCache cache;
         std::string getSignature(const Literal &literal);
 
-        std::shared_mutex *mutex;
+        std::mutex *mutex;
         std::mutex cache_mutex;
 
         void removeBlock(const size_t iteration);
 
     public:
-        FCTable(std::shared_mutex *mutex, const uint8_t sizeRow);
+        FCTable(std::mutex *mutex, const uint8_t sizeRow);
 
         std::shared_ptr<const FCTable> filter(const Literal &literal, int nthreads) {
             return filter(literal, 0, NULL, nthreads);

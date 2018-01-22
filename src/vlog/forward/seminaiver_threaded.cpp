@@ -302,7 +302,7 @@ bool SemiNaiverThreaded::tryLock(std::vector<PredId_t> &predicates, PredId_t idH
             if (*itr == idHeadPredicate) {
                 gotlock = mutexes[*itr].try_lock();
             } else {
-                gotlock = mutexes[*itr].try_lock_shared();
+                gotlock = mutexes[*itr].try_lock(); //Previously it was a shared lock
             }
             if (! gotlock) {
                 prev = (PredId_t) -1;
@@ -311,7 +311,7 @@ bool SemiNaiverThreaded::tryLock(std::vector<PredId_t> &predicates, PredId_t idH
                         if (*itr1 == idHeadPredicate) {
                             mutexes[*itr1].unlock();
                         } else {
-                            mutexes[*itr1].unlock_shared();
+                            mutexes[*itr1].unlock(); //Previously it was a shared lock
                         }
                     }
                 }
@@ -334,7 +334,7 @@ void SemiNaiverThreaded::lock(std::vector<PredId_t> &predicates, PredId_t idHead
             if (*itr == idHeadPredicate) {
                 mutexes[*itr].lock();
             } else {
-                mutexes[*itr].lock_shared();
+                mutexes[*itr].lock(); //Previously it was a shared lock
             }
         }
         prev = *itr;
@@ -351,7 +351,7 @@ void SemiNaiverThreaded::unlock(std::vector<PredId_t> &predicates, PredId_t idHe
             if (*itr == idHeadPredicate) {
                 mutexes[*itr].unlock();
             } else {
-                mutexes[*itr].unlock_shared();
+                mutexes[*itr].unlock(); //Previously it was a shared lock
             }
         }
         prev = *itr;
