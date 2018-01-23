@@ -134,9 +134,189 @@ void ExistentialRuleProcessor::filterDerivations(const Literal &literal,
 
 }
 
+void ExistentialRuleProcessor::retainNonExisting(
+        std::vector<uint64_t> &filterRows,
+        uint64_t &sizecolumns,
+        std::vector<std::shared_ptr<Column>> &c) {
+
+    std::sort(filterRows.begin(), filterRows.end());
+    std::vector<uint64_t> newFilterRows; //Remember only the rows where all
+    //atoms were found
+    uint8_t count = 0;
+    uint64_t prevIdx = ~0lu;
+    for(uint64_t i = 0; i < filterRows.size(); ++i) {
+        if (filterRows[i] == prevIdx) {
+            count++;
+        } else {
+            if (prevIdx != ~0lu && count == atomTables.size()) {
+                newFilterRows.push_back(prevIdx);
+            }
+            prevIdx = filterRows[i];
+            count = 1;
+        }
+    }
+    if (prevIdx != ~0lu && count == atomTables.size()) {
+        newFilterRows.push_back(prevIdx);
+    }
+    filterRows = newFilterRows;
+
+    if (!filterRows.empty()) {
+        //Now I can filter the columns
+        std::vector<ColumnWriter> writers;
+        std::vector<std::unique_ptr<ColumnReader>> readers;
+        for(uint8_t i = 0; i < c.size(); ++i) {
+            readers.push_back(c[i]->getReader());
+        }
+        writers.resize(c.size());
+        uint64_t idxs = 0;
+        uint64_t nextid = filterRows[idxs];
+        for(uint64_t i = 0; i < sizecolumns; ++i) {
+            if (i < nextid) {
+                //Copy
+                for(uint8_t j = 0; j < c.size(); ++j) {
+                    if (!readers[j]->hasNext()) {
+                        throw 10;
+                    }
+                    writers[j].add(readers[j]->next());
+                }
+            } else {
+                //Move to the next ID if any
+                idxs++;
+                if (idxs < filterRows.size()) {
+                    nextid = filterRows[idxs];
+                } else {
+                    nextid = ~0lu; //highest value -- copy the rest
+                }
+            }
+        }
+        //Copy back the retricted columns
+        for(uint8_t i = 0; i < c.size(); ++i) {
+            c[i] = writers[i].getColumn();
+        }
+        sizecolumns = 0;
+        if (rowsize > 0) {
+            sizecolumns = c[0]->size();
+        }
+    }
+}
+
 void ExistentialRuleProcessor::addColumns(const int blockid,
         std::vector<std::shared_ptr<Column>> &c,
         const bool unique, const bool sorted) {
+    //Even though the code below is designed to handle multiple head atoms
+    //this works only if there is only head atom.
+    if (atomTables.size() > 1) {
+        LOG(ERRORL) << "Calling untested procedure. Aborting ...";
+        throw 10;
+    }
+
+    uint64_t sizecolumns = 0;
+    if (c.size() > 0) {
+        sizecolumns = c[0]->size();
+    }
+
+    std::vector<std::shared_ptr<Column>> knownColumns;
+    uint8_t nKnownColumns = 0;
+    std::pair<uint8_t,uint8_t> posKnownColumns[SIZETUPLE];
+    for(uint8_t j = 0; j < c.size(); ++j) {
+        bool found = false;
+        for(uint8_t i = 0; i < nCopyFromFirst; ++i) {
+            if (posFromFirst[i].first == j) {
+                found = true;
+                posKnownColumns[nKnownColumns++] = std::make_pair(0, posFromFirst[i].first);
+                break;
+            }
+        }
+        for(uint8_t i = 0; i < nCopyFromSecond && !found; ++i) {
+            if (posFromSecond[i].first == j) {
+                found = true;
+                posKnownColumns[nKnownColumns++] = std::make_pair(0, posFromSecond[i].first);
+                break;
+            }
+        }
+        if (found) {
+            knownColumns.push_back(c[j]);
+        }
+    }
+
+    std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
+    if (chaseMgmt->isRestricted()) {
+        uint8_t count = 0;
+        for(const auto &at : atomTables) {
+            const auto &h = at->getLiteral();
+            FCTable *t = sn->getTable(h.getPredicate().getId(),
+                    h.getPredicate().getCardinality());
+            filterDerivations(h, t, row, count, ruleDetails, nKnownColumns,
+                    posKnownColumns, c, sizecolumns, filterRows);
+            count += h.getTupleSize();
+        }
+    }
+
+    if (filterRows.size() == sizecolumns * atomTables.size()) {
+        return; //every substitution already exists in the database. Nothing
+        //new can be derived.
+    }
+
+    //Filter out the potential values for the derivation
+    //(only restricted chase can do it)
+    if (!filterRows.empty()) {
+        retainNonExisting(filterRows, sizecolumns, c);
+    }
+
+    //Create existential columns
+    const auto &at = atomTables[0];
+    const auto &literal = at->getLiteral();
+    assert(literal.getTupleSize() == c.size());
+    std::map<uint8_t, std::shared_ptr<Column>> extvars;
+    for(uint8_t i = 0; i < c.size(); ++i) {
+        auto t = literal.getTermAtPos(i);
+        bool found = false;
+        for(int j = 0; j < nKnownColumns; ++j) {
+            if (posKnownColumns[j].second == i) {
+                found = true;
+                break;
+            }
+        }
+        //The column is existential
+        if (!found) {
+            if (!extvars.count(t.getId())) { //Must be existential
+                //The body might contain more variables than what
+                //is needed to create existential columns
+                //First I copy the columns from the body of the rule
+                auto extcolumn = chaseMgmt->getNewOrExistingIDs(
+                        ruleDetails->rule.getId(),
+                        t.getId(),
+                        knownColumns,
+                        sizecolumns);
+                extvars.insert(std::make_pair(t.getId(), extcolumn));
+            }
+            c[i] = extvars[t.getId()];
+        }
+    }
+
+    //Output the columns
+    for(auto &t : atomTables) {
+        t->addColumns(blockid, c, unique, sorted);
+    }
+}
+
+void ExistentialRuleProcessor::addColumn(const int blockid, const uint8_t pos,
+        std::shared_ptr<Column> column, const bool unique,
+        const bool sorted) {
+    //TODO: Chase...
+    LOG(ERRORL) << "Not implemented yet";
+    throw 10;
+}
+
+void ExistentialRuleProcessor::addColumns(const int blockid,
+        FCInternalTableItr *itr, const bool unique,
+        const bool sorted, const bool lastInsert) {
+    if (nCopyFromFirst > 0) {
+        LOG(ERRORL) << "This method is not supposed to work if other columns"
+            " from outside the itr";
+        throw 10;
+    }
+    std::vector<std::shared_ptr<Column>> c = itr->getAllColumns();
     uint64_t sizecolumns = 0;
     if (c.size() > 0) {
         sizecolumns = c[0]->size();
@@ -163,65 +343,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     //Filter out the potential values for the derivation
     //(only restricted chase can do it)
     if (!filterRows.empty()) {
-        std::sort(filterRows.begin(), filterRows.end());
-        std::vector<uint64_t> newFilterRows; //Remember only the rows where all
-        //atoms were found
-        uint8_t count = 0;
-        uint64_t prevIdx = ~0lu;
-        for(uint64_t i = 0; i < filterRows.size(); ++i) {
-            if (filterRows[i] == prevIdx) {
-                count++;
-            } else {
-                if (prevIdx != ~0lu && count == atomTables.size()) {
-                    newFilterRows.push_back(prevIdx);
-                }
-                prevIdx = filterRows[i];
-                count = 1;
-            }
-        }
-        if (prevIdx != ~0lu && count == atomTables.size()) {
-            newFilterRows.push_back(prevIdx);
-        }
-        filterRows = newFilterRows;
-
-        if (!filterRows.empty()) {
-            //Now I can filter the columns
-            std::vector<ColumnWriter> writers;
-            std::vector<std::unique_ptr<ColumnReader>> readers;
-            for(uint8_t i = 0; i < c.size(); ++i) {
-                readers.push_back(c[i]->getReader());
-            }
-            writers.resize(c.size());
-            uint64_t idxs = 0;
-            uint64_t nextid = filterRows[idxs];
-            for(uint64_t i = 0; i < sizecolumns; ++i) {
-                if (i < nextid) {
-                    //Copy
-                    for(uint8_t j = 0; j < c.size(); ++j) {
-                        if (!readers[j]->hasNext()) {
-                            throw 10;
-                        }
-                        writers[j].add(readers[j]->next());
-                    }
-                } else {
-                    //Move to the next ID if any
-                    idxs++;
-                    if (idxs < filterRows.size()) {
-                        nextid = filterRows[idxs];
-                    } else {
-                        nextid = ~0lu; //highest value -- copy the rest
-                    }
-                }
-            }
-            //Copy back the retricted columns
-            for(uint8_t i = 0; i < c.size(); ++i) {
-                c[i] = writers[i].getColumn();
-            }
-            sizecolumns = 0;
-            if (rowsize > 0) {
-                sizecolumns = c[0]->size();
-            }
-        }
+        retainNonExisting(filterRows, sizecolumns, c);
     }
 
     //Create existential columns store them in a vector with the corresponding
@@ -240,12 +362,6 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                         break;
                     }
                 }
-                for(int j = 0; j < nCopyFromFirst; ++j) {
-                    if (posFromFirst[j].first == count + i) {
-                        found = true;
-                        break;
-                    }
-                }
                 if (!found && !extvars.count(t.getId())) { //Must be existential
                     //The body might contain more variables than what
                     //is needed to create existential columns
@@ -256,17 +372,13 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                         depc_t.push_back(std::make_pair(posFromSecond[i].first,
                                     c[posFromSecond[i].second]));
                     }
-                    for(uint8_t i = 0; i < nCopyFromFirst; ++i) {
-                        depc_t.push_back(std::make_pair(posFromFirst[i].first,
-                                    c[posFromFirst[i].second]));
-                    }
                     //I sort the columns according the order where they appear
                     //in the head
                     sort(depc_t.begin(), depc_t.end(),
-                    [](const std::pair<uint8_t, std::shared_ptr<Column>>& a,
-                       const std::pair<uint8_t, std::shared_ptr<Column>>& b) -> bool { 
-                                return a.first < b.first;
-                                });
+                            [](const std::pair<uint8_t, std::shared_ptr<Column>>& a,
+                                const std::pair<uint8_t, std::shared_ptr<Column>>& b) -> bool {
+                            return a.first < b.first;
+                            });
                     //Now that the columns are sorted, I no longer care
                     //about the indices
                     std::vector<std::shared_ptr<Column>> depc;
@@ -285,38 +397,36 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         count += literal.getTupleSize();
     }
 
-    if (c.size() < rowsize) {
-        //The heads contain also constants or ext vars.
-        std::vector<std::shared_ptr<Column>> newc;
-        uint8_t count = 0;
-        for(const auto &at : atomTables) {
-            const auto &literal = at->getLiteral();
-            for (int i = 0; i < literal.getTupleSize(); ++i) {
-                auto t = literal.getTermAtPos(i);
-                if (!t.isVariable()) {
-                    newc.push_back(std::shared_ptr<Column>(
-                                new CompressedColumn(row[count + i],
-                                    sizecolumns)));
-                } else {
-                    //Does the variable appear in the body? Then copy it
-                    bool found = false;
-                    for(uint8_t j = 0; j < nCopyFromSecond; ++j) {
-                        if (posFromSecond[j].first == count + i) {
-                            found = true;
-                            uint8_t pos = posFromSecond[j].second;
-                            newc.push_back(c[pos]);
-                            break;
-                        }
-                    }
-                    if (!found) {
-                        newc.push_back(extvars[t.getId()]);
+    //The heads might also contain constants or ext vars.
+    std::vector<std::shared_ptr<Column>> newc;
+    count = 0;
+    for(const auto &at : atomTables) {
+        const auto &literal = at->getLiteral();
+        for (int i = 0; i < literal.getTupleSize(); ++i) {
+            auto t = literal.getTermAtPos(i);
+            if (!t.isVariable()) {
+                newc.push_back(std::shared_ptr<Column>(
+                            new CompressedColumn(row[count + i],
+                                sizecolumns)));
+            } else {
+                //Does the variable appear in the body? Then copy it
+                bool found = false;
+                for(uint8_t j = 0; j < nCopyFromSecond; ++j) {
+                    if (posFromSecond[j].first == count + i) {
+                        found = true;
+                        uint8_t pos = posFromSecond[j].second;
+                        newc.push_back(c[pos]);
+                        break;
                     }
                 }
+                if (!found) {
+                    newc.push_back(extvars[t.getId()]);
+                }
             }
-            count += literal.getTupleSize();
         }
-        c = newc;
+        count += literal.getTupleSize();
     }
+    c = newc;
 
     count = 0;
     for(auto &t : atomTables) {
@@ -328,19 +438,4 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         t->addColumns(blockid, c2, unique, sorted);
         count += sizeTuple;
     }
-}
-
-void ExistentialRuleProcessor::addColumn(const int blockid, const uint8_t pos,
-        std::shared_ptr<Column> column, const bool unique,
-        const bool sorted) {
-    //TODO: Chase...
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
-}
-
-void ExistentialRuleProcessor::addColumns(const int blockid,
-        FCInternalTableItr *itr, const bool unique,
-        const bool sorted, const bool lastInsert) {
-    std::vector<std::shared_ptr<Column>> c = itr->getAllColumns();
-    addColumns(blockid, c, unique, sorted);
 }

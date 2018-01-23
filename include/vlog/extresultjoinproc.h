@@ -21,6 +21,11 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 uint64_t sizecolumns,
                 std::vector<uint64_t> &output);
 
+        void retainNonExisting(
+                std::vector<uint64_t> &filterRows,
+                uint64_t &sizecolumns,
+                std::vector<std::shared_ptr<Column>> &c);
+
     public:
         ExistentialRuleProcessor(
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,

@@ -484,11 +484,11 @@ std::shared_ptr<const Segment> InmemoryFCInternalTable::filter_row(std::shared_p
 
     SegmentInserter inserter(seg->getNColumns());
 
-    LOG(TRACEL) << "Filter_row, nConstantsToFilter = " << (int) nConstantsToFilter << ", nRepeatedVars = " << (int) nRepeatedVars
+    LOG(DEBUGL) << "Filter_row, nConstantsToFilter = " << (int) nConstantsToFilter << ", nRepeatedVars = " << (int) nRepeatedVars
         << ", segment columns = " << (int) (seg->getNColumns()) << ", segment size = " << seg->getNRows();
 
     std::shared_ptr<const Segment> retval = filter_row(seg->iterator().get(), nConstantsToFilter, posConstantsToFilter, valuesConstantsToFilter, nRepeatedVars, repeatedVars, inserter);
-    LOG(TRACEL) << "Filter_row, result count = " << retval->getNRows();
+    LOG(DEBUGL) << "Filter_row, result count = " << retval->getNRows();
     return retval;
 }
 
