@@ -55,7 +55,7 @@ class SemiNaiverThreaded: public SemiNaiver {
         const int interRuleThreads;
 
         //Create one mutex per table
-        std::shared_mutex mutexes[MAX_NPREDS];
+        std::mutex mutexes[MAX_NPREDS];
 
         size_t getAtomicIteration() {
             std::lock_guard<std::mutex> lock(mutexIteration);
