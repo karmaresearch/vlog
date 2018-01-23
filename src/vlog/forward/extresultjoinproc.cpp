@@ -120,8 +120,8 @@ void ExistentialRuleProcessor::filterDerivations(const Literal &literal,
                 itr1Ok = itr1->hasNext();
                 if (itr1Ok)
                     itr1->next();
-		// Should we not increment idx here??? Added. --Ceriel
-		idx++;
+                // Should we not increment idx here??? Added. --Ceriel
+                idx++;
             }
         }
         tableItr.moveNextCount();
@@ -135,9 +135,8 @@ void ExistentialRuleProcessor::filterDerivations(const Literal &literal,
 }
 
 void ExistentialRuleProcessor::addColumns(const int blockid,
-        FCInternalTableItr *itr, const bool unique,
-        const bool sorted, const bool lastInsert) {
-    std::vector<std::shared_ptr<Column>> c = itr->getAllColumns();
+        std::vector<std::shared_ptr<Column>> &c,
+        const bool unique, const bool sorted) {
     uint64_t sizecolumns = 0;
     if (c.size() > 0) {
         sizecolumns = c[0]->size();
@@ -161,7 +160,8 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         //new can be derived.
     }
 
-    //Filter out the potential values for the derivation (only restricted chase can do it)
+    //Filter out the potential values for the derivation
+    //(only restricted chase can do it)
     if (!filterRows.empty()) {
         std::sort(filterRows.begin(), filterRows.end());
         std::vector<uint64_t> newFilterRows; //Remember only the rows where all
@@ -205,7 +205,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     }
                 } else {
                     //Move to the next ID if any
-		    idxs++;
+                    idxs++;
                     if (idxs < filterRows.size()) {
                         nextid = filterRows[idxs];
                     } else {
@@ -224,7 +224,8 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         }
     }
 
-    //Create existential columns store them in a vector with the corresponding var ID
+    //Create existential columns store them in a vector with the corresponding
+    //var ID
     std::map<uint8_t, std::shared_ptr<Column>> extvars;
     uint8_t count = 0;
     for(const auto &at : atomTables) {
@@ -239,11 +240,38 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                         break;
                     }
                 }
+                for(int j = 0; j < nCopyFromFirst; ++j) {
+                    if (posFromFirst[j].first == count + i) {
+                        found = true;
+                        break;
+                    }
+                }
                 if (!found && !extvars.count(t.getId())) { //Must be existential
-                    //The body might contain more variables than what is needed to create existential columns
-                    std::vector<std::shared_ptr<Column>> depc;
+                    //The body might contain more variables than what
+                    //is needed to create existential columns
+                    //First I copy the columns from the body of the rule
+                    std::vector<
+                        std::pair<uint8_t, std::shared_ptr<Column>>> depc_t;
                     for(uint8_t i = 0; i < nCopyFromSecond; ++i) {
-                        depc.push_back(c[posFromSecond[i].second]);
+                        depc_t.push_back(std::make_pair(posFromSecond[i].first,
+                                    c[posFromSecond[i].second]));
+                    }
+                    for(uint8_t i = 0; i < nCopyFromFirst; ++i) {
+                        depc_t.push_back(std::make_pair(posFromFirst[i].first,
+                                    c[posFromFirst[i].second]));
+                    }
+                    //I sort the columns according the order where they appear
+                    //in the head
+                    sort(depc_t.begin(), depc_t.end(),
+                    [](const std::pair<uint8_t, std::shared_ptr<Column>>& a,
+                       const std::pair<uint8_t, std::shared_ptr<Column>>& b) -> bool { 
+                                return a.first < b.first;
+                                });
+                    //Now that the columns are sorted, I no longer care
+                    //about the indices
+                    std::vector<std::shared_ptr<Column>> depc;
+                    for(auto &el : depc_t) {
+                        depc.push_back(el.second);
                     }
                     auto extcolumn = chaseMgmt->getNewOrExistingIDs(
                             ruleDetails->rule.getId(),
@@ -300,4 +328,19 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         t->addColumns(blockid, c2, unique, sorted);
         count += sizeTuple;
     }
+}
+
+void ExistentialRuleProcessor::addColumn(const int blockid, const uint8_t pos,
+        std::shared_ptr<Column> column, const bool unique,
+        const bool sorted) {
+    //TODO: Chase...
+    LOG(ERRORL) << "Not implemented yet";
+    throw 10;
+}
+
+void ExistentialRuleProcessor::addColumns(const int blockid,
+        FCInternalTableItr *itr, const bool unique,
+        const bool sorted, const bool lastInsert) {
+    std::vector<std::shared_ptr<Column>> c = itr->getAllColumns();
+    addColumns(blockid, c, unique, sorted);
 }

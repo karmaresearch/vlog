@@ -614,7 +614,7 @@ uint8_t removePosConstants(uint8_t c, Literal literal) {
 void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRule,
         SemiNaiver * naiver, const JoinHashMap & map,
         const DoubleJoinHashMap & doublemap,
-        ResultJoinProcessor * out, const uint8_t njoinfields,
+        ResultJoinProcessor *resultsContainer, const uint8_t njoinfields,
         const uint8_t idxJoinField1, const uint8_t idxJoinField2,
         const std::vector<Literal> *outputLiterals, const Literal & literal, const uint8_t rowSize,
         const std::vector<uint8_t> &posToSort, std::vector<Term_t> &values,
@@ -624,8 +624,8 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
         int &processedTables) {
 
     //Change the position in the output container since we replace a number of variables with constants.
-    std::pair<uint8_t, uint8_t> *posFromSecond = out->getPosFromSecond();
-    for (int i = 0; i < out->getNCopyFromSecond(); ++i) {
+    std::pair<uint8_t, uint8_t> *posFromSecond = resultsContainer->getPosFromSecond();
+    for (int i = 0; i < resultsContainer->getNCopyFromSecond(); ++i) {
         if (njoinfields == 2 && posFromSecond[i].second > idxJoinField2) {
             posFromSecond[i].second--;
         }
@@ -687,8 +687,8 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
         }
 
         //We need these to filter duplicates
-        const std::pair<uint8_t, uint8_t> *posFromFirst = out->getPosFromFirst();
-        const uint8_t nPosFromFirst = out->getNCopyFromFirst();
+        const std::pair<uint8_t, uint8_t> *posFromFirst = resultsContainer->getPosFromFirst();
+        const uint8_t nPosFromFirst = resultsContainer->getNCopyFromFirst();
         VTuple tuple = literal.getTuple();
         std::vector<DuplicateContainers> existingTuples;
 
@@ -794,7 +794,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                             existingTuples.
                                 push_back(DuplicateContainers(
                                             outputItr,
-                                            out->getNCopyFromSecond()));
+                                            resultsContainer->getNCopyFromSecond()));
                             emptyIterals = false;
                         } else {
                             existingTuples.push_back(DuplicateContainers());
@@ -826,7 +826,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                     {
                         std::vector<uint8_t> ps = newPosToSort;
 
-                        FilterHashJoin exec(out, &map, &doublemap, &values, rowSize, njoinfields,
+                        FilterHashJoin exec(resultsContainer, &map, &doublemap, &values, rowSize, njoinfields,
                                 idxJoinField1, idxJoinField2,
                                 &literalToQuery, true, false, (emptyIterals) ? NULL : &existingTuples,
                                 0, NULL, NULL); //The last three parameters are
@@ -861,7 +861,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                 //size_t uniqueDerivation = out->getUniqueDerivation();
                 //size_t unfilteredDerivation = out->getUnfilteredDerivation();
                 //std::chrono::system_clock::time_point startC = std::chrono::system_clock::now();
-                out->consolidate(false);
+                resultsContainer->consolidate(false);
                 //std::chrono::duration<double> secC = std::chrono::system_clock::now() - startC;
 
 #if DEBUG

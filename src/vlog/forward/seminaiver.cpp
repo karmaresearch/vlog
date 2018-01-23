@@ -1175,7 +1175,7 @@ size_t SemiNaiver::estimateCardTable(const Literal &literal,
 FCIterator SemiNaiver::getTableFromIDBLayer(const Literal &literal, const size_t minIteration, TableFilterer *filter) {
 
     PredId_t id = literal.getPredicate().getId();
-    LOG(DEBUGL) << "SemiNaiver::getTableFromIDBLayer: id = " << (int) id
+    LOG(TRACEL) << "SemiNaiver::getTableFromIDBLayer: id = " << (int) id
         << ", minIter = " << minIteration << ", literal=" << literal.tostring(NULL, NULL);
     FCTable *table = predicatesTables[id];
     if (table == NULL || table->isEmpty() || table->getMaxIteration() < minIteration) {
@@ -1189,7 +1189,7 @@ FCIterator SemiNaiver::getTableFromIDBLayer(const Literal &literal, const size_t
 FCIterator SemiNaiver::getTableFromIDBLayer(const Literal &literal, const size_t minIteration,
         const size_t maxIteration, TableFilterer *filter) {
     PredId_t id = literal.getPredicate().getId();
-    LOG(DEBUGL) << "SemiNaiver::getTableFromIDBLayer: id = " << (int) id
+    LOG(TRACEL) << "SemiNaiver::getTableFromIDBLayer: id = " << (int) id
         << ", minIter = " << minIteration << ", maxIteration = " << maxIteration << ", literal=" << literal.tostring(NULL, NULL);
     FCTable *table = predicatesTables[id];
     if (table == NULL || table->isEmpty() || table->getMaxIteration() < minIteration) {

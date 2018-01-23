@@ -40,6 +40,15 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
         void addColumns(const int blockid, FCInternalTableItr *itr,
                 const bool unique, const bool sorted,
                 const bool lastInsert);
+
+        void addColumns(const int blockid,
+                std::vector<std::shared_ptr<Column>> &columns,
+                const bool unique, const bool sorted);
+
+        void addColumn(const int blockid, const uint8_t pos,
+                std::shared_ptr<Column> column, const bool unique,
+                const bool sorted);
+
 };
 
 #endif
