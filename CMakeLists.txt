@@ -127,7 +127,7 @@ endif()
 
 #Set compiler options
 set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3")
-set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -DDEBUG")
 set(COMPILE_FLAGS "-c -MD -std=c++11 -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1")
 set_target_properties(vlog PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}")
 set_target_properties(vlog_exec PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}" OUTPUT_NAME "vlog")
