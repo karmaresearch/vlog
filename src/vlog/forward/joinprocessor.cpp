@@ -1027,13 +1027,12 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
         t1->releaseIterator(t2);
     }
 
-#if DEBUG
     if (joinsCoordinates.size() < 2) {
-        LOG(TRACEL) << "Hashmap size = " << map.size();
+        LOG(DEBUGL) << "Hashmap size = " << map.size();
     } else {
-        LOG(TRACEL) << "Hashmap size = " << doublemap.size();
+        LOG(DEBUGL) << "Hashmap size = " << doublemap.size();
     }
-#endif
+    
     //Perform as many joins as the rows in the hashmap
     execSelectiveHashJoin(ruleDetails, naiver, map, doublemap, output, (uint8_t) joinsCoordinates.size(),
             (joinsCoordinates.size() > 0) ? joinsCoordinates[0].second : 0,

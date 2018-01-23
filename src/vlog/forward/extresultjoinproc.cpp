@@ -223,14 +223,16 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         for(uint8_t i = 0; i < nCopyFromFirst; ++i) {
             if (posFromFirst[i].first == j) {
                 found = true;
-                posKnownColumns[nKnownColumns++] = std::make_pair(0, posFromFirst[i].first);
+                posKnownColumns[nKnownColumns++] = 
+                    std::make_pair(posFromFirst[i].first, posFromFirst[i].first);
                 break;
             }
         }
         for(uint8_t i = 0; i < nCopyFromSecond && !found; ++i) {
             if (posFromSecond[i].first == j) {
                 found = true;
-                posKnownColumns[nKnownColumns++] = std::make_pair(0, posFromSecond[i].first);
+                posKnownColumns[nKnownColumns++] = std::make_pair(
+                        posFromSecond[i].first, posFromSecond[i].first);
                 break;
             }
         }
