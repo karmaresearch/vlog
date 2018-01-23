@@ -120,6 +120,8 @@ void ExistentialRuleProcessor::filterDerivations(const Literal &literal,
                 itr1Ok = itr1->hasNext();
                 if (itr1Ok)
                     itr1->next();
+		// Should we not increment idx here??? Added. --Ceriel
+		idx++;
             }
         }
         tableItr.moveNextCount();
@@ -203,8 +205,9 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     }
                 } else {
                     //Move to the next ID if any
+		    idxs++;
                     if (idxs < filterRows.size()) {
-                        nextid = filterRows[++idxs];
+                        nextid = filterRows[idxs];
                     } else {
                         nextid = ~0lu; //highest value -- copy the rest
                     }
