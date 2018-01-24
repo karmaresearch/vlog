@@ -99,6 +99,41 @@ ELSE()
     message("-- Found LZ4")
 ENDIF()
 
+#Webserver support
+if(WEBINTERFACE)
+    set(COMPILE_FLAGS "${COMPILE_FLAGS} -DWEBINTERFACE=1")
+    find_library(curl curl)
+    #Boost
+    set(Boost_USE_STATIC_LIBS OFF)
+    set(Boost_USE_MULTITHREADED ON)
+    set(Boost_USE_STATIC_RUNTIME OFF)
+    FIND_PACKAGE(Boost COMPONENTS system REQUIRED)
+    IF (Boost_FOUND)
+        INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR} SYSTEM)
+    ENDIF()
+
+ENDIF()
+
+if(MYSQL)
+    file(GLOB vlog_SRC "src/vlog/mysql/*.cpp")
+    set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMYSQL=1")
+ENDIF()
+
+if(ODBC)
+    file(GLOB vlog_SRC "src/vlog/odbc/*.cpp")
+    set(COMPILE_FLAGS "${COMPILE_FLAGS} -DODBC=1")
+ENDIF()
+
+if(MAPI)
+    file(GLOB vlog_SRC "src/vlog/mapi/*.cpp")
+    set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMAPI=1")
+ENDIF()
+
+if(MDLITE)
+    file(GLOB vlog_SRC "src/vlog/mdlite/*.cpp")
+    set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMDLITE=1")
+ENDIF()
+
 #add files to compile
 file(GLOB vlog_SRC
     "src/vlog/*.cpp"
@@ -108,9 +143,10 @@ file(GLOB vlog_SRC
     "src/vlog/magic/*.cpp"
     "src/vlog/inmemory/*.cpp"
     "src/vlog/trident/*.cpp"
+    "src/vlog/web/*.cpp"
     "src/launcher/vloglayer.cpp"
     "src/launcher/vlogscan.cpp"
-    )
+)
 
 #Create both a library and the executable program
 add_library(vlog STATIC ${vlog_SRC})
@@ -128,11 +164,15 @@ endif()
 #Set compiler options
 set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -DDEBUG")
-set(COMPILE_FLAGS "-c -MD -std=c++11 -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1")
+set(COMPILE_FLAGS "${COMPILE_FLAGS} -c -MD -std=c++11 -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1")
 set_target_properties(vlog PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}")
 set_target_properties(vlog_exec PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}" OUTPUT_NAME "vlog")
 
 #standard include
 include_directories(include/)
+if(WEBINTERFACE)
+TARGET_LINK_LIBRARIES(vlog trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log curl ${Boost_LIBRARIES})
+else()
 TARGET_LINK_LIBRARIES(vlog trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log)
+endif()
 TARGET_LINK_LIBRARIES(vlog_exec vlog)

@@ -29,12 +29,6 @@
 #include <rts/operator/PlanPrinter.hpp>
 #include <rts/operator/ResultsPrinter.hpp>
 
-//TBB
-// Don't use global_control, to allow for older TBB versions.
-// #define TBB_PREVIEW_GLOBAL_CONTROL 1
-//#include <tbb/task_scheduler_init.h>
-// #include <tbb/global_control.h>
-
 #include <iostream>
 #include <cstdlib>
 #include <sstream>
@@ -257,6 +251,10 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "Textual term to search", false);
     lookup_options.add<int>("n","number", 0, "Numeric term to search",false);
 
+    ProgramArgs::GroupArgs& server_options = *vm.newGroup("Options for <server>");
+    server_options.add<string>("","webpages", "../webinterface",
+            "Path to the webpages relative to where the executable is. Default is ../webinterface", false);
+
     ProgramArgs::GroupArgs& cmdline_options = *vm.newGroup("Parameters");
     cmdline_options.add<string>("l","logLevel", "info",
             "Set the log level (accepted values: trace, debug, info, warning, error, fatal). Default is info.", false);
@@ -326,8 +324,9 @@ void startServer(int argc,
         ProgramArgs &vm) {
     std::unique_ptr<WebInterface> webint;
     int port = vm["port"].as<int>();
+    std::string webinterface = vm["webpages"].as<string>();
     webint = std::unique_ptr<WebInterface>(
-            new WebInterface(vm, NULL, pathExec + "/webinterface",
+            new WebInterface(vm, NULL, pathExec + "/" + webinterface,
                 flattenAllArgs(argc, argv),
                 vm["edb"].as<string>()));
     webint->start("0.0.0.0", to_string(port));
