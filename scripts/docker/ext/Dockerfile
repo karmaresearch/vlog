@@ -1,3 +1,3 @@
 FROM karmaresearch/vlog:ext
 
-RUN ["/app/vlog/scripts/update_and_make.sh"]
+RUN ["/app/vlog/scripts/docker/update_and_make.sh"]
