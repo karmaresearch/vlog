@@ -36,7 +36,8 @@ struct RuleExecutionPlan {
     bool filterLastHashMap;
 
     //If the head contains unbound variables, I assume they are existentially
-    //quantified. This map keeps trace, for each of such variable, whether they are linked to
+    //quantified. This map keeps trace, for each of such variable, whether
+    //they are linked to
     //any variable in the body. I need it to construct function terms.
     std::map<uint8_t, std::vector<uint8_t>> extvars2posFromSecond;
 

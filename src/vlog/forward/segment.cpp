@@ -1203,7 +1203,7 @@ std::shared_ptr<const Segment> SegmentInserter::retainEDB(
             ->posColumnInLiteral();
         //Chech the two literals are equivalent and that the rel. are
         //different positions
-        Substitution subs[MAX_ROWSIZE];
+        Substitution subs[SIZETUPLE];
         if (!l1.sameVarSequenceAs(l12) || l1.subsumes(subs, l1, l12) == -1
                 || pos1 == pos12) {
             //The columns come from different literals. This is not yet
@@ -1644,9 +1644,9 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
             //                         << ", e1 = " << e1 << ", e2 = " << e2;
 
             bool lastValueEOF = false;
-            Term_t lastValues[MAX_ROWSIZE];
+            Term_t lastValues[SIZETUPLE];
             bool curValueEOF = false;
-            Term_t curValues[MAX_ROWSIZE];
+            Term_t curValues[SIZETUPLE];
 
             long count1 = 1;
             long count2 = 1;

@@ -31,7 +31,7 @@ struct LessTwoTuples {
 };
 
 //If the previous table has less than these lines, then it executes an hash join
-#define THRESHOLD_HASHJOIN 1000
+#define THRESHOLD_HASHJOIN 100
 
 #define FLUSH_SIZE (1 << 20)
 

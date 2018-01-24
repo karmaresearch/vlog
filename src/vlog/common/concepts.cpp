@@ -461,8 +461,8 @@ void Rule::checkRule() const {
         }
     }
     LOG(DEBUGL) << "Rule " << this->tostring() << " has " << varCount << " variables";
-    if (varCount > MAX_ROWSIZE) {
-        LOG(ERRORL) << "MAX_ROWSIZE needs to be set to at least " << varCount << "!";
+    if (varCount > SIZETUPLE) {
+        LOG(ERRORL) << "SIZETUPLE needs to be set to at least " << varCount << "!";
         abort();
     }
 }

@@ -305,13 +305,12 @@ class InmemoryFCInternalTableItr : public FCInternalTableItr {
         }
 };
 
-#define MAX_ROWSIZE 10
 class EDBFCInternalTableItr : public FCInternalTableItr {
     private:
         std::vector<uint8_t> fields;
         EDBIterator *edbItr;
         uint8_t nfields;
-        uint8_t posFields[MAX_ROWSIZE];
+        uint8_t posFields[SIZETUPLE];
         bool compiled;
         size_t iteration;
 
@@ -578,14 +577,14 @@ class EDBFCInternalTable : public FCInternalTable {
     private:
         const size_t iteration;
         const uint8_t nfields;
-        uint8_t posFields[MAX_ROWSIZE];
+        uint8_t posFields[SIZETUPLE];
         const QSQQuery query;
         EDBLayer *layer;
         Factory<EDBFCInternalTableItr> factory;
         std::vector<uint8_t> defaultSorting;
 
         EDBFCInternalTable(const size_t iteration,
-                const uint8_t nfields, uint8_t const posFields[MAX_ROWSIZE],
+                const uint8_t nfields, uint8_t const posFields[SIZETUPLE],
                 const QSQQuery &query,
                 EDBLayer *layer,
                 const std::vector<uint8_t> &defaultSorting) :

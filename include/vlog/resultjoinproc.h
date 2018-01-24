@@ -57,12 +57,10 @@ class ResultJoinProcessor {
         HashSet *rowsHash;
         size_t rowCount;
 #endif
-
-    private:
+    protected:
         virtual void processResults(const int blockid,
                 const bool unique, std::mutex *m) = 0;
 
-    protected:
         void copyRawRow(const Term_t *first, const Term_t* second);
 
         void copyRawRow(const Term_t *first, FCInternalTableItr* second);

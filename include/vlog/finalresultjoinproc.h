@@ -228,7 +228,7 @@ class FinalRuleProcessor: public ResultJoinProcessor {
 
         bool isBlockEmpty(const int blockId, const bool unique) const;
 
-        void consolidate(const bool isFinished);
+        virtual void consolidate(const bool isFinished);
 
         ~FinalRuleProcessor() {}
 };
