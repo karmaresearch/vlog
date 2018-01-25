@@ -61,18 +61,18 @@ bool InmemoryDict::getText(uint64_t id, char *text) {
 InmemoryTable::InmemoryTable(string repository, string tablename,
         PredId_t predid) {
     arity = 0;
-    string schemaFile = repository + "/" + tablename + ".schema";
-    ifstream ifs;
-    ifs.open(schemaFile);
-    string line;
-    while (std::getline(ifs, line)) {
-        auto delim = line.find(':');
-        string varname = line.substr(0, delim);
-        varnames.push_back(varname);
-        arity++;
-    }
-    ifs.close();
-
+//    string schemaFile = repository + "/" + tablename + ".schema";
+//    ifstream ifs;
+//    ifs.open(schemaFile);
+//    string line;
+//    while (std::getline(ifs, line)) {
+//        auto delim = line.find(':');
+//        string varname = line.substr(0, delim);
+//        varnames.push_back(varname);
+//        arity++;
+//    }
+//    ifs.close();
+//
     //Load the dictionary
 //    if (!singletonDict.isDictLoaded()) {
 //        singletonDict.load(repository + "/dict");
@@ -81,18 +81,31 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
     //Load the table in the database
     string tablefile = repository + "/" + tablename + ".csv";
     if (Utils::exists(tablefile)) {
+	ifstream ifs;
         ifs.open(tablefile);
         string line;
         std::vector<std::vector<Term_t>> vectors;
-        vectors.resize(arity);
         while(std::getline(ifs, line)) {
             //Parse the row
-            for(uint8_t i = 0; i < arity; ++i) {
+	    int i = 0;
+	    while (line.length() > 0) {
                 auto delim = line.find(',');
                 string sn = line.substr(0, delim);
+		if (arity == 0 && vectors.size() <= i) {
+		    std::vector<Term_t> v;
+		    vectors.push_back(v);
+		}
                 vectors[i].push_back(singletonDict.getOrAdd(sn));
-                line = line.substr(delim + 1);
+		if (delim == std::string::npos) {
+		    line = "";
+		} else {
+		    line = line.substr(delim + 1);
+		}
+		i++;
             }
+	    if (arity == 0) {
+		arity = i;
+	    }
         }
         std::vector<std::shared_ptr<Column>> columns;
         for(uint8_t i = 0; i < arity; ++i) {
