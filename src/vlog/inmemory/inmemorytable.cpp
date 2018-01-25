@@ -5,27 +5,37 @@
 
 InmemoryDict singletonDict;
 
-void InmemoryDict::load(string pathfile) {
-    if (isloaded) {
-        LOG(ERRORL) << "The dictionary is already loaded!";
-        throw 10;
+//void InmemoryDict::load(string pathfile) {
+//    if (isloaded) {
+//        LOG(ERRORL) << "The dictionary is already loaded!";
+//        throw 10;
+//    }
+//    if (!Utils::exists(pathfile)) {
+//        LOG(ERRORL) << "The file " << pathfile << " does not exist";
+//        throw 10;
+//    }
+//    ifstream ifs;
+//    ifs.open(pathfile);
+//    string line;
+//    while (std::getline(ifs, line)) {
+//        auto delim = line.find('\t');
+//        string number = line.substr(0, delim);
+//        string value = line.substr(delim + 1);
+//        uint64_t id = std::stol(number);
+//        singletonDict.add(id, value);
+//    }
+//    ifs.close();
+//    isloaded = true;
+//}
+//
+
+void dump() {
+    ofstream ofs;
+    ofs.open("dict", ofstream::out | ofstream::trunc);
+    for (uint64_t i = 1; i <= singletonDict.getNTerms(); i++) {
+	ofs << i << "\t" << singletonDict.get(i) << "\n";
     }
-    if (!Utils::exists(pathfile)) {
-        LOG(ERRORL) << "The file " << pathfile << " does not exist";
-        throw 10;
-    }
-    ifstream ifs;
-    ifs.open(pathfile);
-    string line;
-    while (std::getline(ifs, line)) {
-        auto delim = line.find('\t');
-        string number = line.substr(0, delim);
-        string value = line.substr(delim + 1);
-        uint64_t id = std::stol(number);
-        singletonDict.add(id, value);
-    }
-    ifs.close();
-    isloaded = true;
+    ofs.close();
 }
 
 bool InmemoryDict::getID(const char *text, uint64_t sizetext, uint64_t &id) {
@@ -64,9 +74,9 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
     ifs.close();
 
     //Load the dictionary
-    if (!singletonDict.isDictLoaded()) {
-        singletonDict.load(repository + "/dict");
-    }
+//    if (!singletonDict.isDictLoaded()) {
+//        singletonDict.load(repository + "/dict");
+//    }
 
     //Load the table in the database
     string tablefile = repository + "/" + tablename + ".csv";
@@ -80,7 +90,7 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
             for(uint8_t i = 0; i < arity; ++i) {
                 auto delim = line.find(',');
                 string sn = line.substr(0, delim);
-                vectors[i].push_back(stol(sn));
+                vectors[i].push_back(singletonDict.getOrAdd(sn));
                 line = line.substr(delim + 1);
             }
         }
@@ -94,6 +104,7 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
     } else {
         segment = NULL;
     }
+    // dump();
 }
 
 void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
