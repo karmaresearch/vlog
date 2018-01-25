@@ -85,6 +85,7 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
         ifs.open(tablefile);
         string line;
         std::vector<std::vector<Term_t>> vectors;
+	LOG(DEBUGL) << "Reading " << tablefile;
         while(std::getline(ifs, line)) {
             //Parse the row
 	    int i = 0;
@@ -155,6 +156,10 @@ size_t InmemoryTable::getCardinality(const Literal &q) {
 }
 
 size_t InmemoryTable::getCardinalityColumn(const Literal &q, uint8_t posColumn) {
+    if (q.getNUniqueVars() == q.getTupleSize()) {
+	std::shared_ptr<Column> col = segment->getColumn(posColumn);
+	return col->sort_and_unique()->size();
+    }
     LOG(ERRORL) << "Not implemented yet";
     throw 10;
 }
