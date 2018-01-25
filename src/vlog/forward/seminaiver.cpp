@@ -1336,7 +1336,7 @@ void SemiNaiver::printCountAllIDBs() {
                 long count = predicatesTables[i]->getNAllRows();
                 if (count > 0) {
                     string predname = program->getPredicateName(i);
-                    LOG(DEBUGL) << "Cardinality of " <<
+                    LOG(INFOL) << "Cardinality of " <<
                         predname << ": " << count;
                 } else {
                     emptyRel++;
