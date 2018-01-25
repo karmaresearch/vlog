@@ -197,28 +197,28 @@ class FinalRuleProcessor: public ResultJoinProcessor {
         virtual void processResults(const int blockid, const bool unique,
                 std::mutex *m);
 
-        void processResults(std::vector<int> &blockid, Term_t *p,
+        virtual void processResults(std::vector<int> &blockid, Term_t *p,
                 std::vector<bool> &unique, std::mutex *m);
 
-        void processResults(const int blockid, const Term_t *first,
+        virtual void processResults(const int blockid, const Term_t *first,
                 FCInternalTableItr* second, const bool unique);
 
-        void processResults(const int blockid,
+        virtual void processResults(const int blockid,
                 const std::vector<const std::vector<Term_t> *> &vectors1, size_t i1,
                 const std::vector<const std::vector<Term_t> *> &vectors2, size_t i2,
                 const bool unique);
 
-        void processResults(const int blockid, FCInternalTableItr *first,
+        virtual void processResults(const int blockid, FCInternalTableItr *first,
                 FCInternalTableItr* second, const bool unique);
 
-        void processResultsAtPos(const int blockid, const uint8_t pos,
+        virtual void processResultsAtPos(const int blockid, const uint8_t pos,
                 const Term_t v, const bool unique);
 
-        void addColumns(const int blockid,
+        virtual void addColumns(const int blockid,
                 std::vector<std::shared_ptr<Column>> &columns,
                 const bool unique, const bool sorted);
 
-        void addColumn(const int blockid, const uint8_t pos,
+        virtual void addColumn(const int blockid, const uint8_t pos,
                 std::shared_ptr<Column> column, const bool unique,
                 const bool sorted);
 

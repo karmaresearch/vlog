@@ -569,6 +569,16 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                 allColumns[pos] = extcolumn;
             }
         }
+/*        LOG(DEBUGL) << "N. rows " << nrows;
+        for(int i = 0; i < allColumns.size(); ++i) {
+            auto reader = allColumns[i]->getReader();
+            for(int j = 0; j < 10; ++j) {
+                reader->hasNext();
+                auto v = reader->next();
+                cout << v << "\t";
+            }
+            cout << std::endl;
+        }*/
 
         //Add the columns to the head atoms
         int count = 0;
