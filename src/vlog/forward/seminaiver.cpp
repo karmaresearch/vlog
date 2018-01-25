@@ -1036,7 +1036,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                         plan,
                         processedTables,
                         optimalOrderIdx,
-                        nthreads);
+                        multithreaded ? nthreads : -1);
                 std::chrono::duration<double> d =
                     std::chrono::system_clock::now() - start;
                 LOG(DEBUGL) << "Time join: " << d.count() * 1000;

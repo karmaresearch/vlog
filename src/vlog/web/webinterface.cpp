@@ -509,11 +509,11 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             long totmem = Utils::getSystemMemory() / 1024 / 1024;
             pt.put("totmem", to_string(totmem));
             pt.put("commandline", inter->getCommandLineArgs());
-            pt.put("nrules", inter->getSemiNaiver()->getProgram()->getNRules());
+            pt.put("nrules", (unsigned int) inter->getSemiNaiver()->getProgram()->getNRules());
             ////obsolete
             //pt.put("rules", inter->getSemiNaiver()->getListAllRulesForJSONSerialization());
-            pt.put("nedbs", inter->getSemiNaiver()->getProgram()->getNEDBPredicates());
-            pt.put("nidbs", inter->getSemiNaiver()->getProgram()->getNIDBPredicates());
+            pt.put("nedbs", (unsigned int) inter->getSemiNaiver()->getProgram()->getNEDBPredicates());
+            pt.put("nidbs", (unsigned int) inter->getSemiNaiver()->getProgram()->getNIDBPredicates());
             std::ostringstream buf;
             JSON::write(buf, pt);
             //write_json(buf, pt, false);
@@ -542,9 +542,9 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             JSON pt;
             JSON rules;
             if (inter->program) {
-                pt.put("nrules", inter->program->getNRules());
-                pt.put("nedb", inter->program->getNEDBPredicates());
-                pt.put("nidb", inter->program->getNIDBPredicates());
+                pt.put("nrules", (unsigned int) inter->program->getNRules());
+                pt.put("nedb", (unsigned int) inter->program->getNEDBPredicates());
+                pt.put("nidb", (unsigned int) inter->program->getNIDBPredicates());
                 int i = 0;
                 for(auto &r : inter->program->getAllRules()) {
                     if (r.getId() != i) {
@@ -554,9 +554,9 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
                     i++;
                 }
             } else {
-                pt.put("nrules", 0);
-                pt.put("nedb", 0);
-                pt.put("nidb", 0);
+                pt.put("nrules", 0u);
+                pt.put("nedb", 0u);
+                pt.put("nidb", 0u);
             }
             pt.add_child("rules", rules);
             std::ostringstream buf;
@@ -571,8 +571,8 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             for(auto predid : predicates) {
                 JSON entry;
                 entry.put("name", inter->edb->getPredName(predid));
-                entry.put("size", inter->edb->getPredSize(predid));
-                entry.put("arity", inter->edb->getPredArity(predid));
+                entry.put("size", (unsigned long) inter->edb->getPredSize(predid));
+                entry.put("arity", (unsigned int) inter->edb->getPredArity(predid));
                 entry.put("type", inter->edb->getPredType(predid));
                 pt.push_back(entry);
             }
@@ -585,13 +585,14 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             //Start a materialization
             if (inter->program) {
                 if (!inter->sn || !inter->sn->isRunning()) {
+		    bool multithreaded = !inter->vm["multithreaded"].empty();
                     inter->sn = Reasoner::getSemiNaiver(*inter->edb.get(),
                             inter->program.get(), inter->vm["no-intersect"].empty(),
                             inter->vm["no-filtering"].empty(),
-                            !inter->vm["multithreaded"].empty(),
+                            multithreaded,
                             inter->vm["restrictedChase"].as<bool>(),
-                            inter->vm["nthreads"].as<int>(),
-                            inter->vm["interRuleThreads"].as<int>(),
+                            multithreaded ? inter->vm["nthreads"].as<int>() : -1,
+                            multithreaded ? inter->vm["interRuleThreads"].as<int>() : 0,
                             !inter->vm["shufflerules"].empty());
                     inter->cvMatRunner.notify_one(); //start the computation
                     page = inter->getPage("/newmat.html");
