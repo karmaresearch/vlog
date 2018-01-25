@@ -167,7 +167,7 @@ class SemiNaiver {
         void run(size_t lastIteration, size_t iteration);
 
         void storeOnFiles(std::string path, const bool decompress,
-                const int minLevel);
+                const int minLevel, const bool csv);
 
         FCIterator getTable(const Literal &literal, const size_t minIteration,
                 const size_t maxIteration) {
