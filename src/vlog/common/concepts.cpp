@@ -36,6 +36,10 @@ uint8_t Literal::getNVars() const {
     return n;
 }
 
+uint8_t Literal::getNConstants() const {
+    return getTupleSize() - getNVars();
+}
+
 std::vector<uint8_t> Literal::getPosVars() const {
     std::vector<uint8_t> out;
     for (uint8_t i = 0; i < tuple.getSize(); ++i) {
@@ -1036,6 +1040,22 @@ std::string Program::getAllPredicates() {
     return dictPredicates.tostring();
 }
 
+std::vector<std::string> Program::getAllPredicateStrings() {
+    return dictPredicates.getKeys();
+}
+
+std::vector<PredId_t> Program::getAllEDBPredicateIds() {
+    std::vector<PredId_t> output;
+    std::vector<std::string> predicateStrings = this->getAllPredicateStrings();
+    for (int i = 0; i < predicateStrings.size(); ++i) {
+        PredId_t pid = this->getPredicate(predicateStrings[i]).getId();
+        if (kb->doesPredExists(pid)) {
+            output.push_back(pid);
+        }
+    }
+    return output;
+}
+
 std::string Program::tostring() {
     std::string output = "";
     /*for (int i = 0; i < MAX_NPREDS; ++i) {
@@ -1048,4 +1068,38 @@ std::string Program::tostring() {
         output += rule.tostring() + std::string("\n");
     }
     return output;
+}
+
+std::string extractFileName(std::string& filePath) {
+    int index = filePath.find_last_of('/');
+    std::string out = filePath.substr(index+1, (filePath.find_last_of('.') - index)-1);
+    return out;
+}
+
+std::vector<Substitution> concat(std::vector<Substitution>& sigma1, std::vector<Substitution>& sigma2) {
+    std::vector<Substitution> result;
+    for (std::vector<Substitution>::iterator itr1 = sigma1.begin(); itr1 != sigma1.end(); ++itr1) {
+        for (std::vector<Substitution>::iterator itr2 = sigma2.begin(); itr2 != sigma2.end(); ++itr2) {
+            if (itr1->origin == itr2->origin) {
+                if (itr2->destination.isVariable()){
+                    result.push_back(Substitution(itr1->destination.getId(), VTerm(itr2->destination.getId(), 0)));
+                } else {
+                    result.push_back(Substitution(itr1->destination.getId(), VTerm(0, itr2->destination.getValue())));
+                }
+            }
+        }
+    }
+    return result;
+}
+
+std::vector<Substitution> inverse_concat(std::vector<Substitution>& sigma1, std::vector<Substitution>& sigma2) {
+    std::vector<Substitution> result;
+    for (std::vector<Substitution>::iterator itr1 = sigma1.begin(); itr1 != sigma1.end(); ++itr1) {
+        for (std::vector<Substitution>::iterator itr2 = sigma2.begin(); itr2 != sigma2.end(); ++itr2) {
+            if (itr1->destination == itr2->destination) {
+                result.push_back(Substitution(itr1->origin, VTerm(itr2->origin, 0)));
+            }
+        }
+    }
+    return result;
 }

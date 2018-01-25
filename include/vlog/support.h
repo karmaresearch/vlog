@@ -53,6 +53,14 @@ public:
         }
     }
 
+    std::vector<std::string> getKeys() {
+        std::vector<std::string> output;
+        for (SimpleHashmap::iterator itr = map.begin(); itr != map.end(); ++itr) {
+            output.push_back(itr->first);
+        }
+        return output;
+    }
+
     std::string getRawValue(const Term_t id) {
         SimpleInverseHashMap::iterator itr = inverseMap.find(id);
         if (itr == inverseMap.end()) {
