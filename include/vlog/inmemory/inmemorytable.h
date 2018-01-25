@@ -59,10 +59,15 @@ class InmemoryIterator : public EDBIterator {
         std::shared_ptr<const Segment> segment;
         std::unique_ptr<SegmentIterator> iterator;
         PredId_t predid;
+	bool skipDuplicatedFirst;
+	bool hasNextChecked;
+	bool hasNextValue;
+	bool isFirst;
 
     public:
         InmemoryIterator(std::shared_ptr<const Segment> segment, PredId_t predid) :
-            segment(segment), iterator(segment->iterator()), predid(predid) {
+            segment(segment), iterator(segment->iterator()), predid(predid), skipDuplicatedFirst(false),
+	    hasNextChecked(false), hasNextValue(false), isFirst(true) {
             }
 
         bool hasNext();
@@ -139,23 +144,6 @@ class InmemoryTable : public EDBTable {
         uint64_t getNTerms();
 
         void releaseIterator(EDBIterator *itr);
-
-        std::vector<std::shared_ptr<Column>> checkNewIn(const Literal &l1,
-                std::vector<uint8_t> &posInL1,
-                const Literal &l2,
-                std::vector<uint8_t> &posInL2);
-
-        std::vector<std::shared_ptr<Column>> checkNewIn(
-                std::vector <
-                std::shared_ptr<Column >> &checkValues,
-                const Literal &l2,
-                std::vector<uint8_t> &posInL2);
-
-        std::shared_ptr<Column> checkIn(
-                std::vector<Term_t> &values,
-                const Literal &l2,
-                uint8_t posInL2,
-                size_t &sizeOutput);
 
         uint64_t getSize();
 

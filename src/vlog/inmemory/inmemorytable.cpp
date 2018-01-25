@@ -367,32 +367,6 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
     }
 }
 
-std::vector<std::shared_ptr<Column>> InmemoryTable::checkNewIn(const Literal &l1,
-        std::vector<uint8_t> &posInL1,
-        const Literal &l2,
-        std::vector<uint8_t> &posInL2) {
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
-}
-
-std::vector<std::shared_ptr<Column>> InmemoryTable::checkNewIn(
-        std::vector <
-        std::shared_ptr<Column >> &checkValues,
-        const Literal &l2,
-        std::vector<uint8_t> &posInL2) {
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
-}
-
-std::shared_ptr<Column> InmemoryTable::checkIn(
-        std::vector<Term_t> &values,
-        const Literal &l2,
-        uint8_t posInL2,
-        size_t &sizeOutput) {
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
-}
-
 void InmemoryTable::releaseIterator(EDBIterator *itr) {
     delete itr;
 }
@@ -426,11 +400,43 @@ InmemoryTable::~InmemoryTable() {
 }
 
 bool InmemoryIterator::hasNext() {
-    return iterator && iterator->hasNext();
+    if (hasNextChecked) {
+	return hasNextValue;
+    }
+    if (isFirst || ! skipDuplicatedFirst) {
+	hasNextValue = iterator && iterator->hasNext();
+    } else {
+	Term_t oldval = getElementAt(1);
+	bool stop = false;
+	while (! stop && iterator->hasNext()) {
+	    iterator->next();
+	    // This may be a problem, because now hasNext has the side effect of already shifting the
+	    // iterator ...
+	    if (getElementAt(1) != oldval) {
+		stop = true;
+	    }
+	}
+	hasNextValue = stop;
+    }
+    hasNextChecked = true;
+    return hasNextValue;
 }
 
 void InmemoryIterator::next() {
-    iterator->next();
+    if (! hasNextChecked) {
+	LOG(ERRORL) << "InmemoryIterator::next called without hasNext check";
+	throw 10;
+    }
+    if (! hasNextValue) {
+	LOG(ERRORL) << "InmemoryIterator::next called while hasNext returned false";
+	throw 10;
+    }
+    if (isFirst || ! skipDuplicatedFirst) {
+	// otherwise we already did next() on the iterator. See hasNext().
+	iterator->next();
+    }
+    isFirst = false;
+    hasNextChecked = false;
 }
 
 Term_t InmemoryIterator::getElementAt(const uint8_t p) {
@@ -442,8 +448,7 @@ PredId_t InmemoryIterator::getPredicateID() {
 }
 
 void InmemoryIterator::skipDuplicatedFirstColumn() {
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
+    skipDuplicatedFirst = true;
 }
 
 void InmemoryIterator::clear() {

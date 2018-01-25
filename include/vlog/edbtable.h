@@ -8,19 +8,19 @@ public:
     virtual std::vector<std::shared_ptr<Column>> checkNewIn(const Literal &l1,
             std::vector<uint8_t> &posInL1,
             const Literal &l2,
-            std::vector<uint8_t> &posInL2) = 0;
+            std::vector<uint8_t> &posInL2);
 
     virtual std::vector<std::shared_ptr<Column>> checkNewIn(
                 std::vector <
                 std::shared_ptr<Column >> &checkValues,
                 const Literal &l2,
-                std::vector<uint8_t> &posInL2) = 0;
+                std::vector<uint8_t> &posInL2);
 
     virtual std::shared_ptr<Column> checkIn(
         std::vector<Term_t> &values,
         const Literal &l2,
         uint8_t posInL2,
-        size_t &sizeOutput) = 0;
+        size_t &sizeOutput);
 
     //execute the query on the knowledge base
     virtual void query(QSQQuery *query, TupleTable *outputTable,
