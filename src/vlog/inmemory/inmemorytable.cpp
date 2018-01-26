@@ -237,9 +237,20 @@ EDBIterator *InmemoryTable::getIterator(const Literal &q) {
 
 std::vector<uint8_t> __mergeSortingFields(std::vector<uint8_t> v1,
         std::vector<uint8_t> v2) {
-    if (!v1.empty()) {
-        for(auto f : v2)
-            v1.push_back(f);
+    int sz = v1.size();
+    if (sz != 0) {
+        for(auto f : v2) {
+	    bool found = false;
+	    for (int i = 0; i < sz; i++) {
+		if (v1[i] == f) {
+		    found = true;
+		    break;
+		}
+	    }
+	    if (! found) {
+		v1.push_back(f);
+	    }
+	}
         return v1;
     } else {
         return v2;
@@ -251,7 +262,7 @@ uint64_t __getKeyFromFields(const std::vector<uint8_t> &fields) {
     uint64_t key = 0;
     for(uint8_t i = 0; i < fields.size(); ++i) {
         uint8_t field = fields[i];
-        key += ((uint64_t)(field+1)) << 8;
+        key = (key << 8) + (uint64_t)(field+1);
     }
     return key;
 }

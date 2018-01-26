@@ -655,11 +655,12 @@ std::vector<std::shared_ptr<Column>> EDBLayer::checkNewIn(const Literal &l1,
 	}
 	std::vector<uint8_t> posVars2 = l2.getPosVars();
 	std::vector<uint8_t> fieldsToSort2;
+	std::vector<uint64_t> savedVal;
 	for (int i = 0; i < posInL2.size(); i++) {
 	    fieldsToSort2.push_back(posVars2[posInL2[i]]);
 	}
 	EDBIterator *itr1 = p->second.manager->getSortedIterator(l1, fieldsToSort1);
-	EDBIterator *itr2 = p->second.manager->getSortedIterator(l2, fieldsToSort2);
+	EDBIterator *itr2 = p2->second.manager->getSortedIterator(l2, fieldsToSort2);
 
 	std::vector<std::shared_ptr<ColumnWriter>> cols;
 	for (int i = 0; i < fieldsToSort1.size(); i++) {
@@ -676,25 +677,35 @@ std::vector<std::shared_ptr<Column>> EDBLayer::checkNewIn(const Literal &l1,
 		for (int i = 0; i < fieldsToSort1.size(); i++) {
 		    if (itr1->getElementAt(fieldsToSort1[i]) != itr2->getElementAt(fieldsToSort2[i])) {
 			equal = false;
-			lt = itr1->getElementAt(fieldsToSort1[i]) != itr2->getElementAt(fieldsToSort2[i]);
+			lt = itr1->getElementAt(fieldsToSort1[i]) < itr2->getElementAt(fieldsToSort2[i]);
 			break;
 		    }
 		}
 		if (equal) {
 		    if (itr1->hasNext()) {
 			itr1->next();
-			if (itr2->hasNext()) {
-			    itr2->next();
-			} else {
-			    more = true;
-			    break;
-			}
 		    } else {
 			break;
 		    }
 		} else if (lt) {
-		    for (int i = 0; i < fieldsToSort1.size(); i++) {
-			cols[i]->add(itr1->getElementAt(fieldsToSort1[i]));
+		    if (savedVal.size() == 0) {
+			for (int i = 0; i < fieldsToSort1.size(); i++) {
+			    savedVal.push_back(itr1->getElementAt(fieldsToSort1[i]));
+			    cols[i]->add(savedVal[i]);
+			}
+		    } else {
+			bool present = true;
+			for (int i = 0; i < fieldsToSort1.size(); i++) {
+			    if (savedVal[i] != itr1->getElementAt(fieldsToSort1[i])) {
+				present = false;
+				savedVal[i] = itr1->getElementAt(fieldsToSort1[i]);
+			    }
+			}
+			if (! present) {
+			    for (int i = 0; i < fieldsToSort1.size(); i++) {
+				cols[i]->add(savedVal[i]);
+			    }
+			}
 		    }
 		    if (itr1->hasNext()) {
 			itr1->next();
@@ -714,15 +725,29 @@ std::vector<std::shared_ptr<Column>> EDBLayer::checkNewIn(const Literal &l1,
 	    more = itr1->hasNext();
 	}
 
-	if (more) {
-	    for (int i = 0; i < fieldsToSort1.size(); i++) {
-		cols[i]->add(itr1->getElementAt(fieldsToSort1[i]));
-	    }
-	    while (itr1->hasNext()) {
-		itr1->next();
+	while (more) {
+	    if (savedVal.size() == 0) {
 		for (int i = 0; i < fieldsToSort1.size(); i++) {
-		    cols[i]->add(itr1->getElementAt(fieldsToSort1[i]));
+		    savedVal.push_back(itr1->getElementAt(fieldsToSort1[i]));
+		    cols[i]->add(savedVal[i]);
 		}
+	    } else {
+		bool present = true;
+		for (int i = 0; i < fieldsToSort1.size(); i++) {
+		    if (savedVal[i] != itr1->getElementAt(fieldsToSort1[i])) {
+			present = false;
+			savedVal[i] = itr1->getElementAt(fieldsToSort1[i]);
+		    }
+		}
+		if (! present) {
+		    for (int i = 0; i < fieldsToSort1.size(); i++) {
+			cols[i]->add(savedVal[i]);
+		    }
+		}
+	    }
+	    more = itr1->hasNext();
+	    if (more) {
+		itr1->next();
 	    }
 	}
 
@@ -1268,6 +1293,7 @@ std::shared_ptr<Column> EDBTable::checkIn(
 //	throw 10;
 //    }
 
+    LOG(DEBUGL) << "EDBTable::checkIn";
     std::vector<uint8_t> posVars = l.getPosVars();
     std::vector<uint8_t> fieldsToSort;
     fieldsToSort.push_back(posVars[posInL]);
