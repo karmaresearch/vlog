@@ -447,7 +447,7 @@ bool SemiNaiver::executeUntilSaturation(
 }
 
 void SemiNaiver::storeOnFiles(std::string path, const bool decompress,
-        const int minLevel) {
+        const int minLevel, const bool csv) {
     //Create a directory if necessary
     Utils::create_directories(path);
     char buffer[MAX_TERM_SIZE];
@@ -465,20 +465,42 @@ void SemiNaiver::storeOnFiles(std::string path, const bool decompress,
                     FCInternalTableItr *iitr = t->getIterator();
                     while (iitr->hasNext()) {
                         iitr->next();
-                        std::string row = to_string(iitr->getCurrentIteration()) + "\t";
+			std::string row = "";
+			if (! csv) {
+			    row = to_string(iitr->getCurrentIteration());
+			}
+			bool first = true;
                         for (uint8_t m = 0; m < sizeRow; ++m) {
-                            if (decompress) {
+                            if (decompress || csv) {
                                 if (layer.getDictText(iitr->getCurrentValue(m), buffer)) {
-                                    row += string(buffer) + "\t";
+				    if (csv) {
+					if (first) {
+					    first = false;
+					} else {
+					    row += ",";
+					}
+				    } else {
+					row += "\t";
+				    }
+				    row += string(buffer);
                                 } else {
                                     std::string t = program->getFromAdditional(iitr->getCurrentValue(m));
                                     if (t == std::string("")) {
                                         t = std::to_string(iitr->getCurrentValue(m));
                                     }
-                                    row += t + "\t";
+				    if (csv) {
+					if (first) {
+					    first = false;
+					} else {
+					    row += ",";
+					}
+				    } else {
+					row += "\t";
+				    }
+                                    row += t;
                                 }
                             } else {
-                                row += to_string(iitr->getCurrentValue(m)) + "\t";
+                                row += "\t" + to_string(iitr->getCurrentValue(m));
                             }
                         }
                         streamout << row << std::endl;
@@ -1334,13 +1356,12 @@ void SemiNaiver::printCountAllIDBs() {
         if (predicatesTables[i] != NULL) {
             if (program->isPredicateIDB(i)) {
                 long count = predicatesTables[i]->getNAllRows();
-                if (count > 0) {
-                    string predname = program->getPredicateName(i);
-                    LOG(INFOL) << "Cardinality of " <<
-                        predname << ": " << count;
-                } else {
+                if (count == 0) {
                     emptyRel++;
-                }
+		}
+		string predname = program->getPredicateName(i);
+		LOG(INFOL) << "Cardinality of " <<
+		    predname << ": " << count;
                 c += count;
             }
         }

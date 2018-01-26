@@ -215,7 +215,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     query_options.add<string>("","storemat_path", "",
             "Directory where to store all results of the materialization. Default is '' (disable).",false);
     query_options.add<string>("","storemat_format", "files",
-            "Format in which to dump the materialization. 'files' simply dumps the IDBs in files. 'db' creates a new RDF database. Default is 'files'.",false);
+            "Format in which to dump the materialization. 'files' simply dumps the IDBs in files. 'csv' creates comma-separated files. 'db' creates a new RDF database. Default is 'files'.",false);
     query_options.add<bool>("","explain", false,
             "Explain the query instead of executing it. Default is false.",false);
     query_options.add<bool>("","decompressmat", false,
@@ -418,13 +418,15 @@ void launchFullMat(int argc,
 
             Exporter exp(sn);
 
-            if (vm["storemat_format"].as<string>() == "files") {
+	    string storemat_format = vm["storemat_format"].as<string>();
+
+            if (storemat_format == "files" || storemat_format == "csv") {
                 sn->storeOnFiles(vm["storemat_path"].as<string>(),
-                        vm["decompressmat"].as<bool>(), 0);
-            } else if (vm["storemat_format"].as<string>() == "db") {
+                        vm["decompressmat"].as<bool>(), 0, storemat_format == "csv");
+            } else if (storemat_format == "db") {
                 //I will store the details on a Trident index
                 exp.generateTridentDiffIndex(vm["storemat_path"].as<string>());
-            } else if (vm["storemat_format"].as<string>() == "nt") {
+            } else if (storemat_format == "nt") {
                 exp.generateNTTriples(vm["storemat_path"].as<string>(), vm["decompressmat"].as<bool>());
             } else {
                 LOG(ERRORL) << "Option 'storemat_format' not recognized";

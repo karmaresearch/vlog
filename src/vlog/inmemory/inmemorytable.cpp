@@ -5,30 +5,6 @@
 
 InmemoryDict singletonDict;
 
-//void InmemoryDict::load(string pathfile) {
-//    if (isloaded) {
-//        LOG(ERRORL) << "The dictionary is already loaded!";
-//        throw 10;
-//    }
-//    if (!Utils::exists(pathfile)) {
-//        LOG(ERRORL) << "The file " << pathfile << " does not exist";
-//        throw 10;
-//    }
-//    ifstream ifs;
-//    ifs.open(pathfile);
-//    string line;
-//    while (std::getline(ifs, line)) {
-//        auto delim = line.find('\t');
-//        string number = line.substr(0, delim);
-//        string value = line.substr(delim + 1);
-//        uint64_t id = std::stol(number);
-//        singletonDict.add(id, value);
-//    }
-//    ifs.close();
-//    isloaded = true;
-//}
-//
-
 void dump() {
     ofstream ofs;
     ofs.open("dict", ofstream::out | ofstream::trunc);
@@ -73,11 +49,6 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
 //    }
 //    ifs.close();
 //
-    //Load the dictionary
-//    if (!singletonDict.isDictLoaded()) {
-//        singletonDict.load(repository + "/dict");
-//    }
-
     //Load the table in the database
     string tablefile = repository + "/" + tablename + ".csv";
     if (Utils::exists(tablefile)) {
@@ -85,6 +56,7 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
         ifs.open(tablefile);
         string line;
         std::vector<std::vector<Term_t>> vectors;
+	LOG(DEBUGL) << "Reading " << tablefile;
         while(std::getline(ifs, line)) {
             //Parse the row
 	    int i = 0;
@@ -149,12 +121,24 @@ size_t InmemoryTable::getCardinality(const Literal &q) {
             }
         }
     } else {
-        LOG(ERRORL) << "Not implemented yet";
-        throw 10;
+	// Not efficient, just to get it to run ... TODO!
+	size_t cnt = 0;
+	EDBIterator *iter = getIterator(q);
+	while (iter->hasNext()) {
+	    iter->next();
+	    cnt++;
+	}
+	iter->clear();
+	delete iter;
+	return cnt;
     }
 }
 
 size_t InmemoryTable::getCardinalityColumn(const Literal &q, uint8_t posColumn) {
+    if (q.getNUniqueVars() == q.getTupleSize()) {
+	std::shared_ptr<Column> col = segment->getColumn(posColumn);
+	return col->sort_and_unique()->size();
+    }
     LOG(ERRORL) << "Not implemented yet";
     throw 10;
 }
@@ -187,10 +171,68 @@ void _literal2filter(const Literal &query, std::vector<uint8_t> &posVarsToCopy,
 EDBIterator *InmemoryTable::getIterator(const Literal &q) {
     if (q.getNUniqueVars() == q.getTupleSize()) {
         return new InmemoryIterator(segment, predid);
-    } else {
-        LOG(ERRORL) << "Not implemented yet";
-        throw 10;
     }
+
+    std::vector<uint8_t> posVarsToCopy;
+    std::vector<uint8_t> posConstantsToFilter;
+    std::vector<Term_t> valuesConstantsToFilter;
+    std::vector<std::pair<uint8_t, uint8_t>> repeatedVars;
+    std::unique_ptr<SegmentIterator> segIter = segment->iterator();
+    uint8_t nfields = segment->getNColumns();
+    std::vector<ColumnWriter *> writers;
+
+    _literal2filter(q, posVarsToCopy, posConstantsToFilter,
+	    valuesConstantsToFilter, repeatedVars);
+    
+    writers.resize(nfields);
+    for (uint8_t i = 0; i < nfields; ++i) {
+	writers[i] = new ColumnWriter();
+    }
+    
+    while (segIter->hasNext()) {
+	segIter->next();
+	bool match = true;
+	// First filter out non-matching constants
+	for (uint8_t i = 0; i < posConstantsToFilter.size(); i++) {
+	    if (segIter->get(posConstantsToFilter[i]) != valuesConstantsToFilter[i]) {
+		match = false;
+		break;
+	    }
+	}
+
+	if (! match) {
+	    continue;
+	}
+
+	if (repeatedVars.size() > 0) {
+	    for (int i = 0; i < repeatedVars.size(); i++) {
+		if (segIter->get(repeatedVars[i].first) != segIter->get(posVarsToCopy[repeatedVars[i].second])) {
+		    match = false;
+		    break;
+		}
+	    }
+	    if (! match) {
+		continue;
+	    }
+	}
+	
+	for (uint8_t i = 0; i < nfields; ++i) {
+	    writers[i]->add(segIter->get(i));
+	}
+    }
+
+    std::vector<std::shared_ptr<Column>> columns;
+    for (uint8_t i = 0; i < nfields; ++i) {
+	columns.push_back(writers[i]->getColumn());
+    }
+
+    std::shared_ptr<Segment> filteredSegment = std::shared_ptr<Segment>(new Segment(nfields, columns));
+    
+    for (uint8_t i = 0; i < nfields; ++i) {
+	delete writers[i];
+    }
+
+    return new InmemoryIterator(filteredSegment, predid);
 }
 
 std::vector<uint8_t> __mergeSortingFields(std::vector<uint8_t> v1,
@@ -362,32 +404,6 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
     }
 }
 
-std::vector<std::shared_ptr<Column>> InmemoryTable::checkNewIn(const Literal &l1,
-        std::vector<uint8_t> &posInL1,
-        const Literal &l2,
-        std::vector<uint8_t> &posInL2) {
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
-}
-
-std::vector<std::shared_ptr<Column>> InmemoryTable::checkNewIn(
-        std::vector <
-        std::shared_ptr<Column >> &checkValues,
-        const Literal &l2,
-        std::vector<uint8_t> &posInL2) {
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
-}
-
-std::shared_ptr<Column> InmemoryTable::checkIn(
-        std::vector<Term_t> &values,
-        const Literal &l2,
-        uint8_t posInL2,
-        size_t &sizeOutput) {
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
-}
-
 void InmemoryTable::releaseIterator(EDBIterator *itr) {
     delete itr;
 }
@@ -421,11 +437,43 @@ InmemoryTable::~InmemoryTable() {
 }
 
 bool InmemoryIterator::hasNext() {
-    return iterator && iterator->hasNext();
+    if (hasNextChecked) {
+	return hasNextValue;
+    }
+    if (isFirst || ! skipDuplicatedFirst) {
+	hasNextValue = iterator && iterator->hasNext();
+    } else {
+	Term_t oldval = getElementAt(1);
+	bool stop = false;
+	while (! stop && iterator->hasNext()) {
+	    iterator->next();
+	    // This may be a problem, because now hasNext has the side effect of already shifting the
+	    // iterator ...
+	    if (getElementAt(1) != oldval) {
+		stop = true;
+	    }
+	}
+	hasNextValue = stop;
+    }
+    hasNextChecked = true;
+    return hasNextValue;
 }
 
 void InmemoryIterator::next() {
-    iterator->next();
+    if (! hasNextChecked) {
+	LOG(ERRORL) << "InmemoryIterator::next called without hasNext check";
+	throw 10;
+    }
+    if (! hasNextValue) {
+	LOG(ERRORL) << "InmemoryIterator::next called while hasNext returned false";
+	throw 10;
+    }
+    if (isFirst || ! skipDuplicatedFirst) {
+	// otherwise we already did next() on the iterator. See hasNext().
+	iterator->next();
+    }
+    isFirst = false;
+    hasNextChecked = false;
 }
 
 Term_t InmemoryIterator::getElementAt(const uint8_t p) {
@@ -437,8 +485,7 @@ PredId_t InmemoryIterator::getPredicateID() {
 }
 
 void InmemoryIterator::skipDuplicatedFirstColumn() {
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
+    skipDuplicatedFirst = true;
 }
 
 void InmemoryIterator::clear() {
