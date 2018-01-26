@@ -66,8 +66,13 @@ class InmemoryIterator : public EDBIterator {
 
     public:
         InmemoryIterator(std::shared_ptr<const Segment> segment, PredId_t predid) :
-            segment(segment), iterator(segment->iterator()), predid(predid), skipDuplicatedFirst(false),
+            segment(segment), predid(predid), skipDuplicatedFirst(false),
 	    hasNextChecked(false), hasNextValue(false), isFirst(true) {
+		if (! segment) {
+		    iterator = NULL;
+		} else {
+		    iterator = segment->iterator();
+		}
             }
 
         bool hasNext();
