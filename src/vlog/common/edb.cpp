@@ -1263,10 +1263,10 @@ std::shared_ptr<Column> EDBTable::checkIn(
     uint8_t posInL,
     size_t &sizeOutput) {
 
-    if (l.getNVars() == 0 || l.getNVars() == l.getTupleSize()) {
-	LOG(ERRORL) << "EDBTable::checkIn() with getNVars() == " << l.getNVars() << " is not supported.";
-	throw 10;
-    }
+//    if (l.getNVars() == 0 || l.getNVars() == l.getTupleSize()) {
+//	LOG(ERRORL) << "EDBTable::checkIn() with getNVars() == " << l.getNVars() << " is not supported.";
+//	throw 10;
+//    }
 
     std::vector<uint8_t> posVars = l.getPosVars();
     std::vector<uint8_t> fieldsToSort;
@@ -1286,6 +1286,9 @@ std::shared_ptr<Column> EDBTable::checkIn(
 	    if (idx1 == values.size()) {
 		break;
 	    }
+	}
+	if (idx1 == values.size()) {
+	    break;
 	}
 	if (values[idx1] == v2) {
 	    col->add(v2);
