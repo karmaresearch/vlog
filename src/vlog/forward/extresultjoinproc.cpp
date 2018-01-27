@@ -433,8 +433,19 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     //Now that the columns are sorted, I no longer care
                     //about the indices
                     std::vector<std::shared_ptr<Column>> depc;
+		    //A column may be used more than once in the head. Filter duplicates out.
+		    //Otherwise, an assert goes off in getNewOrExistingIDs --Ceriel
                     for(auto &el : depc_t) {
-                        depc.push_back(el.second);
+			bool present = false;
+			for (auto &l : depc) {
+			    if (el.second == l) {
+				present = true;
+				break;
+			    }
+			}
+			if (! present) {
+			    depc.push_back(el.second);
+			}
                     }
                     auto extcolumn = chaseMgmt->getNewOrExistingIDs(
                             ruleDetails->rule.getId(),

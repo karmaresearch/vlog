@@ -154,7 +154,6 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                                 isVariableNeeded = true;
                             }
                         }
-
                     }
 
                     //Check the head or chase-related dependencies

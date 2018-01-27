@@ -55,7 +55,7 @@ class VTerm {
 };
 
 /*** TUPLES ***/
-#define SIZETUPLE 10
+#define SIZETUPLE 16
 class VTuple {
     private:
         const uint8_t sizetuple;

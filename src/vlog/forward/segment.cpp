@@ -147,7 +147,7 @@ bool Segment::areAllColumnsPartOftheSameQuery(EDBLayer **edb, const Literal **l,
             } else {
                 //Check the literal is the same
                 const Literal *newlit = &(edbC->getLiteral());
-                Substitution subs[10];
+                Substitution subs[SIZETUPLE];
                 if (Literal::subsumes(subs, *newlit, *lit) != -1
                         && Literal::subsumes(subs, *lit, *newlit) != -1) {
                     posInLiteral.push_back(edbC->posColumnInLiteral());
