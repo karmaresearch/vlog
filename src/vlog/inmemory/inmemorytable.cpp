@@ -322,6 +322,10 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
         }
     }
 
+    if (vars.empty()) {
+	return new InmemoryIterator(NULL, predid);
+    }
+
     /*** If there are no constants, then just returned a sorted version of the
      * table ***/
     if (posConstants.empty() && !repeatedVars) {
