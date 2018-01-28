@@ -780,7 +780,7 @@ std::string Program::rewriteRDFOWLConstants(std::string input) {
     return input;
 }
 
-Literal Program::parseLiteral(std::string l) {
+Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     size_t posBeginTuple = l.find("(");
     if (posBeginTuple == std::string::npos) {
         throw 10;
@@ -874,7 +874,6 @@ int Program::getNRules() const {
 
 std::shared_ptr<Program> Program::cloneNew() const {
     Program *p = new Program(assignedIds, kb);
-    p->dictVariables = dictVariables;
     p->dictPredicates = dictPredicates;
     p->cardPredicates = cardPredicates;
     p->additionalConstants = additionalConstants;
@@ -936,6 +935,7 @@ int Program::getNIDBPredicates() {
 
 void Program::parseRule(std::string rule) {
     //split the rule between head and body
+    Dictionary dictVariables;
     try {
         size_t posEndHead = rule.find(":-");
         if (posEndHead == std::string::npos) {
@@ -954,7 +954,7 @@ void Program::parseRule(std::string rule) {
                 headLiteral = head;
                 head = "";
             }
-            Literal h = parseLiteral(headLiteral);
+            Literal h = parseLiteral(headLiteral, dictVariables);
             lHeads.push_back(h);
         }
 
@@ -971,7 +971,7 @@ void Program::parseRule(std::string rule) {
                 bodyLiteral = body;
                 body = "";
             }
-            lBody.push_back(parseLiteral(bodyLiteral));
+            lBody.push_back(parseLiteral(bodyLiteral, dictVariables));
         }
 
         //Add the rule
@@ -980,10 +980,6 @@ void Program::parseRule(std::string rule) {
     } catch (int e) {
         LOG(ERRORL) << "Failed in parsing rule " << rule;
     }
-}
-
-Term_t Program::getIDVar(std::string var) {
-    return dictVariables.getOrAdd(var);
 }
 
 std::vector<Rule> Program::getAllRulesByPredicate(PredId_t predid) const {

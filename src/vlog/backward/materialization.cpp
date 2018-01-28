@@ -17,7 +17,8 @@ void Materialization::loadLiteralsFromFile(Program &p, std::string filePath) {
     std::ifstream stream(filePath);
     std::string line;
     while (std::getline(stream, line)) {
-        Literal l = p.parseLiteral(line);
+	Dictionary dictVariables;
+        Literal l = p.parseLiteral(line, dictVariables);
         prematerializedLiterals.push_back(l);
     }
     stream.close();
@@ -27,7 +28,8 @@ void Materialization::loadLiteralsFromString(Program &p, std::string queries) {
     stringstream ss(queries);
     string t;
     while (getline(ss, t)) {
-        Literal l = p.parseLiteral(t);
+	Dictionary dictVariables;
+        Literal l = p.parseLiteral(t, dictVariables);
         prematerializedLiterals.push_back(l);
     }
 }

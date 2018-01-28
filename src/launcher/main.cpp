@@ -770,7 +770,8 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     } else {
         query = queryFileName;
     }
-    Literal literal = p.parseLiteral(query);
+    Dictionary dictVariables;
+    Literal literal = p.parseLiteral(query, dictVariables);
     Reasoner reasoner(vm["reasoningThreshold"].as<long>());
     runLiteralQuery(edb, p, literal, reasoner, vm);
 }
