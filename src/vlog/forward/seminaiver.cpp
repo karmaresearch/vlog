@@ -669,6 +669,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
             && literalItr.getNTables() == 1 && heads.size() == 1;
         while (!literalItr.isEmpty()) {
             //Add the columns to the output container
+	    // Can lastLiteral be false if nBodyLiterals == 1??? --Ceriel
             if (!lastLiteral ||
                     heads.size() != 1 || !queryFilterer.
                     producedDerivationInPreviousSteps(
@@ -683,6 +684,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
                 bool unique = uniqueResults && heads.size() == 0 && firstEndTable->isEmpty();
                 bool sorted = uniqueResults && heads.size() == 0 && firstHeadLiteral.
                     sameVarSequenceAs(*bodyLiteral);
+		// heads.size() == 0??? Not 1??? But uniqueResults already includes that. --Ceriel
                 joinOutput->addColumns(0, interitr,
                         unique,
                         sorted,
@@ -690,6 +692,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
 
                 table->releaseIterator(interitr);
             }
+	    // No else-clause here???  --Ceriel
             literalItr.moveNextCount();
         }
     } else {
