@@ -139,8 +139,18 @@ size_t InmemoryTable::getCardinalityColumn(const Literal &q, uint8_t posColumn) 
 	std::shared_ptr<Column> col = segment->getColumn(posColumn);
 	return col->sort_and_unique()->size();
     }
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
+    std::vector<uint8_t> fields;
+    fields.push_back(posColumn);
+    // probably not efficient... TODO
+    EDBIterator *iter = getSortedIterator(q, fields);
+    size_t cnt = 0;
+    while (iter->hasNext()) {
+	iter->next();
+	cnt++;
+    }
+    iter->clear();
+    delete iter;
+    return cnt;
 }
 
 void _literal2filter(const Literal &query, std::vector<uint8_t> &posVarsToCopy,
