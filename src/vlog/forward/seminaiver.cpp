@@ -486,7 +486,11 @@ void SemiNaiver::storeOnFiles(std::string path, const bool decompress,
                                 } else {
                                     std::string t = program->getFromAdditional(iitr->getCurrentValue(m));
                                     if (t == std::string("")) {
-                                        t = std::to_string(iitr->getCurrentValue(m));
+					uint64_t v = iitr->getCurrentValue(m);
+					t = "" + std::to_string(v >> 40) + "_"
+					    + std::to_string((v >> 32) & 0377) + "_"
+					    + std::to_string(v & 0xffffffff);
+                                        // t = std::to_string(iitr->getCurrentValue(m));
                                     }
 				    if (csv) {
 					if (first) {
