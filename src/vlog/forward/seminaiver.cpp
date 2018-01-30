@@ -664,8 +664,9 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
             literalItr.moveNextCount();
         }
     } else if (nBodyLiterals == 1) {
-        const bool uniqueResults = firstHeadLiteral.getNUniqueVars()
-            == bodyLiteral->getNUniqueVars()
+        const bool uniqueResults =
+	    ! ruleDetails.rule.isExistential()
+	    && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
             && literalItr.getNTables() == 1 && heads.size() == 1;
         while (!literalItr.isEmpty()) {
             //Add the columns to the output container
@@ -681,10 +682,9 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
                     literalItr.getCurrentTable();
                 FCInternalTableItr *interitr = table->getIterator();
 
-                bool unique = uniqueResults && heads.size() == 0 && firstEndTable->isEmpty();
-                bool sorted = uniqueResults && heads.size() == 0 && firstHeadLiteral.
+                bool unique = uniqueResults && firstEndTable->isEmpty();
+                bool sorted = uniqueResults && firstHeadLiteral.
                     sameVarSequenceAs(*bodyLiteral);
-		// heads.size() == 0??? Not 1??? But uniqueResults already includes that. --Ceriel
                 joinOutput->addColumns(0, interitr,
                         unique,
                         sorted,
@@ -692,14 +692,16 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
 
                 table->releaseIterator(interitr);
             }
-	    // No else-clause here???  --Ceriel
+	    // No else-clause here? Yes, can only be duplicates
             literalItr.moveNextCount();
         }
     } else {
         //Copy the iterator in the tmp container.
         //This process cannot derive duplicates if the number of variables is equivalent.
-        const bool uniqueResults = heads.size() == 1 && firstHeadLiteral.getNUniqueVars() ==
-            bodyLiteral->getNUniqueVars() && (!lastLiteral || firstEndTable->isEmpty());
+        const bool uniqueResults = heads.size() == 1
+	    && ! ruleDetails.rule.isExistential()
+	    && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
+	    && (!lastLiteral || firstEndTable->isEmpty());
 
         while (!literalItr.isEmpty()) {
             std::shared_ptr<const FCInternalTable> table = literalItr.getCurrentTable();
