@@ -422,7 +422,10 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
                     posConstantsToFilter.size(), posConstantsToFilter.data(),
                     valuesConstantsToFilter.data(), repeatedVars.size(),
                     repeatedVars.data(), 1); //no multithread
-            auto filteredSegment = ((InmemoryFCInternalTable*)fTable.get())->
+	    if (fTable == NULL) {
+                return new InmemoryIterator(NULL, predid);
+	    }
+            auto filteredSegment = ((InmemoryFCInternalTable*)(fTable.get()))->
                 getUnderlyingSegment();
             return new InmemoryIterator(filteredSegment, predid);
         }
