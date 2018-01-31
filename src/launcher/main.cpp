@@ -186,7 +186,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     query_options.add<string>("","rules", "",
             "Activate reasoning during query answering using the rules defined at this path. It is REQUIRED in case the command is <mat>. Default is '' (disabled).", false);
     query_options.add<bool>("", "rewriteMultihead", false,
-	    "try to split up rules with multiple heads.", false);
+            "try to split up rules with multiple heads.", false);
     query_options.add<long>("", "reasoningThreshold", 1000000,
             "This parameter sets a threshold to estimate the reasoning cost of a pattern. This cost can be broadly associated to the cardinality of the pattern. It is used to choose either TopDown or Magic evalution. Default is 1000000 (1M).", false);
     query_options.add<string>("", "reasoningAlgo", "",
@@ -331,7 +331,7 @@ void startServer(int argc,
             new WebInterface(vm, NULL, pathExec + "/" + webinterface,
                 flattenAllArgs(argc, argv),
                 vm["edb"].as<string>()));
-    webint->start("0.0.0.0", to_string(port));
+    webint->start(port);
     LOG(INFOL) << "Server is launched at 0.0.0.0:" << to_string(port);
     webint->join();
 }
@@ -404,7 +404,7 @@ void launchFullMat(int argc,
                         flattenAllArgs(argc, argv),
                         vm["edb"].as<string>()));
             int port = vm["port"].as<int>();
-            webint->start("localhost", to_string(port));
+            webint->start(port);
         }
 #endif
 
@@ -420,7 +420,7 @@ void launchFullMat(int argc,
 
             Exporter exp(sn);
 
-	    string storemat_format = vm["storemat_format"].as<string>();
+            string storemat_format = vm["storemat_format"].as<string>();
 
             if (storemat_format == "files" || storemat_format == "csv") {
                 sn->storeOnFiles(vm["storemat_path"].as<string>(),
