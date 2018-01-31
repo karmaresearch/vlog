@@ -977,77 +977,80 @@ void Program::parseRule(std::string rule, bool rewriteMultihead) {
         //Add the rule
         Rule r = Rule(allrules.size(), lHeads, lBody);
 	if (rewriteMultihead && r.isExistential() && lHeads.size() > 1) {
-	    // For testing purposes, try and rewrite the rule.
-	    LOG(DEBUGL) << "Trying to rewrite rule";
-	    std::vector<uint8_t> bodyVars;
-	    // First determine the non-existential variables.
-	    for (auto body: lBody) {
-		for (int i = 0; i < body.getTupleSize(); i++) {
-		    const VTerm t = body.getTermAtPos(i);
-		    if (t.isVariable()) {
-			bool present = false;
-			for (int j = 0; j < bodyVars.size(); j++) {
-			    if (bodyVars[j] == t.getId()) {
-				present = true;
-				break;
-			    }
-			}
-			if (! present) {
-			    bodyVars.push_back(t.getId());
-			}
-		    }
-		}
-	    }
-	    // Now, for every head, first determine its existential vars. If not used in later heads,
-	    // we can split.
-	    std::vector<Literal> newHeads;
-	    std::vector<uint8_t> extVars;
-	    for (int i = 0; i < lHeads.size(); i++) {
-		Literal head = lHeads[i];
-		// Determine existential variables.
-		for (int k = 0; k < head.getTupleSize(); k++) {
-		    const VTerm t = head.getTermAtPos(k);
-		    if (t.isVariable()) {
-			bool present = false;
-			for (int j = 0; j < bodyVars.size(); j++) {
-			    if (bodyVars[j] == t.getId()) {
-				present = true;
-				break;
-			    }
-			}
-			if (! present) {
-			    extVars.push_back(t.getId());
-			}
-		    }
-		}
-		bool used = false;
-		if (extVars.size() > 0) {
-		    for (int k = i+1; ! used && k < lHeads.size(); k++) {
-			Literal head1 = lHeads[k];
-			for (int l = 0; ! used && l < head1.getTupleSize(); l++) {
-			    const VTerm t = head1.getTermAtPos(l);
-			    if (t.isVariable()) {
-				for (int j = 0; ! used && j < bodyVars.size(); j++) {
-				    if (extVars[j] == t.getId()) {
-					used = true;
-				    }
-				}
-			    }
-			}
-		    }
-		}
-		newHeads.push_back(head);
-		if (! used) {
-		    Rule r1 = Rule(allrules.size(), newHeads, lBody);
-		    addRule(r1);
-		    newHeads.clear();
-		}
-	    }
+	    rewriteRule(lHeads, lBody);
 	} else {
 	    addRule(r);
 	}
     } catch (int e) {
         LOG(ERRORL) << "Failed in parsing rule " << rule;
+    }
+}
+
+void Program::rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lBody) {
+    LOG(DEBUGL) << "Trying to rewrite rule";
+    std::vector<uint8_t> bodyVars;
+    // First determine the non-existential variables.
+    for (auto body: lBody) {
+	for (int i = 0; i < body.getTupleSize(); i++) {
+	    const VTerm t = body.getTermAtPos(i);
+	    if (t.isVariable()) {
+		bool present = false;
+		for (int j = 0; j < bodyVars.size(); j++) {
+		    if (bodyVars[j] == t.getId()) {
+			present = true;
+			break;
+		    }
+		}
+		if (! present) {
+		    bodyVars.push_back(t.getId());
+		}
+	    }
+	}
+    }
+    // Now, for every head, first determine its existential vars. If not used in later heads,
+    // we can split.
+    std::vector<Literal> newHeads;
+    std::vector<uint8_t> extVars;
+    for (int i = 0; i < lHeads.size(); i++) {
+	Literal head = lHeads[i];
+	// Determine existential variables.
+	for (int k = 0; k < head.getTupleSize(); k++) {
+	    const VTerm t = head.getTermAtPos(k);
+	    if (t.isVariable()) {
+		bool present = false;
+		for (int j = 0; j < bodyVars.size(); j++) {
+		    if (bodyVars[j] == t.getId()) {
+			present = true;
+			break;
+		    }
+		}
+		if (! present) {
+		    extVars.push_back(t.getId());
+		}
+	    }
+	}
+	bool used = false;
+	if (extVars.size() > 0) {
+	    for (int k = i+1; ! used && k < lHeads.size(); k++) {
+		Literal head1 = lHeads[k];
+		for (int l = 0; ! used && l < head1.getTupleSize(); l++) {
+		    const VTerm t = head1.getTermAtPos(l);
+		    if (t.isVariable()) {
+			for (int j = 0; ! used && j < bodyVars.size(); j++) {
+			    if (extVars[j] == t.getId()) {
+				used = true;
+			    }
+			}
+		    }
+		}
+	    }
+	}
+	newHeads.push_back(head);
+	if (! used) {
+	    Rule r1 = Rule(allrules.size(), newHeads, lBody);
+	    addRule(r1);
+	    newHeads.clear();
+	}
     }
 }
 

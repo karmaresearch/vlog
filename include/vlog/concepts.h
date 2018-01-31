@@ -401,6 +401,8 @@ class Program {
 
         void parseRule(std::string rule, bool rewriteMultihead);
 
+	void rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lBody);
+
         std::string rewriteRDFOWLConstants(std::string input);
 
     public:
