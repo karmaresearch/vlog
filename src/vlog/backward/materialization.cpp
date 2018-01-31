@@ -17,7 +17,8 @@ void Materialization::loadLiteralsFromFile(Program &p, std::string filePath) {
     std::ifstream stream(filePath);
     std::string line;
     while (std::getline(stream, line)) {
-        Literal l = p.parseLiteral(line);
+	Dictionary dictVariables;
+        Literal l = p.parseLiteral(line, dictVariables);
         prematerializedLiterals.push_back(l);
     }
     stream.close();
@@ -27,7 +28,8 @@ void Materialization::loadLiteralsFromString(Program &p, std::string queries) {
     stringstream ss(queries);
     string t;
     while (getline(ss, t)) {
-        Literal l = p.parseLiteral(t);
+	Dictionary dictVariables;
+        Literal l = p.parseLiteral(t, dictVariables);
         prematerializedLiterals.push_back(l);
     }
 }
@@ -61,7 +63,7 @@ bool Materialization::cardIsTooLarge(const Literal &lit, Program &p,
         EDBLayer &layer) {
     //Search among the rules is there is one without IDB and whose head matches
     //lit
-    Substitution subs[10];
+    Substitution subs[SIZETUPLE];
     for (auto &rule : p.getAllRules()) {
         if (rule.getNIDBPredicates() == 0 && rule.getBody().size() == 1) {
             int nsubs = Literal::subsumes(subs, rule.getFirstHead(), lit);
@@ -82,7 +84,7 @@ bool Materialization::cardIsTooLarge(const Literal &lit, Program &p,
 void Materialization::guessLiteralsFromRules(Program &p, EDBLayer &layer) {
     //Potential literals
     std::vector<std::pair<Literal, int>> allLiterals;
-    Substitution subs[18];
+    Substitution subs[SIZETUPLE];
 
     //Create a list of potential atoms that should be materialized
     std::vector<Rule> rules = p.getAllRules();
@@ -363,7 +365,7 @@ void Materialization::getAndStorePrematerialization(EDBLayer & kb, Program & p,
 
 void Materialization::rewriteLiteralInProgram(Literal & prematLiteral, Literal & rewrittenLiteral, EDBLayer & kb, Program & p) {
     std::vector<Rule> rewrittenRules;
-    Substitution subs[3];
+    Substitution subs[SIZETUPLE];
     for (Rule r : p.getAllRules()) {
         bool toBeAdded = true;
 

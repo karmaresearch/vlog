@@ -139,8 +139,18 @@ size_t InmemoryTable::getCardinalityColumn(const Literal &q, uint8_t posColumn) 
 	std::shared_ptr<Column> col = segment->getColumn(posColumn);
 	return col->sort_and_unique()->size();
     }
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
+    std::vector<uint8_t> fields;
+    fields.push_back(posColumn);
+    // probably not efficient... TODO
+    EDBIterator *iter = getSortedIterator(q, fields);
+    size_t cnt = 0;
+    while (iter->hasNext()) {
+	iter->next();
+	cnt++;
+    }
+    iter->clear();
+    delete iter;
+    return cnt;
 }
 
 void _literal2filter(const Literal &query, std::vector<uint8_t> &posVarsToCopy,
@@ -237,9 +247,20 @@ EDBIterator *InmemoryTable::getIterator(const Literal &q) {
 
 std::vector<uint8_t> __mergeSortingFields(std::vector<uint8_t> v1,
         std::vector<uint8_t> v2) {
-    if (!v1.empty()) {
-        for(auto f : v2)
-            v1.push_back(f);
+    int sz = v1.size();
+    if (sz != 0) {
+        for(auto f : v2) {
+	    bool found = false;
+	    for (int i = 0; i < sz; i++) {
+		if (v1[i] == f) {
+		    found = true;
+		    break;
+		}
+	    }
+	    if (! found) {
+		v1.push_back(f);
+	    }
+	}
         return v1;
     } else {
         return v2;
@@ -251,7 +272,7 @@ uint64_t __getKeyFromFields(const std::vector<uint8_t> &fields) {
     uint64_t key = 0;
     for(uint8_t i = 0; i < fields.size(); ++i) {
         uint8_t field = fields[i];
-        key += ((uint64_t)(field+1)) << 8;
+        key = (key << 8) + (uint64_t)(field+1);
     }
     return key;
 }
@@ -309,6 +330,10 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
             if (!found)
                 vars.push_back(query.getTermAtPos(i).getId());
         }
+    }
+
+    if (vars.empty()) {
+	return new InmemoryIterator(NULL, predid);
     }
 
     /*** If there are no constants, then just returned a sorted version of the
@@ -397,7 +422,10 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
                     posConstantsToFilter.size(), posConstantsToFilter.data(),
                     valuesConstantsToFilter.data(), repeatedVars.size(),
                     repeatedVars.data(), 1); //no multithread
-            auto filteredSegment = ((InmemoryFCInternalTable*)fTable.get())->
+	    if (fTable == NULL) {
+                return new InmemoryIterator(NULL, predid);
+	    }
+            auto filteredSegment = ((InmemoryFCInternalTable*)(fTable.get()))->
                 getUnderlyingSegment();
             return new InmemoryIterator(filteredSegment, predid);
         }

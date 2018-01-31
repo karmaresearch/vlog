@@ -185,6 +185,8 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "The path of the file with a query. It is REQUIRED with <query> or <queryLiteral>", false);
     query_options.add<string>("","rules", "",
             "Activate reasoning during query answering using the rules defined at this path. It is REQUIRED in case the command is <mat>. Default is '' (disabled).", false);
+    query_options.add<bool>("", "rewriteMultihead", false,
+	    "try to split up rules with multiple heads.", false);
     query_options.add<long>("", "reasoningThreshold", 1000000,
             "This parameter sets a threshold to estimate the reasoning cost of a pattern. This cost can be broadly associated to the cardinality of the pattern. It is used to choose either TopDown or Magic evalution. Default is 1000000 (1M).", false);
     query_options.add<string>("", "reasoningAlgo", "",
@@ -299,7 +301,7 @@ string flattenAllArgs(int argc,
 void writeRuleDependencyGraph(EDBLayer &db, string pathRules, string filegraph) {
     LOG(INFOL) << " Write the graph file to " << filegraph;
     Program p(db.getNTerms(), &db);
-    p.readFromFile(pathRules);
+    p.readFromFile(pathRules, false);
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(db,
             &p, true, true, false, false, 1, 1, false);
 
@@ -343,7 +345,7 @@ void launchFullMat(int argc,
         std::string pathRules) {
     //Load a program with all the rules
     Program p(db.getNTerms(), &db);
-    p.readFromFile(pathRules);
+    p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
 
     //Existential check
     if (p.areExistentialRules()) {
@@ -453,7 +455,7 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     Program p(edb.getNTerms(), &edb);
     string pathRules = vm["rules"].as<string>();
     if (pathRules != "") {
-        p.readFromFile(pathRules);
+        p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
         p.sortRulesByIDBPredicates();
     }
 
@@ -500,7 +502,7 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     if (db == NULL) {
         if (pathRules == "") {
             // Use default rule
-            p.readFromFile(pathRules);
+            p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
             p.sortRulesByIDBPredicates();
         }
         db = new VLogLayer(edb, p, vm["reasoningThreshold"].as<long>(), "TI", "TE");
@@ -727,7 +729,7 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     Program p(edb.getNTerms(), &edb);
     string pathRules = vm["rules"].as<string>();
     if (pathRules != "") {
-        p.readFromFile(pathRules);
+        p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
         p.sortRulesByIDBPredicates();
     }
 
@@ -770,7 +772,8 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     } else {
         query = queryFileName;
     }
-    Literal literal = p.parseLiteral(query);
+    Dictionary dictVariables;
+    Literal literal = p.parseLiteral(query, dictVariables);
     Reasoner reasoner(vm["reasoningThreshold"].as<long>());
     runLiteralQuery(edb, p, literal, reasoner, vm);
 }

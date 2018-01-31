@@ -55,7 +55,7 @@ class VTerm {
 };
 
 /*** TUPLES ***/
-#define SIZETUPLE 10
+#define SIZETUPLE 16
 class VTuple {
     private:
         const uint8_t sizetuple;
@@ -393,14 +393,15 @@ class Program {
         EDBLayer *kb;
         std::vector<uint32_t> rules[MAX_NPREDS];
         std::vector<Rule> allrules;
-        Dictionary dictVariables;
 
         Dictionary dictPredicates;
         std::unordered_map<PredId_t, uint8_t> cardPredicates;
 
         Dictionary additionalConstants;
 
-        void parseRule(std::string rule);
+        void parseRule(std::string rule, bool rewriteMultihead);
+
+	void rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lBody);
 
         std::string rewriteRDFOWLConstants(std::string input);
 
@@ -408,13 +409,11 @@ class Program {
         Program(const uint64_t assignedIds,
                 EDBLayer *kb);
 
-        Literal parseLiteral(std::string literal);
+        Literal parseLiteral(std::string literal, Dictionary &dictVariables);
 
-        void readFromFile(std::string pathFile);
+        void readFromFile(std::string pathFile, bool rewriteMultihead);
 
-        void readFromString(std::string rules);
-
-        Term_t getIDVar(std::string var);
+        void readFromString(std::string rules, bool rewriteMultihead);
 
         PredId_t getPredicateID(std::string &p, const uint8_t card);
 
