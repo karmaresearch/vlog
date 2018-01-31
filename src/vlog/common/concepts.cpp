@@ -706,31 +706,31 @@ Program::Program(const uint64_t assignedIds,
     additionalConstants(assignedIds) {
     }
 
-void Program::readFromFile(std::string pathFile) {
+void Program::readFromFile(std::string pathFile, bool rewriteMultihead) {
     LOG(INFOL) << "Read program from file " << pathFile;
     if (pathFile == "") {
         LOG(INFOL) << "Using default rule TI(A,B,C) :- TE(A,B,C)";
-        parseRule("TI(A,B,C) :- TE(A,B,C)");
+        parseRule("TI(A,B,C) :- TE(A,B,C)", false);
     } else {
         std::ifstream file(pathFile);
         std::string line;
         while (std::getline(file, line)) {
             if (line != "" && line.substr(0, 2) != "//") {
                 LOG(DEBUGL) << "Parsing rule " << line;
-                parseRule(line);
+                parseRule(line, rewriteMultihead);
             }
         }
         LOG(INFOL) << "New assigned constants: " << additionalConstants.size();
     }
 }
 
-void Program::readFromString(std::string rules) {
+void Program::readFromString(std::string rules, bool rewriteMultihead) {
     stringstream ss(rules);
     string rule;
     while (getline(ss, rule)) {
         if (rule != "" && rule .substr(0, 2) != "//") {
             LOG(DEBUGL) << "Parsing rule " << rule;
-            parseRule(rule);
+            parseRule(rule, rewriteMultihead);
         }
     }
     LOG(INFOL) << "New assigned constants: " << additionalConstants.size();
@@ -933,7 +933,7 @@ int Program::getNIDBPredicates() {
 }
 
 
-void Program::parseRule(std::string rule) {
+void Program::parseRule(std::string rule, bool rewriteMultihead) {
     //split the rule between head and body
     Dictionary dictVariables;
     try {
@@ -976,7 +976,76 @@ void Program::parseRule(std::string rule) {
 
         //Add the rule
         Rule r = Rule(allrules.size(), lHeads, lBody);
-        addRule(r);
+	if (rewriteMultihead && r.isExistential() && lHeads.size() > 1) {
+	    // For testing purposes, try and rewrite the rule.
+	    LOG(DEBUGL) << "Trying to rewrite rule";
+	    std::vector<uint8_t> bodyVars;
+	    // First determine the non-existential variables.
+	    for (auto body: lBody) {
+		for (int i = 0; i < body.getTupleSize(); i++) {
+		    const VTerm t = body.getTermAtPos(i);
+		    if (t.isVariable()) {
+			bool present = false;
+			for (int j = 0; j < bodyVars.size(); j++) {
+			    if (bodyVars[j] == t.getId()) {
+				present = true;
+				break;
+			    }
+			}
+			if (! present) {
+			    bodyVars.push_back(t.getId());
+			}
+		    }
+		}
+	    }
+	    // Now, for every head, first determine its existential vars. If not used in later heads,
+	    // we can split.
+	    std::vector<Literal> newHeads;
+	    std::vector<uint8_t> extVars;
+	    for (int i = 0; i < lHeads.size(); i++) {
+		Literal head = lHeads[i];
+		// Determine existential variables.
+		for (int k = 0; k < head.getTupleSize(); k++) {
+		    const VTerm t = head.getTermAtPos(k);
+		    if (t.isVariable()) {
+			bool present = false;
+			for (int j = 0; j < bodyVars.size(); j++) {
+			    if (bodyVars[j] == t.getId()) {
+				present = true;
+				break;
+			    }
+			}
+			if (! present) {
+			    extVars.push_back(t.getId());
+			}
+		    }
+		}
+		bool used = false;
+		if (extVars.size() > 0) {
+		    for (int k = i+1; ! used && k < lHeads.size(); k++) {
+			Literal head1 = lHeads[k];
+			for (int l = 0; ! used && l < head1.getTupleSize(); l++) {
+			    const VTerm t = head1.getTermAtPos(l);
+			    if (t.isVariable()) {
+				for (int j = 0; ! used && j < bodyVars.size(); j++) {
+				    if (extVars[j] == t.getId()) {
+					used = true;
+				    }
+				}
+			    }
+			}
+		    }
+		}
+		newHeads.push_back(head);
+		if (! used) {
+		    Rule r1 = Rule(allrules.size(), newHeads, lBody);
+		    addRule(r1);
+		    newHeads.clear();
+		}
+	    }
+	} else {
+	    addRule(r);
+	}
     } catch (int e) {
         LOG(ERRORL) << "Failed in parsing rule " << rule;
     }

@@ -411,7 +411,7 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             //Setup the program
             inter->program = std::unique_ptr<Program>(new Program(
                         inter->edb->getNTerms(), inter->edb.get()));
-            inter->program->readFromString(srules);
+            inter->program->readFromString(srules, inter->vm["rewriteMultihead"].as<bool>());
             inter->program->sortRulesByIDBPredicates();
             //Set up the ruleset and perform the pre-materialization if necessary
             if (sauto != "") {

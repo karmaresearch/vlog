@@ -399,7 +399,7 @@ class Program {
 
         Dictionary additionalConstants;
 
-        void parseRule(std::string rule);
+        void parseRule(std::string rule, bool rewriteMultihead);
 
         std::string rewriteRDFOWLConstants(std::string input);
 
@@ -409,9 +409,9 @@ class Program {
 
         Literal parseLiteral(std::string literal, Dictionary &dictVariables);
 
-        void readFromFile(std::string pathFile);
+        void readFromFile(std::string pathFile, bool rewriteMultihead);
 
-        void readFromString(std::string rules);
+        void readFromString(std::string rules, bool rewriteMultihead);
 
         PredId_t getPredicateID(std::string &p, const uint8_t card);
 
