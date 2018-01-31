@@ -928,6 +928,6 @@ std::shared_ptr<SemiNaiver> Reasoner::fullMaterialization(EDBLayer &layer,
     sn->run();
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
-    sn->printCountAllIDBs();
+    sn->printCountAllIDBs("");
     return sn;
 }

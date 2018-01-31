@@ -209,7 +209,7 @@ class SemiNaiver {
 
         //Statistics methods
 
-        void printCountAllIDBs();
+        void printCountAllIDBs(string prefix);
 
         size_t getCurrentIteration();
 

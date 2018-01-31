@@ -413,7 +413,7 @@ void launchFullMat(int argc,
         sn->run();
         std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
         LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
-        sn->printCountAllIDBs();
+        sn->printCountAllIDBs("");
 
         if (vm["storemat_path"].as<string>() != "") {
             std::chrono::system_clock::time_point start = std::chrono::system_clock::now();

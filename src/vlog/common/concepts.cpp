@@ -986,6 +986,15 @@ void Program::parseRule(std::string rule, bool rewriteMultihead) {
     }
 }
 
+static bool isInVector(uint8_t v, std::vector<uint8_t> &vec) {
+    for (int i = 0; i < vec.size(); i++) {
+	if (v == vec[i]) {
+	    return true;
+	}
+    }
+    return false;
+}
+
 void Program::rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lBody) {
     LOG(DEBUGL) << "Trying to rewrite rule";
     std::vector<uint8_t> bodyVars;
@@ -994,14 +1003,7 @@ void Program::rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lB
 	for (int i = 0; i < body.getTupleSize(); i++) {
 	    const VTerm t = body.getTermAtPos(i);
 	    if (t.isVariable()) {
-		bool present = false;
-		for (int j = 0; j < bodyVars.size(); j++) {
-		    if (bodyVars[j] == t.getId()) {
-			present = true;
-			break;
-		    }
-		}
-		if (! present) {
+		if (! isInVector(t.getId(), bodyVars)) {
 		    bodyVars.push_back(t.getId());
 		}
 	    }
@@ -1017,14 +1019,7 @@ void Program::rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lB
 	for (int k = 0; k < head.getTupleSize(); k++) {
 	    const VTerm t = head.getTermAtPos(k);
 	    if (t.isVariable()) {
-		bool present = false;
-		for (int j = 0; j < bodyVars.size(); j++) {
-		    if (bodyVars[j] == t.getId()) {
-			present = true;
-			break;
-		    }
-		}
-		if (! present) {
+		if (! isInVector(t.getId(), bodyVars)) {
 		    extVars.push_back(t.getId());
 		}
 	    }
@@ -1036,11 +1031,7 @@ void Program::rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lB
 		for (int l = 0; ! used && l < head1.getTupleSize(); l++) {
 		    const VTerm t = head1.getTermAtPos(l);
 		    if (t.isVariable()) {
-			for (int j = 0; ! used && j < bodyVars.size(); j++) {
-			    if (extVars[j] == t.getId()) {
-				used = true;
-			    }
-			}
+			used = isInVector(t.getId(), extVars);
 		    }
 		}
 	    }
