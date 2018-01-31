@@ -2,6 +2,15 @@
 #include <vlog/ruleexecdetails.h>
 #include <vlog/seminaiver.h>
 
+static bool isPresent(uint8_t el, std::vector<uint8_t> &v) {
+    for (int i = 0; i < v.size(); i++) {
+	if (el == v[i]) {
+	    return true;
+	}
+    }
+    return false;
+}
+
 ExistentialRuleProcessor::ExistentialRuleProcessor(
         std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
         std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
@@ -44,6 +53,10 @@ ExistentialRuleProcessor::ExistentialRuleProcessor(
                         }
                         posExtColumns[term.getId()].push_back(count);
                     } else {
+			if (! isPresent(term.getId(),varsUsedForExt)) {
+			    varsUsedForExt.push_back(term.getId());
+			    colsForExt.push_back(count);
+			}
                         posKnownColumns[nKnownColumns++] = count;
                     }
                 }
@@ -565,8 +578,8 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
         //Populate the known columns (they will be the arguments to get the
         //fresh IDs)
         std::vector<std::shared_ptr<Column>> knownColumns;
-        for(uint8_t i = 0; i < nKnownColumns; ++i) {
-            knownColumns.push_back(allColumns[posKnownColumns[i]]);
+        for(int i = 0; i < colsForExt.size(); ++i) {
+            knownColumns.push_back(allColumns[colsForExt[i]]);
         }
 
         for(auto &el : posExtColumns) {
