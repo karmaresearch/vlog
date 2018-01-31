@@ -17,23 +17,19 @@
 #include <kognac/utils.h>
 #include <trident/utils/json.h>
 
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/lexical_cast.hpp>
-
-#include <curl/curl.h>
-
 #include <string>
 #include <fstream>
 #include <chrono>
 #include <thread>
+#include <regex>
 
 WebInterface::WebInterface(
         ProgramArgs &vm, std::shared_ptr<SemiNaiver> sn, string htmlfiles,
         string cmdArgs, string edbfile) : vm(vm), sn(sn),
     dirhtmlfiles(htmlfiles), cmdArgs(cmdArgs),
-    acceptor(io), resolver(io), isActive(false),
-    edbFile(edbfile) {
+    isActive(false),
+    edbFile(edbfile),
+    nthreads(1) {
         //Setup the EDB layer
         EDBConf conf(edbFile);
         edb = std::unique_ptr<EDBLayer>(new EDBLayer(conf, false));
@@ -67,21 +63,20 @@ void WebInterface::processMaterialization() {
     }
 }
 
-void WebInterface::startThread(string address, string port) {
+void WebInterface::startThread(int port) {
     this->webport = port;
-    boost::asio::ip::tcp::resolver::query query(address, port);
-    boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
-    acceptor.open(endpoint.protocol());
-    acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
-    acceptor.bind(endpoint);
-    acceptor.listen();
-    connect();
-    io.run();
+    server->start();
 }
 
-void WebInterface::start(string address, string port) {
-    t = std::thread(&WebInterface::startThread, this, address, port);
+void WebInterface::start(int port) {
     matRunner = std::thread(&WebInterface::processMaterialization, this);
+    auto f = std::bind(&WebInterface::processRequest, this,
+            std::placeholders::_1,
+            std::placeholders::_2);
+    server = std::shared_ptr<HttpServer>(new HttpServer(port,
+                f, nthreads));
+    this->webport = port;
+    t = std::thread(&WebInterface::startThread, this, port);
 }
 
 void WebInterface::stop() {
@@ -89,9 +84,6 @@ void WebInterface::stop() {
     while (isActive) {
         std::this_thread::sleep_for(chrono::milliseconds(100));
     }
-    acceptor.cancel();
-    acceptor.close();
-    io.stop();
     LOG(INFOL) << "Done";
 }
 
@@ -99,22 +91,6 @@ long WebInterface::getDurationExecMs() {
     std::chrono::system_clock::time_point start = sn->getStartingTimeMs();
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     return std::chrono::duration_cast<std::chrono::milliseconds>(sec).count();
-}
-
-void WebInterface::connect() {
-    boost::shared_ptr<Server> conn(new Server(io, this));
-    acceptor.async_accept(conn->socket,
-            boost::bind(&Server::acceptHandler,
-                conn, boost::asio::placeholders::error));
-};
-
-void WebInterface::Server::acceptHandler(const boost::system::error_code &err) {
-    if (err == boost::system::errc::success) {
-        socket.async_read_some(boost::asio::buffer(data_.get(), 4096),
-                boost::bind(&Server::readHeader, shared_from_this(),
-                    boost::asio::placeholders::error,
-                    boost::asio::placeholders::bytes_transferred));
-    }
 }
 
 static string _getValueParam(string req, string param) {
@@ -274,32 +250,14 @@ void WebInterface::execSPARQLQuery(string sparqlquery,
     delete plangen;
 }
 
-void WebInterface::Server::readHeader(boost::system::error_code const &err,
-        size_t bytes) {
-    inter->setActive();
-
-    ss << string(data_.get(), bytes);
-    string tmpstring = ss.str();
-    int pos = tmpstring.find("Content-Length:");
-    if (pos != string::npos) {
-        int endpos = tmpstring.find("\r\n\r\n", pos);
-        string slenparams = tmpstring.substr(pos + 16, endpos - pos - 16);
-        int lenparams = std::stoi(slenparams);
-        int remsize = tmpstring.size() - endpos - 4;
-        if (remsize < lenparams) {
-            //I must keep reading ...
-            acceptHandler(err);
-            return;
-        }
-    }
-
-    req = ss.str();
+void WebInterface::processRequest(std::string req, std::string &resp) {
+    setActive();
     //Get the page
     string page;
     bool isjson = false;
     int error = 0;
 
-    if (boost::starts_with(req, "POST")) {
+    if (Utils::starts_with(req, "POST")) {
         int pos = req.find("HTTP");
         string path = req.substr(5, pos - 6);
         if (path == "/sparql") {
@@ -308,20 +266,18 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             string printresults = _getValueParam(form, "print");
             string sparqlquery = _getValueParam(form, "query");
             //Decode the query
-            CURL *curl;
-            curl = curl_easy_init();
-            if (curl) {
-                int newlen = 0;
-                char *un2 = curl_easy_unescape(curl, sparqlquery.c_str(),
-                        sparqlquery.size(), &newlen);
-                sparqlquery = string(un2, newlen);
-                curl_free(un2);
-                boost::algorithm::replace_all(sparqlquery, "+", " ");
-                boost::algorithm::replace_all(sparqlquery, "\r\n", "\n");
-            } else {
-                throw 10;
-            }
-            curl_easy_cleanup(curl);
+            sparqlquery = HttpServer::unescape(sparqlquery);
+            std::regex e1("\\+");
+            std::string replacedString;
+            std::regex_replace(std::back_inserter(replacedString),
+                    sparqlquery.begin(), sparqlquery.end(),
+                    e1, "$1 ");
+            sparqlquery = replacedString;
+            std::regex e2("\\r\\n");
+            replacedString = "";
+            std::regex_replace(std::back_inserter(replacedString),
+                    sparqlquery.begin(), sparqlquery.end(), e2, "$1\n");
+            sparqlquery = replacedString;
 
             //Execute the SPARQL query
             JSON pt;
@@ -329,12 +285,12 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             JSON bindings;
             JSON stats;
             bool jsonoutput = printresults == string("true");
-            if (inter->program) {
+            if (program) {
                 LOG(INFOL) << "Answering the SPARQL query with VLog ...";
                 WebInterface::execSPARQLQuery(sparqlquery,
                         false,
-                        inter->edb->getNTerms(),
-                        *(inter->vloglayer.get()),
+                        edb->getNTerms(),
+                        *(vloglayer.get()),
                         false,
                         jsonoutput,
                         &vars,
@@ -344,8 +300,8 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
                 LOG(INFOL) << "Answering the SPARQL query with Trident ...";
                 WebInterface::execSPARQLQuery(sparqlquery,
                         false,
-                        inter->edb->getNTerms(),
-                        *(inter->tridentlayer.get()),
+                        edb->getNTerms(),
+                        *(tridentlayer.get()),
                         false,
                         jsonoutput,
                         &vars,
@@ -365,7 +321,7 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             string form = req.substr(req.find("application/x-www-form-urlencoded"));
             string id = _getValueParam(form, "id");
             //Lookup the value
-            string value = lookup(id, *(inter->tridentlayer.get()));
+            string value = lookup(id, *(tridentlayer.get()));
             JSON pt;
             pt.put("value", value);
             std::ostringstream buf;
@@ -380,47 +336,50 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             string sauto = _getValueParam(form, "automat");
             int automatThreshold = 1000000; // microsecond timeout
 
-            //Decode the data in the forms
-            CURL *curl;
-            curl = curl_easy_init();
-            if (curl) {
-                int newlen = 0;
-                char *un2 = curl_easy_unescape(curl, srules.c_str(), srules.size(), &newlen);
-                srules = string(un2, newlen);
-                curl_free(un2);
-                boost::algorithm::replace_all(srules, "+", " ");
-                boost::algorithm::replace_all(srules, "\r\n", "\n");
-                char *un3 = curl_easy_unescape(curl, spremat.c_str(), spremat.size(), &newlen);
-                spremat = string(un3, newlen);
-                curl_free(un3);
-                boost::algorithm::replace_all(spremat, "+", " ");
-                boost::algorithm::replace_all(spremat, "\r\n", "\n");
+            srules = HttpServer::unescape(srules);
+            std::regex e1("\\+");
+            std::string replacedString;
+            std::regex_replace(std::back_inserter(replacedString),
+                    srules.begin(), srules.end(),
+                    e1, "$1 ");
+            srules = replacedString;
+            std::regex e2("\\r\\n");
+            replacedString = "";
+            std::regex_replace(std::back_inserter(replacedString),
+                    srules.begin(), srules.end(), e2, "$1\n");
+            srules = replacedString;
 
-            } else {
-                throw 10;
-            }
-            curl_easy_cleanup(curl);
+            spremat = HttpServer::unescape(spremat);
+            replacedString = "";
+            std::regex_replace(std::back_inserter(replacedString),
+                    spremat.begin(), spremat.end(),
+                    e1, "$1 ");
+            spremat = replacedString;
+            replacedString = "";
+            std::regex_replace(std::back_inserter(replacedString),
+                    spremat.begin(), spremat.end(), e2, "$1\n");
+            spremat = replacedString;
 
             LOG(INFOL) << "Setting up the KB with the given rules ...";
 
             //Cleanup and install the EDB layer
-            EDBConf conf(inter->edbFile);
-            inter->edb = std::unique_ptr<EDBLayer>(new EDBLayer(conf, false));
-            inter->setupTridentLayer();
+            EDBConf conf(edbFile);
+            edb = std::unique_ptr<EDBLayer>(new EDBLayer(conf, false));
+            setupTridentLayer();
 
             //Setup the program
-            inter->program = std::unique_ptr<Program>(new Program(
-                        inter->edb->getNTerms(), inter->edb.get()));
-            inter->program->readFromString(srules, inter->vm["rewriteMultihead"].as<bool>());
-            inter->program->sortRulesByIDBPredicates();
+            program = std::unique_ptr<Program>(new Program(
+                        edb->getNTerms(), edb.get()));
+            program->readFromString(srules, vm["rewriteMultihead"].as<bool>());
+            program->sortRulesByIDBPredicates();
             //Set up the ruleset and perform the pre-materialization if necessary
             if (sauto != "") {
                 //Automatic prematerialization
                 std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
                 Materialization *mat = new Materialization();
-                mat->guessLiteralsFromRules(*inter->program, *inter->edb.get());
-                mat->getAndStorePrematerialization(*inter->edb.get(),
-                        *inter->program,
+                mat->guessLiteralsFromRules(*program, *edb.get());
+                mat->getAndStorePrematerialization(*edb.get(),
+                        *program,
                         true, automatThreshold);
                 delete mat;
                 std::chrono::duration<double> sec = std::chrono::system_clock::now()
@@ -430,25 +389,20 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             } else if (spremat != "") {
                 std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
                 Materialization *mat = new Materialization();
-                mat->loadLiteralsFromString(*inter->program, spremat);
-                mat->getAndStorePrematerialization(*inter->edb.get(), *inter->program, false, ~0l);
-                inter->program->sortRulesByIDBPredicates();
+                mat->loadLiteralsFromString(*program, spremat);
+                mat->getAndStorePrematerialization(*edb.get(), *program, false, ~0l);
+                program->sortRulesByIDBPredicates();
                 delete mat;
                 std::chrono::duration<double> sec = std::chrono::system_clock::now()
                     - start;
                 LOG(INFOL) << "Runtime pre-materialization = " <<
                     sec.count() * 1000 << " milliseconds";
             }
-
-            //Setup the VLogLayer
-            //inter->vloglayer = std::unique_ptr<VLogLayer>(new VLogLayer(*(inter->edb.get()),
-            //            *(inter->program),
-            //            reasoningThreshold, "TI", "TE"));
             page = "OK!";
         } else {
             page = "Error!";
         }
-    } else if (boost::starts_with(req, "GET")) {
+    } else if (Utils::starts_with(req, "GET")) {
         //Get the page
         int pos = req.find("HTTP");
         string path = req.substr(4, pos - 5);
@@ -460,19 +414,19 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             long ramperc = (((double)usedmem / totmem) * 100);
             pt.put("ramperc", to_string(ramperc));
             pt.put("usedmem", to_string(usedmem));
-            long time = inter->getDurationExecMs();
+            long time = getDurationExecMs();
             pt.put("runtime", to_string(time));
             //Semi naiver details
-            if (inter->getSemiNaiver()->isRunning())
+            if (getSemiNaiver()->isRunning())
                 pt.put("finished", "false");
             else
                 pt.put("finished", "true");
-            size_t currentIteration = inter->getSemiNaiver()->getCurrentIteration();
+            size_t currentIteration = getSemiNaiver()->getCurrentIteration();
             pt.put("iteration", currentIteration);
-            pt.put("rule", inter->getSemiNaiver()->getCurrentRule());
+            pt.put("rule", getSemiNaiver()->getCurrentRule());
 
             std::vector<StatsRule> outputrules =
-                inter->getSemiNaiver()->
+                getSemiNaiver()->
                 getOutputNewIterations();
             string outrules = "";
             for (const auto &el : outputrules) {
@@ -508,12 +462,12 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             JSON pt;
             long totmem = Utils::getSystemMemory() / 1024 / 1024;
             pt.put("totmem", to_string(totmem));
-            pt.put("commandline", inter->getCommandLineArgs());
-            pt.put("nrules", (unsigned int) inter->getSemiNaiver()->getProgram()->getNRules());
+            pt.put("commandline", getCommandLineArgs());
+            pt.put("nrules", (unsigned int) getSemiNaiver()->getProgram()->getNRules());
             ////obsolete
-            //pt.put("rules", inter->getSemiNaiver()->getListAllRulesForJSONSerialization());
-            pt.put("nedbs", (unsigned int) inter->getSemiNaiver()->getProgram()->getNEDBPredicates());
-            pt.put("nidbs", (unsigned int) inter->getSemiNaiver()->getProgram()->getNIDBPredicates());
+            //pt.put("rules", getSemiNaiver()->getListAllRulesForJSONSerialization());
+            pt.put("nedbs", (unsigned int) getSemiNaiver()->getProgram()->getNEDBPredicates());
+            pt.put("nidbs", (unsigned int) getSemiNaiver()->getProgram()->getNIDBPredicates());
             std::ostringstream buf;
             JSON::write(buf, pt);
             //write_json(buf, pt, false);
@@ -524,10 +478,10 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             JSON pt;
             long totmem = Utils::getSystemMemory() / 1024 / 1024;
             pt.put("totmem", to_string(totmem));
-            pt.put("commandline", inter->getCommandLineArgs());
-            /*if (inter->tridentlayer.get()) {
-              pt.put("tripleskb", to_string(inter->tridentlayer->getKB()->getSize()));
-              pt.put("termskb", to_string(inter->tridentlayer->getKB()->getNTerms()));
+            pt.put("commandline", getCommandLineArgs());
+            /*if (tridentlayer.get()) {
+              pt.put("tripleskb", to_string(tridentlayer->getKB()->getSize()));
+              pt.put("termskb", to_string(tridentlayer->getKB()->getNTerms()));
               } else {
               pt.put("tripleskb", -1);
               pt.put("termskb", -1);
@@ -541,16 +495,16 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
         } else if (path == "/getprograminfo") {
             JSON pt;
             JSON rules;
-            if (inter->program) {
-                pt.put("nrules", (unsigned int) inter->program->getNRules());
-                pt.put("nedb", (unsigned int) inter->program->getNEDBPredicates());
-                pt.put("nidb", (unsigned int) inter->program->getNIDBPredicates());
+            if (program) {
+                pt.put("nrules", (unsigned int) program->getNRules());
+                pt.put("nedb", (unsigned int) program->getNEDBPredicates());
+                pt.put("nidb", (unsigned int) program->getNIDBPredicates());
                 int i = 0;
-                for(auto &r : inter->program->getAllRules()) {
+                for(auto &r : program->getAllRules()) {
                     if (r.getId() != i) {
                         throw 10;
                     }
-                    rules.push_back(r.toprettystring(inter->program.get(), inter->edb.get()));
+                    rules.push_back(r.toprettystring(program.get(), edb.get()));
                     i++;
                 }
             } else {
@@ -567,13 +521,13 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
 
         } else if (path == "/getedbinfo") {
             JSON pt;
-            auto predicates = inter->edb->getAllPredicateIDs();
+            auto predicates = edb->getAllPredicateIDs();
             for(auto predid : predicates) {
                 JSON entry;
-                entry.put("name", inter->edb->getPredName(predid));
-                entry.put("size", (unsigned long) inter->edb->getPredSize(predid));
-                entry.put("arity", (unsigned int) inter->edb->getPredArity(predid));
-                entry.put("type", inter->edb->getPredType(predid));
+                entry.put("name", edb->getPredName(predid));
+                entry.put("size", (unsigned long) edb->getPredSize(predid));
+                entry.put("arity", (unsigned int) edb->getPredArity(predid));
+                entry.put("type", edb->getPredType(predid));
                 pt.push_back(entry);
             }
             std::ostringstream buf;
@@ -583,19 +537,19 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
 
         } else if (path == "/launchMat") {
             //Start a materialization
-            if (inter->program) {
-                if (!inter->sn || !inter->sn->isRunning()) {
-		    bool multithreaded = !inter->vm["multithreaded"].empty();
-                    inter->sn = Reasoner::getSemiNaiver(*inter->edb.get(),
-                            inter->program.get(), inter->vm["no-intersect"].empty(),
-                            inter->vm["no-filtering"].empty(),
+            if (program) {
+                if (!sn || !sn->isRunning()) {
+                    bool multithreaded = !vm["multithreaded"].empty();
+                    sn = Reasoner::getSemiNaiver(*edb.get(),
+                            program.get(), vm["no-intersect"].empty(),
+                            vm["no-filtering"].empty(),
                             multithreaded,
-                            inter->vm["restrictedChase"].as<bool>(),
-                            multithreaded ? inter->vm["nthreads"].as<int>() : -1,
-                            multithreaded ? inter->vm["interRuleThreads"].as<int>() : 0,
-                            !inter->vm["shufflerules"].empty());
-                    inter->cvMatRunner.notify_one(); //start the computation
-                    page = inter->getPage("/newmat.html");
+                            vm["restrictedChase"].as<bool>(),
+                            multithreaded ? vm["nthreads"].as<int>() : -1,
+                            multithreaded ? vm["interRuleThreads"].as<int>() : 0,
+                            !vm["shufflerules"].empty());
+                    cvMatRunner.notify_one(); //start the computation
+                    page = getPage("/newmat.html");
                 } else {
                     error = 1;
                     page = "Materialization is already running!";
@@ -607,7 +561,7 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
 
         } else if (path == "/sizeidbs") {
             JSON pt;
-            std::vector<std::pair<string, std::vector<StatsSizeIDB>>> sizeIDBs = inter->getSemiNaiver()->getSizeIDBs();
+            std::vector<std::pair<string, std::vector<StatsSizeIDB>>> sizeIDBs = getSemiNaiver()->getSizeIDBs();
             //Construct the string
             string flat = "";
             for (auto el : sizeIDBs) {
@@ -631,13 +585,13 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
             isjson = true;
 
         } else if (path.size() > 1) {
-            page = inter->getPage(path);
+            page = getPage(path);
         }
     }
 
     if (page == "") {
         //return the main page
-        page = inter->getDefaultPage();
+        page = getDefaultPage();
     }
 
     string code = "200 OK ";
@@ -646,26 +600,12 @@ void WebInterface::Server::readHeader(boost::system::error_code const &err,
     }
 
     if (isjson) {
-        res = "HTTP/1.1 " + code + "\r\nContent-Type: application/json\nContent-Length: " + to_string(page.size()) + "\r\n\r\n" + page;
+        resp = "HTTP/1.1 " + code + "\r\nContent-Type: application/json\nContent-Length: " + to_string(page.size()) + "\r\n\r\n" + page;
     } else {
-        res = "HTTP/1.1 " + code + "\r\nContent-Length: " + to_string(page.size()) + "\r\n\r\n" + page;
+        resp = "HTTP/1.1 " + code + "\r\nContent-Length: " + to_string(page.size()) + "\r\n\r\n" + page;
     }
-
-    boost::asio::async_write(socket, boost::asio::buffer(res),
-            boost::asio::transfer_all(),
-            boost::bind(&Server::writeHandler,
-                shared_from_this(),
-                boost::asio::placeholders::error,
-                boost::asio::placeholders::bytes_transferred));
-
-    inter->setInactive();
+    setInactive();
 }
-
-void WebInterface::Server::writeHandler(const boost::system::error_code &err,
-        std::size_t bytes) {
-    socket.close();
-    inter->connect();
-};
 
 string WebInterface::getDefaultPage() {
     return getPage("/index.html");
@@ -689,7 +629,7 @@ string WebInterface::getPage(string f) {
         size_t index = 0;
         index = contentFile.find("WEB_PORT", index);
         if (index != std::string::npos)
-            contentFile.replace(index, 8, webport);
+            contentFile.replace(index, 8, to_string(webport));
 
         cachehtml.insert(make_pair(f, contentFile));
         return contentFile;

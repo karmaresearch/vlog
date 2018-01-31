@@ -102,16 +102,6 @@ ENDIF()
 #Webserver support
 if(WEBINTERFACE)
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DWEBINTERFACE=1")
-    find_library(curl curl)
-    #Boost
-    set(Boost_USE_STATIC_LIBS OFF)
-    set(Boost_USE_MULTITHREADED ON)
-    set(Boost_USE_STATIC_RUNTIME OFF)
-    FIND_PACKAGE(Boost COMPONENTS system REQUIRED)
-    IF (Boost_FOUND)
-        INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR} SYSTEM)
-    ENDIF()
-
 ENDIF()
 
 if(MYSQL)
@@ -171,7 +161,7 @@ set_target_properties(vlog_exec PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}" OUTP
 #standard include
 include_directories(include/)
 if(WEBINTERFACE)
-TARGET_LINK_LIBRARIES(vlog trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log curl ${Boost_LIBRARIES})
+TARGET_LINK_LIBRARIES(vlog trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log)
 else()
 TARGET_LINK_LIBRARIES(vlog trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log)
 endif()

@@ -12,6 +12,7 @@
 
 #include <trident/kb/kb.h>
 #include <trident/utils/json.h>
+#include <trident/server/server.h>
 
 #include <kognac/progargs.h>
 
@@ -20,21 +21,13 @@
 #include <cts/parser/SPARQLParser.hpp>
 #include <rts/runtime/QueryDict.hpp>
 
-#include <boost/asio.hpp>
-#include <boost/bind.hpp>
-#include <boost/enable_shared_from_this.hpp>
-#include <boost/bind.hpp>
-#include <boost/shared_ptr.hpp>
-
 #include <map>
 #include <condition_variable>
 #include <mutex>
 
 class VLogLayer;
-//class TridentLayer;
 class WebInterface {
     protected:
-        //program details
         ProgramArgs &vm;
         std::unique_ptr<Program> program;
         std::unique_ptr<EDBLayer> edb;
@@ -45,44 +38,23 @@ class WebInterface {
 
     private:
         std::shared_ptr<SemiNaiver> sn;
+        std::thread t;
         std::thread matRunner;
         std::mutex mtxMatRunner;
         std::condition_variable cvMatRunner;
         string dirhtmlfiles;
-        std::thread t;
         string cmdArgs;
 
-
-        boost::asio::io_service io;
-        boost::asio::ip::tcp::acceptor acceptor;
-        boost::asio::ip::tcp::resolver resolver;
+        std::shared_ptr<HttpServer> server;
 
         bool isActive;
         string edbFile;
-        string webport;
+        int webport;
+        int nthreads;
 
         map<string, string> cachehtml;
 
-        class Server: public boost::enable_shared_from_this<Server> {
-            private:
-                std::string res, req;
-                WebInterface *inter;
-
-                std::ostringstream ss;
-                std::unique_ptr<char[]> data_;
-
-            public:
-                boost::asio::ip::tcp::socket socket;
-                Server(boost::asio::io_service &io, WebInterface *inter):
-                    inter(inter), socket(io) {
-                        data_ = std::unique_ptr<char[]>(new char[4096]);
-                    }
-                void writeHandler(const boost::system::error_code &err, std::size_t bytes);
-                void readHeader(boost::system::error_code const &err, size_t bytes);
-                void acceptHandler(const boost::system::error_code &err);
-        };
-
-        void startThread(string address, string port);
+        void startThread(int port);
 
         void processMaterialization();
 
@@ -91,11 +63,14 @@ class WebInterface {
                 std::shared_ptr<QueryGraph> &queryGraph,
                 QueryDict &queryDict,
                 DBLayer &db);
+
+        void processRequest(std::string req, std::string &resp);
+
     public:
         WebInterface(ProgramArgs &vm, std::shared_ptr<SemiNaiver> sn, string htmlfiles,
                 string cmdArgs, string edbfile);
 
-        void start(string address, string port);
+        void start(int port);
 
         void connect();
 
