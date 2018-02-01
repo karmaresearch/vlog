@@ -1009,38 +1009,71 @@ void Program::rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lB
 	    }
 	}
     }
-    // Now, for every head, first determine its existential vars. If not used in later heads,
-    // we can split.
-    std::vector<Literal> newHeads;
-    std::vector<uint8_t> extVars;
+
+    std::vector<uint8_t> done;
     for (int i = 0; i < lHeads.size(); i++) {
-	Literal head = lHeads[i];
-	// Determine existential variables.
-	for (int k = 0; k < head.getTupleSize(); k++) {
-	    const VTerm t = head.getTermAtPos(k);
-	    if (t.isVariable()) {
-		if (! isInVector(t.getId(), bodyVars)) {
+	if (! isInVector(i, done)) {
+	    std::vector<uint8_t> extVars;
+	    Literal head = lHeads[i];
+	    std::vector<uint8_t> addedHeads;
+
+	    addedHeads.push_back(i);
+	    // Determine existential variables.
+	    for (int k = 0; k < head.getTupleSize(); k++) {
+		const VTerm t = head.getTermAtPos(k);
+		if (t.isVariable()
+			&& ! isInVector(t.getId(), bodyVars)
+			&& ! isInVector(t.getId(), extVars)) {
 		    extVars.push_back(t.getId());
 		}
 	    }
-	}
-	bool used = false;
-	if (extVars.size() > 0) {
-	    for (int k = i+1; ! used && k < lHeads.size(); k++) {
-		Literal head1 = lHeads[k];
-		for (int l = 0; ! used && l < head1.getTupleSize(); l++) {
+	    if (extVars.size() == 0) {
+		std::vector<Literal> heads;
+		done.push_back(i);
+		heads.push_back(lHeads[i]);
+		Rule r = Rule(allrules.size(), heads, lBody);
+		addRule(r);
+		continue;
+	    }
+
+	    for (int j = i+1; j < lHeads.size(); j++) {
+		if (isInVector(j, addedHeads)) {
+		    continue;
+		}
+		// Go through the head, to see if it uses an extvar that is used earlier.
+		Literal head1 = lHeads[j];
+		bool used = false;
+		for (int l = 0; l < head1.getTupleSize(); l++) {
 		    const VTerm t = head1.getTermAtPos(l);
-		    if (t.isVariable()) {
-			used = isInVector(t.getId(), extVars);
+		    if (t.isVariable() && ! isInVector(t.getId(), bodyVars)) {
+			if (isInVector(t.getId(), extVars)) {
+			    used = true;
+			    break;
+			}
 		    }
 		}
+		if (used) {
+		    // If it does, we add it to the list of heads, and add all extvars that it uses
+		    // to the list, and restart the loop.
+		    for (int l = 0; l < head1.getTupleSize(); l++) {
+			const VTerm t = head1.getTermAtPos(l);
+			if (t.isVariable()
+				&& ! isInVector(t.getId(), bodyVars)
+				&& ! isInVector(t.getId(), extVars)) {
+			    extVars.push_back(t.getId());
+			}
+		    }
+		    addedHeads.push_back(j);
+		    j = i;	// Will be incremented.
+		}
 	    }
-	}
-	newHeads.push_back(head);
-	if (! used) {
-	    Rule r1 = Rule(allrules.size(), newHeads, lBody);
-	    addRule(r1);
-	    newHeads.clear();
+	    std::vector<Literal> newHeads;
+	    for (uint8_t h : addedHeads) {
+		newHeads.push_back(lHeads[h]);
+		done.push_back(h);
+	    }
+	    Rule r = Rule(allrules.size(), newHeads, lBody);
+	    addRule(r);
 	}
     }
 }
