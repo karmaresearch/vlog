@@ -1021,8 +1021,8 @@ std::shared_ptr<const Segment> SegmentInserter::retainMemMem(Column *c1,
             }
         } else {
             while(true) {
-                if (v1 < v2) {
-                    if (v1 != prevv1) {
+                if (v1 <= v2) {
+		    if (v1 < v2 && v1 != prevv1) {
                         co.add(v1);
                         prevv1 = v1;
                     }
@@ -1032,21 +1032,7 @@ std::shared_ptr<const Segment> SegmentInserter::retainMemMem(Column *c1,
                         v1 = (Term_t) -1;
                         break;
                     }
-                } else if (v1 > v2) {
-                    if (v2Index < vc2.size()) {
-                        v2 = vc2[v2Index++];
-                    } else {
-                        v2 = (Term_t) -1;
-                        break;
-                    }
                 } else {
-                    prevv1 = v1;
-                    if (v1Index < vc1.size()) {
-                        v1 = vc1[v1Index++];
-                    } else {
-                        v1 = (Term_t) -1;
-                        break;
-                    }
                     if (v2Index < vc2.size()) {
                         v2 = vc2[v2Index++];
                     } else {
@@ -1086,8 +1072,8 @@ std::shared_ptr<const Segment> SegmentInserter::retainMemMem(Column *c1,
             v2 = c2R->next();
 
         while (true) {
-            if (v1 < v2) {
-                if (v1 != prevv1) {
+            if (v1 <= v2) {
+                if (v1 < v2 && v1 != prevv1) {
                     co.add(v1);
                     prevv1 = v1;
                 }
@@ -1097,21 +1083,8 @@ std::shared_ptr<const Segment> SegmentInserter::retainMemMem(Column *c1,
                     v1 = (Term_t) - 1;
                     break;
                 }
-            } else if (v1 > v2) {
-                if (c2R->hasNext()) {
-                    v2 = c2R->next();
-                } else {
-                    v2 = (Term_t) - 1;
-                    break;
-                }
-            } else {
-                prevv1 = v1;
-                if (c1R->hasNext()) {
-                    v1 = c1R->next();
-                } else {
-                    v1 = (Term_t) - 1;
-                    break;
-                }
+            }
+	    else {
                 if (c2R->hasNext()) {
                     v2 = c2R->next();
                 } else {

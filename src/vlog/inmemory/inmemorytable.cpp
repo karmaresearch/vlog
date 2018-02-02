@@ -472,13 +472,13 @@ bool InmemoryIterator::hasNext() {
     if (isFirst || ! skipDuplicatedFirst) {
 	hasNextValue = iterator && iterator->hasNext();
     } else {
-	Term_t oldval = getElementAt(1);
+	Term_t oldval = getElementAt(0);
 	bool stop = false;
 	while (! stop && iterator->hasNext()) {
 	    iterator->next();
 	    // This may be a problem, because now hasNext has the side effect of already shifting the
 	    // iterator ...
-	    if (getElementAt(1) != oldval) {
+	    if (getElementAt(0) != oldval) {
 		stop = true;
 	    }
 	}
