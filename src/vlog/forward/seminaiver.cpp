@@ -672,7 +672,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
         while (!literalItr.isEmpty()) {
             //Add the columns to the output container
 	    // Can lastLiteral be false if nBodyLiterals == 1??? --Ceriel
-            if (!lastLiteral ||
+            if (!lastLiteral || ruleDetails.rule.isExistential() ||
                     heads.size() != 1 || !queryFilterer.
                     producedDerivationInPreviousSteps(
                         firstHeadLiteral,
