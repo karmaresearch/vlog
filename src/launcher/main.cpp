@@ -807,10 +807,11 @@ int main(int argc, const char** argv) {
         string execFile = string(argv[0]);
         string dirExecFile = Utils::parentDir(execFile);
         edbFile = dirExecFile + string("/edb.conf");
-        if (cmd != "load" && !Utils::exists(edbFile)) {
-            printErrorMsg(string("I could not find the EDB conf file " + edbFile).c_str());
-            return EXIT_FAILURE;
-        }
+    }
+
+    if (cmd != "load" && !Utils::exists(edbFile)) {
+	printErrorMsg(string("I could not find the EDB conf file " + edbFile).c_str());
+	return EXIT_FAILURE;
     }
 
     //set up parallelism in the TBB library

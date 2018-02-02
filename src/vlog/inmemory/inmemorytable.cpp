@@ -87,6 +87,7 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
         segment = std::shared_ptr<Segment>(new Segment(arity, columns));
         ifs.close();
     } else {
+	LOG(WARNL) << "tablefile " << tablefile << " does not exist";
         segment = NULL;
     }
     // dump();
