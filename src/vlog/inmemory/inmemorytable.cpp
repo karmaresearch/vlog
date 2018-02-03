@@ -180,8 +180,9 @@ void _literal2filter(const Literal &query, std::vector<uint8_t> &posVarsToCopy,
 }
 
 EDBIterator *InmemoryTable::getIterator(const Literal &q) {
+    std::vector<uint8_t> sortFields;
     if (q.getNUniqueVars() == q.getTupleSize()) {
-        return new InmemoryIterator(segment, predid);
+        return new InmemoryIterator(segment, predid, sortFields);
     }
 
     std::vector<uint8_t> posVarsToCopy;
@@ -243,7 +244,7 @@ EDBIterator *InmemoryTable::getIterator(const Literal &q) {
 	delete writers[i];
     }
 
-    return new InmemoryIterator(filteredSegment, predid);
+    return new InmemoryIterator(filteredSegment, predid, sortFields);
 }
 
 std::vector<uint8_t> __mergeSortingFields(std::vector<uint8_t> v1,
@@ -334,7 +335,7 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
     }
 
     if (vars.empty()) {
-	return new InmemoryIterator(NULL, predid);
+	return new InmemoryIterator(NULL, predid, fields);
     }
 
     /*** If there are no constants, then just returned a sorted version of the
@@ -342,7 +343,7 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
     if (posConstants.empty() && !repeatedVars) {
         std::shared_ptr<const Segment> sortedSegment = getSortedCachedSegment(
                 segment, fields);
-        return new InmemoryIterator(sortedSegment, predid);
+        return new InmemoryIterator(sortedSegment, predid, fields);
     } else {
         //Filter the table
         if (posConstants.size() == 1 &&
@@ -405,10 +406,10 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
                 }
                 std::shared_ptr<const Segment> subsegment = std::shared_ptr<
                     const Segment>(new Segment(arity, subcolumns));
-                return new InmemoryIterator(subsegment, predid);
+                return new InmemoryIterator(subsegment, predid, fields);
             } else {
                 //Return an empty segment (i.e., where hasNext() returns false)
-                return new InmemoryIterator(NULL, predid);
+                return new InmemoryIterator(NULL, predid, fields);
             }
 
         } else { //More sophisticated sorting procedure ...
@@ -424,11 +425,11 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
                     valuesConstantsToFilter.data(), repeatedVars.size(),
                     repeatedVars.data(), 1); //no multithread
 	    if (fTable == NULL) {
-                return new InmemoryIterator(NULL, predid);
+                return new InmemoryIterator(NULL, predid, fields);
 	    }
             auto filteredSegment = ((InmemoryFCInternalTable*)(fTable.get()))->
                 getUnderlyingSegment();
-            return new InmemoryIterator(filteredSegment, predid);
+            return new InmemoryIterator(filteredSegment, predid, fields);
         }
     }
 }
@@ -472,17 +473,41 @@ bool InmemoryIterator::hasNext() {
     if (isFirst || ! skipDuplicatedFirst) {
 	hasNextValue = iterator && iterator->hasNext();
     } else {
-	Term_t oldval = getElementAt(0);
-	bool stop = false;
-	while (! stop && iterator->hasNext()) {
-	    iterator->next();
-	    // This may be a problem, because now hasNext has the side effect of already shifting the
-	    // iterator ...
-	    if (getElementAt(0) != oldval) {
-		stop = true;
-	    }
+	int elNo = 0;
+	if (sortFields.size() == 1) {
+	    elNo = sortFields[0];
 	}
-	hasNextValue = stop;
+	if (sortFields.size() <= 1) {
+	    Term_t oldval = getElementAt(elNo);
+	    bool stop = false;
+	    while (! stop && iterator->hasNext()) {
+		iterator->next();
+		// This may be a problem, because now hasNext has the side effect of already shifting the
+		// iterator ...
+		if (getElementAt(elNo) != oldval) {
+		    stop = true;
+		}
+	    }
+	    hasNextValue = stop;
+	} else {
+	    std::vector<Term_t> oldval;
+	    for (int i = 0; i < sortFields.size(); i++) {
+		oldval.push_back(getElementAt(sortFields[i]));
+	    }
+	    bool stop = false;
+	    while (! stop && iterator->hasNext()) {
+		iterator->next();
+		// This may be a problem, because now hasNext has the side effect of already shifting the
+		// iterator ...
+		for (int i = 0; i < sortFields.size(); i++) {
+		    if (oldval[i] != getElementAt(sortFields[i])) {
+			stop = true;
+			break;
+		    }
+		}
+	    }
+	    hasNextValue = stop;
+	}
     }
     hasNextChecked = true;
     return hasNextValue;
