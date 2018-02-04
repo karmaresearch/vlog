@@ -419,6 +419,7 @@ bool SemiNaiver::executeUntilSaturation(
             //CODE FOR Statistics
             LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". RulesWithDerivation=" <<
                 nRulesOnePass << " out of " << ruleset.size() << " Derivations so far " << countAllIDBs();
+	    printCountAllIDBs("After step " + to_string(iteration) + ": ");
             nRulesOnePass = 0;
 
             //Get the top 10 rules in the last iteration
@@ -671,7 +672,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
         while (!literalItr.isEmpty()) {
             //Add the columns to the output container
 	    // Can lastLiteral be false if nBodyLiterals == 1??? --Ceriel
-            if (!lastLiteral ||
+            if (!lastLiteral || ruleDetails.rule.isExistential() ||
                     heads.size() != 1 || !queryFilterer.
                     producedDerivationInPreviousSteps(
                         firstHeadLiteral,
@@ -1358,7 +1359,7 @@ std::vector<std::pair<string, std::vector<StatsSizeIDB>>> SemiNaiver::getSizeIDB
 }
 #endif
 
-void SemiNaiver::printCountAllIDBs() {
+void SemiNaiver::printCountAllIDBs(string prefix) {
     long c = 0;
     long emptyRel = 0;
     for (PredId_t i = 0; i < MAX_NPREDS; ++i) {
@@ -1369,14 +1370,14 @@ void SemiNaiver::printCountAllIDBs() {
                     emptyRel++;
 		}
 		string predname = program->getPredicateName(i);
-		LOG(INFOL) << "Cardinality of " <<
+		LOG(INFOL) << prefix << "Cardinality of " <<
 		    predname << ": " << count;
                 c += count;
             }
         }
     }
-    LOG(DEBUGL) << "Predicates without derivation: " << emptyRel;
-    LOG(INFOL) << "Total # derivations: " << c;
+    LOG(DEBUGL) << prefix << "Predicates without derivation: " << emptyRel;
+    LOG(INFOL) << prefix << "Total # derivations: " << c;
 }
 
 std::pair<uint8_t, uint8_t> SemiNaiver::removePosConstants(

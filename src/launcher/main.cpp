@@ -413,7 +413,7 @@ void launchFullMat(int argc,
         sn->run();
         std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
         LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
-        sn->printCountAllIDBs();
+        sn->printCountAllIDBs("");
 
         if (vm["storemat_path"].as<string>() != "") {
             std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
@@ -807,10 +807,11 @@ int main(int argc, const char** argv) {
         string execFile = string(argv[0]);
         string dirExecFile = Utils::parentDir(execFile);
         edbFile = dirExecFile + string("/edb.conf");
-        if (cmd != "load" && !Utils::exists(edbFile)) {
-            printErrorMsg(string("I could not find the EDB conf file " + edbFile).c_str());
-            return EXIT_FAILURE;
-        }
+    }
+
+    if (cmd != "load" && !Utils::exists(edbFile)) {
+	printErrorMsg(string("I could not find the EDB conf file " + edbFile).c_str());
+	return EXIT_FAILURE;
     }
 
     //set up parallelism in the TBB library

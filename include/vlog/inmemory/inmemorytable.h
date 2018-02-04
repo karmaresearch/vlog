@@ -58,6 +58,7 @@ class InmemoryIterator : public EDBIterator {
     private:
         std::shared_ptr<const Segment> segment;
         std::unique_ptr<SegmentIterator> iterator;
+	std::vector<uint8_t> sortFields;
         PredId_t predid;
 	bool skipDuplicatedFirst;
 	bool hasNextChecked;
@@ -65,8 +66,8 @@ class InmemoryIterator : public EDBIterator {
 	bool isFirst;
 
     public:
-        InmemoryIterator(std::shared_ptr<const Segment> segment, PredId_t predid) :
-            segment(segment), predid(predid), skipDuplicatedFirst(false),
+        InmemoryIterator(std::shared_ptr<const Segment> segment, PredId_t predid, std::vector<uint8_t> sortFields) :
+            segment(segment), predid(predid), sortFields(sortFields), skipDuplicatedFirst(false),
 	    hasNextChecked(false), hasNextValue(false), isFirst(true) {
 		if (! segment) {
 		    iterator = NULL;

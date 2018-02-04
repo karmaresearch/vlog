@@ -1021,8 +1021,8 @@ std::shared_ptr<const Segment> SegmentInserter::retainMemMem(Column *c1,
             }
         } else {
             while(true) {
-                if (v1 < v2) {
-                    if (v1 != prevv1) {
+                if (v1 <= v2) {
+		    if (v1 < v2 && v1 != prevv1) {
                         co.add(v1);
                         prevv1 = v1;
                     }
@@ -1032,21 +1032,7 @@ std::shared_ptr<const Segment> SegmentInserter::retainMemMem(Column *c1,
                         v1 = (Term_t) -1;
                         break;
                     }
-                } else if (v1 > v2) {
-                    if (v2Index < vc2.size()) {
-                        v2 = vc2[v2Index++];
-                    } else {
-                        v2 = (Term_t) -1;
-                        break;
-                    }
                 } else {
-                    prevv1 = v1;
-                    if (v1Index < vc1.size()) {
-                        v1 = vc1[v1Index++];
-                    } else {
-                        v1 = (Term_t) -1;
-                        break;
-                    }
                     if (v2Index < vc2.size()) {
                         v2 = vc2[v2Index++];
                     } else {
@@ -1086,8 +1072,8 @@ std::shared_ptr<const Segment> SegmentInserter::retainMemMem(Column *c1,
             v2 = c2R->next();
 
         while (true) {
-            if (v1 < v2) {
-                if (v1 != prevv1) {
+            if (v1 <= v2) {
+                if (v1 < v2 && v1 != prevv1) {
                     co.add(v1);
                     prevv1 = v1;
                 }
@@ -1097,21 +1083,8 @@ std::shared_ptr<const Segment> SegmentInserter::retainMemMem(Column *c1,
                     v1 = (Term_t) - 1;
                     break;
                 }
-            } else if (v1 > v2) {
-                if (c2R->hasNext()) {
-                    v2 = c2R->next();
-                } else {
-                    v2 = (Term_t) - 1;
-                    break;
-                }
-            } else {
-                prevv1 = v1;
-                if (c1R->hasNext()) {
-                    v1 = c1R->next();
-                } else {
-                    v1 = (Term_t) - 1;
-                    break;
-                }
+            }
+	    else {
                 if (c2R->hasNext()) {
                     v2 = c2R->next();
                 } else {
@@ -1202,10 +1175,11 @@ std::shared_ptr<const Segment> SegmentInserter::retainEDB(
         uint8_t pos12 = ((EDBColumn*)column12.get())
             ->posColumnInLiteral();
         //Chech the two literals are equivalent and that the rel. are
-        //different positions
+        //different positions. ??? What if the head is, say pred(?A,?A)? --Ceriel
         Substitution subs[SIZETUPLE];
         if (!l1.sameVarSequenceAs(l12) || l1.subsumes(subs, l1, l12) == -1
-                || pos1 == pos12) {
+                // || pos1 == pos12	// Commented out --Ceriel
+		) {
             //The columns come from different literals. This is not yet
             //supported
             throw 10;
@@ -1218,7 +1192,8 @@ std::shared_ptr<const Segment> SegmentInserter::retainEDB(
         uint8_t pos22 = ((EDBColumn*)column22.get())
             ->posColumnInLiteral();
         if (!l2.sameVarSequenceAs(l22) || l1.subsumes(subs, l2, l22) == -1
-                || pos2 == pos22) {
+                // || pos2 == pos22	// Commented out --Ceriel
+		) {
             //The columns come from different literals. This is not yet
             //supported
             throw 10;

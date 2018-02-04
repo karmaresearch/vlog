@@ -19,6 +19,8 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
         std::unique_ptr<SegmentInserter> tmpRelation;
         //In the above case, I store the data in a temporary segment, and assign
         //existential IDs when I consolidate
+	std::vector<uint8_t> varsUsedForExt;
+	std::vector<int> colsForExt;
 
         static void filterDerivations(FCTable *t,
                 std::vector<std::shared_ptr<Column>> &tobeRetained,
