@@ -1,3 +1,4 @@
+#if MYSQL
 #include <vlog/mysql/mysqltable.h>
 #include <vlog/mysql/mysqliterator.h>
 
@@ -326,3 +327,4 @@ uint64_t MySQLTable::getNTerms() {
     delete stmt;
     return card;
 }
+#endif

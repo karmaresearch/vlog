@@ -1,3 +1,4 @@
+#if MAPI
 #include <vlog/mapi/mapitable.h>
 #include <vlog/mapi/mapiiterator.h>
 
@@ -371,3 +372,4 @@ uint64_t MAPITable::getNTerms() {
 MAPITable::~MAPITable() {
     mapi_destroy(con);
 }
+#endif

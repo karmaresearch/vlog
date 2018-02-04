@@ -1,3 +1,4 @@
+#if MAPI
 #include <vlog/mapi/mapiiterator.h>
 #include <vlog/mapi/mapitable.h>
 
@@ -195,3 +196,4 @@ Term_t MAPIIterator::getElementAt(const uint8_t p) {
 MAPIIterator::~MAPIIterator() {
     clear();
 }
+#endif

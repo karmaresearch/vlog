@@ -119,23 +119,23 @@ if(WEBINTERFACE)
 ENDIF()
 
 if(MYSQL)
-    file(GLOB vlog_SRC "src/vlog/mysql/*.cpp")
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMYSQL=1")
+    link_libraries("-lmysqlcppconn")
 ENDIF()
 
 if(ODBC)
-    file(GLOB vlog_SRC "src/vlog/odbc/*.cpp")
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DODBC=1")
+    link_libraries("-lodbc")
 ENDIF()
 
 if(MAPI)
-    file(GLOB vlog_SRC "src/vlog/mapi/*.cpp")
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMAPI=1")
+    link_libraries("-lmapi")
 ENDIF()
 
 if(MDLITE)
-    file(GLOB vlog_SRC "src/vlog/mdlite/*.cpp")
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMDLITE=1")
+    link_libraries("-lmonetdb5")
 ENDIF()
 
 if(ELASTIC)

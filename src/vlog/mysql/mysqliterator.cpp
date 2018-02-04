@@ -1,3 +1,4 @@
+#if MYSQL
 #include <vlog/mysql/mysqliterator.h>
 #include <vlog/mysql/mysqltable.h>
 
@@ -190,3 +191,4 @@ Term_t MySQLIterator::getElementAt(const uint8_t p) {
 MySQLIterator::~MySQLIterator() {
     clear();
 }
+#endif
