@@ -309,7 +309,8 @@ std::pair<std::string, int> makeComplexQuery(Program& p, Literal& l, vector<Subs
     int countConst = 0;
     for (int i = 0; i < card; ++i) {
         std::string canV = "V" + to_string(i+1);
-        uint8_t id = p.getIDVar(canV);
+        //FIXME: uint8_t id = p.getIDVar(canV); //I don't know how to convert this line
+        uint8_t id = 0;
         bool found = false;
         for (int j = 0; j < sub.size(); ++j) {
             if (sub[j].origin == id) {
@@ -447,13 +448,14 @@ std::vector<std::pair<std::string, int>> generateTrainingQueries(EDBLayer &db,
     // Gather all predicates
     std::vector<PredId_t> ids = p.getAllEDBPredicateIds();
     std::ofstream allPredicatesLog("allPredicatesInQueries.log");
+    Dictionary dictVariables;
     for (int i = 0; i < ids.size(); ++i) {
         int neighbours = graph[ids[i]].size();
             LOG(INFOL) << p.getPredicateName(ids[i]) << " is EDB : " << neighbours << "neighbours";
             Predicate edbPred = p.getPredicate(ids[i]);
             int card = edbPred.getCardinality();
             std::string query = makeGenericQuery(p, edbPred.getId(), edbPred.getCardinality());
-            Literal literal = p.parseLiteral(query);
+            Literal literal = p.parseLiteral(query, dictVariables);
             int nVars = literal.getNVars();
             QSQQuery qsqQuery(literal);
             TupleTable *table = new TupleTable(nVars);
@@ -533,7 +535,7 @@ std::vector<std::pair<std::string, int>> generateTrainingQueries(EDBLayer &db,
                         PredId_t qId  = graph[predId][randomNeighbour].first;
                         uint8_t qCard = p.getPredicate(graph[predId][randomNeighbour].first).getCardinality();
                         std::string qQuery = makeGenericQuery(p, qId, qCard);
-                        Literal qLiteral = p.parseLiteral(qQuery);
+                        Literal qLiteral = p.parseLiteral(qQuery, dictVariables);
                         allPredicatesLog << p.getPredicateName(qId) << std::endl;
                         std::pair<string, int> finalQueryResult = makeComplexQuery(p, qLiteral, result, db);
                         std::string qFinalQuery = finalQueryResult.first;
@@ -1254,10 +1256,14 @@ int main(int argc, const char** argv) {
         string rulesFile = vm["rules"].as<string>();
         EDBLayer *layer = new EDBLayer(conf, false);
         Program p(layer->getNTerms(), layer);
-        uint8_t vt1 = (uint8_t) p.getIDVar("V1");
-        uint8_t vt2 = (uint8_t) p.getIDVar("V2");
-        uint8_t vt3 = (uint8_t) p.getIDVar("V3");
-        uint8_t vt4 = (uint8_t) p.getIDVar("V4");
+        //uint8_t vt1 = (uint8_t) p.getIDVar("V1");
+        //uint8_t vt2 = (uint8_t) p.getIDVar("V2");
+        //uint8_t vt3 = (uint8_t) p.getIDVar("V3");
+        //uint8_t vt4 = (uint8_t) p.getIDVar("V4");
+        uint8_t vt1 = 0;
+        uint8_t vt2 = 1;
+        uint8_t vt3 = 2;
+        uint8_t vt4 = 3;
         std::vector<uint8_t> vt;
         vt.push_back(vt1);
         vt.push_back(vt2);

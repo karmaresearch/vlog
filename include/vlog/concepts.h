@@ -406,7 +406,7 @@ class Program {
 
         void parseRule(std::string rule, bool rewriteMultihead);
 
-	void rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lBody);
+        void rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lBody);
 
         std::string rewriteRDFOWLConstants(std::string input);
 
@@ -416,9 +416,9 @@ class Program {
 
         Literal parseLiteral(std::string literal, Dictionary &dictVariables);
 
-        void readFromFile(std::string pathFile, bool rewriteMultihead);
+        void readFromFile(std::string pathFile, bool rewriteMultihead = false);
 
-        void readFromString(std::string rules, bool rewriteMultihead);
+        void readFromString(std::string rules, bool rewriteMultihead = false);
 
         PredId_t getPredicateID(std::string &p, const uint8_t card);
 
