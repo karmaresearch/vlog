@@ -980,12 +980,12 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
                         cout << supportText;
                     }
                 }
+                cout << endl;
             }
-            cout << endl;
         }
     }
     std::chrono::duration<double> durationQ1 = std::chrono::system_clock::now() - startQ1;
-    LOG(INFOL) << "Algo = " << algo << ", query runtime = " << (durationQ1.count() * 1000) << " msec, #rows = " << count;
+    LOG(INFOL) << "Algo = " << algo << ", cold query runtime = " << (durationQ1.count() * 1000) << " msec, #rows = " << count;
 
     delete iter;
     if (times > 0) {
@@ -999,25 +999,27 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
             int sz = iter->getTupleSize();
             while (iter->hasNext()) {
                 iter->next();
-                for (int i = 0; i < sz; i++) {
-                    char supportText[MAX_TERM_SIZE];
-                    uint64_t value = iter->getElementAt(i);
-                    if (i != 0) {
-                        cout << ", ";
+                if (printResults) {
+                    for (int i = 0; i < sz; i++) {
+                        char supportText[MAX_TERM_SIZE];
+                        uint64_t value = iter->getElementAt(i);
+                        if (i != 0) {
+                            cout << ", ";
+                        }
+                        if (!edb.getDictText(value, supportText)) {
+                            cout << value;
+                        } else {
+                            cout << supportText;
+                        }
                     }
-                    if (!edb.getDictText(value, supportText)) {
-                        cout << value;
-                    } else {
-                        cout << supportText;
-                    }
+                    cout << endl;
                 }
             }
-            cout << endl;
         }
         std::chrono::duration<double> durationQ = std::chrono::system_clock::now() - startQ;
         //Restore stdout
         cout.rdbuf(strm_buffer);
-        LOG(INFOL) << "Algo = " << algo << ", repeated query runtime = " << (durationQ.count() / times) * 1000 << " milliseconds";
+        LOG(INFOL) << "Algo = " << algo << ", average warm query runtime = " << (durationQ.count() / times) * 1000 << " milliseconds";
     }
 }
 
