@@ -1,3 +1,4 @@
+#if ODBC
 #include <vlog/odbc/odbciterator.h>
 #include <vlog/odbc/odbctable.h>
 
@@ -204,3 +205,4 @@ Term_t ODBCIterator::getElementAt(const uint8_t p) {
 ODBCIterator::~ODBCIterator() {
     clear();
 }
+#endif

@@ -1,3 +1,4 @@
+#if ODBC
 #include <vlog/odbc/odbctable.h>
 #include <vlog/odbc/odbciterator.h>
 
@@ -351,3 +352,4 @@ ODBCTable::~ODBCTable() {
     SQLFreeHandle(SQL_HANDLE_DBC, con);
     SQLFreeHandle(SQL_HANDLE_ENV, env);
 }
+#endif

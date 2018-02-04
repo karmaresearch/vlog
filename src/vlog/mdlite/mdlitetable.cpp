@@ -1,3 +1,4 @@
+#if MDLITE
 #include <vlog/mdlite/mdlitetable.h>
 
 #include <kognac/utils.h>
@@ -125,3 +126,4 @@ void *MDLiteCon::getConnection() {
     }
     return conn;
 }
+#endif
