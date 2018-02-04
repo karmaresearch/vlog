@@ -203,7 +203,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "Pre-materialize the atoms in the file passed as argument. Default is '' (disabled).", false);
     query_options.add<bool>("","multithreaded", false,
             "Run multithreaded (currently only supported for <mat>).", false);
-    query_options.add<bool>("","restrictedChase", false,
+    query_options.add<bool>("","restrictedChase", true,
             "Use the restricted chase if there are existential rules.", false);
     query_options.add<int>("", "nthreads", std::max((unsigned int)1, std::thread::hardware_concurrency() / 2),
             string("Set maximum number of threads to use when run in multithreaded mode. Default is " + to_string(std::max((unsigned int)1, std::thread::hardware_concurrency() / 2))).c_str(), false);
