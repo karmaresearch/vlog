@@ -1,6 +1,9 @@
 #ifndef _EDB_TABLE_H
 #define _EDB_TABLE_H
 
+#include <vlog/qsqquery.h>
+#include <vlog/idxtupletable.h>
+
 class Column;
 class EDBIterator;
 class EDBTable {

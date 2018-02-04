@@ -99,6 +99,20 @@ ELSE()
     message("-- Found LZ4")
 ENDIF()
 
+#add files to compile
+file(GLOB vlog_SRC
+    "src/vlog/*.cpp"
+    "src/vlog/common/*.cpp"
+    "src/vlog/backward/*.cpp"
+    "src/vlog/forward/*.cpp"
+    "src/vlog/magic/*.cpp"
+    "src/vlog/inmemory/*.cpp"
+    "src/vlog/trident/*.cpp"
+    "src/vlog/web/*.cpp"
+    "src/launcher/vloglayer.cpp"
+    "src/launcher/vlogscan.cpp"
+)
+
 #Webserver support
 if(WEBINTERFACE)
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DWEBINTERFACE=1")
@@ -124,19 +138,11 @@ if(MDLITE)
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMDLITE=1")
 ENDIF()
 
-#add files to compile
-file(GLOB vlog_SRC
-    "src/vlog/*.cpp"
-    "src/vlog/common/*.cpp"
-    "src/vlog/backward/*.cpp"
-    "src/vlog/forward/*.cpp"
-    "src/vlog/magic/*.cpp"
-    "src/vlog/inmemory/*.cpp"
-    "src/vlog/trident/*.cpp"
-    "src/vlog/web/*.cpp"
-    "src/launcher/vloglayer.cpp"
-    "src/launcher/vlogscan.cpp"
-)
+if(ELASTIC)
+    file(GLOB vlog_elasticSRC "src/vlog/text/elastictable.cpp")
+    set(vlog_SRC ${vlog_elasticSRC} ${vlog_SRC})
+    set(COMPILE_FLAGS "${COMPILE_FLAGS} -DELASTIC=1")
+ENDIF()
 
 #Create both a library and the executable program
 add_library(vlog STATIC ${vlog_SRC})

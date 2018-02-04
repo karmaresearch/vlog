@@ -13,57 +13,57 @@
 
 #define MYSQLCALL(stat) \
     try { \
-	stat; \
+        stat; \
     } catch (sql::SQLException &e) { \
-       LOG(WARNL) << "# ERR: SQLException in " << __FILE__ \
-	   << "(" << __FUNCTION__ << ") on line " << __LINE__; \
-       LOG(WARNL) << "# ERR: " << e.what() \
-	   << " (MySQL error code: " << e.getErrorCode() \
-	   << ", SQLState: " << e.getSQLState() << " )"; \
-	exit(1); \
+        LOG(WARNL) << "# ERR: SQLException in " << __FILE__ \
+        << "(" << __FUNCTION__ << ") on line " << __LINE__; \
+        LOG(WARNL) << "# ERR: " << e.what() \
+        << " (MySQL error code: " << e.getErrorCode() \
+        << ", SQLState: " << e.getSQLState() << " )"; \
+        exit(1); \
     }
 
 class MySQLTable : public SQLTable {
-private:
-    sql::Driver *driver;
-    sql::Connection *con;
+    private:
+        sql::Driver *driver;
+        sql::Connection *con;
 
-public:
-    MySQLTable(string host, string user, string pwd, string dbname,
-               string tablename, string tablefields);
+    public:
+        MySQLTable(string host, string user, string pwd, string dbname,
+                string tablename, string tablefields);
 
-    void query(QSQQuery *query, TupleTable *outputTable,
-               std::vector<uint8_t> *posToFilter,
-               std::vector<Term_t> *valuesToFilter);
+        void query(QSQQuery *query, TupleTable *outputTable,
+                std::vector<uint8_t> *posToFilter,
+                std::vector<Term_t> *valuesToFilter);
 
-    size_t getCardinality(const Literal &query);
+        size_t getCardinality(const Literal &query);
 
-    size_t getCardinalityColumn(const Literal &query, uint8_t posColumn);
+        size_t getCardinalityColumn(const Literal &query, uint8_t posColumn);
 
-    bool isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
-                 std::vector<Term_t> *valuesToFilter);
+        bool isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
+                std::vector<Term_t> *valuesToFilter);
 
-    EDBIterator *getIterator(const Literal &query);
+        EDBIterator *getIterator(const Literal &query);
 
-    EDBIterator *getSortedIterator(const Literal &query,
-                                   const std::vector<uint8_t> &fields);
+        EDBIterator *getSortedIterator(const Literal &query,
+                const std::vector<uint8_t> &fields);
 
-    bool getDictNumber(const char *text, const size_t sizeText,
-                       uint64_t &id);
+        bool getDictNumber(const char *text, const size_t sizeText,
+                uint64_t &id);
 
-    bool getDictText(const uint64_t id, char *text);
+        bool getDictText(const uint64_t id, char *text);
 
-    uint64_t getNTerms();
+        uint64_t getNTerms();
 
-    uint64_t getSize();
+        uint64_t getSize();
 
-    ~MySQLTable() {
-        if (con) {
-	    con->close();
-            delete con;
-	    con = NULL;
-	}
-    }
+        ~MySQLTable() {
+            if (con) {
+                con->close();
+                delete con;
+                con = NULL;
+            }
+        }
 };
 
 #endif
