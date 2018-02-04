@@ -204,6 +204,8 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "Determines the selection strategy (only for <queryLiteral>, when \"auto\" is specified for the reasoningAlgorithm). Possible values are \"cardEst\", ... (to be extended) .", false);
     query_options.add<long>("", "matThreshold", 10000000,
             "In case reasoning is activated, this parameter sets a threshold above which a full materialization is performed before we execute the query. Default is 10000000 (10M).", false);
+    query_options.add<bool>("", "printResults", true,
+            "Print the answers of a literal query.", false);
     query_options.add<bool>("", "automat", false,
             "Automatically premateralialize some atoms.", false);
     query_options.add<int>("", "timeoutPremat", 1000000,
@@ -286,7 +288,7 @@ typedef enum QueryType{
     QUERY_TYPE_MIXED = 0,
     QUERY_TYPE_GENERIC = 100,
     QUERY_TYPE_BOOLEAN = 1000
-    }QueryType;
+}QueryType;
 
 std::string makeGenericQuery(Program& p, PredId_t predId, uint8_t predCard) {
     std::string query = p.getPredicateName(predId);
@@ -451,106 +453,106 @@ std::vector<std::pair<std::string, int>> generateTrainingQueries(EDBLayer &db,
     Dictionary dictVariables;
     for (int i = 0; i < ids.size(); ++i) {
         int neighbours = graph[ids[i]].size();
-            LOG(INFOL) << p.getPredicateName(ids[i]) << " is EDB : " << neighbours << "neighbours";
-            Predicate edbPred = p.getPredicate(ids[i]);
-            int card = edbPred.getCardinality();
-            std::string query = makeGenericQuery(p, edbPred.getId(), edbPred.getCardinality());
-            Literal literal = p.parseLiteral(query, dictVariables);
-            int nVars = literal.getNVars();
-            QSQQuery qsqQuery(literal);
-            TupleTable *table = new TupleTable(nVars);
-            db.query(&qsqQuery, table, NULL, NULL);
-            uint64_t nRows = table->getNRows();
-            std::vector<std::vector<uint64_t>> output;
-            uint64_t maxTuples = vm["maxTuples"].as<unsigned int>();
-            /**
-             * RP1(A,B) :- TE(A, <studies>, B)
-             * RP2(A,B) :- TE(A, <worksFor>, B)
-             *
-             * Tuple <jon, studies, VU> can match with RP2, which it should not
-             *
-             * All EDB tuples should be carefully matched with rules
-             * */
-            PredId_t predId = edbPred.getId();
-            uint64_t rowNumber = 0;
-            if (maxTuples > nRows) {
-                maxTuples = nRows;
+        LOG(INFOL) << p.getPredicateName(ids[i]) << " is EDB : " << neighbours << "neighbours";
+        Predicate edbPred = p.getPredicate(ids[i]);
+        int card = edbPred.getCardinality();
+        std::string query = makeGenericQuery(p, edbPred.getId(), edbPred.getCardinality());
+        Literal literal = p.parseLiteral(query, dictVariables);
+        int nVars = literal.getNVars();
+        QSQQuery qsqQuery(literal);
+        TupleTable *table = new TupleTable(nVars);
+        db.query(&qsqQuery, table, NULL, NULL);
+        uint64_t nRows = table->getNRows();
+        std::vector<std::vector<uint64_t>> output;
+        uint64_t maxTuples = vm["maxTuples"].as<unsigned int>();
+        /**
+         * RP1(A,B) :- TE(A, <studies>, B)
+         * RP2(A,B) :- TE(A, <worksFor>, B)
+         *
+         * Tuple <jon, studies, VU> can match with RP2, which it should not
+         *
+         * All EDB tuples should be carefully matched with rules
+         * */
+        PredId_t predId = edbPred.getId();
+        uint64_t rowNumber = 0;
+        if (maxTuples > nRows) {
+            maxTuples = nRows;
+        }
+        while (rowNumber < maxTuples) {
+            std::vector<uint64_t> tuple;
+            std::string tupleString("<");
+            for (int j = 0; j < nVars; ++j) {
+                uint64_t value = table->getPosAtRow(rowNumber, j);
+                tuple.push_back(value);
+                char supportText[MAX_TERM_SIZE];
+                db.getDictText(value, supportText);
+                tupleString += supportText;
+                tupleString += ",";
             }
-            while (rowNumber < maxTuples) {
-                std::vector<uint64_t> tuple;
-                std::string tupleString("<");
-                for (int j = 0; j < nVars; ++j) {
-                    uint64_t value = table->getPosAtRow(rowNumber, j);
-                    tuple.push_back(value);
-                    char supportText[MAX_TERM_SIZE];
-                    db.getDictText(value, supportText);
-                    tupleString += supportText;
-                    tupleString += ",";
-                }
-                tupleString += ">";
-                LOG(INFOL) << "Tuple # " << rowNumber << " : " << tupleString;
-                PredId_t idbPredId = getMatchingIDB(db, p, tuple);
-                if (65535 == idbPredId) {
-                    rowNumber++;
-                    continue;
-                }
-                std::string predName = p.getPredicateName(idbPredId);
-
-                LOG(INFOL) << tupleString << " ==> " << predName << " : " << +idbPredId;
-                vector<Substitution> subs;
-                for (int k = 0; k < card; ++k) {
-                    subs.push_back(Substitution(vt[k], VTerm(0, tuple[k])));
-                }
-                // Find powerset of subs here
-                std::vector<std::vector<Substitution>> options =  powerset<Substitution>(subs);
-                unsigned int seed = (unsigned int) ((clock() ^ 413711) % 105503);
-                srand(seed);
-                for (int l = 0; l < options.size(); ++l) {
-                    int depth = vm["depth"].as<unsigned int>();
-                    vector<Substitution> sigma = options[l];
-                    PredId_t predId = edbPred.getId();
-                    int n = 1;
-                    while (n != depth+1) {
-                        uint32_t nNeighbours = graph[predId].size();
-                        if (0 == nNeighbours) {
-                            break;
-                        }
-                        uint32_t randomNeighbour;
-                        if (1 == n) {
-                            int index = 0;
-                            bool found = false;
-                            for (auto it = graph[predId].begin(); it != graph[predId].end(); ++it,++index) {
-                                if (it->first == idbPredId) {
-                                    randomNeighbour = index;
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            assert(found == true);
-                        } else {
-                            randomNeighbour = rand() % nNeighbours;
-                        }
-                        std::vector<Substitution>sigmaN = graph[predId][randomNeighbour].second;
-                        std::vector<Substitution> result = concat(sigmaN, sigma);
-                        PredId_t qId  = graph[predId][randomNeighbour].first;
-                        uint8_t qCard = p.getPredicate(graph[predId][randomNeighbour].first).getCardinality();
-                        std::string qQuery = makeGenericQuery(p, qId, qCard);
-                        Literal qLiteral = p.parseLiteral(qQuery, dictVariables);
-                        allPredicatesLog << p.getPredicateName(qId) << std::endl;
-                        std::pair<string, int> finalQueryResult = makeComplexQuery(p, qLiteral, result, db);
-                        std::string qFinalQuery = finalQueryResult.first;
-                        int type = finalQueryResult.second + ((n > 4) ? 4 : n);
-                        if (allQueries.find(qFinalQuery) == allQueries.end()) {
-                            allQueries.insert(std::make_pair(qFinalQuery, type));
-                        }
-
-                        predId = qId;
-                        sigma = result;
-                        n++;
-                    } // while the depth of exploration is reached
-                } // for each partial substitution
+            tupleString += ">";
+            LOG(INFOL) << "Tuple # " << rowNumber << " : " << tupleString;
+            PredId_t idbPredId = getMatchingIDB(db, p, tuple);
+            if (65535 == idbPredId) {
                 rowNumber++;
+                continue;
             }
+            std::string predName = p.getPredicateName(idbPredId);
+
+            LOG(INFOL) << tupleString << " ==> " << predName << " : " << +idbPredId;
+            vector<Substitution> subs;
+            for (int k = 0; k < card; ++k) {
+                subs.push_back(Substitution(vt[k], VTerm(0, tuple[k])));
+            }
+            // Find powerset of subs here
+            std::vector<std::vector<Substitution>> options =  powerset<Substitution>(subs);
+            unsigned int seed = (unsigned int) ((clock() ^ 413711) % 105503);
+            srand(seed);
+            for (int l = 0; l < options.size(); ++l) {
+                int depth = vm["depth"].as<unsigned int>();
+                vector<Substitution> sigma = options[l];
+                PredId_t predId = edbPred.getId();
+                int n = 1;
+                while (n != depth+1) {
+                    uint32_t nNeighbours = graph[predId].size();
+                    if (0 == nNeighbours) {
+                        break;
+                    }
+                    uint32_t randomNeighbour;
+                    if (1 == n) {
+                        int index = 0;
+                        bool found = false;
+                        for (auto it = graph[predId].begin(); it != graph[predId].end(); ++it,++index) {
+                            if (it->first == idbPredId) {
+                                randomNeighbour = index;
+                                found = true;
+                                break;
+                            }
+                        }
+                        assert(found == true);
+                    } else {
+                        randomNeighbour = rand() % nNeighbours;
+                    }
+                    std::vector<Substitution>sigmaN = graph[predId][randomNeighbour].second;
+                    std::vector<Substitution> result = concat(sigmaN, sigma);
+                    PredId_t qId  = graph[predId][randomNeighbour].first;
+                    uint8_t qCard = p.getPredicate(graph[predId][randomNeighbour].first).getCardinality();
+                    std::string qQuery = makeGenericQuery(p, qId, qCard);
+                    Literal qLiteral = p.parseLiteral(qQuery, dictVariables);
+                    allPredicatesLog << p.getPredicateName(qId) << std::endl;
+                    std::pair<string, int> finalQueryResult = makeComplexQuery(p, qLiteral, result, db);
+                    std::string qFinalQuery = finalQueryResult.first;
+                    int type = finalQueryResult.second + ((n > 4) ? 4 : n);
+                    if (allQueries.find(qFinalQuery) == allQueries.end()) {
+                        allQueries.insert(std::make_pair(qFinalQuery, type));
+                    }
+
+                    predId = qId;
+                    sigma = result;
+                    n++;
+                } // while the depth of exploration is reached
+            } // for each partial substitution
+            rowNumber++;
+        }
     } // all EDB predicate ids
     allPredicatesLog.close();
     std::vector<std::pair<std::string,int>> queries;
@@ -924,6 +926,7 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
 
     string algo = vm["reasoningAlgo"].as<string>();
     int times = vm["repeatQuery"].as<int>();
+    bool printResults = vm["printResults"].as<bool>();
 
     int nVars = literal.getNVars();
     bool onlyVars = nVars > 0;
@@ -963,17 +966,19 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
         while (iter->hasNext()) {
             iter->next();
             count++;
-            for (int i = 0; i < sz; i++) {
-                char supportText[MAX_TERM_SIZE];
-                uint64_t value = iter->getElementAt(i);
-                if (i != 0) {
-                    cout << " ";
-                }
-                if (!edb.getDictText(value, supportText)) {
-                    cerr << "Term " << value << " not found" << endl;
-                    cout << value;
-                } else {
-                    cout << supportText;
+            if (printResults) {
+                for (int i = 0; i < sz; i++) {
+                    char supportText[MAX_TERM_SIZE];
+                    uint64_t value = iter->getElementAt(i);
+                    if (i != 0) {
+                        cout << " ";
+                    }
+                    if (!edb.getDictText(value, supportText)) {
+                        cerr << "Term " << value << " not found" << endl;
+                        cout << value;
+                    } else {
+                        cout << supportText;
+                    }
                 }
             }
             cout << endl;
@@ -1102,8 +1107,8 @@ int main(int argc, const char** argv) {
     }
 
     if (cmd != "load" && !Utils::exists(edbFile)) {
-	printErrorMsg(string("I could not find the EDB conf file " + edbFile).c_str());
-	return EXIT_FAILURE;
+        printErrorMsg(string("I could not find the EDB conf file " + edbFile).c_str());
+        return EXIT_FAILURE;
     }
 
     //set up parallelism in the TBB library
