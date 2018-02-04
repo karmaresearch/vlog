@@ -61,46 +61,57 @@
         </div>
 
 
-        <div id="leftcolumn">
-            <div id="leftcolumnblock">
-                <h3>Memory Monitor</h3>
+        <div class="tabs">
+        <ul class ="tab-links">
+        <li class "active"> <a href="#Materialization">Materialization</a></li>
+        <li> <a href="#Queries">Queries</a></li>
+        </ul>
+        </div>
+
+        <div class="tab-content">
+        <div id="Materialization" class="tab active">
+
+            <div id="leftcolumn">
+                <div id="leftcolumnblock">
+                    <h3>Memory Monitor</h3>
 
 
-                <div id="rambox">
-                    <p><i>Occupied RAM:</i> <label id="usedram"></label>/<label id="totalram"></label> MB</p>
+                    <div id="rambox">
+                        <p><i>Occupied RAM:</i> <label id="usedram"></label>/<label id="totalram"></label> MB</p>
 
 
-                    <div id="divRAM" class="radial">
+                        <div id="divRAM" class="radial">
+                        </div>
                     </div>
-                </div>
 
 
-                <p><i>Refresh rate (ms):</i> <input id="refreshRate" size="5" text="1000" value="1000" onchange="setRefresh(refreshMem);"></p>
+                    <p><i>Refresh rate (ms):</i> <input id="refreshRate" size="5" text="1000" value="1000" onchange="setRefresh(refreshMem);"></p>
 
 
-                <p><i>Command line:</i>
-                </p>
+                    <p><i>Command line:</i>
+                    </p>
 
 
-                <p><small><label id="commandline"></label></small>
-                </p>
-                <br>
+                    <p><small><label id="commandline"></label></small>
+                    </p>
+                    <br>
 
 
-                <div id="detailsedbblock">
-                    <h3>Details EDB predicates</h3>
+                    <div id="detailsedbblock">
+                        <h3>Details EDB predicates</h3>
 
 
-                    <div id="detailsedb">
+                        <div id="detailsedb">
+                        </div>
                     </div>
-                </div>
 
 
-                <div id="detailsprogramblock">
-                    <h3>Details current program</h3>
+                    <div id="detailsprogramblock">
+                        <h3>Details current program</h3>
 
 
-                    <div id="detailsprogram">
+                        <div id="detailsprogram">
+                        </div>
                     </div>
                 </div>
 
@@ -109,35 +120,46 @@
                 <div id="sizeidbs"></div>
 
             </div>
-        </div>
 
 
-        <form name="setup" method="post" id="setup">
-            <div class="block" id="setupdatalog">
-                <div id="finishedBox">
-                    <h3><label id="finished"></label>
-                    </h3>
+            <form name="setup" method="post" id="setup">
+                <div class="block" id="setupdatalog">
+                    <div id="finishedBox">
+                        <h3><label id="finished"></label>
+                        </h3>
+                    </div>
+
+
+                    <h3>Rules</h3>
+
+
+                    <table>
+                        <tr>
+                            <td>
+                            <textarea id="rulebox" name="rules" rows="30">
+    </textarea>
+                            </td>
+                        </tr>
+
+
+                        <tr>
+                            <td>Load from file: <input type="file" id="filerule" onchange="loadfile(this, 'rulebox')"></td>
+                        </tr>
+                    </table>
+
+
+
+
+                    <table id="containerSubmit">
+                        <tr>
+                            <td><input type="button" onclick="setupProgram();" id="buttonSetup" name="submit" value="Load Rules"> <input type="button" onclick="launchMat();" id="buttonMat" name="submit" value="Launch Materialization"></td>
+                        </tr>
+                    </table>
                 </div>
+            </form>
+        </div> <!-- div for Materialization tab --!>
 
-
-                <h3>Rules</h3>
-
-
-                <table>
-                    <tr>
-                        <td>
-                        <textarea id="rulebox" name="rules" rows="30">
-</textarea>
-                        </td>
-                    </tr>
-
-
-                    <tr>
-                        <td>Load from file: <input type="file" id="filerule" onchange="loadfile(this, 'rulebox')"></td>
-                    </tr>
-                </table>
-
-
+        <div id="Queries" class="tab">
                 <p>Queries to prematerialize <button type="button" href="#tableQueries" class="nav-toggle">Show Content</button></p>
 
 
@@ -159,15 +181,7 @@
                         <td>Auto premat. <input id="automat" name="automat" type="checkbox" onclick="disablepremat()"></td>
                     </tr>
                 </table>
-
-
-                <table id="containerSubmit">
-                    <tr>
-                        <td><input type="button" onclick="setupProgram();" id="buttonSetup" name="submit" value="Load Rules"> <input type="button" onclick="launchMat();" id="buttonMat" name="submit" value="Launch Materialization"></td>
-                    </tr>
-                </table>
-            </div>
-        </form>
+        </div>
 
         <div id="messageBox">
         </div>

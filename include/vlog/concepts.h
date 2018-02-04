@@ -209,6 +209,9 @@ struct Substitution {
     Substitution(uint8_t origin, VTerm destination) : origin(origin), destination(destination) {}
 };
 
+std::vector<Substitution> concat(std::vector<Substitution>&, std::vector<Substitution>&);
+std::vector<Substitution> inverse_concat(std::vector<Substitution>&, std::vector<Substitution>&);
+std::string extractFileName(std::string& filePath);
 /*** LITERALS ***/
 class Program;
 class Literal {
@@ -254,6 +257,8 @@ class Literal {
         bool sameVarSequenceAs(const Literal &l) const;
 
         uint8_t getNVars() const;
+
+        uint8_t getNConstants() const;
 
         uint8_t getNUniqueVars() const;
 
@@ -459,6 +464,8 @@ class Program {
 
         std::string getAllPredicates();
 
+        std::vector<std::string> getAllPredicateStrings();
+
         int getNEDBPredicates();
 
         int getNIDBPredicates();
@@ -468,6 +475,8 @@ class Program {
         bool areExistentialRules();
 
         static std::string compressRDFOWLConstants(std::string input);
+
+        std::vector<PredId_t> getAllEDBPredicateIds();
 
         ~Program() {
         }
