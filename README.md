@@ -2,35 +2,28 @@
 
 ## Installation instructions
 
-In order to compile VLog, first you need trident. 
+We used CMake to ease the installation process. To build VLog, the following
+commands should suffice:
 
 ```
-git clone https://github.com/karmaresearch/trident.git
+mkdir build
+cd build
+cmake ..
+make
 ```
 
-should get it. Then, go to the trident directory and follow the README instructions there.
-It will also require you to install some other packages.
+The only library VLog depends on is zlib, which is usually present by default.
 
-Next, you also need curl. On Ubuntu/Debian,
+To enable the web-interface, you need to use the -DWEBINTERFACE=1 option to cmake.
 
-```
-sudo apt-get install libcurl3-openssl-dev
-```
-
-should do the trick. On OSX, the necessary files are present in Xcode.
-Next,
+If you want to for instance build the DEBUG version, including the web interface: proceed as follows:
 
 ```
-make TRIDENT=<location of trident>
+mkdir build_debug
+cd build_debug
+cmake DWEBINTERFACE=1 -DCMAKE_BUILD_TYPE=Debug ..
+make
 ```
-
-should compile everything (replace <location of trident>). If you want to create a debug version of the program, run
-
-```
-make TRIDENT=<location of trident> DEBUG=1
-```
-
-instead.
 
 ## License
 
