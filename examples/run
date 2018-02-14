@@ -4,10 +4,10 @@ rm -rf indexDir materialization_lubm1
 
 # load the database in the ttl directory, creating the index in "indexDir".
 echo "========================"
-../vlog load -i ttl -o indexDir 2>&1
+../build/vlog load -i ttl -o indexDir 2>&1
 echo "========================"
 
 #materialize using the LUBM1_LE rules and store the result in "materialization_lubm1".
 echo "========================"
-../vlog mat -e edb.conf --storemat_path materialization_lubm1 --storemat_format files --decompressmat true --rules rules/dlog/LUBM1_LE.dlog 2>&1
+../build/vlog mat -e edb.conf --storemat_path materialization_lubm1 --storemat_format files --decompressmat true --rules rules/dlog/LUBM1_LE.dlog 2>&1
 echo "========================"
