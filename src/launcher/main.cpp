@@ -995,7 +995,19 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
         cout.rdbuf(file.rdbuf());
         std::chrono::system_clock::time_point startQ = std::chrono::system_clock::now();
         for (int j = 0; j < times; j++) {
-            TupleIterator *iter = reasoner.getIterator(literal, NULL, NULL, edb, p, true, NULL);
+            TupleIterator *iter;
+            if (algo == "edb") {
+                iter = reasoner.getEDBIterator(literal, NULL, NULL, edb, onlyVars, NULL);
+            } else if (algo == "magic") {
+                iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
+            } else if (algo == "qsqr") {
+                iter = reasoner.getTopDownIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
+            } else if (algo == "mat") {
+                iter = reasoner.getMaterializationIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
+            } else {
+                LOG(ERRORL) << "Unrecognized reasoning algorithm: " << algo;
+                throw 10;
+            }
             int sz = iter->getTupleSize();
             while (iter->hasNext()) {
                 iter->next();
@@ -1015,6 +1027,7 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
                     cout << endl;
                 }
             }
+            delete iter;
         }
         std::chrono::duration<double> durationQ = std::chrono::system_clock::now() - startQ;
         //Restore stdout
