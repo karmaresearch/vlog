@@ -1,6 +1,6 @@
 # VLog
 
-## Installation instructions
+## Installation 
 
 We used CMake to ease the installation process. To build VLog, the following
 commands should suffice:
@@ -12,7 +12,7 @@ cmake ..
 make
 ```
 
-The only library VLog depends on is zlib, which is usually present by default.
+External libraries should be automatically downloaded and installed in the same directory. The only library that should be already installed is zlib, which is necessary to read gzip files. This library is usually already present by default.
 
 To enable the web-interface, you need to use the -DWEBINTERFACE=1 option to cmake.
 
