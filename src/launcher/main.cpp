@@ -346,7 +346,7 @@ template <typename Generic>
 std::vector<std::vector<Generic>> powerset(std::vector<Generic>& set) {
     std::vector<std::vector<Generic>> output;
     uint16_t setSize = set.size();
-    uint16_t powersetSize = pow(2, setSize) - 1;
+    uint16_t powersetSize = pow((uint16_t)2, setSize) - 1;
     for (int i = 1; i <= powersetSize; ++i) {
         std::vector<Generic> element;
         for (int j = 0; j < setSize; ++j) {
