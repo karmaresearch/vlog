@@ -1,36 +1,44 @@
 # VLog
 
-## Installation instructions
+## Installation 
 
-In order to compile VLog, first you need trident. 
-
-```
-git clone https://github.com/karmaresearch/trident.git
-```
-
-should get it. Then, go to the trident directory and follow the README instructions there.
-It will also require you to install some other packages.
-
-Next, you also need curl. On Ubuntu/Debian,
+We used CMake to ease the installation process. To build VLog, the following
+commands should suffice:
 
 ```
-sudo apt-get install libcurl3-openssl-dev
+mkdir build
+cd build
+cmake ..
+make
 ```
 
-should do the trick. On OSX, the necessary files are present in Xcode.
-Next,
+External libraries should be automatically downloaded and installed in the same directory. The only library that should be already installed is zlib, which is necessary to read gzip files. This library is usually already present by default.
+
+To enable the web-interface, you need to use the -DWEBINTERFACE=1 option to cmake.
+
+If you want to build the DEBUG version of the program, including the web interface: proceed as follows:
 
 ```
-make TRIDENT=<location of trident>
+mkdir build_debug
+cd build_debug
+cmake DWEBINTERFACE=1 -DCMAKE_BUILD_TYPE=Debug ..
+make
 ```
 
-should compile everything (replace <location of trident>). If you want to create a debug version of the program, run
+## Docker
+
+In case you do not want to compile the program, you can use a Docker image that
+contains a precompiled version of the program. After you install Docker, you can launch
+the following commands:
 
 ```
-make TRIDENT=<location of trident> DEBUG=1
+docker pull karmaresearch/vlog
+docker run -ti karmaresearch/vlog
 ```
 
-instead.
+## Usage
+
+Please check the [Wiki](https://github.com/karmaresearch/vlog/wiki) for some instructions on how to run the program.
 
 ## License
 
