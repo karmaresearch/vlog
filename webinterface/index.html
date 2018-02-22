@@ -55,21 +55,19 @@
             <h1>VLog</h1>
         </div>
 
-
-        <div>
-            <button type="button" href="#leftcolumnblock" class="nav-toggle">Hide Content</button>
+        <div class="tab">
+            <button class="tablinks" onclick="chooseOption(event, 'materialization')"> Materialization</button>
+            <button class="tablinks" onclick="chooseOption(event, 'queries')"> Queries</button>
+            </ul>
         </div>
 
 
-        <div class="tabs">
-        <ul class ="tab-links">
-        <li class "active"> <a href="#Materialization">Materialization</a></li>
-        <li> <a href="#Queries">Queries</a></li>
-        </ul>
-        </div>
 
-        <div class="tab-content">
-        <div id="Materialization" class="tab active">
+        <div id="materialization" class="tabcontent">
+
+            <div>
+                <button type="button" href="#leftcolumnblock" class="nav-toggle">Hide Content</button>
+            </div>
 
             <div id="leftcolumn">
                 <div id="leftcolumnblock">
@@ -99,17 +97,12 @@
 
                     <div id="detailsedbblock">
                         <h3>Details EDB predicates</h3>
-
-
                         <div id="detailsedb">
                         </div>
                     </div>
 
-
                     <div id="detailsprogramblock">
                         <h3>Details current program</h3>
-
-
                         <div id="detailsprogram">
                         </div>
                     </div>
@@ -159,7 +152,7 @@
             </form>
         </div> <!-- div for Materialization tab --!>
 
-        <div id="Queries" class="tab">
+        <div id="queries" class="tabcontent">
                 <p>Queries to prematerialize <button type="button" href="#tableQueries" class="nav-toggle">Show Content</button></p>
 
 
@@ -183,6 +176,7 @@
                 </table>
         </div>
 
+
         <div id="messageBox">
         </div>
 
@@ -190,7 +184,20 @@
         </div>
     </div>
     <script type="text/javascript">
-setRefresh(refreshMem);
+    setRefresh(refreshMem);
+    function chooseOption(evt, option) {
+        var i,tabcontent, tablinks;
+        tabcontent = document.getElementByClassName("tabcontent");
+        for (i = 0 ;i < tabcontent.length; i++){
+            tabcontent[i].style.display = "none";
+        }
+        tablinks = document.getElementByClassName("tablinks");
+        for (i= 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+        document.getElementById(option).style.display = "block";
+        evt.currentTarget.className += " active";
+    }
     </script>
 </body>
 </html>
