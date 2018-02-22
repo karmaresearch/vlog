@@ -111,6 +111,7 @@ file(GLOB vlog_SRC
     "src/vlog/web/*.cpp"
     "src/launcher/vloglayer.cpp"
     "src/launcher/vlogscan.cpp"
+    "src/vlog/util/*.cpp"
 )
 
 #Webserver support
