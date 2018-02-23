@@ -126,6 +126,8 @@ function setupProgram() {
             }
             document.getElementById('buttonSetup').value='Load Rules';
             document.getElementById('buttonSetup').disabled = false;
+        } else {
+            msgbox('error', '#messageBox', 'http request failed', 2000);
         }
     };
     http_request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
