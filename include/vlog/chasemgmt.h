@@ -44,6 +44,7 @@ class ChaseMgmt {
             private:
                 const uint64_t startCounter;
                 const uint8_t sizerow;
+		const bool restricted;
                 uint64_t currentcounter;
                 std::vector<std::unique_ptr<uint64_t>> blocks;
                 uint32_t blockCounter;
@@ -51,8 +52,8 @@ class ChaseMgmt {
 		std::unordered_map<ChaseRow, uint64_t, hash_ChaseRow> rows;
 
             public:
-                Rows(uint64_t startCounter, uint8_t sizerow) :
-                    startCounter(startCounter), sizerow(sizerow) {
+                Rows(uint64_t startCounter, uint8_t sizerow, bool restricted) :
+                    startCounter(startCounter), sizerow(sizerow), restricted(restricted) {
                         blockCounter = 0;
                         currentblock = NULL;
                         currentcounter = startCounter;
@@ -79,7 +80,7 @@ class ChaseMgmt {
                     dependencies = dep;
                 }
 
-                ChaseMgmt::Rows *getRows(uint8_t var);
+                ChaseMgmt::Rows *getRows(uint8_t var, bool restricted);
         };
 
         std::vector<std::unique_ptr<ChaseMgmt::RuleContainer>> rules;
