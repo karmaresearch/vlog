@@ -108,32 +108,41 @@ file(GLOB vlog_SRC
     "src/vlog/magic/*.cpp"
     "src/vlog/inmemory/*.cpp"
     "src/vlog/trident/*.cpp"
-    "src/vlog/web/*.cpp"
     "src/launcher/vloglayer.cpp"
     "src/launcher/vlogscan.cpp"
 )
 
 #Webserver support
 if(WEBINTERFACE)
+    file(GLOB vlog_webSRC "src/vlog/web/*.cpp")
+    set(vlog_SRC ${vlog_webSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DWEBINTERFACE=1")
 ENDIF()
 
 if(MYSQL)
+    file(GLOB vlog_mysqlSRC "src/vlog/mysql/*.cpp")
+    set(vlog_SRC ${vlog_mysqlSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMYSQL=1")
     link_libraries("-lmysqlcppconn")
 ENDIF()
 
 if(ODBC)
+    file(GLOB vlog_odbcSRC "src/vlog/odbc/*.cpp")
+    set(vlog_SRC ${vlog_odbcSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DODBC=1")
     link_libraries("-lodbc")
 ENDIF()
 
 if(MAPI)
+    file(GLOB vlog_mapiSRC "src/vlog/mapi/*.cpp")
+    set(vlog_SRC ${vlog_mapiSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMAPI=1")
     link_libraries("-lmapi")
 ENDIF()
 
 if(MDLITE)
+    file(GLOB vlog_mdliteSRC "src/vlog/mdlite/*.cpp")
+    set(vlog_SRC ${vlog_mdliteSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMDLITE=1")
     link_libraries("-lmonetdb5")
 ENDIF()
