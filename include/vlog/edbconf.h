@@ -21,10 +21,9 @@ private:
     void parse(string f);
 
 public:
+    EDBConf(string rawcontent, bool isFile);
 
-    EDBConf(string f) {
-        parse(f);
-    }
+    EDBConf(string rawcontent) : EDBConf(rawcontent, true) {}
 
     const std::vector<Table> &getTables() {
         return tables;

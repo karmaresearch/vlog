@@ -31,7 +31,7 @@ WebInterface::WebInterface(
     edbFile(edbfile),
     nthreads(1) {
         //Setup the EDB layer
-        EDBConf conf(edbFile);
+        EDBConf conf(edbFile, true);
         edb = std::unique_ptr<EDBLayer>(new EDBLayer(conf, false));
         //If the database is a single RDF Graph, then we can query it without launching any program
         setupTridentLayer();
@@ -363,7 +363,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             LOG(INFOL) << "Setting up the KB with the given rules ...";
 
             //Cleanup and install the EDB layer
-            EDBConf conf(edbFile);
+            EDBConf conf(edbFile, true);
             edb = std::unique_ptr<EDBLayer>(new EDBLayer(conf, false));
             setupTridentLayer();
 

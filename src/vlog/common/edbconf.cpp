@@ -7,12 +7,26 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
+
+EDBConf::EDBConf(string rawcontent, bool isFile) {
+    if (isFile) {
+        //Read the input file line by line
+        string f = rawcontent;
+        std::ifstream file(f);
+        string line;
+        rawcontent = "";
+        while (std::getline(file, line)) {
+            rawcontent += line;
+        }
+    }
+    parse(rawcontent);
+}
 
 void EDBConf::parse(string f) {
-    //Read the input file line by line
-    std::ifstream file(f);
+    std::stringstream reader(f);
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(reader, line)) {
         if (line == "" || (line.size() > 0 && line[0] == '#')) {
             continue;
         }
