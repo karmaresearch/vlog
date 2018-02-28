@@ -108,7 +108,10 @@
 
                           <table id="containerSubmit">
                           <tr>
-                          <td><input type="button" onclick="setupProgram();" id="buttonSetup" name="submit" value="Load Rules"> <input type="button" onclick="launchMat();" id="buttonMat" name="submit" value="Launch Materialization"></td>
+                          <td>
+                            <input type="button" onclick=" return setupProgram(event);" id="buttonSetup" name="submit" value="Load Rules">
+                            <input type="button" onclick="launchMat();" id="buttonMat" name="submit" value="Launch Materialization">
+                          </td>
                           </tr>
                           </table>
                           </div>
@@ -158,7 +161,7 @@
                               document.getElementById(cityName).style.display = "block";
                               evt.currentTarget.className += " active";
                           }
-                          //setRefresh(refreshMem);
+                          setRefresh(refreshMem);
                           get_mem_commandline();
                           getEDBInfo();
                           getProgramInfo();

@@ -98,13 +98,14 @@ function launchMat() {
     http_request.send(null);
 }
 
-function setupProgram() {
+function setupProgram(event) {
     var info;
-
+    event.preventDefault();
     //Create the data for the form
     var contentform = '';
     var srule = document.getElementById('rulebox').value;
     contentform += 'rules=' + encodeURIComponent(srule);
+
     if (document.getElementById('automat').checked == true) {
         contentform += "&automat=on";
     } else {
@@ -115,13 +116,14 @@ function setupProgram() {
 
     var http_request = new XMLHttpRequest();
     document.getElementById('buttonSetup').disabled = true;
+    //getProgramInfo();
     http_request.open("POST", "http://" + window.location.hostname + ":" + port + "/setup", true);
     http_request.onreadystatechange = function () {
         var done = 4, ok = 200;
         if (http_request.readyState === done) {
             if (http_request.status === ok) {
                 //Refresh the program details
-                getProgramInfo();
+                //getProgramInfo();
                 msgbox('ok', '#messageBox','Program loaded!', 1500);
             }
             document.getElementById('buttonSetup').value='Load Rules';
@@ -131,7 +133,6 @@ function setupProgram() {
         }
     };
     http_request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-    http_request.setRequestHeader('Content-Length', contentform.length);
 
     document.getElementById('buttonSetup').value='The program is loading ...';
     document.getElementById('buttonSetup').disabled = true;
