@@ -99,6 +99,13 @@ ELSE()
     message("-- Found LZ4")
 ENDIF()
 
+IF (JAVA)
+    find_package(Java REQUIRED)
+    include(UseJava)
+    find_package(JNI REQUIRED)
+    include_directories(${JNI_INCLUDE_DIRS})
+ENDIF()
+
 #add files to compile
 file(GLOB vlog_SRC
     "src/vlog/*.cpp"
@@ -113,44 +120,49 @@ file(GLOB vlog_SRC
 )
 
 #Webserver support
-if(WEBINTERFACE)
+IF(WEBINTERFACE)
     file(GLOB vlog_webSRC "src/vlog/web/*.cpp")
     set(vlog_SRC ${vlog_webSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DWEBINTERFACE=1")
 ENDIF()
 
-if(MYSQL)
+IF(MYSQL)
     file(GLOB vlog_mysqlSRC "src/vlog/mysql/*.cpp")
     set(vlog_SRC ${vlog_mysqlSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMYSQL=1")
     link_libraries("-lmysqlcppconn")
 ENDIF()
 
-if(ODBC)
+IF(ODBC)
     file(GLOB vlog_odbcSRC "src/vlog/odbc/*.cpp")
     set(vlog_SRC ${vlog_odbcSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DODBC=1")
     link_libraries("-lodbc")
 ENDIF()
 
-if(MAPI)
+IF(MAPI)
     file(GLOB vlog_mapiSRC "src/vlog/mapi/*.cpp")
     set(vlog_SRC ${vlog_mapiSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMAPI=1")
     link_libraries("-lmapi")
 ENDIF()
 
-if(MDLITE)
+IF(MDLITE)
     file(GLOB vlog_mdliteSRC "src/vlog/mdlite/*.cpp")
     set(vlog_SRC ${vlog_mdliteSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMDLITE=1")
     link_libraries("-lmonetdb5")
 ENDIF()
 
-if(ELASTIC)
+IF(ELASTIC)
     file(GLOB vlog_elasticSRC "src/vlog/text/elastictable.cpp")
     set(vlog_SRC ${vlog_elasticSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DELASTIC=1")
+ENDIF()
+
+IF(JAVA)
+    file(GLOB vlog_javaSRC "src/vlog/java/native/*.cpp")
+    add_library(vlog_jni SHARED ${vlog_javaSRC})
 ENDIF()
 
 #Create both a library and the executable program
@@ -171,6 +183,9 @@ set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -DDEBUG")
 set(COMPILE_FLAGS "${COMPILE_FLAGS} -c -MD -std=c++11 -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1")
 set_target_properties(vlog PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}")
+IF(JAVA)
+set_target_properties(vlog_jni PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}")
+ENDIF()
 set_target_properties(vlog_exec PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}" OUTPUT_NAME "vlog")
 
 #standard include
@@ -180,4 +195,10 @@ TARGET_LINK_LIBRARIES(vlog trident trident-sparql ${ZLIB_LIBRARIES} kognac kogna
 else()
 TARGET_LINK_LIBRARIES(vlog trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log)
 endif()
+if(JAVA)
+    add_jar(jvlog SOURCES "src/vlog/java/karmaresearch/vlog/VLog.java")
+    Create_javah(TARGET headers CLASSES karmaresearch.vlog.VLog CLASSPATH jvlog OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/vlog/java/native)
+    add_dependencies(vlog_jni headers)
+    TARGET_LINK_LIBRARIES(vlog_jni vlog)
+ENDIF()
 TARGET_LINK_LIBRARIES(vlog_exec vlog)
