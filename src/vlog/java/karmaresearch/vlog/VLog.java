@@ -6,7 +6,7 @@ public class VLog {
         System.loadLibrary("kognac-log");
         System.loadLibrary("trident-core");
         System.loadLibrary("trident-sparql");
-        System.loadLibrary("vlog");
+        System.loadLibrary("vlog_jni");
     }
 
     //This method starts the reasoner. As input, we pass the content (as a string)

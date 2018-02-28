@@ -1,0 +1,3 @@
+VLOG=$HOME/Projects/vlog
+BUILD=$VLOG/build
+java -cp $BUILD/'*' -Djava.library.path=$BUILD:$BUILD/trident:$BUILD/trident/kognac karmaresearch.vlog.VLog
