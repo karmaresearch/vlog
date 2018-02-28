@@ -6,3 +6,7 @@
 /build*
 /vlog*
 /MyTridentLink
+*.class
+*.jar
+*.jnilib
+*.o
