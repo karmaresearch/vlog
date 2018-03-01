@@ -1,6 +1,7 @@
 package karmaresearch.vlog;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 /**
  * The <code>VLog class exposes, at a low level, VLog to Java.
@@ -86,6 +87,9 @@ public class VLog {
     /**
      * Queries the current, so possibly materialized, database, and returns an iterator that delivers the answers,
      * one by one.
+     * 
+     * TODO: is having variables as negative values OK?
+     *
      * @param predicate the predicate id of the query
      * @param terms the literal values or variables. If the term is negative, it is assumed to be a variable.
      * @exception NotStartedException is thrown when vlog is not started yet.
@@ -93,11 +97,51 @@ public class VLog {
     public native QueryResultEnumeration query(int predicate, long[] terms) throws NotStartedException;
 
     /**
+     * Queries the current, so possibly materialized, database, and returns an iterator that delivers the answers,
+     * one by one.
+     *
+     * TODO: is having variables start with a questionmark OK?
+     *
+     * TODO: deal with not-found predicates, terms.
+     *
+     * @param predicate the predicate of the query
+     * @param terms the literals or variables. If the term starts with a question mark, it is a variable,
+     * otherwise it is a literal.
+     * @exception NotStartedException is thrown when vlog is not started yet.
+     */
+    public StringQueryResultEnumeration query(String predicate, String[] terms) throws NotStartedException {
+        int intPred = getPredicateId(predicate);
+        ArrayList<String> variables = new ArrayList<>();
+        long[] longTerms = new long[terms.length];
+        for (int i = 0; i < terms.length; i++) {
+            if (terms[i].startsWith("?")) {
+                boolean found = false;
+                for (int j = 0; i < variables.size(); j++) {
+                    if (variables.get(j).equals(terms[i])) {
+                        found = true;
+                        longTerms[i] = -j - 1;
+                        break;
+                    }
+                }
+                if (! found) {
+                    variables.add(terms[i]);
+                    longTerms[i] = -variables.size();
+                }
+            } else {
+                longTerms[i] = getLiteralId(terms[i]);
+            }
+        }
+        return new StringQueryResultEnumeration(this, query(intPred, longTerms));
+    }
+
+    /*
      * Materializes the database under the specified rules.
      *
      * TODO: We probably need flags: restricted or skolem, maybe limit number of iterations? (Currently not in vlog, but could be added)
      *
      * TODO: Should there be a separate method to specify rules?
+     *
+     * TODO: whether we should store the result of the materialization somewhere, for instance as CSV files?
      *
      * TODO: special exception for parse error in rules?
      *
