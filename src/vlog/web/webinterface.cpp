@@ -317,6 +317,40 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             //write_json(buf, pt, false);
             page = buf.str();
             isjson = true;
+        } else if (path == "/queries") {
+
+            //Get all queries
+            string form = req.substr(req.find("application/x-www-form-urlencoded"));
+            //string printresults = _getValueParam(form, "print");
+            string queries = _getValueParam(form, "queries");
+            //Decode the query
+            queries = HttpServer::unescape(queries);
+            std::regex e1("\\+");
+            std::string replacedString;
+            std::regex_replace(std::back_inserter(replacedString),
+                    queries.begin(), queries.end(),
+                    e1, "$1 ");
+            queries = replacedString;
+            LOG(INFOL) << "queries: " << queries;
+            std::regex e2("\\r\\n");
+            replacedString = "";
+            std::regex_replace(std::back_inserter(replacedString),
+                   queries.begin(), queries.end(), e2, "$1\n");
+            queries = replacedString;
+            LOG(INFOL) << "queries: " << queries;
+            vector<string> queryVector;
+            stringstream ss(queries);
+            string query;
+
+            while (std::getline(ss, query, '\n')) {
+                queryVector.push_back(query);
+            }
+
+            //LOG(INFOL) << "vectors:";
+            //for (auto q : queryVector) {
+            //    LOG(INFOL) << q;
+            //}
+
         } else if (path == "/lookup") {
             string form = req.substr(req.find("application/x-www-form-urlencoded"));
             string id = _getValueParam(form, "id");
@@ -330,6 +364,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             page = buf.str();
             isjson = true;
         } else if (path == "/setup") {
+            LOG(INFOL) << "request : " << req;
             string form = req.substr(req.find("application/x-www-form-urlencoded"));
             string srules = _getValueParam(form, "rules");
             string spremat = _getValueParam(form, "queries");
@@ -349,6 +384,8 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                     srules.begin(), srules.end(), e2, "$1\n");
             srules = replacedString;
 
+            LOG(INFOL) << srules;
+            LOG(INFOL) << "size = "<< srules.size();
             spremat = HttpServer::unescape(spremat);
             replacedString = "";
             std::regex_replace(std::back_inserter(replacedString),

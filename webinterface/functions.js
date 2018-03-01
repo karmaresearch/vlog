@@ -98,6 +98,34 @@ function launchMat() {
     http_request.send(null);
 }
 
+function execQuery() {
+
+    var queries = document.getElementById('textQueries').value;
+
+    console.log(queries);
+    var body = '';
+    body += 'queries=' + encodeURIComponent(queries);
+
+    body = body.replace('/%20/g','+');
+    var http_request = new XMLHttpRequest();
+    document.getElementById('buttonQuery').disabled = true;
+    http_request.open("POST", "http://" + window.location.hostname + ":" + port + "/queries", true);
+    http_request.onreadystatechange = function () {
+        var done = 4, ok = 200;
+        if (http_request.readyState === done) {
+            if (http_request.status === ok) {
+                msgbox('ok', '#messageBox','Queries executed!!', 1500);
+            }
+            document.getElementById('buttonQuery').disabled = false;
+        } else {
+            msgbox('error', '#messageBox', 'http request failed', 2000);
+        }
+    };
+    http_request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+
+    http_request.send(body);
+}
+
 function setupProgram(event) {
     var info;
     event.preventDefault();
@@ -108,10 +136,11 @@ function setupProgram(event) {
 
     if (document.getElementById('automat').checked == true) {
         contentform += "&automat=on";
-    } else {
-        var spremat = document.getElementById('premat').value;
-        contentform += '&queries=' + encodeURIComponent(spremat);
     }
+    //else {
+    //    var spremat = document.getElementById('premat').value;
+    //    contentform += '&queries=' + encodeURIComponent(spremat);
+    //}
     contentform = contentform.replace('/%20/g', '+');
 
     var http_request = new XMLHttpRequest();
@@ -123,7 +152,7 @@ function setupProgram(event) {
         if (http_request.readyState === done) {
             if (http_request.status === ok) {
                 //Refresh the program details
-                //getProgramInfo();
+                getProgramInfo();
                 msgbox('ok', '#messageBox','Program loaded!', 1500);
             }
             document.getElementById('buttonSetup').value='Load Rules';

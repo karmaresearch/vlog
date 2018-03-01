@@ -113,6 +113,7 @@
                             <input type="button" onclick="launchMat();" id="buttonMat" name="submit" value="Launch Materialization">
                           </td>
                           </tr>
+                          <tr> <td>Auto premat. <input id="automat" name="automat" type="checkbox" onclick="disablepremat()"></td> </tr>
                           </table>
                           </div>
                           </form>
@@ -129,17 +130,15 @@
                           <table id="tableQueries" style="display:active">
                           <tr>
                           <td>
-                          <textarea id="premat" name="queries" rows="7">
+                          <textarea id="textQueries" name="queries" rows="30">
                           </textarea>
                           </td>
                           </tr>
 
 
                           <tr>
-                          <td>Load from file: <input type="file" id="queryrule" onchange="loadfile(this, 'premat')"></td>
+                          <td>Load from file: <input type="file" id="queryrule" onchange="loadfile(this, 'textQueries')"></td>
                           </tr>
-
-                          <tr> <td>Auto premat. <input id="automat" name="automat" type="checkbox" onclick="disablepremat()"></td> </tr>
 
                           <tr>
                           <td><input type="button" onclick="execQuery();" id="buttonQuery" name="submit" value="Execute Query/ies"></td>
