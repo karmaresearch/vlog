@@ -1300,7 +1300,7 @@ int main(int argc, const char** argv) {
         trainingFileName += "-training.log";
         std::ofstream logFile(trainingFileName);
         for (auto it = trainingQueries.begin(); it != trainingQueries.end(); ++it) {
-            logFile << it->first <<":"<<it->second << std::endl;
+            logFile << it->first <<" "<<it->second << std::endl;
         }
         if (logFile.fail()) {
             LOG(INFOL) << "Error writing to the log file";

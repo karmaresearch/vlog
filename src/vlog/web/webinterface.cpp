@@ -154,6 +154,82 @@ string WebInterface::lookup(string sId, DBLayer &db) {
     return string(start, end - start);
 }
 
+void WebInterface::execLiteralQuery(string& literalquery,
+        EDBLayer& edb,
+        Program& p,
+        bool jsonoutput,
+        JSON* jsonResults,
+        JSON* jsonFeatures,
+        JSON* jsonQsqrTime,
+        JSON* jsonMagicTime) {
+
+    Dictionary dictVariables;
+    Literal literal = p.parseLiteral(literalquery, dictVariables);
+    Reasoner reasoner(1000000);
+
+    Metrics metrics;
+    reasoner.getMetrics(literal, NULL, NULL, edb, p, metrics, 5);
+    stringstream strMetrics;
+    strMetrics  << std::to_string(metrics.cost) << ","
+                << std::to_string(metrics.estimate) << ", "
+                << std::to_string(metrics.countRules) << ", "
+                << std::to_string(metrics.countUniqueRules) << ", "
+                << std::to_string(metrics.countIntermediateQueries) << ", "
+                << std::to_string(metrics.countIDBPredicates);
+    jsonFeatures->put("features", strMetrics.str());
+    LOG(INFOL) << strMetrics.str();
+    std::chrono::system_clock::time_point startQ1 = std::chrono::system_clock::now();
+    string algo = "qsqr";
+    //int times = vm["repeatQuery"].as<int>();
+    bool printResults = false; // vm["printResults"].as<bool>();
+
+    int nVars = literal.getNVars();
+    bool onlyVars = nVars > 0;
+
+    if (literal.getPredicate().getType() == EDB) {
+        if (algo != "edb") {
+            LOG(INFOL) << "Overriding strategy, setting it to edb";
+            algo = "edb";
+        }
+    }
+    stringstream ss;
+    //iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
+    TupleIterator *iter;
+    iter = reasoner.getTopDownIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
+    long count = 0;
+    int sz = iter->getTupleSize();
+    if (nVars == 0) {
+        ss << (iter->hasNext() ? "TRUE" : "FALSE") << endl;
+        count = (iter->hasNext() ? 1 : 0);
+    } else {
+        while (iter->hasNext()) {
+            iter->next();
+            count++;
+            if (printResults) {
+                for (int i = 0; i < sz; i++) {
+                    char supportText[MAX_TERM_SIZE];
+                    uint64_t value = iter->getElementAt(i);
+                    if (i != 0) {
+                        ss << " ";
+                    }
+                    if (!edb.getDictText(value, supportText)) {
+                        LOG(ERRORL) << "Term " << value << " not found";
+                    } else {
+                        ss << supportText;
+                    }
+                }
+                ss << endl;
+            }
+        }
+    }
+    std::chrono::duration<double> durationQ1 = std::chrono::system_clock::now() - startQ1;
+    LOG(INFOL) << "Algo = " << algo << ", cold query runtime = " << (durationQ1.count() * 1000) << " msec, #rows = " << count;
+
+    jsonResults->put("results", ss.str());
+    jsonQsqrTime->put("qsqrtime", to_string(durationQ1.count()));
+    jsonMagicTime->put("magictime", to_string(0));
+}
+
 void WebInterface::execSPARQLQuery(string sparqlquery,
         bool explain,
         long nterms,
@@ -317,12 +393,12 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             //write_json(buf, pt, false);
             page = buf.str();
             isjson = true;
-        } else if (path == "/queries") {
+        } else if (path == "/query") {
 
-            //Get all queries
+            //Get all query
             string form = req.substr(req.find("application/x-www-form-urlencoded"));
             //string printresults = _getValueParam(form, "print");
-            string queries = _getValueParam(form, "queries");
+            string queries = _getValueParam(form, "query");
             //Decode the query
             queries = HttpServer::unescape(queries);
             std::regex e1("\\+");
@@ -337,7 +413,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             std::regex_replace(std::back_inserter(replacedString),
                    queries.begin(), queries.end(), e2, "$1\n");
             queries = replacedString;
-            LOG(INFOL) << "queries: " << queries;
+            //LOG(INFOL) << "query: " << query;
             vector<string> queryVector;
             stringstream ss(queries);
             string query;
@@ -346,10 +422,43 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                 queryVector.push_back(query);
             }
 
-            //LOG(INFOL) << "vectors:";
-            //for (auto q : queryVector) {
-            //    LOG(INFOL) << q;
-            //}
+            LOG(INFOL) << "vectors:";
+            JSON node;
+            JSON queryResults;
+            JSON queryFeatures;
+            JSON queryQsqrTimes;
+            JSON queryMagicTimes;
+            for (auto q : queryVector) {
+                LOG(INFOL) << q;
+                // Execute the literal query
+                JSON results;
+                JSON features;
+                JSON qsqrTime;
+                JSON magicTime;
+                if (program) {
+                    LOG(INFOL) << "Answering the literal query with VLog ...";
+                    WebInterface::execLiteralQuery(q,
+                                                *edb.get(),
+                                                *program.get(),
+                                                false,
+                                                &results,
+                                                &features,
+                                                &qsqrTime,
+                                                &magicTime);
+                    queryResults.push_back(results);
+                    queryFeatures.push_back(features);
+                    queryQsqrTimes.push_back(qsqrTime);
+                    queryMagicTimes.push_back(magicTime);
+                }
+            }
+            node.add_child("results", queryResults);
+            node.add_child("features", queryFeatures);
+            node.add_child("qsqrtimes", queryQsqrTimes);
+            node.add_child("magictimes", queryMagicTimes);
+            std::ostringstream buf;
+            JSON::write(buf, node);
+            page = buf.str();
+            isjson = true;
 
         } else if (path == "/lookup") {
             string form = req.substr(req.find("application/x-www-form-urlencoded"));

@@ -101,20 +101,29 @@ function launchMat() {
 function execQuery() {
 
     var queries = document.getElementById('textQueries').value;
-
-    console.log(queries);
+    document.getElementById('buttonQuery').disabled = true;
     var body = '';
-    body += 'queries=' + encodeURIComponent(queries);
+    body += 'query=' + encodeURIComponent(queries);
 
     body = body.replace('/%20/g','+');
     var http_request = new XMLHttpRequest();
-    document.getElementById('buttonQuery').disabled = true;
-    http_request.open("POST", "http://" + window.location.hostname + ":" + port + "/queries", true);
+    http_request.open("POST", "http://" + window.location.hostname + ":" + port + "/query", true);
+    http_request.timeout = 2000;
     http_request.onreadystatechange = function () {
         var done = 4, ok = 200;
         if (http_request.readyState === done) {
             if (http_request.status === ok) {
-                msgbox('ok', '#messageBox','Queries executed!!', 1500);
+                msgbox('ok', '#messageBox','Query executed!!', 1500);
+                results = JSON.parse(http_request.responseText);
+                console.log(results.results);
+                console.log(results.features);
+                console.log(results.qsqrtimes);
+                var strResults = JSON.stringify(results.results);
+                var strFeatures = JSON.stringify(results.features);
+                var strQsqrTimes = JSON.stringify(results.qsqrtimes);
+                document.getElementById('textResults').innerHTML = strResults;
+                document.getElementById('textFeatures').innerHTML = strFeatures;
+                document.getElementById('textQsqrTime').innerHTML = strQsqrTimes;
             }
             document.getElementById('buttonQuery').disabled = false;
         } else {

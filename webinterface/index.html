@@ -130,7 +130,11 @@
                           <table id="tableQueries" style="display:active">
                           <tr>
                           <td>
-                          <textarea id="textQueries" name="queries" rows="30">
+                          <textarea id="textQueries" name="queries" rows="30" cols="20">
+                          </textarea>
+                          </td>
+                          <td>
+                          <textarea id="textResults" name="results" rows="30" cols="20">
                           </textarea>
                           </td>
                           </tr>
@@ -142,6 +146,8 @@
 
                           <tr>
                           <td><input type="button" onclick="execQuery();" id="buttonQuery" name="submit" value="Execute Query/ies"></td>
+                          <td> <textarea id="textFeatures" name="features" rows="1" cols"10"> </textarea></td>
+                          <td> <textarea id="textQsqrTime" name="qsqrtime" rows="1" cols"10"> </textarea></td>
                           </tr>
                           </table>
                           </div>

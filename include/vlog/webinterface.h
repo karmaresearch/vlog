@@ -113,6 +113,15 @@ class WebInterface {
                 JSON *jsonvars,
                 JSON *jsonresults,
                 JSON *jsonstats);
+
+        static void execLiteralQuery(string& literalquery,
+                EDBLayer &edb,
+                Program &p,
+                bool jsonoutput,
+                JSON *jsonresults,
+                JSON *jsonFeatures,
+                JSON *jsonQsqrTime,
+                JSON *jsonMagicTime);
 };
 #endif
 #endif
