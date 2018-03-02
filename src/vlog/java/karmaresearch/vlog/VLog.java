@@ -157,6 +157,8 @@ public class VLog {
     // For testing purposes ...
     public static void main(String[] args) throws Exception {
         VLog vlog = new VLog();
-        vlog.start("Test string", false);
+        vlog.start("blabla", false);
+        vlog.stop();
+        vlog.startCSV("/Users/ceriel/Projects/chasebench/scenarios/doctors/data/10k");
     }
 }
