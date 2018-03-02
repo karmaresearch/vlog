@@ -1,5 +1,3 @@
 VLOG=$HOME/Projects/vlog
 BUILD=$VLOG/build
-export LD_LIBRARY_PATH=$BUILD:$BUILD/trident:$BUILD/trident/kognac:$LD_LIBRARY_PATH
-# java -cp $BUILD/'*' -Djava.library.path=$BUILD:$BUILD/trident:$BUILD/trident/kognac karmaresearch.vlog.VLog
 java -cp $BUILD/'*' -Djava.library.path=$BUILD karmaresearch.vlog.VLog
