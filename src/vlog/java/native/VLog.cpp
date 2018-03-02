@@ -343,7 +343,12 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_materialize(JNIEnv *env, job
     }
 
     sn = new SemiNaiver(program->getAllRules(), *(program->getKB()), program, true, true, false, ! (bool) skolem, -1, false);
+    LOG(INFOL) << "Starting full materialization";
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     sn->run();
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
+    sn->printCountAllIDBs("");
 }
 
 /*
