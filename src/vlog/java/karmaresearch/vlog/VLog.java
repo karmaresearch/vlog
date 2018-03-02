@@ -16,15 +16,19 @@ public class VLog {
     }
 
     /**
-     * Start vlog with the specified edb configuration, as a string.
+     * Start vlog with the specified edb configuration.
+     * The edb configuration can either be specified directly as a string,
+     * in which case the <code>isFile</code> parameter should be <code>false</code>,
+     * or as a file name, in which case the <code>isFile</code> parameter should be <code>true</code>.
      * 
      * TODO: special exception for parse error in the configuration?
      *
      * @param edbconfig the edb configuration, as a string.
+     * @param isFile whether it is a file, or an edb configuration as a string.
      * @exception IOException is thrown when the database could not be read for some reason.
      * @exception AlreadyStartedException is thrown when vlog was already started, and not stopped.
      */
-    public native void start(String edbconfig) throws AlreadyStartedException, IOException;
+    public native void start(String edbconfig, boolean isFile) throws AlreadyStartedException, IOException;
 
     /**
      * Start vlog with the database as CSV files, in a directory specified by the parameter.
@@ -153,6 +157,6 @@ public class VLog {
     // For testing purposes ...
     public static void main(String[] args) throws Exception {
         VLog vlog = new VLog();
-        vlog.start("Test string");
+        vlog.start("Test string", false);
     }
 }
