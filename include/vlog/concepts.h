@@ -163,7 +163,7 @@ class Predicate {
             return (type >> 1) != 0;
         }
 
-        uint8_t getAdorment() const {
+        uint8_t getAdornment() const {
             return adornment;
         }
 
@@ -242,7 +242,7 @@ class Literal {
         }
 
         size_t getNBoundVariables() const {
-            return pred.getNFields(pred.getAdorment());
+            return pred.getNFields(pred.getAdornment());
         }
 
         static int mgu(Substitution *substitutions, const Literal &l, const Literal &m);
