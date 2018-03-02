@@ -30,7 +30,7 @@ void RuleExecutor::calculateJoinsSizeIntermediateRelations() {
     int nBoundInAdornment = 0;
     int nBoundVarInAdornment = 0;
     Literal head = adornedRule.getFirstHead();
-    uint8_t headAdornment = head.getPredicate().getAdorment();
+    uint8_t headAdornment = head.getPredicate().getAdornment();
     for (size_t i = 0; i < head.getTupleSize(); ++i) {
         if (headAdornment >> i & 1) {
             VTerm t = head.getTermAtPos(i);
@@ -73,7 +73,7 @@ void RuleExecutor::calculateJoinsSizeIntermediateRelations() {
 
     for (size_t j = 0; j < body.size(); ++j) {
         Literal literal = body.at(j);
-        uint8_t adornmentLiteral = literal.getPredicate().getAdorment();
+        uint8_t adornmentLiteral = literal.getPredicate().getAdornment();
         std::vector<uint8_t> currentSignature;
         std::vector<int> posToSupplRel;
         std::vector<std::pair<uint8_t, uint8_t>> boundFromLiteral;
