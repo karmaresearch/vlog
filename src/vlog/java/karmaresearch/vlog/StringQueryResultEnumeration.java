@@ -36,8 +36,12 @@ public class StringQueryResultEnumeration implements Enumeration<String[]> {
         long[] v = iter.nextElement();
         String[] result = new String[v.length];
         for (int i = 0; i < v.length; i++) {
-            result[i] = vlog.getLiteral(v[i]);
+            result[i] = vlog.getConstant(v[i]);
         }
         return result;
+    }
+
+    public void cleanup() {
+        iter.cleanup();
     }
 };

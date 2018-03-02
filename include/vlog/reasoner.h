@@ -76,6 +76,11 @@ public:
             bool returnOnlyVars,
             std::vector<uint8_t> *sortByFields);
 
+    TupleIterator *getIteratorWithMaterialization(SemiNaiver *sn,
+	    Literal &query,
+	    bool returnOnlyVars,
+	    std::vector<uint8_t> *sortByFields);
+
     TupleIterator *getEDBIterator(Literal &query,
             std::vector<uint8_t> * posJoins,
             std::vector<Term_t> *possibleValuesJoins,

@@ -9,6 +9,7 @@ import java.util.NoSuchElementException;
 public class QueryResultEnumeration implements Enumeration<long[]> {
 
     private final long handle;
+    private boolean cleaned = false;
 
     /**
      * Creates a query result enumeration. The parameter provided is a handle to a
@@ -40,6 +41,23 @@ public class QueryResultEnumeration implements Enumeration<long[]> {
         }
         return v;
     }
+
+    /**
+     * Cleans up the underlying VLog iterator, if not done before.
+     */
+    public void cleanup() {
+        if (! cleaned) {
+            cleanup(handle);
+            cleaned = true;
+        }
+    }
+
+    // Called by GC. In case we forget.
+    protected void finalize() {
+        cleanup();
+    }
+
+    private native void cleanup(long handle);
 
     private native boolean hasMoreElements(long handle);
 
