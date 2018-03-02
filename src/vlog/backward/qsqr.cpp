@@ -19,10 +19,10 @@ BindingsTable *QSQR::getInputTable(const Predicate pred) {
         inputs[pred.getId()] = table;
         sizePreds[pred.getId()] = maxAdornments;
     }
-    if (table[pred.getAdorment()] == NULL) {
-        table[pred.getAdorment()] = new BindingsTable(pred.getCardinality(), pred.getAdorment());
+    if (table[pred.getAdornment()] == NULL) {
+        table[pred.getAdornment()] = new BindingsTable(pred.getCardinality(), pred.getAdornment());
     }
-    return table[pred.getAdorment()];
+    return table[pred.getAdornment()];
 }
 
 BindingsTable *QSQR::getAnswerTable(const Predicate pred, uint8_t adornment) {
@@ -118,15 +118,15 @@ void QSQR::createRules(Predicate &pred) {
         memset(rules[pred.getId()], 0, sizeof(RuleExecutor**)*maxAdornments);
     }
 
-    if (rules[pred.getId()][pred.getAdorment()] == NULL) {
+    if (rules[pred.getId()][pred.getAdornment()] == NULL) {
         const auto rulesIds = program->getRulesIDsByPredicate(pred.getId());
-        // LOG(DEBUGL) << "createRules for predicate " << pred.getId() << ", adornment = " << pred.getAdorment() << ", r->size = " << r->size();
-        rules[pred.getId()][pred.getAdorment()] =
+        // LOG(DEBUGL) << "createRules for predicate " << pred.getId() << ", adornment = " << pred.getAdornment() << ", r->size = " << r->size();
+        rules[pred.getId()][pred.getAdornment()] =
             new RuleExecutor*[rulesIds.size()];
         int m = 0;
         for (auto ruleId : rulesIds) {
-            rules[pred.getId()][pred.getAdorment()][m] =
-                new RuleExecutor(program->getRule(ruleId), pred.getAdorment(), program, layer);
+            rules[pred.getId()][pred.getAdornment()][m] =
+                new RuleExecutor(program->getRule(ruleId), pred.getAdornment(), program, layer);
             m++;
         }
     }
@@ -143,7 +143,7 @@ size_t QSQR::estimate(int depth, Predicate &pred, BindingsTable *inputTable/*, s
     std::vector<size_t> outputs;
     size_t output = 0;
     for (int i = 0; i < program->getNRulesByPredicate(pred.getId()); ++i) {
-        RuleExecutor *exec = rules[pred.getId()][pred.getAdorment()][i];
+        RuleExecutor *exec = rules[pred.getId()][pred.getAdornment()][i];
         size_t r = exec->estimate(depth + 1, inputTable/*, offsetInput*/, this, layer);
 	if (r != 0) {
 	    // if (depth > 0 || r <= 10) {
@@ -171,6 +171,117 @@ size_t QSQR::estimate(int depth, Predicate &pred, BindingsTable *inputTable/*, s
     return output;
 }
 
+void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Rule> &execRules) {
+
+    LOG(DEBUGL) << "Literal " << l.tostring(program, &layer) << ", depth = " << depth;
+
+    if (depth <= 0) {
+	metrics.estimate++;
+	metrics.intermediateResults++;
+	metrics.cost++;
+        return;
+    }
+
+    Predicate pred = l.getPredicate();
+    metrics.countIntermediateQueries++;
+
+    if (pred.getType() == EDB) {
+	size_t result = layer.estimateCardinality(l);
+	LOG(DEBUGL) << "EDB: estimate = " << result;
+	metrics.estimate += result;
+	metrics.intermediateResults += result;
+	metrics.cost += result;
+    }
+
+    std::vector<Rule> r = program->getAllRulesByPredicate(pred.getId());
+    for (std::vector<Rule>::iterator itr =
+	    r.begin(); itr != r.end(); ++itr) {
+	Literal head = itr->getHead(0);
+	Substitution substitutions[SIZETUPLE];
+	int nSubs = Literal::subsumes(substitutions, head, l);
+	if (nSubs < 0) {
+	    continue;
+	}
+
+	Metrics m;
+	memset(&m, 0, sizeof(Metrics));
+
+	LOG(DEBUGL) << "Matches with rule " << itr->tostring(program, &layer);
+
+	// Remove replacements of variables with variables ...
+	int filterednSubs = 0;
+	Substitution filteredSubstitutions[SIZETUPLE];
+	for (int i = 0; i < nSubs; i++) {
+	    if (! substitutions[i].destination.isVariable()) {
+		 filteredSubstitutions[filterednSubs++] = substitutions[i];
+	    }
+	}
+
+        estimateRule(m, depth - 1, *itr, filteredSubstitutions, filterednSubs, execRules);
+	metrics.estimate += m.estimate;
+	metrics.intermediateResults += m.intermediateResults;
+	metrics.countRules += m.countRules;
+	metrics.countIntermediateQueries += m.countIntermediateQueries;
+	metrics.cost += m.cost;
+    }
+}
+
+void QSQR::estimateRule(Metrics &metrics, int depth, Rule &rule, Substitution *subs, int nSubs, std::vector<Rule> &execRules) {
+    bool exists = false;
+    for (std::vector<Rule>::iterator itr = execRules.begin(); itr != execRules.end() && ! exists; itr++) {
+	exists = itr->getHead(0) == rule.getHead(0) && itr->getBody() == rule.getBody();
+    }
+    if (!exists) {
+	LOG(DEBUGL) << "Adding rule " << rule.tostring(program, &layer);
+	execRules.push_back(rule);
+    }
+    metrics.countRules++;
+    std::vector<Literal> body = rule.getBody();
+    Literal substitutedHead = rule.getHead(0).substitutes(subs, nSubs);
+    std::vector<uint8_t> headVars = substitutedHead.getAllVars();
+    std::vector<uint8_t> allVars;
+    bool noAnswers = false;
+    for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end(); ++itr) {
+	Metrics m;
+	memset(&m, 0, sizeof(Metrics));
+	Literal substituted = itr->substitutes(subs, nSubs);
+	LOG(DEBUGL) << "Substituted literal = " << substituted.tostring(program, &layer);
+	estimateQuery(m, depth, substituted, execRules);
+	metrics.countRules += m.countRules;
+	metrics.countIntermediateQueries += m.countIntermediateQueries;
+	metrics.cost += m.cost;
+	metrics.cost += m.intermediateResults * metrics.intermediateResults;
+
+	if (m.estimate == 0) {
+	    // Should only be the case when we are sure...
+	    noAnswers = true;
+	    break;
+	}
+
+	// Check for filtering join ...
+	std::vector<uint8_t> newAllVars = substituted.getNewVars(allVars);
+	bool contribution = newAllVars.size() > 0;
+	for (int i = 0; i < newAllVars.size(); i++) {
+	    allVars.push_back(newAllVars[i]);
+	}
+	if (contribution) {
+	    metrics.intermediateResults += m.intermediateResults;
+	    // check if the literal has variables in common with the LHS. If not, no contribution to estimate?
+	    std::vector<uint8_t> shared = substituted.getSharedVars(headVars);
+	    if (shared.size() == 0) {
+		contribution = false;
+	    }
+	}
+	if (contribution) {
+	    metrics.estimate += m.estimate;
+	}
+    }
+    if (noAnswers) {
+	metrics.estimate = 0;
+    } else if (metrics.estimate == 0) {
+	metrics.estimate = 1;
+    }
+}
 void QSQR::evaluate(Predicate &pred, BindingsTable *inputTable,
                     size_t offsetInput, bool repeat) {
 #ifdef RECURSIVE_QSQR
@@ -183,7 +294,7 @@ void QSQR::evaluate(Predicate &pred, BindingsTable *inputTable,
         //Create rules
         createRules(pred);
         for (int i = 0; i < program->getAllRulesByPredicate(pred.getId())->size(); ++i) {
-            RuleExecutor *exec = rules[pred.getId()][pred.getAdorment()][i];
+            RuleExecutor *exec = rules[pred.getId()][pred.getAdornment()][i];
             exec->evaluate(inputTable, offsetInput, this, layer);
         }
 
@@ -206,7 +317,7 @@ void QSQR::evaluate(Predicate &pred, BindingsTable *inputTable,
 	task.repeat = repeat;
 	task.totalAnswers = calculateAllAnswers();
 	pushTask(task);
-        RuleExecutor *exec = rules[pred.getId()][pred.getAdorment()][0];
+        RuleExecutor *exec = rules[pred.getId()][pred.getAdornment()][0];
         exec->evaluate(inputTable, offsetInput, this, layer);
     }
 #endif
@@ -228,7 +339,7 @@ void QSQR::processTask(QSQR_Task &task) {
 	    pushTask(newTask);
             // LOG(DEBUGL) << "pushed new task QUERY, totalAnswers = " << newTask.totalAnswers;
             RuleExecutor *exec = rules[task.pred.getId()]
-                                 [task.pred.getAdorment()][task.currentRuleIndex];
+                                 [task.pred.getAdornment()][task.currentRuleIndex];
             exec->evaluate(task.inputTable, task.offsetInput, this, layer);
         } else {
             size_t newAnswers = calculateAllAnswers();
@@ -244,7 +355,7 @@ void QSQR::processTask(QSQR_Task &task) {
 		pushTask(newTask);
                 // LOG(DEBUGL) << "pushed new task QUERY(0), totalAnswers = " << newTask.totalAnswers;
                 RuleExecutor *exec = rules[task.pred.getId()]
-                                     [task.pred.getAdorment()][0];
+                                     [task.pred.getAdornment()][0];
                 exec->evaluate(task.inputTable, task.offsetInput, this, layer);
             }
         }
@@ -282,7 +393,7 @@ TupleTable *QSQR::evaluateQuery(int evaluateOrEstimate, QSQQuery *query,
         cleanAllInputs();
         size_t totalAnswers, newTotalAnswers;
         bool shouldRepeat = false;
-        uint8_t adornment = pred.getAdorment();
+        uint8_t adornment = pred.getAdornment();
         do {
             BindingsTable *inputTable;
             if (posJoins != NULL) {
