@@ -12,10 +12,12 @@ public class QueryResultEnumeration implements Enumeration<long[]> {
     private boolean cleaned = false;
 
     /**
-     * Creates a query result enumeration. The parameter provided is a handle to a
-     * native underlying object. This constructor is to be called from native code.
+     * Creates a query result enumeration. The parameter provided is a handle to
+     * a native underlying object. This constructor is to be called from native
+     * code.
      *
-     * @param handle the handle.
+     * @param handle
+     *            the handle.
      */
     public QueryResultEnumeration(long handle) {
         this.handle = handle;
@@ -23,6 +25,7 @@ public class QueryResultEnumeration implements Enumeration<long[]> {
 
     /**
      * Returns whether there are more results to the query.
+     * 
      * @return whether there are more results.
      */
     public boolean hasMoreElements() {
@@ -31,8 +34,10 @@ public class QueryResultEnumeration implements Enumeration<long[]> {
 
     /**
      * Returns the next result.
+     * 
      * @return the next result
-     * @exception NoSuchElementException is thrown when no more elements exist.
+     * @exception NoSuchElementException
+     *                is thrown when no more elements exist.
      */
     public long[] nextElement() {
         long[] v = nextElement(handle);
@@ -46,13 +51,14 @@ public class QueryResultEnumeration implements Enumeration<long[]> {
      * Cleans up the underlying VLog iterator, if not done before.
      */
     public void cleanup() {
-        if (! cleaned) {
+        if (!cleaned) {
             cleanup(handle);
             cleaned = true;
         }
     }
 
     // Called by GC. In case we forget.
+    @Override
     protected void finalize() {
         cleanup();
     }

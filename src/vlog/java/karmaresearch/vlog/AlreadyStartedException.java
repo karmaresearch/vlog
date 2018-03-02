@@ -1,7 +1,8 @@
 package karmaresearch.vlog;
 
 /**
- * This exception gets thrown when an attempt is made to start VLog when it is already started.
+ * This exception gets thrown when an attempt is made to start VLog when it is
+ * already started.
  *
  * TODO: checked or unchecked exception? For now, unchecked.
  */
@@ -9,46 +10,45 @@ package karmaresearch.vlog;
 public class AlreadyStartedException extends RuntimeException {
 
     /**
-     * Constructs an <code>AlreadyStartedException</code> with
-     * <code>null</code> as its error detail message.
+     * Constructs an <code>AlreadyStartedException</code> with <code>null</code>
+     * as its error detail message.
      */
     public AlreadyStartedException() {
-	super();
+        super();
     }
 
     /**
-     * Constructs an <code>AlreadyStartedException</code> with
-     * the specified detail message.
+     * Constructs an <code>AlreadyStartedException</code> with the specified
+     * detail message.
      *
      * @param message
-     *          the detail message
+     *            the detail message
      */
     public AlreadyStartedException(String message) {
-	super(message);
+        super(message);
     }
 
     /**
-     * Constructs an <code>AlreadyStartedException</code> with
-     * the specified cause.
+     * Constructs an <code>AlreadyStartedException</code> with the specified
+     * cause.
      *
      * @param cause
-     *          the cause
+     *            the cause
      */
     public AlreadyStartedException(Throwable cause) {
-	super(cause);
+        super(cause);
     }
 
     /**
-     * Constructs an <code>AlreadyStartedException</code> with
-     * the specified detail message and cause.
+     * Constructs an <code>AlreadyStartedException</code> with the specified
+     * detail message and cause.
      *
      * @param message
-     *          the detail message
+     *            the detail message
      * @param cause
-     *          the cause
+     *            the cause
      */
     public AlreadyStartedException(String message, Throwable cause) {
-	super(message, cause);
+        super(message, cause);
     }
 }
-

@@ -12,15 +12,22 @@ public class StringQueryResultEnumeration implements Enumeration<String[]> {
     private final QueryResultEnumeration iter;
 
     /**
-     * Creates a query result enumeration.
+     * Creates a query result enumeration with the results as strings.
+     * 
+     * @param vlog
+     *            the VLog JNI interface object.
+     * @param iter
+     *            the underlying vlog result enumeration.
      */
-    public StringQueryResultEnumeration(VLog vlog, QueryResultEnumeration iter) {
+    public StringQueryResultEnumeration(VLog vlog,
+            QueryResultEnumeration iter) {
         this.vlog = vlog;
         this.iter = iter;
     }
 
     /**
      * Returns whether there are more results to the query.
+     * 
      * @return whether there are more results.
      */
     public boolean hasMoreElements() {
@@ -29,8 +36,10 @@ public class StringQueryResultEnumeration implements Enumeration<String[]> {
 
     /**
      * Returns the next result.
+     * 
      * @return the next result
-     * @exception NoSuchElementException is thrown when no more elements exist.
+     * @exception NoSuchElementException
+     *                is thrown when no more elements exist.
      */
     public String[] nextElement() {
         long[] v = iter.nextElement();
