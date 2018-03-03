@@ -181,7 +181,7 @@ void WebInterface::execLiteralQuery(string& literalquery,
     std::chrono::system_clock::time_point startQ1 = std::chrono::system_clock::now();
     string algo = "qsqr";
     //int times = vm["repeatQuery"].as<int>();
-    bool printResults = false; // vm["printResults"].as<bool>();
+    bool printResults = true; // vm["printResults"].as<bool>();
 
     int nVars = literal.getNVars();
     bool onlyVars = nVars > 0;
@@ -224,7 +224,7 @@ void WebInterface::execLiteralQuery(string& literalquery,
     }
     std::chrono::duration<double> durationQ1 = std::chrono::system_clock::now() - startQ1;
     LOG(INFOL) << "Algo = " << algo << ", cold query runtime = " << (durationQ1.count() * 1000) << " msec, #rows = " << count;
-
+    LOG(INFOL) << ss.str();
     jsonResults->put("results", ss.str());
     jsonQsqrTime->put("qsqrtime", to_string(durationQ1.count()));
     jsonMagicTime->put("magictime", to_string(0));
