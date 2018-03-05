@@ -108,7 +108,7 @@ function execQuery() {
     body = body.replace('/%20/g','+');
     var http_request = new XMLHttpRequest();
     http_request.open("POST", "http://" + window.location.hostname + ":" + port + "/query", true);
-    http_request.timeout = 2000;
+    //http_request.timeout = 2000;
     http_request.onreadystatechange = function () {
         var done = 4, ok = 200;
         if (http_request.readyState === done) {
@@ -121,9 +121,13 @@ function execQuery() {
                 var strResults = JSON.stringify(results.results);
                 var strFeatures = JSON.stringify(results.features);
                 var strQsqrTimes = JSON.stringify(results.qsqrtimes);
+                var strMagicTimes = JSON.stringify(results.magictimes);
                 document.getElementById('textResults').innerHTML = strResults;
                 document.getElementById('textFeatures').innerHTML = strFeatures;
                 document.getElementById('textQsqrTime').innerHTML = strQsqrTimes;
+                document.getElementById('textMagicTime').innerHTML = strMagicTimes;
+            } else {
+                console.log(http_request.status);
             }
             document.getElementById('buttonQuery').disabled = false;
         } else {

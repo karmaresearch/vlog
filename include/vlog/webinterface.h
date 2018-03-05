@@ -7,7 +7,7 @@
 
 #include <vlog/seminaiver.h>
 #include <vlog/trident/tridenttable.h>
-
+#include <vlog/reasoner.h>
 #include <layers/TridentLayer.hpp>
 
 #include <trident/kb/kb.h>
@@ -122,6 +122,13 @@ class WebInterface {
                 JSON *jsonFeatures,
                 JSON *jsonQsqrTime,
                 JSON *jsonMagicTime);
+        static double runAlgo(string& algo,
+                Reasoner& reasoner,
+                EDBLayer& edb,
+                Program& p,
+                Literal& literal,
+                stringstream& ss,
+                uint64_t timeoutMillis);
 };
 #endif
 #endif

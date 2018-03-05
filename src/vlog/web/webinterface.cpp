@@ -22,6 +22,7 @@
 #include <chrono>
 #include <thread>
 #include <regex>
+#include <csignal>
 
 WebInterface::WebInterface(
         ProgramArgs &vm, std::shared_ptr<SemiNaiver> sn, string htmlfiles,
@@ -154,6 +155,113 @@ string WebInterface::lookup(string sId, DBLayer &db) {
     return string(start, end - start);
 }
 
+
+pid_t pid;
+bool timedOut;
+void alarmHandler(int signalNumber) {
+    if (signalNumber == SIGALRM) {
+        kill(pid, SIGKILL);
+        timedOut = true;
+    }
+}
+
+
+double WebInterface::runAlgo(string& algo,
+        Reasoner& reasoner,
+        EDBLayer& edb,
+        Program& p,
+        Literal& literal,
+        stringstream& ss,
+        uint64_t timeoutMillis) {
+
+    int pipefd[2];
+    pipe(pipefd);
+
+
+    int ret;
+    signal(SIGALRM, alarmHandler);
+    timedOut = false;
+
+    pid = fork();
+    if (pid < 0) {
+        LOG(ERRORL) << "Could not fork";
+        return 0.0L;
+    } else if (pid == 0) {
+        close(pipefd[0]);
+        dup2(pipefd[1] ,1);
+        dup2(pipefd[1], 2);
+        close(pipefd[1]);
+        //Child work begins
+        //+
+        std::chrono::system_clock::time_point queryStartTime = std::chrono::system_clock::now();
+        //int times = vm["repeatQuery"].as<int>();
+        bool printResults = true; // vm["printResults"].as<bool>();
+
+        int nVars = literal.getNVars();
+        bool onlyVars = nVars > 0;
+
+        LOG(INFOL) << "started computing";
+        TupleIterator *iter;
+        if (algo == "magic"){
+            iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
+        } else if (algo == "qsqr") {
+            iter = reasoner.getTopDownIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
+        } else {
+            LOG(ERRORL) << "Algorithm not supported : " << algo;
+            return 0;
+        }
+        long count = 0;
+        int sz = iter->getTupleSize();
+        if (nVars == 0) {
+            ss << (iter->hasNext() ? "TRUE" : "FALSE") << endl;
+            count = (iter->hasNext() ? 1 : 0);
+        } else {
+            while (iter->hasNext()) {
+                iter->next();
+                count++;
+                if (printResults) {
+                    for (int i = 0; i < sz; i++) {
+                        char supportText[MAX_TERM_SIZE];
+                        uint64_t value = iter->getElementAt(i);
+                        if (i != 0) {
+                            ss << " ";
+                        }
+                        if (!edb.getDictText(value, supportText)) {
+                            LOG(ERRORL) << "Term " << value << " not found";
+                        } else {
+                            ss << supportText;
+                        }
+                    }
+                    ss << endl;
+                }
+            }
+        }
+        std::chrono::system_clock::time_point queryEndTime = std::chrono::system_clock::now();
+        std::chrono::duration<double> durationQuery = queryEndTime - queryStartTime;
+        cout << durationQuery.count();
+        exit(0);
+        //-
+        //Child work ends
+    } else {
+        uint64_t l =  timeoutMillis / 1000;
+        alarm(l);
+        LOG(INFOL) << "waiting for child to die for " << l << " seconds";
+        ret = waitpid(pid, NULL, 0);
+        alarm(0);
+        if (timedOut) {
+            return timeoutMillis;
+        }
+        fcntl(pipefd[0], F_SETFL, O_NONBLOCK);
+        string result="";
+        char buffer[80];
+        if ((ret = read(pipefd[0], buffer, sizeof(buffer))) > 0) {
+            result += buffer;
+        }
+        double time = std::stod(result);
+        return time;
+    }
+}
+
 void WebInterface::execLiteralQuery(string& literalquery,
         EDBLayer& edb,
         Program& p,
@@ -171,63 +279,27 @@ void WebInterface::execLiteralQuery(string& literalquery,
     reasoner.getMetrics(literal, NULL, NULL, edb, p, metrics, 5);
     stringstream strMetrics;
     strMetrics  << std::to_string(metrics.cost) << ","
-                << std::to_string(metrics.estimate) << ", "
-                << std::to_string(metrics.countRules) << ", "
-                << std::to_string(metrics.countUniqueRules) << ", "
-                << std::to_string(metrics.countIntermediateQueries) << ", "
-                << std::to_string(metrics.countIDBPredicates);
+        << std::to_string(metrics.estimate) << ", "
+        << std::to_string(metrics.countRules) << ", "
+        << std::to_string(metrics.countUniqueRules) << ", "
+        << std::to_string(metrics.countIntermediateQueries) << ", "
+        << std::to_string(metrics.countIDBPredicates);
     jsonFeatures->put("features", strMetrics.str());
     LOG(INFOL) << strMetrics.str();
-    std::chrono::system_clock::time_point startQ1 = std::chrono::system_clock::now();
+
+    stringstream ssQsqr;
     string algo = "qsqr";
-    //int times = vm["repeatQuery"].as<int>();
-    bool printResults = true; // vm["printResults"].as<bool>();
+    double durationQsqr = WebInterface::runAlgo(algo, reasoner, edb, p, literal, ssQsqr, 5000);
 
-    int nVars = literal.getNVars();
-    bool onlyVars = nVars > 0;
-
-    if (literal.getPredicate().getType() == EDB) {
-        if (algo != "edb") {
-            LOG(INFOL) << "Overriding strategy, setting it to edb";
-            algo = "edb";
-        }
-    }
-    stringstream ss;
-    //iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
-    TupleIterator *iter;
-    iter = reasoner.getTopDownIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
-    long count = 0;
-    int sz = iter->getTupleSize();
-    if (nVars == 0) {
-        ss << (iter->hasNext() ? "TRUE" : "FALSE") << endl;
-        count = (iter->hasNext() ? 1 : 0);
-    } else {
-        while (iter->hasNext()) {
-            iter->next();
-            count++;
-            if (printResults) {
-                for (int i = 0; i < sz; i++) {
-                    char supportText[MAX_TERM_SIZE];
-                    uint64_t value = iter->getElementAt(i);
-                    if (i != 0) {
-                        ss << " ";
-                    }
-                    if (!edb.getDictText(value, supportText)) {
-                        LOG(ERRORL) << "Term " << value << " not found";
-                    } else {
-                        ss << supportText;
-                    }
-                }
-                ss << endl;
-            }
-        }
-    }
-    std::chrono::duration<double> durationQ1 = std::chrono::system_clock::now() - startQ1;
-    LOG(INFOL) << "Algo = " << algo << ", cold query runtime = " << (durationQ1.count() * 1000) << " msec, #rows = " << count;
-    LOG(INFOL) << ss.str();
-    jsonResults->put("results", ss.str());
-    jsonQsqrTime->put("qsqrtime", to_string(durationQ1.count()));
-    jsonMagicTime->put("magictime", to_string(0));
+    stringstream ssMagic;
+    algo = "magic";
+    double durationMagic = WebInterface::runAlgo(algo, reasoner, edb, p, literal, ssMagic, 5000);
+    LOG(INFOL) << ssMagic.str();
+    LOG(INFOL) << "Qsqr time : " << durationQsqr;
+    LOG(INFOL) << "magic time: " << durationMagic;
+    jsonResults->put("results", ssQsqr.str());// + ":" + ssMagic.str());
+    jsonQsqrTime->put("qsqrtime", to_string(durationQsqr));
+    jsonMagicTime->put("magictime", to_string(durationMagic));
 }
 
 void WebInterface::execSPARQLQuery(string sparqlquery,
@@ -332,7 +404,6 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
     string page;
     bool isjson = false;
     int error = 0;
-
     if (Utils::starts_with(req, "POST")) {
         int pos = req.find("HTTP");
         string path = req.substr(5, pos - 6);
@@ -411,7 +482,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             std::regex e2("\\r\\n");
             replacedString = "";
             std::regex_replace(std::back_inserter(replacedString),
-                   queries.begin(), queries.end(), e2, "$1\n");
+                    queries.begin(), queries.end(), e2, "$1\n");
             queries = replacedString;
             //LOG(INFOL) << "query: " << query;
             vector<string> queryVector;
@@ -438,13 +509,13 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                 if (program) {
                     LOG(INFOL) << "Answering the literal query with VLog ...";
                     WebInterface::execLiteralQuery(q,
-                                                *edb.get(),
-                                                *program.get(),
-                                                false,
-                                                &results,
-                                                &features,
-                                                &qsqrTime,
-                                                &magicTime);
+                            *edb.get(),
+                            *program.get(),
+                            false,
+                            &results,
+                            &features,
+                            &qsqrTime,
+                            &magicTime);
                     queryResults.push_back(results);
                     queryFeatures.push_back(features);
                     queryQsqrTimes.push_back(qsqrTime);
