@@ -88,9 +88,14 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_start(JNIEnv *env, jobject o
 	Logger::setMinLevel(INFOL);
     }
 
-    const char *crawconf = env->GetStringUTFChars(rawconf, NULL);
-    EDBConf conf(crawconf, isfile);
-    env->ReleaseStringUTFChars(rawconf, crawconf);
+    std::string crawconf = jstring2string(env, rawconf);
+    if (isfile) {
+	if (! Utils::exists(crawconf)) {
+	    throwIOException(env, ("File " + crawconf + " does not exist").c_str());
+	    return;
+	}
+    }
+    EDBConf conf(crawconf.c_str(), isfile);
 
     EDBLayer *layer = new EDBLayer(conf, false);
     program = new Program(layer->getNTerms(), layer);
@@ -123,7 +128,7 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_startCSV(JNIEnv *env, jobjec
     // Generate EDB configuration
     std::stringstream edbconf;
     for (int i = 0; i < files.size(); i++) {
-	std::string fn = Utils::removeExtension(Utils::filename(files[i]));
+	std::string fn = Utils::removeLastExtension(Utils::filename(files[i]));
 	edbconf << "EDB" << i << "_predname=" << fn << "\n";
 	edbconf << "EDB" << i << "_type=INMEMORY\n";
 	edbconf << "EDB" << i << "_param0=" << dirName << "\n";

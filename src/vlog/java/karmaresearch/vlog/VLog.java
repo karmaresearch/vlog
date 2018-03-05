@@ -39,7 +39,7 @@ public class VLog {
      *            whether it is a file, or an edb configuration as a string.
      * @exception IOException
      *                is thrown when the database could not be read for some
-     *                reason.
+     *                reason, or <code>isFile</code> is set and the file does not exist.
      * @exception AlreadyStartedException
      *                is thrown when vlog was already started, and not stopped.
      */
