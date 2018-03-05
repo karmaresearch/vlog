@@ -119,6 +119,8 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_startCSV(JNIEnv *env, jobjec
 	return;
     }
     std::vector<std::string> files = Utils::getFilesWithSuffix(dirName, ".csv");
+
+    // Generate EDB configuration
     std::stringstream edbconf;
     for (int i = 0; i < files.size(); i++) {
 	std::string fn = Utils::removeExtension(Utils::filename(files[i]));
@@ -290,15 +292,16 @@ JNIEXPORT jobject JNICALL Java_karmaresearch_vlog_VLog_query(JNIEnv * env, jobje
 
 /*
  * Class:     karmaresearch_vlog_VLog
- * Method:    addRules
+ * Method:    setRules
  * Signature: ([Ljava/lang/String;Z)V
  */
-JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_addRules(JNIEnv *env, jobject obj, jobjectArray rules, jboolean rewriteHeads) {
+JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setRules(JNIEnv *env, jobject obj, jobjectArray rules, jboolean rewriteHeads) {
     if (program == NULL) {
 	throwNotStartedException(env, "VLog is not started yet");
 	return;
     }
     if (rules != NULL) {
+	program->cleanAllRules();
 	jsize sz = env->GetArrayLength(rules);
 	std::stringstream ss;
 	for (int i = 0; i < sz; i++) {
@@ -312,14 +315,16 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_addRules(JNIEnv *env, jobjec
 
 /*
  * Class:     karmaresearch_vlog_VLog
- * Method:    addRulesFile
+ * Method:    setRulesFile
  * Signature: (Ljava/lang/String;Z)V
  */
-JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_addRulesFile(JNIEnv *env, jobject obj, jstring f, jboolean rewriteHeads) {
+JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setRulesFile(JNIEnv *env, jobject obj, jstring f, jboolean rewriteHeads) {
     if (program == NULL) {
 	throwNotStartedException(env, "VLog is not started yet");
 	return;
     }
+
+    program->cleanAllRules();
 
     //Transform the string into a C++ string
     std::string fileName = jstring2string(env, f);
@@ -340,6 +345,10 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_materialize(JNIEnv *env, job
     if (program == NULL) {
 	throwNotStartedException(env, "VLog is not started yet");
 	return;
+    }
+
+    if (sn != NULL) {
+	delete sn;
     }
 
     sn = new SemiNaiver(program->getAllRules(), *(program->getKB()), program, true, true, false, ! (bool) skolem, -1, false);

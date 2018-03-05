@@ -188,9 +188,11 @@ public class VLog {
     }
 
     /**
-     * Adds the specified rules to the VLog run.
+     * Sets the rules for the VLog run. Any existing rules are removed.
      *
      * TODO: special exception for parse error in rules?
+     *
+     * TODO: make removal of existing rules a boolean parameter?
      *
      * @param rules
      *            the rules
@@ -199,25 +201,28 @@ public class VLog {
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      */
-    public native void addRules(String[] rules, boolean rewriteMultipleHeads)
+    public native void setRules(String[] rules, boolean rewriteMultipleHeads)
             throws NotStartedException;
 
     /**
-     * Adds the rules in the specified file to the VLog run.
+     * Sets the rules for the VLog run to the rules in the specified file. Any existing rules are removed.
+     *
+     * TODO: special exception for parse error in rules?
+     * 
+     * TODO: make removal of existing rules a boolean parameter?
      *
      * @param rulesFile
      *            the file name of the file containing the rules
      * @param rewriteMultipleHeads
      *            whether multiple-head rules should be rewritten when possible.
      *
-     *            TODO: special exception for parse error in rules?
      *
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      * @exception IOException
      *                is thrown when the file could not be read for some reason
      */
-    public native void addRulesFile(String rulesFile,
+    public native void setRulesFile(String rulesFile,
             boolean rewriteMultipleHeads)
             throws NotStartedException, IOException;
 
@@ -245,7 +250,7 @@ public class VLog {
         vlog.stop();
         vlog.startCSV(
                 "/Users/ceriel/Projects/chasebench/scenarios/doctors/data/10k");
-        vlog.addRulesFile("/Users/ceriel/Projects/vlog-runs/data/doctors/rules",
+        vlog.setRulesFile("/Users/ceriel/Projects/vlog-runs/data/doctors/rules",
                 true);
         vlog.materialize(false);
         StringQueryResultEnumeration result = vlog.query("prescription",
