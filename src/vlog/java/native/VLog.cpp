@@ -217,7 +217,7 @@ JNIEXPORT jint JNICALL Java_karmaresearch_vlog_VLog_getPredicateId(JNIEnv *env, 
     //Transform the string into a C++ string
     std::string predName = jstring2string(env, p);
 
-    // TODO: fix this: this might create a new predicate if it does not exists.
+    // TODO: fix this: this might create a new predicate if it does not exist.
     // There should be a way to just do a lookup???
     Predicate pred = program->getPredicate(predName);
 

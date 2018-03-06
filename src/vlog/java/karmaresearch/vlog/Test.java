@@ -72,21 +72,19 @@ class Test {
         vlog.start(fn, true);
         ArrayList<Rule> rules = new ArrayList<>();
         rules.add(rule1);
-        rules.add(rule2);
-        rules.add(rule3);
-        rules.add(rule4);
-        rules.add(rule5);
 
         vlog.setRules(rules.toArray(new Rule[rules.size()]),
                 RuleRewriteStrategy.AGGRESSIVE);
         vlog.materialize(false);
+
         List<Term> q = new ArrayList<Term>();
         q.add(new Term(TermType.VARIABLE, "?ID"));
         q.add(new Term(TermType.VARIABLE, "?PATIENT"));
         q.add(new Term(TermType.CONSTANT, "186"));
         q.add(new Term(TermType.VARIABLE, "?C1"));
-        StringQueryResultEnumeration result = vlog
-                .query(new Atom("prescription", q.toArray(new Term[4])));
+        Atom query = new Atom("prescription", q.toArray(new Term[q.size()]));
+
+        StringQueryResultEnumeration result = vlog.query(query);
         while (result.hasMoreElements()) {
             String[] r = result.nextElement();
             for (String s : r) {
@@ -95,6 +93,27 @@ class Test {
             System.out.println();
         }
         result.cleanup();
+
+        rules.clear();
+        rules.add(rule1);
+        rules.add(rule2);
+        rules.add(rule3);
+        rules.add(rule4);
+        rules.add(rule5);
+
+        vlog.setRules(rules.toArray(new Rule[rules.size()]),
+                RuleRewriteStrategy.AGGRESSIVE);
+        vlog.materialize(false);
+        result = vlog.query(query);
+        while (result.hasMoreElements()) {
+            String[] r = result.nextElement();
+            for (String s : r) {
+                System.out.print(s + " ");
+            }
+            System.out.println();
+        }
+        result.cleanup();
+
     }
 
 }
