@@ -162,10 +162,10 @@ void alarmHandler(int signalNumber) {
     if (signalNumber == SIGALRM) {
         kill(pid, SIGKILL);
         timedOut = true;
-    } else if (signalNumber == SIGCHLD) {
+    } /*else if (signalNumber == SIGCHLD) {
         timedOut = false;
         cout << "child died";
-    }
+    }*/
 }
 
 
@@ -183,7 +183,7 @@ double WebInterface::runAlgo(string& algo,
 
     std::chrono::duration<double> durationQuery;
     signal(SIGALRM, alarmHandler);
-    signal(SIGCHLD, alarmHandler);
+    //signal(SIGCHLD, alarmHandler);
     timedOut = false;
 
     double* queryTime = (double*) mmap(NULL, sizeof(double), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
@@ -246,6 +246,7 @@ double WebInterface::runAlgo(string& algo,
         durationQuery = queryEndTime - queryStartTime;
         LOG(INFOL) << "QueryTime = " << durationQuery.count();
         *queryTime = durationQuery.count()*1000;
+        exit(0);
         //cout << durationQuery.count();
         //-
         //Child work ends
@@ -527,7 +528,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             JSON queryMagicTimes;
             int i = 1;
             for (auto q : queryVector) {
-                LOG(INFOL) << i++ << ") " << q;
+                LOG(INFOL) << getpid() << " : " << i++ << ") " << q;
                 // Execute the literal query
                 JSON results;
                 JSON features;
@@ -605,6 +606,8 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             spremat = replacedString;
 
             LOG(INFOL) << "Setting up the KB with the given rules ...";
+
+            LOG(INFOL) << "pid = " << getpid();
 
             //Cleanup and install the EDB layer
             EDBConf conf(edbFile);
