@@ -162,6 +162,9 @@ void alarmHandler(int signalNumber) {
     if (signalNumber == SIGALRM) {
         kill(pid, SIGKILL);
         timedOut = true;
+    } else if (signalNumber == SIGCHLD) {
+        timedOut = false;
+        cout << "child died";
     }
 }
 
@@ -174,33 +177,35 @@ double WebInterface::runAlgo(string& algo,
         stringstream& ss,
         uint64_t timeoutMillis) {
 
-    int pipefd[2];
-    pipe(pipefd);
-
-
+    //int pipefd[2];
     int ret;
+    //pipe(pipefd);
+
+    std::chrono::duration<double> durationQuery;
     signal(SIGALRM, alarmHandler);
+    signal(SIGCHLD, alarmHandler);
     timedOut = false;
+
+    double* queryTime = (double*) mmap(NULL, sizeof(double), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
 
     pid = fork();
     if (pid < 0) {
         LOG(ERRORL) << "Could not fork";
         return 0.0L;
     } else if (pid == 0) {
-        close(pipefd[0]);
-        dup2(pipefd[1] ,1);
-        dup2(pipefd[1], 2);
-        close(pipefd[1]);
+        //close(pipefd[0]); // Close read end of the pipe
+        //dup2(pipefd[1] ,1); // Duplicate write FD of pipe in stdout of child
+        //dup2(pipefd[1], 2); // Duplicate write FD of pipe in stderr of child
+        //close(pipefd[1]); // Close the write end of pipe
         //Child work begins
         //+
         std::chrono::system_clock::time_point queryStartTime = std::chrono::system_clock::now();
         //int times = vm["repeatQuery"].as<int>();
-        bool printResults = true; // vm["printResults"].as<bool>();
+        bool printResults = false; // vm["printResults"].as<bool>();
 
         int nVars = literal.getNVars();
         bool onlyVars = nVars > 0;
 
-        LOG(INFOL) << "started computing";
         TupleIterator *iter;
         if (algo == "magic"){
             iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
@@ -236,29 +241,49 @@ double WebInterface::runAlgo(string& algo,
                 }
             }
         }
+        //LOG(INFOL) << "algo : " << algo;
         std::chrono::system_clock::time_point queryEndTime = std::chrono::system_clock::now();
-        std::chrono::duration<double> durationQuery = queryEndTime - queryStartTime;
-        cout << durationQuery.count();
-        exit(0);
+        durationQuery = queryEndTime - queryStartTime;
+        LOG(INFOL) << "QueryTime = " << durationQuery.count();
+        *queryTime = durationQuery.count()*1000;
+        //cout << durationQuery.count();
         //-
         //Child work ends
     } else {
         uint64_t l =  timeoutMillis / 1000;
         alarm(l);
-        LOG(INFOL) << "waiting for child to die for " << l << " seconds";
-        ret = waitpid(pid, NULL, 0);
+        int status;
+        //LOG(INFOL) << "waiting for child to die for " << l << " seconds";
+        ret = waitpid(pid, &status, 0);
+        LOG(INFOL) << "ret = " << ret << " pid = " << pid << " status = " << status;
         alarm(0);
         if (timedOut) {
+            LOG(INFOL) << "TIMED OUTTTTT";
+            munmap(queryTime, sizeof(double));
             return timeoutMillis;
         }
-        fcntl(pipefd[0], F_SETFL, O_NONBLOCK);
-        string result="";
-        char buffer[80];
-        if ((ret = read(pipefd[0], buffer, sizeof(buffer))) > 0) {
-            result += buffer;
-        }
-        double time = std::stod(result);
+        // fcntl(pipefd[0], F_SETFL, O_NONBLOCK);
+        // string result="";
+        // char buffer[80];
+        // if ((ret = read(pipefd[0], buffer, sizeof(buffer))) > 0) {
+        //     result += buffer;
+        // }
+        // LOG(INFOL) << "result : " << result << " : size = " << result.size();
+        // if (result.find("Finished") != string::npos) {
+        //     // Child finished processing successfully for magic sets case
+        //     LOG(INFOL) << "magic set returned in time";
+        // }
+        // int pos = result.find("QueryTime = ");
+        // if (pos == string::npos) {
+        //     return timeoutMillis;
+        // }
+        // string timing = result.substr(pos + 13);
+        // double time = std::stod(timing);
+        double time = *queryTime;
+        LOG(INFOL) << "query time in parent :" << time;
+        munmap(queryTime, sizeof(double));
         return time;
+        //return durationQuery.count()*1000;
     }
 }
 
@@ -285,16 +310,17 @@ void WebInterface::execLiteralQuery(string& literalquery,
         << std::to_string(metrics.countIntermediateQueries) << ", "
         << std::to_string(metrics.countIDBPredicates);
     jsonFeatures->put("features", strMetrics.str());
-    LOG(INFOL) << strMetrics.str();
+    //LOG(INFOL) << strMetrics.str();
 
     stringstream ssQsqr;
     string algo = "qsqr";
+    //LOG(INFOL) << "query : " << literalquery;
     double durationQsqr = WebInterface::runAlgo(algo, reasoner, edb, p, literal, ssQsqr, 5000);
 
     stringstream ssMagic;
     algo = "magic";
     double durationMagic = WebInterface::runAlgo(algo, reasoner, edb, p, literal, ssMagic, 5000);
-    LOG(INFOL) << ssMagic.str();
+    //LOG(INFOL) << ssMagic.str();
     LOG(INFOL) << "Qsqr time : " << durationQsqr;
     LOG(INFOL) << "magic time: " << durationMagic;
     jsonResults->put("results", ssQsqr.str());// + ":" + ssMagic.str());
@@ -499,8 +525,9 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             JSON queryFeatures;
             JSON queryQsqrTimes;
             JSON queryMagicTimes;
+            int i = 1;
             for (auto q : queryVector) {
-                LOG(INFOL) << q;
+                LOG(INFOL) << i++ << ") " << q;
                 // Execute the literal query
                 JSON results;
                 JSON features;
