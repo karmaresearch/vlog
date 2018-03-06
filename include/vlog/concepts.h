@@ -414,6 +414,10 @@ class Program {
         Program(const uint64_t assignedIds,
                 EDBLayer *kb);
 
+	EDBLayer *getKB() {
+	    return kb;
+	}
+
         Literal parseLiteral(std::string literal, Dictionary &dictVariables);
 
         void readFromFile(std::string pathFile, bool rewriteMultihead = false);

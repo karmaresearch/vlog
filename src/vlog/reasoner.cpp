@@ -703,19 +703,16 @@ TupleIterator *Reasoner::getMaterializationIterator(Literal &query,
 
     sn->run();
 
-    //To use if the flag returnOnlyVars is set to false
-    uint64_t outputTuple[3];    // Used in trident method, so no Term_t
-    uint8_t nPosToCopy = 0;
-    uint8_t posToCopy[3];
-    for (int j = 0; j < query.getTupleSize(); ++j) {
-        if (!query.getTermAtPos(j).isVariable()) {
-            outputTuple[j] = query.getTermAtPos(j).getValue();
-        } else {
-            posToCopy[nPosToCopy++] = j;
-        }
-    }
+    TupleIterator *result = getIteratorWithMaterialization(sn, query, returnOnlyVars, sortByFields);
+    delete sn;
+    return result;
+}
 
-    FCIterator tableIt = sn->getTable(pred.getId());
+TupleIterator *Reasoner::getIteratorWithMaterialization(SemiNaiver *sn, Literal &query, bool returnOnlyVars,
+	std::vector<uint8_t> *sortByFields) {
+
+    FCIterator tableIt = sn->getTable(query.getPredicate().getId());
+    VTuple tuple = query.getTuple();
 
     TupleTable *finalTable;
     if (returnOnlyVars) {
@@ -752,7 +749,6 @@ TupleIterator *Reasoner::getMaterializationIterator(Literal &query,
     }
 
     std::shared_ptr<TupleTable> pFinalTable(finalTable);
-    delete sn;
 
     if (sortByFields != NULL && !sortByFields->empty()) {
         std::shared_ptr<TupleTable> sortTab = std::shared_ptr<TupleTable>(

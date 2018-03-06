@@ -197,13 +197,13 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "Activate reasoning during query answering using the rules defined at this path. It is REQUIRED in case the command is <mat>. Default is '' (disabled).", false);
     query_options.add<bool>("", "rewriteMultihead", false,
             "try to split up rules with multiple heads.", false);
-    query_options.add<long>("", "reasoningThreshold", 1000000,
+    query_options.add<int64_t>("", "reasoningThreshold", 1000000,
             "This parameter sets a threshold to estimate the reasoning cost of a pattern. This cost can be broadly associated to the cardinality of the pattern. It is used to choose either TopDown or Magic evalution. Default is 1000000 (1M).", false);
     query_options.add<string>("", "reasoningAlgo", "",
             "Determines the reasoning algo (only for <queryLiteral>). Possible values are \"qsqr\", \"magic\", \"auto\".", false);
     query_options.add<string>("", "selectionStrategy", "",
             "Determines the selection strategy (only for <queryLiteral>, when \"auto\" is specified for the reasoningAlgorithm). Possible values are \"cardEst\", ... (to be extended) .", false);
-    query_options.add<long>("", "matThreshold", 10000000,
+    query_options.add<int64_t>("", "matThreshold", 10000000,
             "In case reasoning is activated, this parameter sets a threshold above which a full materialization is performed before we execute the query. Default is 10000000 (10M).", false);
     query_options.add<bool>("", "printResults", true,
             "Print the answers of a literal query.", false);
@@ -263,7 +263,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     ProgramArgs::GroupArgs& lookup_options = *vm.newGroup("Options for <lookup>");
     lookup_options.add<string>("t","text", "",
             "Textual term to search", false);
-    lookup_options.add<int>("n","number", 0, "Numeric term to search",false);
+    lookup_options.add<int64_t>("n","number", 0, "Numeric term to search",false);
 
     ProgramArgs::GroupArgs& server_options = *vm.newGroup("Options for <server>");
     server_options.add<string>("","webpages", "../webinterface",
@@ -574,7 +574,7 @@ void lookup(EDBLayer &layer, ProgramArgs &vm) {
             cout << value << endl;
         }
     } else {
-        uint64_t key = vm["number"].as<long>();
+        int64_t key = vm["number"].as<int64_t>();
         char supportText[MAX_TERM_SIZE];
         if (!layer.getDictText(key, supportText)) {
             cout << "Term " << key << " not found" << endl;
@@ -800,7 +800,7 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
             p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
             p.sortRulesByIDBPredicates();
         }
-        db = new VLogLayer(edb, p, vm["reasoningThreshold"].as<long>(), "TI", "TE");
+        db = new VLogLayer(edb, p, vm["reasoningThreshold"].as<int64_t>(), "TI", "TE");
     }
     string queryFileName = vm["query"].as<string>();
     // Parse the query
@@ -1074,7 +1074,7 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     }
     Dictionary dictVariables;
     Literal literal = p.parseLiteral(query, dictVariables);
-    Reasoner reasoner(vm["reasoningThreshold"].as<long>());
+    Reasoner reasoner(vm["reasoningThreshold"].as<int64_t>());
     runLiteralQuery(edb, p, literal, reasoner, vm);
 }
 
