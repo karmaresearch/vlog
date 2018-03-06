@@ -67,7 +67,12 @@ class Test {
     static void runTest(String fn) throws Exception {
         VLog vlog = new VLog();
         // vlog.setLogLevel("debug");
-        vlog.start("blabla", false);
+        try {
+            vlog.start("blabla", false);
+            System.err.println("vlog.start() should have thrown an exception.");
+        } catch (EDBConfigurationException e) {
+            // Good!
+        }
         vlog.stop();
         vlog.start(fn, true);
         ArrayList<Rule> rules = new ArrayList<>();

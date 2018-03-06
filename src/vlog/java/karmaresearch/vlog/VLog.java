@@ -43,10 +43,8 @@ public class VLog {
      * name, in which case the <code>isFile</code> parameter should be
      * <code>true</code>.
      *
-     * TODO: special exception for parse error in the configuration?
-     *
      * @param edbconfig
-     *            the edb configuration, as a string.
+     *            the edb configuration, as a string or as a filename.
      * @param isFile
      *            whether it is a file, or an edb configuration as a string.
      * @exception IOException
@@ -55,9 +53,12 @@ public class VLog {
      *                not exist.
      * @exception AlreadyStartedException
      *                is thrown when vlog was already started, and not stopped.
+     * @exception EDBConfigurationException
+     *                is thrown when there is an error in the EDB configuration.
      */
     public native void start(String edbconfig, boolean isFile)
-            throws AlreadyStartedException, IOException;
+            throws AlreadyStartedException, EDBConfigurationException,
+            IOException;
 
     /**
      * Stops and de-allocates the reasoner. This method should be called before
@@ -137,7 +138,7 @@ public class VLog {
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      */
-    public native QueryResultEnumeration query(int predicate, long[] terms)
+    private native QueryResultEnumeration query(int predicate, long[] terms)
             throws NotStartedException;
 
     /**

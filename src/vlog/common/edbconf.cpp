@@ -36,7 +36,7 @@ void EDBConf::parse(string f) {
             std::size_t found = line.find("_");
             if (found == string::npos) {
                 LOG(ERRORL) << "Malformed line in edb.conf file: " << line;
-                throw 10;
+                throw ("Malformed line: " + line);
             }
 
             string idedb = line.substr(3, found - 3);
@@ -66,9 +66,11 @@ void EDBConf::parse(string f) {
             } else {
                 //I don't know what it is. Throw error.
                 LOG(ERRORL) << "Malformed line in edb.conf file: " << line;
-                throw 10;
+                throw ("Malformed line: " + line);
             }
-        }
+        } else {
+	    throw ("Malformed line: " + line);
+	}
     }
 
 #ifdef DEBUG

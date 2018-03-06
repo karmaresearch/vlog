@@ -49,6 +49,10 @@ void throwAlreadyStartedException(JNIEnv *env, const char *message) {
     throwException(env, "karmaresearch/vlog/AlreadyStartedException", message);
 }
 
+void throwEDBConfigurationException(JNIEnv *env, const char *message) {
+    throwException(env, "karmaresearch/vlog/EDBConfigurationException", message);
+}
+
 // Converts a vector of Atoms into VLog representation.
 std::vector<Literal> getVectorLiteral(JNIEnv *env, jobjectArray h, Dictionary &dict) {
     std::vector<Literal> result;
@@ -178,10 +182,15 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_start(JNIEnv *env, jobject o
 	    return;
 	}
     }
-    EDBConf conf(crawconf.c_str(), isfile);
 
-    layer = new EDBLayer(conf, false);
-    program = new Program(layer->getNTerms(), layer);
+    try {
+	EDBConf conf(crawconf.c_str(), isfile);
+
+	layer = new EDBLayer(conf, false);
+	program = new Program(layer->getNTerms(), layer);
+    } catch(std::string s) {
+	throwEDBConfigurationException(env, s.c_str());
+    }
 }
 
 /*
