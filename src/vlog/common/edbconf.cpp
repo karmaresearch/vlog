@@ -11,13 +11,14 @@
 
 EDBConf::EDBConf(string rawcontent, bool isFile) {
     if (isFile) {
+	LOG(INFOL) << "Parsing EDB configuration " << rawcontent;
         //Read the input file line by line
         string f = rawcontent;
         std::ifstream file(f);
         string line;
         rawcontent = "";
         while (std::getline(file, line)) {
-            rawcontent += line;
+            rawcontent += line + "\n";
         }
     }
     parse(rawcontent);
