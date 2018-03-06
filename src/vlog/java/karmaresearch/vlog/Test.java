@@ -64,13 +64,12 @@ class Test {
     private static Rule rule5 = new Rule(new Atom[] { targethospital },
             new Atom[] { hospital });
 
-    static void runTest() throws Exception {
+    static void runTest(String fn) throws Exception {
         VLog vlog = new VLog();
-        vlog.setLogLevel("debug");
+        // vlog.setLogLevel("debug");
         vlog.start("blabla", false);
         vlog.stop();
-        vlog.start("/Users/ceriel/Projects/vlog-runs/data/doctors/edb-10K.conf",
-                true);
+        vlog.start(fn, true);
         ArrayList<Rule> rules = new ArrayList<>();
         rules.add(rule1);
         rules.add(rule2);

@@ -236,6 +236,6 @@ public class VLog {
 
     // For testing purposes ...
     public static void main(String[] args) throws Exception {
-        Test.runTest();
+        Test.runTest(args[0]);
     }
 }
