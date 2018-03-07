@@ -96,80 +96,40 @@ std::vector<std::string> readRow(ifstream &ifs) {
 InmemoryTable::InmemoryTable(string repository, string tablename,
         PredId_t predid) {
     arity = 0;
-//    string schemaFile = repository + "/" + tablename + ".schema";
-//    ifstream ifs;
-//    ifs.open(schemaFile);
-//    string line;
-//    while (std::getline(ifs, line)) {
-//        auto delim = line.find(':');
-//        string varname = line.substr(0, delim);
-//        varnames.push_back(varname);
-//        arity++;
-//    }
-//    ifs.close();
-//
     //Load the table in the database
     string tablefile = repository + "/" + tablename + ".csv";
-    if (Utils::exists(tablefile)) {
-	ifstream ifs;
-        ifs.open(tablefile);
-	if (ifs.fail()) {
-	    throw ("Could not open file " + tablefile + " for reading");
-	}
-	LOG(DEBUGL) << "Reading " << tablefile;
-        std::vector<std::vector<Term_t>> vectors;
-//        string line;
-//        while(std::getline(ifs, line)) {
-//            //Parse the row
-//	    int i = 0;
-//	    while (line.length() > 0) {
-//                auto delim = line.find(',');
-//                string sn = line.substr(0, delim);
-//		if (arity == 0 && vectors.size() <= i) {
-//		    std::vector<Term_t> v;
-//		    vectors.push_back(v);
-//		}
-//                vectors[i].push_back(singletonDict.getOrAdd(sn));
-//		if (delim == std::string::npos) {
-//		    line = "";
-//		} else {
-//		    line = line.substr(delim + 1);
-//		}
-//		i++;
-//            }
-//	    if (arity == 0) {
-//		arity = i;
-//	    }
-//        }
-	while (! ifs.eof()) {
-	    std::vector<std::string> row = readRow(ifs);
-	    if (arity == 0) {
-		arity = row.size();
-	    }
-	    if (row.size() == 0) {
-		break;
-	    } else if (row.size() != arity) {
-		throw ("Multiple arities in file " + tablefile);
-	    }
-	    for (int i = 0; i < arity; i++) {
-		if (i >= vectors.size()) {
-		    std::vector<Term_t> v;
-		    vectors.push_back(v);
-		}
-		vectors[i].push_back(singletonDict.getOrAdd(row[i]));
-	    }
-	}
-        std::vector<std::shared_ptr<Column>> columns;
-        for(uint8_t i = 0; i < arity; ++i) {
-            columns.push_back(std::shared_ptr<Column>(new InmemoryColumn(
-                            vectors[i])));
-        }
-        segment = std::shared_ptr<Segment>(new Segment(arity, columns));
-        ifs.close();
-    } else {
-	LOG(WARNL) << "tablefile " << tablefile << " does not exist";
-        segment = NULL;
+    ifstream ifs;
+    ifs.open(tablefile);
+    if (ifs.fail()) {
+	throw ("Could not open file " + tablefile + " for reading");
     }
+    LOG(DEBUGL) << "Reading " << tablefile;
+    std::vector<std::vector<Term_t>> vectors;
+    while (! ifs.eof()) {
+	std::vector<std::string> row = readRow(ifs);
+	if (arity == 0) {
+	    arity = row.size();
+	}
+	if (row.size() == 0) {
+	    break;
+	} else if (row.size() != arity) {
+	    throw ("Multiple arities in file " + tablefile);
+	}
+	for (int i = 0; i < arity; i++) {
+	    if (i >= vectors.size()) {
+		std::vector<Term_t> v;
+		vectors.push_back(v);
+	    }
+	    vectors[i].push_back(singletonDict.getOrAdd(row[i]));
+	}
+    }
+    std::vector<std::shared_ptr<Column>> columns;
+    for(uint8_t i = 0; i < arity; ++i) {
+	columns.push_back(std::shared_ptr<Column>(new InmemoryColumn(
+			vectors[i])));
+    }
+    segment = std::shared_ptr<Segment>(new Segment(arity, columns));
+    ifs.close();
     // dump();
 }
 
