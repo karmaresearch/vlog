@@ -288,7 +288,8 @@ double Training::runAlgo(string& algo,
         Program& p,
         Literal& literal,
         stringstream& ss,
-        uint64_t timeoutMillis) {
+        uint64_t timeoutMillis,
+        uint8_t repeatQuery) {
 
     int ret;
 
@@ -306,9 +307,7 @@ double Training::runAlgo(string& algo,
         //Child work begins
         //+
         std::chrono::system_clock::time_point queryStartTime = std::chrono::system_clock::now();
-        //int times = vm["repeatQuery"].as<int>();
-        bool printResults = false; // vm["printResults"].as<bool>();
-
+        bool printResults = false;
         int nVars = literal.getNVars();
         bool onlyVars = nVars > 0;
 
@@ -372,14 +371,53 @@ double Training::runAlgo(string& algo,
     }
 }
 
-void Training::execLiteralQuery(string& literalquery,
+void Training::execLiteralQueries(vector<string>& queryVector,
         EDBLayer& edb,
         Program& p,
-        bool jsonoutput,
         JSON* jsonResults,
         JSON* jsonFeatures,
         JSON* jsonQsqrTime,
-        JSON* jsonMagicTime) {
+        JSON* jsonMagicTime,
+        uint64_t timeout,
+        uint8_t repeatQuery) {
+        int i = 0;
+        for (auto q : queryVector) {
+            LOG(INFOL) << getpid() << " : " << i++ << ") " << q;
+            // Execute the literal query
+            JSON results;
+            JSON features;
+            JSON qsqrTime;
+            JSON magicTime;
+            Training::execLiteralQuery(q,
+                    edb,
+                    p,
+                    &results,
+                    &features,
+                    &qsqrTime,
+                    &magicTime,
+                    timeout,
+                    repeatQuery);
+            jsonResults->push_back(results);
+            jsonFeatures->push_back(features);
+            jsonQsqrTime->push_back(qsqrTime);
+            jsonMagicTime->push_back(magicTime);
+        }
+}
+
+void Training::execLiteralQuery(string& literalquery,
+        EDBLayer& edb,
+        Program& p,
+        JSON* jsonResults,
+        JSON* jsonFeatures,
+        JSON* jsonQsqrTime,
+        JSON* jsonMagicTime,
+        uint64_t timeout,
+        uint8_t repeatQuery) {
+
+    JSON results;
+    JSON features;
+    JSON qsqrTime;
+    JSON magicTime;
 
     Dictionary dictVariables;
     Literal literal = p.parseLiteral(literalquery, dictVariables);
@@ -398,11 +436,11 @@ void Training::execLiteralQuery(string& literalquery,
 
     stringstream ssQsqr;
     string algo = "qsqr";
-    double durationQsqr = Training::runAlgo(algo, reasoner, edb, p, literal, ssQsqr, 5000);
+    double durationQsqr = Training::runAlgo(algo, reasoner, edb, p, literal, ssQsqr, timeout, repeatQuery);
 
     stringstream ssMagic;
     algo = "magic";
-    double durationMagic = Training::runAlgo(algo, reasoner, edb, p, literal, ssMagic, 5000);
+    double durationMagic = Training::runAlgo(algo, reasoner, edb, p, literal, ssMagic, timeout, repeatQuery);
     LOG(INFOL) << "Qsqr time : " << durationQsqr;
     LOG(INFOL) << "magic time: " << durationMagic;
     jsonResults->put("results", ssQsqr.str());

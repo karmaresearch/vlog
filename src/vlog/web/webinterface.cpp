@@ -318,18 +318,18 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             //write_json(buf, pt, false);
             page = buf.str();
             isjson = true;
+        } else if (path == "/gentq") {
+            // Here we will generate queries and run them and train
         } else if (path == "/query") {
 
             //Get all query
             string form = req.substr(req.find("application/x-www-form-urlencoded"));
-            //string printresults = _getValueParam(form, "print");
             string queries = _getValueParam(form, "query");
             string timeoutStr = _getValueParam(form, "timeout");
             string repeatQueryStr = _getValueParam(form, "repeatQuery");
 
-            int timeout = stoi(timeoutStr);
-            int repeatQuery = stoi(repeatQueryStr);
-            LOG(INFOL) << "time out = " << timeout << " and repeat query = " << repeatQuery;
+            uint64_t timeout = stoull(timeoutStr);
+            uint8_t repeatQuery = stoul(repeatQueryStr);
             //Decode the query
             queries = HttpServer::unescape(queries);
             std::regex e1("\\+");
@@ -338,7 +338,6 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                     queries.begin(), queries.end(),
                     e1, "$1 ");
             queries = replacedString;
-            LOG(INFOL) << "queries: " << queries;
             std::regex e2("\\r\\n");
             replacedString = "";
             std::regex_replace(std::back_inserter(replacedString),
@@ -358,29 +357,16 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             JSON queryFeatures;
             JSON queryQsqrTimes;
             JSON queryMagicTimes;
-            int i = 1;
-            for (auto q : queryVector) {
-                LOG(INFOL) << getpid() << " : " << i++ << ") " << q;
-                // Execute the literal query
-                JSON results;
-                JSON features;
-                JSON qsqrTime;
-                JSON magicTime;
-                if (program) {
-                    LOG(INFOL) << "Answering the literal query with VLog ...";
-                    Training::execLiteralQuery(q,
-                            *edb.get(),
-                            *program.get(),
-                            false,
-                            &results,
-                            &features,
-                            &qsqrTime,
-                            &magicTime);
-                    queryResults.push_back(results);
-                    queryFeatures.push_back(features);
-                    queryQsqrTimes.push_back(qsqrTime);
-                    queryMagicTimes.push_back(magicTime);
-                }
+            if (program) {
+                Training::execLiteralQueries(queryVector,
+                        *edb.get(),
+                        *program.get(),
+                        &queryResults,
+                        &queryFeatures,
+                        &queryQsqrTimes,
+                        &queryMagicTimes,
+                        timeout,
+                        repeatQuery);
             }
             node.add_child("results", queryResults);
             node.add_child("features", queryFeatures);

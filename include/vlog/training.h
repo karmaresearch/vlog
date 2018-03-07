@@ -42,16 +42,28 @@ class Training {
         Program& p,
         Literal& literal,
         stringstream& ss,
-        uint64_t timeoutMillis);
+        uint64_t timeoutMillis,
+        uint8_t repeatQuery);
 
     static void execLiteralQuery(string& literalquery,
         EDBLayer& edb,
         Program& p,
-        bool jsonoutput,
         JSON* jsonResults,
         JSON* jsonFeatures,
         JSON* jsonQsqrTime,
-        JSON* jsonMagicTime);
+        JSON* jsonMagicTime,
+        uint64_t timeout,
+        uint8_t repeatQuery);
+
+    static void execLiteralQueries(vector<string>& literalquery,
+        EDBLayer& edb,
+        Program& p,
+        JSON* jsonResults,
+        JSON* jsonFeatures,
+        JSON* jsonQsqrTime,
+        JSON* jsonMagicTime,
+        uint64_t timeout,
+        uint8_t repeatQuery);
 
     static void trainModel();
 };
