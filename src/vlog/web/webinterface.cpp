@@ -3,6 +3,7 @@
 #include <vlog/webinterface.h>
 #include <vlog/materialization.h>
 #include <vlog/seminaiver.h>
+#include <vlog/training.h>
 
 #include <launcher/vloglayer.h>
 #include <cts/parser/SPARQLLexer.hpp>
@@ -153,180 +154,6 @@ string WebInterface::lookup(string sId, DBLayer &db) {
     unsigned st;
     db.lookupById(id, start, end, type, st);
     return string(start, end - start);
-}
-
-
-pid_t pid;
-bool timedOut;
-void alarmHandler(int signalNumber) {
-    if (signalNumber == SIGALRM) {
-        kill(pid, SIGKILL);
-        timedOut = true;
-    } /*else if (signalNumber == SIGCHLD) {
-        timedOut = false;
-        cout << "child died";
-    }*/
-}
-
-
-double WebInterface::runAlgo(string& algo,
-        Reasoner& reasoner,
-        EDBLayer& edb,
-        Program& p,
-        Literal& literal,
-        stringstream& ss,
-        uint64_t timeoutMillis) {
-
-    //int pipefd[2];
-    int ret;
-    //pipe(pipefd);
-
-    std::chrono::duration<double> durationQuery;
-    signal(SIGALRM, alarmHandler);
-    //signal(SIGCHLD, alarmHandler);
-    timedOut = false;
-
-    double* queryTime = (double*) mmap(NULL, sizeof(double), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
-
-    pid = fork();
-    if (pid < 0) {
-        LOG(ERRORL) << "Could not fork";
-        return 0.0L;
-    } else if (pid == 0) {
-        //close(pipefd[0]); // Close read end of the pipe
-        //dup2(pipefd[1] ,1); // Duplicate write FD of pipe in stdout of child
-        //dup2(pipefd[1], 2); // Duplicate write FD of pipe in stderr of child
-        //close(pipefd[1]); // Close the write end of pipe
-        //Child work begins
-        //+
-        std::chrono::system_clock::time_point queryStartTime = std::chrono::system_clock::now();
-        //int times = vm["repeatQuery"].as<int>();
-        bool printResults = false; // vm["printResults"].as<bool>();
-
-        int nVars = literal.getNVars();
-        bool onlyVars = nVars > 0;
-
-        TupleIterator *iter;
-        if (algo == "magic"){
-            iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
-        } else if (algo == "qsqr") {
-            iter = reasoner.getTopDownIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
-        } else {
-            LOG(ERRORL) << "Algorithm not supported : " << algo;
-            return 0;
-        }
-        long count = 0;
-        int sz = iter->getTupleSize();
-        if (nVars == 0) {
-            ss << (iter->hasNext() ? "TRUE" : "FALSE") << endl;
-            count = (iter->hasNext() ? 1 : 0);
-        } else {
-            while (iter->hasNext()) {
-                iter->next();
-                count++;
-                if (printResults) {
-                    for (int i = 0; i < sz; i++) {
-                        char supportText[MAX_TERM_SIZE];
-                        uint64_t value = iter->getElementAt(i);
-                        if (i != 0) {
-                            ss << " ";
-                        }
-                        if (!edb.getDictText(value, supportText)) {
-                            LOG(ERRORL) << "Term " << value << " not found";
-                        } else {
-                            ss << supportText;
-                        }
-                    }
-                    ss << endl;
-                }
-            }
-        }
-        //LOG(INFOL) << "algo : " << algo;
-        std::chrono::system_clock::time_point queryEndTime = std::chrono::system_clock::now();
-        durationQuery = queryEndTime - queryStartTime;
-        LOG(INFOL) << "QueryTime = " << durationQuery.count();
-        *queryTime = durationQuery.count()*1000;
-        exit(0);
-        //cout << durationQuery.count();
-        //-
-        //Child work ends
-    } else {
-        uint64_t l =  timeoutMillis / 1000;
-        alarm(l);
-        int status;
-        //LOG(INFOL) << "waiting for child to die for " << l << " seconds";
-        ret = waitpid(pid, &status, 0);
-        LOG(INFOL) << "ret = " << ret << " pid = " << pid << " status = " << status;
-        alarm(0);
-        if (timedOut) {
-            LOG(INFOL) << "TIMED OUTTTTT";
-            munmap(queryTime, sizeof(double));
-            return timeoutMillis;
-        }
-        // fcntl(pipefd[0], F_SETFL, O_NONBLOCK);
-        // string result="";
-        // char buffer[80];
-        // if ((ret = read(pipefd[0], buffer, sizeof(buffer))) > 0) {
-        //     result += buffer;
-        // }
-        // LOG(INFOL) << "result : " << result << " : size = " << result.size();
-        // if (result.find("Finished") != string::npos) {
-        //     // Child finished processing successfully for magic sets case
-        //     LOG(INFOL) << "magic set returned in time";
-        // }
-        // int pos = result.find("QueryTime = ");
-        // if (pos == string::npos) {
-        //     return timeoutMillis;
-        // }
-        // string timing = result.substr(pos + 13);
-        // double time = std::stod(timing);
-        double time = *queryTime;
-        LOG(INFOL) << "query time in parent :" << time;
-        munmap(queryTime, sizeof(double));
-        return time;
-        //return durationQuery.count()*1000;
-    }
-}
-
-void WebInterface::execLiteralQuery(string& literalquery,
-        EDBLayer& edb,
-        Program& p,
-        bool jsonoutput,
-        JSON* jsonResults,
-        JSON* jsonFeatures,
-        JSON* jsonQsqrTime,
-        JSON* jsonMagicTime) {
-
-    Dictionary dictVariables;
-    Literal literal = p.parseLiteral(literalquery, dictVariables);
-    Reasoner reasoner(1000000);
-
-    Metrics metrics;
-    reasoner.getMetrics(literal, NULL, NULL, edb, p, metrics, 5);
-    stringstream strMetrics;
-    strMetrics  << std::to_string(metrics.cost) << ","
-        << std::to_string(metrics.estimate) << ", "
-        << std::to_string(metrics.countRules) << ", "
-        << std::to_string(metrics.countUniqueRules) << ", "
-        << std::to_string(metrics.countIntermediateQueries) << ", "
-        << std::to_string(metrics.countIDBPredicates);
-    jsonFeatures->put("features", strMetrics.str());
-    //LOG(INFOL) << strMetrics.str();
-
-    stringstream ssQsqr;
-    string algo = "qsqr";
-    //LOG(INFOL) << "query : " << literalquery;
-    double durationQsqr = WebInterface::runAlgo(algo, reasoner, edb, p, literal, ssQsqr, 5000);
-
-    stringstream ssMagic;
-    algo = "magic";
-    double durationMagic = WebInterface::runAlgo(algo, reasoner, edb, p, literal, ssMagic, 5000);
-    //LOG(INFOL) << ssMagic.str();
-    LOG(INFOL) << "Qsqr time : " << durationQsqr;
-    LOG(INFOL) << "magic time: " << durationMagic;
-    jsonResults->put("results", ssQsqr.str());// + ":" + ssMagic.str());
-    jsonQsqrTime->put("qsqrtime", to_string(durationQsqr));
-    jsonMagicTime->put("magictime", to_string(durationMagic));
 }
 
 void WebInterface::execSPARQLQuery(string sparqlquery,
@@ -497,6 +324,12 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             string form = req.substr(req.find("application/x-www-form-urlencoded"));
             //string printresults = _getValueParam(form, "print");
             string queries = _getValueParam(form, "query");
+            string timeoutStr = _getValueParam(form, "timeout");
+            string repeatQueryStr = _getValueParam(form, "repeatQuery");
+
+            int timeout = stoi(timeoutStr);
+            int repeatQuery = stoi(repeatQueryStr);
+            LOG(INFOL) << "time out = " << timeout << " and repeat query = " << repeatQuery;
             //Decode the query
             queries = HttpServer::unescape(queries);
             std::regex e1("\\+");
@@ -511,7 +344,6 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             std::regex_replace(std::back_inserter(replacedString),
                     queries.begin(), queries.end(), e2, "$1\n");
             queries = replacedString;
-            //LOG(INFOL) << "query: " << query;
             vector<string> queryVector;
             stringstream ss(queries);
             string query;
@@ -536,7 +368,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                 JSON magicTime;
                 if (program) {
                     LOG(INFOL) << "Answering the literal query with VLog ...";
-                    WebInterface::execLiteralQuery(q,
+                    Training::execLiteralQuery(q,
                             *edb.get(),
                             *program.get(),
                             false,

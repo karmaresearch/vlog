@@ -105,6 +105,11 @@ function execQuery() {
     var body = '';
     body += 'query=' + encodeURIComponent(queries);
 
+    var timeout = document.getElementById('timeout').value;
+    body += "&timeout=" + timeout;
+    var repeatQuery = document.getElementById('repeatQuery').value;
+    body += "&repeatQuery=" + repeatQuery;
+
     body = body.replace('/%20/g','+');
     var http_request = new XMLHttpRequest();
     http_request.open("POST", "http://" + window.location.hostname + ":" + port + "/query", true);
