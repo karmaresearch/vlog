@@ -34,6 +34,65 @@ bool InmemoryDict::getText(uint64_t id, char *text) {
     }
 }
 
+std::vector<std::string> readRow(ifstream &ifs) {
+    char buffer[65536];
+    bool insideEscaped = false;
+    char *p = &buffer[0];
+    bool justSeenQuote = false;
+    int quoteCount = 0;		// keep track of number of concecutive quotes.
+    std::vector<std::string> result;
+    while (true) {
+	int c = ifs.get();
+	bool eof = (c == EOF);
+	if (eof) {
+	    if (p == buffer && result.size() == 0) {
+		return result;
+	    }
+	    c = '\n';
+	}
+	if (c == '\r') {
+	    // ignore these?
+	    continue;
+	}
+	if (p == buffer && ! justSeenQuote) {
+	    // Watch out for more than one initial quote ...
+	    if (c == '"') {
+		// Initial character is a quote.
+		insideEscaped = true;
+		justSeenQuote = true;
+		continue;
+	    }
+	} else if (c == '"') {
+	    quoteCount++;
+	    insideEscaped = (quoteCount & 1) == 0;
+	    if (insideEscaped) {
+		p--;
+	    }
+	} else {
+	    quoteCount = 0;
+	}
+	if (eof || (! insideEscaped && (c == '\n' || c == ','))) {
+	    if (justSeenQuote) {
+		*(p-1) = '\0';
+	    } else {
+		*p = '\0';
+	    }
+	    result.push_back(std::string(buffer));
+	    if (c == '\n') {
+		return result;
+	    }
+	    p = buffer;
+	    insideEscaped = false;
+	} else {
+	    if (p - buffer >= 65535) {
+		throw "Maximum field size exceeded in CSV file: 65535";
+	    }
+	    *p++ = c;
+	}
+	justSeenQuote = (c == '"');
+    }
+}
+
 InmemoryTable::InmemoryTable(string repository, string tablename,
         PredId_t predid) {
     arity = 0;
@@ -54,31 +113,52 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
     if (Utils::exists(tablefile)) {
 	ifstream ifs;
         ifs.open(tablefile);
-        string line;
-        std::vector<std::vector<Term_t>> vectors;
+	if (ifs.fail()) {
+	    throw ("Could not open file " + tablefile + " for reading");
+	}
 	LOG(DEBUGL) << "Reading " << tablefile;
-        while(std::getline(ifs, line)) {
-            //Parse the row
-	    int i = 0;
-	    while (line.length() > 0) {
-                auto delim = line.find(',');
-                string sn = line.substr(0, delim);
-		if (arity == 0 && vectors.size() <= i) {
+        std::vector<std::vector<Term_t>> vectors;
+//        string line;
+//        while(std::getline(ifs, line)) {
+//            //Parse the row
+//	    int i = 0;
+//	    while (line.length() > 0) {
+//                auto delim = line.find(',');
+//                string sn = line.substr(0, delim);
+//		if (arity == 0 && vectors.size() <= i) {
+//		    std::vector<Term_t> v;
+//		    vectors.push_back(v);
+//		}
+//                vectors[i].push_back(singletonDict.getOrAdd(sn));
+//		if (delim == std::string::npos) {
+//		    line = "";
+//		} else {
+//		    line = line.substr(delim + 1);
+//		}
+//		i++;
+//            }
+//	    if (arity == 0) {
+//		arity = i;
+//	    }
+//        }
+	while (! ifs.eof()) {
+	    std::vector<std::string> row = readRow(ifs);
+	    if (arity == 0) {
+		arity = row.size();
+	    }
+	    if (row.size() == 0) {
+		break;
+	    } else if (row.size() != arity) {
+		throw ("Multiple arities in file " + tablefile);
+	    }
+	    for (int i = 0; i < arity; i++) {
+		if (i >= vectors.size()) {
 		    std::vector<Term_t> v;
 		    vectors.push_back(v);
 		}
-                vectors[i].push_back(singletonDict.getOrAdd(sn));
-		if (delim == std::string::npos) {
-		    line = "";
-		} else {
-		    line = line.substr(delim + 1);
-		}
-		i++;
-            }
-	    if (arity == 0) {
-		arity = i;
+		vectors[i].push_back(singletonDict.getOrAdd(row[i]));
 	    }
-        }
+	}
         std::vector<std::shared_ptr<Column>> columns;
         for(uint8_t i = 0; i < arity; ++i) {
             columns.push_back(std::shared_ptr<Column>(new InmemoryColumn(

@@ -186,7 +186,12 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_start(JNIEnv *env, jobject o
     try {
 	EDBConf conf(crawconf.c_str(), isfile);
 
-	layer = new EDBLayer(conf, false);
+	try {
+	    layer = new EDBLayer(conf, false);
+	} catch(std::string s) {
+	    throwIOException(env, s.c_str());
+	    return;
+	}
 	program = new Program(layer->getNTerms(), layer);
     } catch(std::string s) {
 	throwEDBConfigurationException(env, s.c_str());
