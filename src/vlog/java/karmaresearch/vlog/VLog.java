@@ -218,9 +218,6 @@ public class VLog {
      * TODO: maybe limit number of iterations? (Currently not in vlog, but could
      * be added)
      *
-     * TODO: whether we should store the result of the materialization
-     * somewhere, for instance as CSV files?
-     *
      * @param skolem
      *            whether to use skolem chase <code>true</code> or restricted
      *            chase <code>false</code>.
@@ -229,11 +226,23 @@ public class VLog {
      */
     public native void materialize(boolean skolem) throws NotStartedException;
 
-    // TODO: allow access to the materialization itself, without querying? For
-    // instance:
-    // (as suggested by Markus).
+    /**
+     * Creates a CSV file at the specified location, for the specified
+     * predicate.
+     *
+     * @param predicateName
+     *            the predicate name
+     * @param fileName
+     *            the location
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet, or materialization
+     *                has not run yet
+     * @exception IOException
+     *                is thrown when the file could not be written for some
+     *                reason
+     */
     public native void writePredicateToCsv(String predicateName,
-            String fileName);
+            String fileName) throws NotStartedException, IOException;
 
     // For testing purposes ...
     public static void main(String[] args) throws Exception {

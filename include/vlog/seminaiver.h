@@ -166,6 +166,9 @@ class SemiNaiver {
 
         void run(size_t lastIteration, size_t iteration);
 
+        void storeOnFile(std::string path, const PredId_t pred, const bool decompress,
+                const int minLevel, const bool csv);
+
         void storeOnFiles(std::string path, const bool decompress,
                 const int minLevel, const bool csv);
 

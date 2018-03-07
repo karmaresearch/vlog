@@ -10,3 +10,4 @@
 *.jar
 *.jnilib
 *.o
+testOutput

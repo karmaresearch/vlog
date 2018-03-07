@@ -117,6 +117,7 @@ class Test {
             }
             System.out.println();
         }
+        vlog.writePredicateToCsv("prescription", "testOutput");
         result.cleanup();
 
     }

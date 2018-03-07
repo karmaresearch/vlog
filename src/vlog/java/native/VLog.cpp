@@ -456,6 +456,29 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_materialize(JNIEnv *env, job
 }
 
 /*
+ * Class:     karmaresearch_vlog_VLog
+ * Method:    writePredicateToCsv
+ * Signature: (Ljava/lang/String;Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_writePredicateToCsv(JNIEnv *env, jobject obj, jstring jpred, jstring jfile) {
+    if (program == NULL) {
+	throwNotStartedException(env, "VLog is not started yet");
+	return;
+    }
+    if (sn == NULL) {
+	throwNotStartedException(env, "Materialization has not run yet");
+	return;
+    }
+    jint predId = Java_karmaresearch_vlog_VLog_getPredicateId(env, obj, jpred);
+    std::string fn = jstring2string(env, jfile);
+    try {
+	sn->storeOnFile(fn, (PredId_t) predId, true, 0, true);
+    } catch(std::string s) {
+	throwIOException(env, s.c_str());
+    }
+}
+
+/*
  * Class:     karmaresearch_vlog_QueryResultEnumeration
  * Method:    hasMoreElements
  * Signature: (J)Z
