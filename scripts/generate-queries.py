@@ -344,12 +344,12 @@ resultFiles = []
 rulesFile = args.rules
 outFile = args.out
 
-foutTypes = open(outFile, 'w')
-foutTypes.write("QueryType QSQR MAGIC\n")
-foutTypes.flush()
-foutFeatures = open(outFile + '.features', 'w')
-foutGenFeatures = open(outFile + '.gen.features', 'w')
-foutQueryStats = open(outFile + '.query.stats', 'w')
+#foutTypes = open(outFile, 'w')
+#foutTypes.write("QueryType QSQR MAGIC\n")
+#foutTypes.flush()
+#foutFeatures = open(outFile + '.features', 'w')
+#foutGenFeatures = open(outFile + '.gen.features', 'w')
+#foutQueryStats = open(outFile + '.query.stats', 'w')
 
 predicateWithResult = dict()
 matDir = args.mat
@@ -366,11 +366,24 @@ numQueries = 0
 globalMagicWon = 0
 start = time.time()
 parseRulesFile(rulesFile, predicateWithResult)
-runQueries(queries)
+
+foutQueries = open(outFile + '.datalog', 'w')
+data = ""
+for queryType in queries.keys():
+    #print ("Running queries of type : ", queryType)
+    uniqueQueries = list(set(queries[queryType]))
+    shuffle(uniqueQueries)
+    for q in uniqueQueries:
+        numQueries += 1
+        data += q + "\n"
+foutQueries.write(data)
+foutQueries.flush()
+foutQueries.close()
+#runQueries(queries)
 end = time.time()
 
-foutTypes.close()
-foutFeatures.close()
-foutGenFeatures.close()
-foutQueryStats.close()
+#foutTypes.close()
+#foutFeatures.close()
+#foutGenFeatures.close()
+#foutQueryStats.close()
 print (numQueries, " queries generated in ", (end-start)/60 , " minutes")
