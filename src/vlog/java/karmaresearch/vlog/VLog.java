@@ -322,6 +322,11 @@ public class VLog {
     public native void writePredicateToCsv(String predicateName,
             String fileName) throws NotStartedException, IOException;
 
+    @Override
+    protected void finalize() {
+        stop();
+    }
+
     // For testing purposes ...
     public static void main(String[] args) throws Exception {
         Test.runTest(args[0]);
