@@ -319,7 +319,81 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             page = buf.str();
             isjson = true;
         } else if (path == "/gentq") {
-            // Here we will generate queries and run them and train
+            // Here we will 
+            // 1. generate queries and run them and train model
+            EDBConf conf(edbFile);
+            int depth = 5;
+            uint64_t maxTuples = 500;
+            uint8_t vt1 = 0;
+            uint8_t vt2 = 1;
+            uint8_t vt3 = 2;
+            uint8_t vt4 = 3;
+            std::vector<uint8_t> vt;
+            vt.push_back(vt1);
+            vt.push_back(vt2);
+            vt.push_back(vt3);
+            vt.push_back(vt4);
+            LOG(INFOL) << "Generating training queries: ";
+            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+            std::vector<std::pair<std::string,int>> trainingQueries = Training::generateTrainingQueries(conf,
+                    *edb.get(),
+                    *program.get(),
+                    depth,
+                    maxTuples,
+                    vt);
+            std::chrono::duration<double> sec = std::chrono::system_clock::now()- start;
+            int nQueries = trainingQueries.size();
+            LOG(INFOL) << nQueries << " queries generated in " << sec.count() << " seconds";
+            vector<string> trainingQueriesVector;
+            for (auto tq: trainingQueries) {
+                trainingQueriesVector.push_back(tq.first);
+            }
+            // 2. test the model against test queries
+            //Get all query
+            string form = req.substr(req.find("application/x-www-form-urlencoded"));
+            string queries = _getValueParam(form, "query");
+            //string timeoutStr = _getValueParam(form, "timeout");
+            //string repeatQueryStr = _getValueParam(form, "repeatQuery");
+
+            uint64_t timeout = 10000;//stoull(timeoutStr);
+            uint8_t repeatQuery = 1;//stoul(repeatQueryStr);
+            //Decode the query
+            queries = HttpServer::unescape(queries);
+            std::regex e1("\\+");
+            std::string replacedString;
+            std::regex_replace(std::back_inserter(replacedString),
+                    queries.begin(), queries.end(),
+                    e1, "$1 ");
+            queries = replacedString;
+            std::regex e2("\\r\\n");
+            replacedString = "";
+            std::regex_replace(std::back_inserter(replacedString),
+                    queries.begin(), queries.end(), e2, "$1\n");
+            queries = replacedString;
+            vector<string> testQueriesLog;
+            stringstream ss(queries);
+            string logLine;
+
+            while (std::getline(ss, logLine, '\n')) {
+                testQueriesLog.push_back(logLine);
+            }
+            double accuracy = 0.0;
+            if (program) {
+                Training::trainAndTestModel(trainingQueriesVector,
+                        testQueriesLog,
+                        *edb.get(),
+                        *program.get(),
+                        accuracy,
+                        timeout,
+                        repeatQuery);
+            }
+            // 3. Set the output in json
+            JSON node;
+            node.put("accuracy", accuracy);
+            std::ostringstream buf;
+            JSON::write(buf, node);
+            page = buf.str();
+            isjson = true;
         } else if (path == "/query") {
 
             //Get all query

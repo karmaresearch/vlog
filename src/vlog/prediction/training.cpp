@@ -192,7 +192,8 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBCo
          * RP1(A,B) :- TE(A, <studies>, B)
          * RP2(A,B) :- TE(A, <worksFor>, B)
          *
-         * Tuple <jon, studies, VU> can match with RP2, which it should not
+         * Tuple <jon, studies, VU> can match with RP2 (because TE has RP1 and RP2 both as neighbours)
+         * , but it should not match
          *
          * All EDB tuples should be carefully matched with rules
          * */
@@ -306,8 +307,12 @@ double Training::runAlgo(string& algo,
 
     std::chrono::duration<double> durationQuery;
     signal(SIGALRM, alarmHandler);
+    if (timedOut){
+        LOG(INFOL) << "some child had timed out. algo = " << algo;
+    }
     timedOut = false;
 
+    LOG(INFOL) << "trying to mmap";
     double* queryTime = (double*) mmap(NULL, sizeof(double), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
 
     pid = fork();
@@ -317,6 +322,7 @@ double Training::runAlgo(string& algo,
     } else if (pid == 0) {
         //Child work begins
         //+
+        LOG(INFOL) << " child started";
         std::chrono::system_clock::time_point queryStartTime = std::chrono::system_clock::now();
         bool printResults = false;
         int nVars = literal.getNVars();
@@ -324,8 +330,12 @@ double Training::runAlgo(string& algo,
 
         TupleIterator *iter;
         if (algo == "magic"){
+            LOG(INFOL) << "trying to get the magic iterator";
+            LOG(INFOL) << literal.toprettystring(&p, &edb);
             iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
+            LOG(INFOL) << "Got the iterator";
         } else if (algo == "qsqr") {
+            LOG(INFOL) << literal.toprettystring(&p, &edb);
             iter = reasoner.getTopDownIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
         } else {
             LOG(ERRORL) << "Algorithm not supported : " << algo;
@@ -333,6 +343,7 @@ double Training::runAlgo(string& algo,
         }
         long count = 0;
         int sz = iter->getTupleSize();
+        LOG(INFOL) << "checking the size :" << sz;
         if (nVars == 0) {
             ss << (iter->hasNext() ? "TRUE" : "FALSE") << endl;
             count = (iter->hasNext() ? 1 : 0);
@@ -359,7 +370,9 @@ double Training::runAlgo(string& algo,
         }
         std::chrono::system_clock::time_point queryEndTime = std::chrono::system_clock::now();
         durationQuery = queryEndTime - queryStartTime;
-        LOG(INFOL) << "QueryTime = " << durationQuery.count();
+        LOG(INFOL) << " count = " << count;
+        if (algo == "magic")
+            LOG(INFOL) << "QueryTime = " << durationQuery.count();
         *queryTime = durationQuery.count()*1000;
         exit(0);
         //-
@@ -376,10 +389,154 @@ double Training::runAlgo(string& algo,
             return timeoutMillis;
         }
         double time = *queryTime;
-        LOG(INFOL) << "query time in parent :" << time;
         munmap(queryTime, sizeof(double));
+        //LOG(INFOL) << "returning time from parent: " << time;
         return time;
     }
+}
+
+
+// http://www.cplusplus.com/forum/general/125094/
+std::vector<std::string> split( std::string str, char sep = ' ' )
+{
+    std::vector<std::string> ret ;
+
+    std::istringstream stm(str) ;
+    std::string token ;
+    while( std::getline( stm, token, sep ) ) ret.push_back(token) ;
+
+    return ret ;
+}
+
+void parseQueriesLog(vector<string>& testQueriesLog,
+        vector<Metrics>& testFeaturesVector,
+        vector<int>& expectedDecisions) {
+
+    for (auto line: testQueriesLog) {
+        // A line looks like this
+        // query_features_QSQTime_MagicTime_Decision
+        //RP29(<http://www.Department4.University60.edu/FullProfessor5>,B) 4.000000,4,1,1,2,0 1.290000 2.069000 1
+        vector<string> tokens = split(line);
+        vector<string> features = split(tokens[1], ',');
+        Metrics metrics;
+        metrics.cost = stod(features[0]);
+        metrics.estimate = stoul(features[1]);
+        metrics.countRules = stoi(features[2]);
+        metrics.countUniqueRules = stoi(features[3]);
+        metrics.countIntermediateQueries = stoi(features[4]);
+        metrics.countIDBPredicates = stoi(features[5]);
+        testFeaturesVector.push_back(metrics);
+        expectedDecisions.push_back(stoi(tokens[4]));
+    }
+}
+
+void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
+        vector<string>& testQueriesLog,
+        EDBLayer& edb,
+        Program& p,
+        double& accuracy,
+        uint64_t timeout,
+        uint8_t repeatQuery) {
+
+    vector<Metrics> featuresVector;
+    vector<int> decisionVector;
+    int i = 1;
+    vector<string> strResults;
+    vector<string> strFeatures;
+    vector<string> strQsqrTime;
+    vector<string> strMagicTime;
+    for (auto q : trainingQueriesVector) {
+        LOG(INFOL) << i++ << ") " << q;
+        // Execute the literal query
+        string results="";
+        string features="";
+        string qsqrTime="";
+        string magicTime="";
+        Training::execLiteralQuery(q,
+                edb,
+                p,
+                results,
+                features,
+                qsqrTime,
+                magicTime,
+                timeout,
+                repeatQuery,
+                featuresVector,
+                decisionVector);
+        strResults.push_back(results);
+        strFeatures.push_back(features);
+        strQsqrTime.push_back(qsqrTime);
+        strMagicTime.push_back(magicTime);
+    }
+
+    int trainingQsqr = 0;
+    int trainingMagic = 0;
+    vector<Instance> dataset;
+    for (int i = 0; i < featuresVector.size(); ++i) {
+        vector<double> features;
+        features.push_back(featuresVector[i].cost);
+        features.push_back(featuresVector[i].estimate);
+        features.push_back(featuresVector[i].countRules);
+        features.push_back(featuresVector[i].countUniqueRules);
+        features.push_back(featuresVector[i].countIntermediateQueries);
+        features.push_back(featuresVector[i].countIDBPredicates);
+        int label = decisionVector[i];
+        if (label == 1) {
+            trainingQsqr++;
+        } else {
+            trainingMagic++;
+        }
+        Instance instance(label, features);
+        dataset.push_back(instance);
+    }
+
+    LogisticRegression lr(6);
+    lr.train(dataset);
+
+    vector<Metrics> testMetrics;
+    vector<int> testDecisions;
+    parseQueriesLog(testQueriesLog, testMetrics, testDecisions);
+    LOG(INFOL) << "parse queries completed";
+    int hit = 0;
+    int totalQsqr = 0;
+    int totalMagic = 0;
+    int hitQsqr = 0;
+    int hitMagic = 0;
+    LOG(INFOL) << " test queries size = " << testMetrics.size();
+    for (int i = 0; i < testMetrics.size(); ++i) {
+        vector<double> features;
+        features.push_back(testMetrics[i].cost);
+        features.push_back(testMetrics[i].estimate);
+        features.push_back(testMetrics[i].countRules);
+        features.push_back(testMetrics[i].countUniqueRules);
+        features.push_back(testMetrics[i].countIntermediateQueries);
+        features.push_back(testMetrics[i].countIDBPredicates);
+        //int label = testDecisions[i];
+        double probability = lr.classify(features);
+        int myDecision = 0;
+        if (probability > 0.5) {
+            myDecision = 1;
+        }
+        if (testDecisions[i] == 1) {
+            totalQsqr++;
+        } else {
+            totalMagic++;
+        }
+        if (myDecision == testDecisions[i]) {
+            if (myDecision == 1) {
+                hitQsqr++;
+            } else {
+                hitMagic++;
+            }
+            hit++;
+        }
+    }
+    accuracy = (double)hit/(double)testMetrics.size();
+    LOG(INFOL) << "accuracy : " << accuracy;
+    LOG(INFOL) << "QSQR accuracy : " << hitQsqr << " / " << totalQsqr << " = " <<  (double)hitQsqr/(double)totalQsqr;
+    LOG(INFOL) << "Magic accuracy : " << hitMagic << " / " << totalMagic << " = " <<  (double)hitMagic/(double)totalMagic;
+    LOG(INFOL) << "QSQR favouring Training Queries = " << trainingQsqr;
+    LOG(INFOL) << "Magic favouring Training Queries = " << trainingMagic;
 }
 
 void Training::execLiteralQueries(vector<string>& queryVector,
@@ -392,67 +549,67 @@ void Training::execLiteralQueries(vector<string>& queryVector,
         uint64_t timeout,
         uint8_t repeatQuery) {
 
-        vector<Metrics> featuresVector;
-        vector<int> decisionVector;
-        int i = 1;
-        vector<string> strResults;
-        vector<string> strFeatures;
-        vector<string> strQsqrTime;
-        vector<string> strMagicTime;
-        ofstream logFile("queries-execution.log");
-        for (auto q : queryVector) {
-            LOG(INFOL) << i++ << ") " << q;
-            // Execute the literal query
-            string results="";
-            string features="";
-            string qsqrTime="";
-            string magicTime="";
-            Training::execLiteralQuery(q,
-                    edb,
-                    p,
-                    results,
-                    features,
-                    qsqrTime,
-                    magicTime,
-                    timeout,
-                    repeatQuery,
-                    featuresVector,
-                    decisionVector);
-            strResults.push_back(results);
-            strFeatures.push_back(features);
-            strQsqrTime.push_back(qsqrTime);
-            strMagicTime.push_back(magicTime);
-            logFile << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back() << endl;
-        }
-        if (logFile.fail()) {
-            LOG(ERRORL) << "Error writing to the log file";
-        }
-        logFile.close();
-        string allResults = stringJoin(strResults);
-        jsonResults->put("results", allResults);
-        string allFeatures = stringJoin(strFeatures);
-        jsonFeatures->put("features", allFeatures);
-        string allQsqrTimes = stringJoin(strQsqrTime);
-        jsonQsqrTime->put("qsqrtimes", allQsqrTimes);
-        string allMagicTimes = stringJoin(strMagicTime);
-        jsonMagicTime->put("magictimes", allMagicTimes);
+    vector<Metrics> featuresVector;
+    vector<int> decisionVector;
+    int i = 1;
+    vector<string> strResults;
+    vector<string> strFeatures;
+    vector<string> strQsqrTime;
+    vector<string> strMagicTime;
+    ofstream logFile("queries-execution.log");
+    for (auto q : queryVector) {
+        LOG(INFOL) << i++ << ") " << q;
+        // Execute the literal query
+        string results="";
+        string features="";
+        string qsqrTime="";
+        string magicTime="";
+        Training::execLiteralQuery(q,
+                edb,
+                p,
+                results,
+                features,
+                qsqrTime,
+                magicTime,
+                timeout,
+                repeatQuery,
+                featuresVector,
+                decisionVector);
+        strResults.push_back(results);
+        strFeatures.push_back(features);
+        strQsqrTime.push_back(qsqrTime);
+        strMagicTime.push_back(magicTime);
+        logFile << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back() << endl;
+    }
+    if (logFile.fail()) {
+        LOG(ERRORL) << "Error writing to the log file";
+    }
+    logFile.close();
+    string allResults = stringJoin(strResults);
+    jsonResults->put("results", allResults);
+    string allFeatures = stringJoin(strFeatures);
+    jsonFeatures->put("features", allFeatures);
+    string allQsqrTimes = stringJoin(strQsqrTime);
+    jsonQsqrTime->put("qsqrtimes", allQsqrTimes);
+    string allMagicTimes = stringJoin(strMagicTime);
+    jsonMagicTime->put("magictimes", allMagicTimes);
 
-        vector<Instance> dataset;
-        for (int i = 0; i < featuresVector.size(); ++i) {
-            vector<double> features;
-            features.push_back(featuresVector[i].cost);
-            features.push_back(featuresVector[i].estimate);
-            features.push_back(featuresVector[i].countRules);
-            features.push_back(featuresVector[i].countUniqueRules);
-            features.push_back(featuresVector[i].countIntermediateQueries);
-            features.push_back(featuresVector[i].countIDBPredicates);
-            int label = decisionVector[i];
-            Instance instance(label, features);
-            dataset.push_back(instance);
-        }
+    //vector<Instance> dataset;
+    //for (int i = 0; i < featuresVector.size(); ++i) {
+    //    vector<double> features;
+    //    features.push_back(featuresVector[i].cost);
+    //    features.push_back(featuresVector[i].estimate);
+    //    features.push_back(featuresVector[i].countRules);
+    //    features.push_back(featuresVector[i].countUniqueRules);
+    //    features.push_back(featuresVector[i].countIntermediateQueries);
+    //    features.push_back(featuresVector[i].countIDBPredicates);
+    //    int label = decisionVector[i];
+    //    Instance instance(label, features);
+    //    dataset.push_back(instance);
+    //}
 
-        LogisticRegression lr(6);
-        lr.train(dataset);
+    //LogisticRegression lr(6);
+    //lr.train(dataset);
 }
 
 void Training::execLiteralQuery(string& literalquery,
@@ -483,13 +640,16 @@ void Training::execLiteralQuery(string& literalquery,
         << std::to_string(metrics.countIDBPredicates);
     strFeatures += strMetrics.str();
 
-    stringstream ssQsqr;
-    string algo = "qsqr";
-    double durationQsqr = Training::runAlgo(algo, reasoner, edb, p, literal, ssQsqr, timeout, repeatQuery);
-
+    string algo="";
     stringstream ssMagic;
     algo = "magic";
     double durationMagic = Training::runAlgo(algo, reasoner, edb, p, literal, ssMagic, timeout, repeatQuery);
+
+    stringstream ssQsqr;
+    algo = "qsqr";
+    double durationQsqr = Training::runAlgo(algo, reasoner, edb, p, literal, ssQsqr, timeout, repeatQuery);
+
+
     LOG(INFOL) << "Qsqr time : " << durationQsqr;
     LOG(INFOL) << "magic time: " << durationMagic;
     int winner = 1; // 1 is for QSQR

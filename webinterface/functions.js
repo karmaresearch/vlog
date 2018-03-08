@@ -98,6 +98,52 @@ function launchMat() {
     http_request.send(null);
 }
 
+function trainAndTest() {
+
+    var queries = document.getElementById('textTestQueries').value;
+    document.getElementById('buttonTrain').disabled = true;
+    var body = '';
+    body += 'query=' + encodeURIComponent(queries);
+
+    //var timeout = document.getElementById('timeout').value;
+    //body += "&timeout=" + timeout;
+    //var repeatQuery = document.getElementById('repeatQuery').value;
+    //body += "&repeatQuery=" + repeatQuery;
+
+    body = body.replace('/%20/g','+');
+    var http_request = new XMLHttpRequest();
+    http_request.open("POST", "http://" + window.location.hostname + ":" + port + "/gentq", true);
+    //http_request.timeout = 2000;
+    http_request.onreadystatechange = function () {
+        var done = 4, ok = 200;
+        if (http_request.readyState === done) {
+            if (http_request.status === ok) {
+                msgbox('ok', '#messageBox','Query executed!!', 1500);
+                results = JSON.parse(http_request.responseText);
+                console.log(results.accuracy);
+                //console.log(results.features);
+                //console.log(results.qsqrtimes);
+                var strAccuracy = JSON.stringify(results.accuracy);
+                //var strFeatures = JSON.stringify(results.features);
+                //var strQsqrTimes = JSON.stringify(results.qsqrtimes);
+                //var strMagicTimes = JSON.stringify(results.magictimes);
+                document.getElementById('textAccuracy').innerHTML = strAccuracy;
+                //document.getElementById('textFeatures').innerHTML = strFeatures;
+                //document.getElementById('textQsqrTime').innerHTML = strQsqrTimes;
+                //document.getElementById('textMagicTime').innerHTML = strMagicTimes;
+            } else {
+                console.log(http_request.status);
+            }
+            document.getElementById('buttonQuery').disabled = false;
+        } else {
+            msgbox('error', '#messageBox', 'http request failed', 2000);
+        }
+    };
+    http_request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+
+    http_request.send(body);
+}
+
 function execQuery() {
 
     var queries = document.getElementById('textQueries').value;
