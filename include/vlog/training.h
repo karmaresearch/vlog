@@ -48,12 +48,14 @@ class Training {
     static void execLiteralQuery(string& literalquery,
         EDBLayer& edb,
         Program& p,
-        JSON* jsonResults,
-        JSON* jsonFeatures,
-        JSON* jsonQsqrTime,
-        JSON* jsonMagicTime,
+        string& strResults,
+        string& strFeatures,
+        string& strQsqrTime,
+        string& strMagicTime,
         uint64_t timeout,
-        uint8_t repeatQuery);
+        uint8_t repeatQuery,
+        vector<Metrics>& featuresVector,
+        vector<int>& decisionVector);
 
     static void execLiteralQueries(vector<string>& literalquery,
         EDBLayer& edb,
