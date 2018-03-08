@@ -419,7 +419,7 @@ bool SemiNaiver::executeUntilSaturation(
             //CODE FOR Statistics
             LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". RulesWithDerivation=" <<
                 nRulesOnePass << " out of " << ruleset.size() << " Derivations so far " << countAllIDBs();
-	    printCountAllIDBs("After step " + to_string(iteration) + ": ");
+            printCountAllIDBs("After step " + to_string(iteration) + ": ");
             nRulesOnePass = 0;
 
             //Get the top 10 rules in the last iteration
@@ -450,20 +450,20 @@ bool SemiNaiver::executeUntilSaturation(
 std::string csvString(std::string s) {
     auto pos = s.find_first_of(" \",\n\t\r");
     if (pos == std::string::npos) {
-	return s;
+        return s;
     }
     // Now, we need to escape the string, which means quoting, and doubling every quote in the string.
     pos = s.find_first_of("\"");
     if (pos == std::string::npos) {
-	// Just quoting is good enough.
-	return "\"" + s + "\"";
+        // Just quoting is good enough.
+        return "\"" + s + "\"";
     }
     std::string result = "\"";
     size_t beginpos = 0;
     while (pos != std::string::npos) {
-	result += s.substr(beginpos, (pos-beginpos)+1) + "\"";
-	beginpos = pos + 1;
-	pos = s.find_first_of("\"", beginpos);
+        result += s.substr(beginpos, (pos-beginpos)+1) + "\"";
+        beginpos = pos + 1;
+        pos = s.find_first_of("\"", beginpos);
     }
     result += s.substr(beginpos, pos) + "\"";
     return result;
@@ -475,68 +475,68 @@ void SemiNaiver::storeOnFile(std::string path, const PredId_t pred, const bool d
 
     std::ofstream streamout(path);
     if (streamout.fail()) {
-	throw("Could not open " + path + " for writing");
+        throw("Could not open " + path + " for writing");
     }
 
     if (table != NULL && !table->isEmpty()) {
-	FCIterator itr = table->read(0);
-	if (! itr.isEmpty()) {
-	    const uint8_t sizeRow = table->getSizeRow();
-	    while (!itr.isEmpty()) {
-		std::shared_ptr<const FCInternalTable> t = itr.getCurrentTable();
-		FCInternalTableItr *iitr = t->getIterator();
-		while (iitr->hasNext()) {
-		    iitr->next();
-		    std::string row = "";
-		    if (! csv) {
-			row = to_string(iitr->getCurrentIteration());
-		    }
-		    bool first = true;
-		    for (uint8_t m = 0; m < sizeRow; ++m) {
-			if (decompress || csv) {
-			    if (layer.getDictText(iitr->getCurrentValue(m), buffer)) {
-				if (csv) {
-				    if (first) {
-					first = false;
-				    } else {
-					row += ",";
-				    }
-				    row += csvString(string(buffer));
-				} else {
-				    row += "\t";
-				    row += string(buffer);
-				}
-			    } else {
-				std::string t = program->getFromAdditional(iitr->getCurrentValue(m));
-				if (t == std::string("")) {
-				    uint64_t v = iitr->getCurrentValue(m);
-				    t = "" + std::to_string(v >> 40) + "_"
-					+ std::to_string((v >> 32) & 0377) + "_"
-					+ std::to_string(v & 0xffffffff);
-				    // t = std::to_string(iitr->getCurrentValue(m));
-				}
-				if (csv) {
-				    if (first) {
-					first = false;
-				    } else {
-					row += ",";
-				    }
-				    row += csvString(t);
-				} else {
-				    row += "\t";
-				    row += t;
-				}
-			    }
-			} else {
-			    row += "\t" + to_string(iitr->getCurrentValue(m));
-			}
-		    }
-		    streamout << row << std::endl;
-		}
-		t->releaseIterator(iitr);
-		itr.moveNextCount();
-	    }
-	}
+        FCIterator itr = table->read(0);
+        if (! itr.isEmpty()) {
+            const uint8_t sizeRow = table->getSizeRow();
+            while (!itr.isEmpty()) {
+                std::shared_ptr<const FCInternalTable> t = itr.getCurrentTable();
+                FCInternalTableItr *iitr = t->getIterator();
+                while (iitr->hasNext()) {
+                    iitr->next();
+                    std::string row = "";
+                    if (! csv) {
+                        row = to_string(iitr->getCurrentIteration());
+                    }
+                    bool first = true;
+                    for (uint8_t m = 0; m < sizeRow; ++m) {
+                        if (decompress || csv) {
+                            if (layer.getDictText(iitr->getCurrentValue(m), buffer)) {
+                                if (csv) {
+                                    if (first) {
+                                        first = false;
+                                    } else {
+                                        row += ",";
+                                    }
+                                    row += csvString(string(buffer));
+                                } else {
+                                    row += "\t";
+                                    row += string(buffer);
+                                }
+                            } else {
+                                std::string t = program->getFromAdditional(iitr->getCurrentValue(m));
+                                if (t == std::string("")) {
+                                    uint64_t v = iitr->getCurrentValue(m);
+                                    t = "" + std::to_string(v >> 40) + "_"
+                                        + std::to_string((v >> 32) & 0377) + "_"
+                                        + std::to_string(v & 0xffffffff);
+                                    // t = std::to_string(iitr->getCurrentValue(m));
+                                }
+                                if (csv) {
+                                    if (first) {
+                                        first = false;
+                                    } else {
+                                        row += ",";
+                                    }
+                                    row += csvString(t);
+                                } else {
+                                    row += "\t";
+                                    row += t;
+                                }
+                            }
+                        } else {
+                            row += "\t" + to_string(iitr->getCurrentValue(m));
+                        }
+                    }
+                    streamout << row << std::endl;
+                }
+                t->releaseIterator(iitr);
+                itr.moveNextCount();
+            }
+        }
     }
     streamout.close();
 }
@@ -551,7 +551,7 @@ void SemiNaiver::storeOnFiles(std::string path, const bool decompress,
     for (PredId_t i = 0; i < MAX_NPREDS; ++i) {
         FCTable *table = predicatesTables[i];
         if (table != NULL && !table->isEmpty()) {
-	    storeOnFile(path + "/" + program->getPredicateName(i), i, decompress, minLevel, csv);
+            storeOnFile(path + "/" + program->getPredicateName(i), i, decompress, minLevel, csv);
         }
     }
 }
@@ -703,12 +703,12 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
         }
     } else if (nBodyLiterals == 1) {
         const bool uniqueResults =
-	    ! ruleDetails.rule.isExistential()
-	    && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
+            ! ruleDetails.rule.isExistential()
+            && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
             && literalItr.getNTables() == 1 && heads.size() == 1;
         while (!literalItr.isEmpty()) {
             //Add the columns to the output container
-	    // Can lastLiteral be false if nBodyLiterals == 1??? --Ceriel
+            // Can lastLiteral be false if nBodyLiterals == 1??? --Ceriel
             if (!lastLiteral || ruleDetails.rule.isExistential() ||
                     heads.size() != 1 || !queryFilterer.
                     producedDerivationInPreviousSteps(
@@ -730,16 +730,16 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
 
                 table->releaseIterator(interitr);
             }
-	    // No else-clause here? Yes, can only be duplicates
+            // No else-clause here? Yes, can only be duplicates
             literalItr.moveNextCount();
         }
     } else {
         //Copy the iterator in the tmp container.
         //This process cannot derive duplicates if the number of variables is equivalent.
         const bool uniqueResults = heads.size() == 1
-	    && ! ruleDetails.rule.isExistential()
-	    && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
-	    && (!lastLiteral || firstEndTable->isEmpty());
+            && ! ruleDetails.rule.isExistential()
+            && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
+            && (!lastLiteral || firstEndTable->isEmpty());
 
         while (!literalItr.isEmpty()) {
             std::shared_ptr<const FCInternalTable> table = literalItr.getCurrentTable();
@@ -1405,10 +1405,10 @@ void SemiNaiver::printCountAllIDBs(string prefix) {
                 long count = predicatesTables[i]->getNAllRows();
                 if (count == 0) {
                     emptyRel++;
-		}
-		string predname = program->getPredicateName(i);
-		LOG(INFOL) << prefix << "Cardinality of " <<
-		    predname << ": " << count;
+                }
+                string predname = program->getPredicateName(i);
+                LOG(DEBUGL) << prefix << "Cardinality of " <<
+                    predname << ": " << count;
                 c += count;
             }
         }
