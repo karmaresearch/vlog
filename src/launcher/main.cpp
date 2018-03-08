@@ -15,6 +15,7 @@
 #include <kognac/utils.h>
 #include <kognac/progargs.h>
 #include <layers/TridentLayer.hpp>
+#include <trident/utils/tridentutils.h>
 
 //RDF3X
 #include <cts/parser/SPARQLLexer.hpp>
@@ -713,7 +714,6 @@ void launchFullMat(int argc,
         std::condition_variable cv;
         bool isFinished = false;
         if (vm["monitorThread"].as<bool>()) {
-            if (p.timeoutStats != -1) {
                 //Activate it only for Linux systems
                 monitor = std::thread(
                         std::bind(TridentUtils::monitorPerformance, 
