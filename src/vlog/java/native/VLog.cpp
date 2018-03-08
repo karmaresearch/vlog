@@ -1,6 +1,6 @@
 #include <jni.h>
 
-#include "vlog_native.h"
+// #include "vlog_native.h"
 
 #include <vlog/concepts.h>
 #include <vlog/edb.h>
@@ -65,13 +65,11 @@ std::vector<Literal> getVectorLiteral(JNIEnv *env, jobjectArray h, Dictionary &d
 
 	// Get the predicate
 	jmethodID getPredicateMethod = env->GetMethodID(cls, "getPredicate", "()Ljava/lang/String;");
-	LOG(DEBUGL) << "getPredicateMethod " << (long) getPredicateMethod;
 	jstring jpred = (jstring) env->CallObjectMethod(atom, getPredicateMethod);
 	std::string predicate = jstring2string(env, jpred);
 
 	// Get the terms
 	jmethodID getTermsMethod = env->GetMethodID(cls, "getTerms", "()[Lkarmaresearch/vlog/Term;");
-	LOG(DEBUGL) << "getTermsMethod " << (long) getTermsMethod;
 	jobjectArray jterms = (jobjectArray) env->CallObjectMethod(atom, getTermsMethod);
 	jsize vtuplesz = env->GetArrayLength(jterms);
 
@@ -87,17 +85,14 @@ std::vector<Literal> getVectorLiteral(JNIEnv *env, jobjectArray h, Dictionary &d
 
 	    // Get the name
 	    jmethodID getNameMethod = env->GetMethodID(termcls, "getName", "()Ljava/lang/String;");
-	    LOG(DEBUGL) << "getNameMethod " << (long) getNameMethod;
 	    jstring jname = (jstring) env->CallObjectMethod(jterm, getNameMethod);
 	    std::string name = jstring2string(env, jname);
 
 	    // Get the type: constant or variable
 	    jmethodID getTypeMethod = env->GetMethodID(termcls, "getTermType", "()Lkarmaresearch/vlog/Term$TermType;");
-	    LOG(DEBUGL) << "getTypeMethod " << (long) getTypeMethod;
 	    jobject jtype = env->CallObjectMethod(jterm, getTypeMethod);
 	    jclass enumClass = env->GetObjectClass(jtype);
 	    jmethodID getOrdinalMethod = env->GetMethodID(enumClass, "ordinal", "()I");
-	    LOG(DEBUGL) << "getOrdinalMethod " << (long) getOrdinalMethod;
 	    jint type = (jint) env->CallIntMethod(jtype, getOrdinalMethod);
 
 	    // For now, we only have two choices.

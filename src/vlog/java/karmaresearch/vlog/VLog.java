@@ -1,6 +1,11 @@
 package karmaresearch.vlog;
 
+import java.io.BufferedInputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 
 import karmaresearch.vlog.Term.TermType;
@@ -11,7 +16,80 @@ import karmaresearch.vlog.Term.TermType;
 public class VLog {
 
     static {
-        System.loadLibrary("vlog_jni");
+        // First try to just load the shared library.
+        try {
+            System.loadLibrary("vlog_jni");
+        } catch (Throwable ex) {
+            // Did not work, now try to load it from the same directory as the
+            // jar file. First determine prefix and suffix, depending on OS.
+
+            // First determine jar file;
+            File jarFile;
+            try {
+                jarFile = new File(VLog.class.getProtectionDomain()
+                        .getCodeSource().getLocation().toURI());
+            } catch (Throwable e) {
+                throw new UnsatisfiedLinkError(e.getMessage());
+            }
+
+            // Next, determine OS.
+            String os = System.getProperty("os.name");
+            String nativeSuffix = ".so";
+            String nativePrefix = "lib";
+            if (os != null) {
+                os = os.toLowerCase();
+                if (os.contains("windows")) {
+                    nativePrefix = "";
+                    nativeSuffix = ".dll";
+                } else if (os.contains("mac")) {
+                    nativeSuffix = ".dylib";
+                }
+            }
+
+            // Determine library name.
+            String libName = nativePrefix + "vlog_jni" + nativeSuffix;
+
+            try {
+                loadFromDir(jarFile, libName);
+            } catch (Throwable e) {
+                try {
+                    loadFromJar(jarFile, libName, os);
+                } catch (Throwable e1) {
+                    throw new UnsatisfiedLinkError(e1.getMessage());
+                }
+            }
+        }
+    }
+
+    private static void loadFromDir(File jarFile, String libName) {
+        String dir = jarFile.getParent();
+        if (dir == null) {
+            dir = ".";
+        }
+        // Only support one size, i.e. 64-bit?
+        String lib = dir + File.separator + libName;
+        System.load(lib);
+    }
+
+    private static void loadFromJar(File jarFile, String libName, String os)
+            throws IOException {
+        InputStream is = new BufferedInputStream(
+                VLog.class.getResourceAsStream("/" + libName));
+        File targetDir = Files.createTempDirectory("VLog-tmp").toFile();
+        targetDir.deleteOnExit();
+        File target = new File(targetDir, libName);
+        target.deleteOnExit();
+        targetDir.deleteOnExit();
+        Files.copy(is, target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        try {
+            System.load(target.getAbsolutePath());
+        } finally {
+            if (os == null || !os.contains("windows")) {
+                // If not on windows, we can delete the files now.
+                target.delete();
+                targetDir.delete();
+            }
+        }
     }
 
     /**
