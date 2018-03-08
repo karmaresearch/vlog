@@ -891,19 +891,20 @@ void Program::cleanAllRules() {
     allrules.clear();
 }
 
-void Program::addRule(Rule &rule) {
-    for (const auto &head : rule.getHeads()) {
-        rules[head.getPredicate().getId()].push_back(allrules.size());
+void Program::addRule(Rule &rule, bool rewriteMultihead) {
+    if (rewriteMultihead && rule.isExistential() && rule.getHeads().size() > 1) {
+	rewriteRule(rule);
+    } else {
+	for (const auto &head : rule.getHeads()) {
+	    rules[head.getPredicate().getId()].push_back(allrules.size());
+	}
+	allrules.push_back(rule);
     }
-    allrules.push_back(rule);
 }
 
-void Program::addRule(std::vector<Literal> heads, std::vector<Literal> body) {
+void Program::addRule(std::vector<Literal> heads, std::vector<Literal> body, bool rewriteMultihead) {
     Rule rule(allrules.size(), heads, body);
-    for (const auto &head : heads) {
-        rules[head.getPredicate().getId()].push_back(allrules.size());
-    }
-    allrules.push_back(rule);
+    addRule(rule, rewriteMultihead);
 }
 
 void Program::addAllRules(std::vector<Rule> &rules) {
@@ -980,11 +981,7 @@ void Program::parseRule(std::string rule, bool rewriteMultihead) {
 
         //Add the rule
         Rule r = Rule(allrules.size(), lHeads, lBody);
-        if (rewriteMultihead && r.isExistential() && lHeads.size() > 1) {
-            rewriteRule(lHeads, lBody);
-        } else {
-            addRule(r);
-        }
+	addRule(r, rewriteMultihead);
     } catch (int e) {
         LOG(ERRORL) << "Failed in parsing rule " << rule;
     }
@@ -999,7 +996,9 @@ static bool isInVector(uint8_t v, std::vector<uint8_t> &vec) {
     return false;
 }
 
-void Program::rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lBody) {
+void Program::rewriteRule(Rule &r) {
+    std::vector<Literal> lHeads = r.getHeads();
+    std::vector<Literal> lBody = r.getBody();
     LOG(DEBUGL) << "Trying to rewrite rule";
     std::vector<uint8_t> bodyVars;
     // First determine the non-existential variables.
@@ -1126,6 +1125,19 @@ Predicate Program::getPredicate(std::string & p, uint8_t adornment) {
     PredId_t id = (PredId_t) dictPredicates.getOrAdd(p);
     return Predicate(id, adornment, kb->doesPredExists(id) ? EDB : IDB,
             cardPredicates.find(id)->second);
+}
+
+int64_t Program::getOrAddPredicate(std::string & p, uint8_t cardinality) {
+    PredId_t id = (PredId_t) dictPredicates.getOrAdd(p);
+    if (cardPredicates.find(id) == cardPredicates.end()) {
+	cardPredicates.insert(make_pair(id, cardinality));
+    } else {
+	if (cardPredicates.find(id)->second != cardinality) {
+	    LOG(INFOL) << "Wrong cardinality for predicate " << p << ": should be " << (int) cardPredicates.find(id)->second;
+	    return -1;
+        }
+    }
+    return id;
 }
 
 std::string Program::getAllPredicates() {

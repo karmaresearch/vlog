@@ -406,7 +406,7 @@ class Program {
 
         void parseRule(std::string rule, bool rewriteMultihead);
 
-        void rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lBody);
+        void rewriteRule(Rule &r);
 
         std::string rewriteRDFOWLConstants(std::string input);
 
@@ -434,6 +434,8 @@ class Program {
 
         Predicate getPredicate(const PredId_t id);
 
+	int64_t getOrAddPredicate(std::string &p, uint8_t cardinality);
+
         std::vector<Rule> getAllRulesByPredicate(PredId_t predid) const;
 
         const std::vector<uint32_t> &getRulesIDsByPredicate(PredId_t predid) const;
@@ -445,6 +447,10 @@ class Program {
         std::string getFromAdditional(Term_t val) {
             return additionalConstants.getRawValue(val);
         }
+
+	uint64_t getOrAddToAdditional(std::string term) {
+	    return additionalConstants.getOrAdd(term);
+	}
 
         void sortRulesByIDBPredicates();
 
@@ -458,9 +464,9 @@ class Program {
 
         void cleanAllRules();
 
-        void addRule(Rule &rule);
+        void addRule(Rule &rule, bool rewriteMultihead = false);
 
-        void addRule(std::vector<Literal> heads, std::vector<Literal> body);
+        void addRule(std::vector<Literal> heads, std::vector<Literal> body, bool rewriteMultihead = false);
 
         void addAllRules(std::vector<Rule> &rules);
 

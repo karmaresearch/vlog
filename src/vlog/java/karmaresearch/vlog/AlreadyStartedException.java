@@ -3,11 +3,9 @@ package karmaresearch.vlog;
 /**
  * This exception gets thrown when an attempt is made to start VLog when it is
  * already started.
- *
- * TODO: checked or unchecked exception? For now, unchecked.
  */
 
-public class AlreadyStartedException extends RuntimeException {
+public class AlreadyStartedException extends Exception {
 
     /**
      * Constructs an <code>AlreadyStartedException</code> with <code>null</code>

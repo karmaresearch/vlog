@@ -1,7 +1,14 @@
 package karmaresearch.vlog;
 
+import java.io.BufferedInputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+
+import karmaresearch.vlog.Term.TermType;
 
 /**
  * The <code>VLog</code> class exposes, at a low level, VLog to Java.
@@ -9,8 +16,91 @@ import java.util.ArrayList;
 public class VLog {
 
     static {
-        System.loadLibrary("vlog_jni");
+        // First try to just load the shared library.
+        try {
+            System.loadLibrary("vlog_jni");
+        } catch (Throwable ex) {
+            // Did not work, now try to load it from the same directory as the
+            // jar file. First determine prefix and suffix, depending on OS.
+
+            // First determine jar file;
+            File jarFile;
+            try {
+                jarFile = new File(VLog.class.getProtectionDomain()
+                        .getCodeSource().getLocation().toURI());
+            } catch (Throwable e) {
+                throw new UnsatisfiedLinkError(e.getMessage());
+            }
+
+            // Next, determine OS.
+            String os = System.getProperty("os.name");
+            String nativeSuffix = ".so";
+            String nativePrefix = "lib";
+            if (os != null) {
+                os = os.toLowerCase();
+                if (os.contains("windows")) {
+                    nativePrefix = "";
+                    nativeSuffix = ".dll";
+                } else if (os.contains("mac")) {
+                    nativeSuffix = ".dylib";
+                }
+            }
+
+            // Determine library name.
+            String libName = nativePrefix + "vlog_jni" + nativeSuffix;
+
+            try {
+                loadFromDir(jarFile, libName);
+            } catch (Throwable e) {
+                try {
+                    loadFromJar(jarFile, libName, os);
+                } catch (Throwable e1) {
+                    throw new UnsatisfiedLinkError(e1.getMessage());
+                }
+            }
+        }
     }
+
+    private static void loadFromDir(File jarFile, String libName) {
+        String dir = jarFile.getParent();
+        if (dir == null) {
+            dir = ".";
+        }
+        // Only support one size, i.e. 64-bit?
+        String lib = dir + File.separator + libName;
+        System.load(lib);
+    }
+
+    private static void loadFromJar(File jarFile, String libName, String os)
+            throws IOException {
+        InputStream is = new BufferedInputStream(
+                VLog.class.getResourceAsStream("/" + libName));
+        File targetDir = Files.createTempDirectory("VLog-tmp").toFile();
+        targetDir.deleteOnExit();
+        File target = new File(targetDir, libName);
+        target.deleteOnExit();
+        targetDir.deleteOnExit();
+        Files.copy(is, target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        try {
+            System.load(target.getAbsolutePath());
+        } finally {
+            if (os == null || !os.contains("windows")) {
+                // If not on windows, we can delete the files now.
+                target.delete();
+                targetDir.delete();
+            }
+        }
+    }
+
+    /**
+     * Currently implemented rule rewriting strategies.
+     *
+     * <code>NONE</code> means heads are never split, <code>AGGRESSIVE</code>
+     * means heads are split whenever possible.
+     */
+    public enum RuleRewriteStrategy {
+        NONE, AGGRESSIVE
+    };
 
     /**
      * Sets the log level of the VLog logger. Possible values of the parameter
@@ -31,36 +121,22 @@ public class VLog {
      * name, in which case the <code>isFile</code> parameter should be
      * <code>true</code>.
      *
-     * TODO: special exception for parse error in the configuration?
-     *
      * @param edbconfig
-     *            the edb configuration, as a string.
+     *            the edb configuration, as a string or as a filename.
      * @param isFile
      *            whether it is a file, or an edb configuration as a string.
      * @exception IOException
      *                is thrown when the database could not be read for some
-     *                reason.
+     *                reason, or <code>isFile</code> is set and the file does
+     *                not exist.
      * @exception AlreadyStartedException
      *                is thrown when vlog was already started, and not stopped.
+     * @exception EDBConfigurationException
+     *                is thrown when there is an error in the EDB configuration.
      */
     public native void start(String edbconfig, boolean isFile)
-            throws AlreadyStartedException, IOException;
-
-    /**
-     * Starts vlog with the database as CSV files, in a directory specified by
-     * the parameter. All files in this directory with suffix ".csv" are
-     * considered. The predicate name is the prefix of the file name.
-     *
-     * @param directory
-     *            the directory in which the CSV files live.
-     * @exception IOException
-     *                is thrown when the database could not be loaded for some
-     *                reason.
-     * @exception AlreadyStartedException
-     *                is thrown when vlog was already started, and not stopped.
-     */
-    public native void startCSV(String directory)
-            throws IOException, AlreadyStartedException;
+            throws AlreadyStartedException, EDBConfigurationException,
+            IOException;
 
     /**
      * Stops and de-allocates the reasoner. This method should be called before
@@ -140,47 +216,43 @@ public class VLog {
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      */
-    public native QueryResultEnumeration query(int predicate, long[] terms)
+    private native QueryResultEnumeration query(int predicate, long[] terms)
             throws NotStartedException;
 
     /**
      * Queries the current, so possibly materialized, database, and returns an
      * iterator that delivers the answers, one by one.
      *
-     * TODO: is having variables start with a questionmark OK?
-     *
      * TODO: deal with not-found predicates, terms.
      *
-     * @param predicate
-     *            the predicate of the query
-     * @param terms
-     *            the constants or variables. If the term starts with a question
-     *            mark, it is a variable, otherwise it is a constant.
+     * @param query
+     *            the query, as an atom.
      * @return the result iterator.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      */
-    public StringQueryResultEnumeration query(String predicate, String[] terms)
+    public StringQueryResultEnumeration query(Atom query)
             throws NotStartedException {
-        int intPred = getPredicateId(predicate);
+        int intPred = getPredicateId(query.getPredicate());
         ArrayList<String> variables = new ArrayList<>();
+        Term[] terms = query.getTerms();
         long[] longTerms = new long[terms.length];
         for (int i = 0; i < terms.length; i++) {
-            if (terms[i].startsWith("?")) {
+            if (terms[i].getTermType() == TermType.VARIABLE) {
                 boolean found = false;
                 for (int j = 0; i < variables.size(); j++) {
-                    if (variables.get(j).equals(terms[i])) {
+                    if (variables.get(j).equals(terms[i].getName())) {
                         found = true;
                         longTerms[i] = -j - 1;
                         break;
                     }
                 }
                 if (!found) {
-                    variables.add(terms[i]);
+                    variables.add(terms[i].getName());
                     longTerms[i] = -variables.size();
                 }
             } else {
-                longTerms[i] = getConstantId(terms[i]);
+                longTerms[i] = getConstantId(terms[i].getName());
             }
         }
         return new StringQueryResultEnumeration(this,
@@ -190,40 +262,32 @@ public class VLog {
     /**
      * Sets the rules for the VLog run. Any existing rules are removed.
      *
-     * TODO: special exception for parse error in rules?
-     *
-     * TODO: make removal of existing rules a boolean parameter?
-     *
      * @param rules
      *            the rules
-     * @param rewriteMultipleHeads
+     * @param rewriteStrategy
      *            whether multiple-head rules should be rewritten when possible.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      */
-    public native void setRules(String[] rules, boolean rewriteMultipleHeads)
-            throws NotStartedException;
+    public native void setRules(Rule[] rules,
+            RuleRewriteStrategy rewriteStrategy) throws NotStartedException;
 
     /**
-     * Sets the rules for the VLog run to the rules in the specified file. Any existing rules are removed.
-     *
-     * TODO: special exception for parse error in rules?
-     * 
-     * TODO: make removal of existing rules a boolean parameter?
+     * Sets the rules for the VLog run to the rules in the specified file. Any
+     * existing rules are removed. For testing only.
      *
      * @param rulesFile
      *            the file name of the file containing the rules
-     * @param rewriteMultipleHeads
+     * @param rewriteStrategy
      *            whether multiple-head rules should be rewritten when possible.
-     *
      *
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      * @exception IOException
      *                is thrown when the file could not be read for some reason
      */
-    public native void setRulesFile(String rulesFile,
-            boolean rewriteMultipleHeads)
+    private native void setRulesFile(String rulesFile,
+            RuleRewriteStrategy rewriteStrategy)
             throws NotStartedException, IOException;
 
     /**
@@ -231,9 +295,6 @@ public class VLog {
      *
      * TODO: maybe limit number of iterations? (Currently not in vlog, but could
      * be added)
-     *
-     * TODO: whether we should store the result of the materialization
-     * somewhere, for instance as CSV files?
      *
      * @param skolem
      *            whether to use skolem chase <code>true</code> or restricted
@@ -243,25 +304,31 @@ public class VLog {
      */
     public native void materialize(boolean skolem) throws NotStartedException;
 
+    /**
+     * Creates a CSV file at the specified location, for the specified
+     * predicate.
+     *
+     * @param predicateName
+     *            the predicate name
+     * @param fileName
+     *            the location
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet, or materialization
+     *                has not run yet
+     * @exception IOException
+     *                is thrown when the file could not be written for some
+     *                reason
+     */
+    public native void writePredicateToCsv(String predicateName,
+            String fileName) throws NotStartedException, IOException;
+
+    @Override
+    protected void finalize() {
+        stop();
+    }
+
     // For testing purposes ...
     public static void main(String[] args) throws Exception {
-        VLog vlog = new VLog();
-        vlog.start("blabla", false);
-        vlog.stop();
-        vlog.startCSV(
-                "/Users/ceriel/Projects/chasebench/scenarios/doctors/data/10k");
-        vlog.setRulesFile("/Users/ceriel/Projects/vlog-runs/data/doctors/rules",
-                true);
-        vlog.materialize(false);
-        StringQueryResultEnumeration result = vlog.query("prescription",
-                new String[] { "?ID", "?PATIENT", "186", "?C1" });
-        while (result.hasMoreElements()) {
-            String[] r = result.nextElement();
-            for (String s : r) {
-                System.out.print(s + " ");
-            }
-            System.out.println();
-        }
-        result.cleanup();
+        Test.runTest(args[0]);
     }
 }

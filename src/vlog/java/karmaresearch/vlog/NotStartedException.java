@@ -3,11 +3,9 @@ package karmaresearch.vlog;
 /**
  * This exception gets thrown when an attempt is made to do something with VLog
  * when it is not started yet.
- *
- * TODO: checked or unchecked exception? For now, unchecked.
  */
 
-public class NotStartedException extends RuntimeException {
+public class NotStartedException extends Exception {
 
     /**
      * Constructs an <code>NotStartedException</code> with <code>null</code> as
