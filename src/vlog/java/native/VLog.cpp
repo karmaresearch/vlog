@@ -217,17 +217,78 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_start(JNIEnv *env, jobject o
  * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_stop(JNIEnv *env, jobject obj) {
-    if (program != NULL) {
+    if (layer != NULL) {
 	delete layer;
+	layer = NULL;
+    }
+    if (program != NULL) {
 	delete program;
 	program = NULL;
-	layer = NULL;
     }
     if (sn != NULL) {
 	delete sn;
 	sn = NULL;
     }
 }
+
+/*
+ * Class:     karmaresearch_vlog_VLog
+ * Method:    addData
+ * Signature: (Ljava/lang/String;[[Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_addData(JNIEnv *env, jobject obj, jstring jpred, jobjectArray data) {
+    if (layer == NULL) {
+	EDBConf conf("", false);
+	layer = new EDBLayer(conf, false);
+    }
+
+    std::string pred = jstring2string(env, jpred);
+
+    if (program != NULL) {
+	if (program->getNRules() > 0) {
+	    throwEDBConfigurationException(env, "Cannot add data if there already are rules");
+	    return;
+	}
+	delete program;
+    }
+
+    if (data == NULL) {
+	throwEDBConfigurationException(env, "null data");
+	return;
+    }
+    jsize nrows = env->GetArrayLength(data);
+    // For all rows:
+    std::vector<std::vector<std::string>> values;
+    for (int i = 0; i < nrows; i++) {
+	// First, get the atom.
+	std::vector<std::string> value;
+	jobjectArray atom = (jobjectArray) env->GetObjectArrayElement(data, (jsize) i);
+	if (atom == NULL) {
+	    throwEDBConfigurationException(env, "null data");
+	    return;
+	}
+	jint arity = env->GetArrayLength(atom);
+	for (int j = 0; j < arity; j++) {
+	    jstring v = (jstring) env->GetObjectArrayElement(atom, (jsize) j);
+	    if (v == NULL) {
+		throwEDBConfigurationException(env, "null data");
+		return;
+	    }
+	    value.push_back(jstring2string(env, v));
+	}
+	values.push_back(value);
+    }
+
+    try {
+	layer->addInmemoryTable(pred, values);
+    } catch(std::string s) {
+	throwEDBConfigurationException(env, s.c_str());
+	return;
+    }
+
+    program = new Program(layer->getNTerms(), layer);
+}
+
 
 /*
  * Class:     karmaresearch_vlog_VLog
@@ -275,7 +336,7 @@ JNIEXPORT jstring JNICALL Java_karmaresearch_vlog_VLog_getPredicate(JNIEnv *env,
  */
 JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_getConstantId(JNIEnv *env, jobject obj, jstring literal) {
 
-    if (program == NULL) {
+    if (layer == NULL) {
 	throwNotStartedException(env, "VLog is not started yet");
 	return -1;
     }

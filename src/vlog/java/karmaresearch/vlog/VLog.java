@@ -139,6 +139,20 @@ public class VLog {
             IOException;
 
     /**
+     * Adds the data for the specified predicate to the database. If VLog is not
+     * started yet, it will be started with an empty configuration.
+     *
+     * @param predicate
+     *            the predicate
+     * @param contents
+     *            the data
+     * @exception EDBConfigurationException
+     *                is thrown when the rows don't all have the same arity.
+     */
+    public native void addData(String predicate, String[][] contents)
+            throws EDBConfigurationException;
+
+    /**
      * Stops and de-allocates the reasoner. This method should be called before
      * beginning runs on another database. If vlog is not started yet, this call
      * does nothing, so it does no harm to call it more than once.

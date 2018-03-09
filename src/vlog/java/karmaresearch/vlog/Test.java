@@ -1,6 +1,11 @@
 package karmaresearch.vlog;
 
+import java.nio.CharBuffer;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import karmaresearch.vlog.Term.TermType;
@@ -64,6 +69,10 @@ class Test {
     private static Rule rule5 = new Rule(new Atom[] { targethospital },
             new Atom[] { hospital });
 
+    private static String[][] p1_contents = { { "a", "b" } };
+    private static String[][] p2_contents = { { "c", "d", "e" },
+            { "f", "g", "h" } };
+
     static void runTest(String fn) throws Exception {
         VLog vlog = new VLog();
         vlog.setLogLevel("debug");
@@ -74,6 +83,32 @@ class Test {
             // Good!
         }
         vlog.stop();
+
+        // Test start with empty config
+        vlog.start("", false);
+        vlog.addData("p1", p1_contents);
+        vlog.addData("p2", p2_contents);
+        List<Term> q1 = new ArrayList<Term>();
+        q1.add(new Term(TermType.VARIABLE, "v1"));
+        q1.add(new Term(TermType.CONSTANT, "d"));
+        q1.add(new Term(TermType.VARIABLE, "v2"));
+        vlog.writeQueryResultsToCsv(
+                new Atom("p2", q1.toArray(new Term[q1.size()])), "blabla");
+        byte[] readBack = Files.readAllBytes(Paths.get("blabla"));
+        if (readBack.length > 7) {
+            throw new Error(
+                    "Error in query, check file 'blabla', should contain 'c,d,e'");
+        }
+        byte[] b2 = Arrays.copyOf(readBack, 5);
+        char[] c = "c,d,e".toCharArray();
+        byte[] b1 = Charset.forName("UTF-8").encode(CharBuffer.wrap(c)).array();
+        if (!Arrays.equals(b1, b2)) {
+            throw new Error(
+                    "Error in query, check file 'blabla', should contain 'c,d,e'");
+        }
+        Files.delete(Paths.get("blabla"));
+        vlog.stop();
+
         vlog.start(fn, true);
         ArrayList<Rule> rules = new ArrayList<>();
         rules.add(rule1);
