@@ -98,6 +98,7 @@ class Test {
             System.out.println();
         }
         result.cleanup();
+        vlog.writeQueryResultsToCsv(query, "queryResult");
 
         rules.clear();
         rules.add(rule1);

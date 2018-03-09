@@ -219,23 +219,8 @@ public class VLog {
     private native QueryResultEnumeration query(int predicate, long[] terms)
             throws NotStartedException;
 
-    /**
-     * Queries the current, so possibly materialized, database, and returns an
-     * iterator that delivers the answers, one by one.
-     *
-     * TODO: deal with not-found predicates, terms.
-     *
-     * @param query
-     *            the query, as an atom.
-     * @return the result iterator.
-     * @exception NotStartedException
-     *                is thrown when vlog is not started yet.
-     */
-    public StringQueryResultEnumeration query(Atom query)
-            throws NotStartedException {
-        int intPred = getPredicateId(query.getPredicate());
+    private long[] extractTerms(Term[] terms) throws NotStartedException {
         ArrayList<String> variables = new ArrayList<>();
-        Term[] terms = query.getTerms();
         long[] longTerms = new long[terms.length];
         for (int i = 0; i < terms.length; i++) {
             if (terms[i].getTermType() == TermType.VARIABLE) {
@@ -255,8 +240,51 @@ public class VLog {
                 longTerms[i] = getConstantId(terms[i].getName());
             }
         }
+        return longTerms;
+    }
+
+    /**
+     * Queries the current, so possibly materialized, database, and returns an
+     * iterator that delivers the answers, one by one.
+     *
+     * TODO: deal with not-found predicates, terms.
+     *
+     * @param query
+     *            the query, as an atom.
+     * @return the result iterator.
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet.
+     */
+    public StringQueryResultEnumeration query(Atom query)
+            throws NotStartedException {
+        int intPred = getPredicateId(query.getPredicate());
+        long[] longTerms = extractTerms(query.getTerms());
         return new StringQueryResultEnumeration(this,
                 query(intPred, longTerms));
+    }
+
+    private native void queryToCsv(int predicate, long[] term, String fileName)
+            throws IOException;
+
+    /**
+     * Writes the result of a query to a CSV file.
+     *
+     * @param query
+     *            the query
+     * @param fileName
+     *            the file to write to.
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet, or materialization
+     *                has not run yet
+     * @exception IOException
+     *                is thrown when the file could not be written for some
+     *                reason
+     */
+    public void writeQueryResultsToCsv(Atom query, String fileName)
+            throws NotStartedException, IOException {
+        int intPred = getPredicateId(query.getPredicate());
+        long[] longTerms = extractTerms(query.getTerms());
+        queryToCsv(intPred, longTerms, fileName);
     }
 
     /**

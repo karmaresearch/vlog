@@ -6,10 +6,12 @@
 #include <vlog/edb.h>
 #include <vlog/seminaiver.h>
 #include <vlog/reasoner.h>
+#include <vlog/utils.h>
 #include <kognac/utils.h>
 #include <kognac/logs.h>
 
 #include <iostream>
+#include <fstream>
 #include <cstring>
 
 static SemiNaiver *sn = NULL;
@@ -23,6 +25,22 @@ std::string jstring2string(JNIEnv *env, jstring jstr) {
     std::string str = std::string(cstr);
     env->ReleaseStringUTFChars(jstr, cstr);
     return str;
+}
+
+// Utility method to convert a literal id to a string.
+std::string literalToString(uint64_t literalid) {
+    char supportText[MAX_TERM_SIZE];
+    if (!layer->getDictText(literalid, supportText)) {
+	std::string s = program->getFromAdditional((Term_t) literalid);
+	if (s == std::string("")) {
+	    s = "" + std::to_string(literalid >> 40) + "_"
+		    + std::to_string((literalid >> 32) & 0377) + "_"
+		    + std::to_string(literalid & 0xffffffff);
+	}
+
+	return s;
+    }
+    return std::string(supportText);
 }
 
 // Utility method to throw an exception
@@ -283,26 +301,10 @@ JNIEXPORT jstring JNICALL Java_karmaresearch_vlog_VLog_getConstant(JNIEnv *env, 
 	throwNotStartedException(env, "VLog is not started yet");
 	return NULL;
     }
-    char supportText[MAX_TERM_SIZE];
-    if (!layer->getDictText((uint64_t) literalid, supportText)) {
-	std::string s = program->getFromAdditional((Term_t) literalid);
-	if (s == std::string("")) {
-	    s = "" + std::to_string(literalid >> 40) + "_"
-		    + std::to_string((literalid >> 32) & 0377) + "_"
-		    + std::to_string(literalid & 0xffffffff);
-	}
-
-	return env->NewStringUTF(s.c_str());
-    }
-    return env->NewStringUTF(supportText);
+    return env->NewStringUTF(literalToString(literalid).c_str());
 }
 
-/*
- * Class:     karmaresearch_vlog_VLog
- * Method:    query
- * Signature: (I[J)Lkarmaresearch/vlog/QueryResultEnumeration;
- */
-JNIEXPORT jobject JNICALL Java_karmaresearch_vlog_VLog_query(JNIEnv * env, jobject obj, jint p, jlongArray els ) {
+static TupleIterator *getQueryIter(JNIEnv *env, PredId_t p, jlongArray els) {
     if (program == NULL) {
 	throwNotStartedException(env, "VLog is not started yet");
 	return NULL;
@@ -341,8 +343,16 @@ JNIEXPORT jobject JNICALL Java_karmaresearch_vlog_VLog_query(JNIEnv * env, jobje
 	std::shared_ptr<TupleTable> pt(table);
 	iter = new TupleTableItr(pt);
     }
+    return iter;
+}
 
-    // Now we have the tuple iterator. Encapsulate it with a QueryResultEnumeration.
+/*
+ * Class:     karmaresearch_vlog_VLog
+ * Method:    query
+ * Signature: (I[J)Lkarmaresearch/vlog/QueryResultEnumeration;
+ */
+JNIEXPORT jobject JNICALL Java_karmaresearch_vlog_VLog_query(JNIEnv * env, jobject obj, jint p, jlongArray els ) {
+    TupleIterator *iter = getQueryIter(env, (PredId_t) p, els);
     jclass jcls=env->FindClass("karmaresearch/vlog/QueryResultEnumeration");
     jmethodID mID = env->GetMethodID(jcls, "<init>", "(J)V");
     jobject jobj = env->NewObject(jcls, mID, (jlong) iter);
@@ -471,6 +481,43 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_writePredicateToCsv(JNIEnv *
     } catch(std::string s) {
 	throwIOException(env, s.c_str());
     }
+}
+
+/*
+ * Class:     karmaresearch_vlog_VLog
+ * Method:    queryToCsv
+ * Signature: (I[JLjava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_queryToCsv(JNIEnv *env, jobject obj, jint pred, jlongArray q, jstring jfile) {
+    char buffer[65536];
+    if (program == NULL) {
+        throwNotStartedException(env, "VLog is not started yet");
+        return;
+    }
+    std::string fn = jstring2string(env, jfile);
+    std::ofstream streamout(fn);
+    if (streamout.fail()) {
+        throwIOException(env, ("Could not open " + fn + " for writing").c_str());
+	return;
+    }
+    TupleIterator *iter = getQueryIter(env, (PredId_t) pred, q);
+    if (iter == NULL) {
+	return;
+    }
+    size_t sz = iter->getTupleSize();
+    while (iter->hasNext()) {
+	iter->next();
+	for (int i = 0; i < sz; i++) {
+	    if (i != 0) {
+		streamout << ",";
+	    }
+	    std::string v = literalToString(iter->getElementAt(i));
+	    streamout << VLogUtils::csvString(v);
+	}
+	streamout << std::endl;
+    }
+    delete iter;
+    streamout.close();
 }
 
 /*

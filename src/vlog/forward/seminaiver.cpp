@@ -6,6 +6,7 @@
 #include <vlog/filterer.h>
 #include <vlog/finalresultjoinproc.h>
 #include <vlog/extresultjoinproc.h>
+#include <vlog/utils.h>
 #include <trident/model/table.h>
 #include <kognac/consts.h>
 #include <kognac/utils.h>
@@ -108,6 +109,8 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
             delete d;
         }
 
+#if 0
+	// Commented out rule-reordering for now. It is only needed for interrule-parallelism.
         if (multithreaded) {
             // newDetails will ultimately contain the new rule order.
             std::vector<int> newDetails;
@@ -193,6 +196,7 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 this->allIDBRules.push_back(saved[newDetails[i]]);
             }
         }
+#endif
     }
 
 bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
@@ -447,28 +451,6 @@ bool SemiNaiver::executeUntilSaturation(
                     return newDer;
 }
 
-std::string csvString(std::string s) {
-    auto pos = s.find_first_of(" \",\n\t\r");
-    if (pos == std::string::npos) {
-	return s;
-    }
-    // Now, we need to escape the string, which means quoting, and doubling every quote in the string.
-    pos = s.find_first_of("\"");
-    if (pos == std::string::npos) {
-	// Just quoting is good enough.
-	return "\"" + s + "\"";
-    }
-    std::string result = "\"";
-    size_t beginpos = 0;
-    while (pos != std::string::npos) {
-	result += s.substr(beginpos, (pos-beginpos)+1) + "\"";
-	beginpos = pos + 1;
-	pos = s.find_first_of("\"", beginpos);
-    }
-    result += s.substr(beginpos, pos) + "\"";
-    return result;
-}
-
 void SemiNaiver::storeOnFile(std::string path, const PredId_t pred, const bool decompress, const int minLevel, const bool csv) {
     FCTable *table = predicatesTables[pred];
     char buffer[MAX_TERM_SIZE];
@@ -501,7 +483,7 @@ void SemiNaiver::storeOnFile(std::string path, const PredId_t pred, const bool d
 				    } else {
 					row += ",";
 				    }
-				    row += csvString(string(buffer));
+				    row += VLogUtils::csvString(string(buffer));
 				} else {
 				    row += "\t";
 				    row += string(buffer);
@@ -521,7 +503,7 @@ void SemiNaiver::storeOnFile(std::string path, const PredId_t pred, const bool d
 				    } else {
 					row += ",";
 				    }
-				    row += csvString(t);
+				    row += VLogUtils::csvString(t);
 				} else {
 				    row += "\t";
 				    row += t;
