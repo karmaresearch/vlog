@@ -1,5 +1,6 @@
 #include <vlog/training.h>
 #include <csignal>
+#include <ctime>
 
 std::string makeGenericQuery(Program& p, PredId_t predId, uint8_t predCard) {
     std::string query = p.getPredicateName(predId);
@@ -116,6 +117,17 @@ PredId_t getMatchingIDB(EDBLayer& db, Program &p, vector<uint64_t>& tuple) {
     return idbPredicateId;
 }
 
+void getRandomTupleIndexes(uint64_t m, uint64_t n, vector<int>& indexes) {
+    srand(time(0));
+    for (uint64_t i = 0; i < m; ++i) {
+        uint64_t r;
+        do {
+            r = rand() % n;
+        } while(std::find(indexes.begin(), indexes.end(), r) != indexes.end());
+        indexes[i] = r;
+    }
+}
+
 std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBConf &conf,
         EDBLayer &db,
         Program &p,
@@ -198,6 +210,9 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBCo
          * All EDB tuples should be carefully matched with rules
          * */
         PredId_t predId = edbPred.getId();
+        vector<int> tupleIndexes(maxTuples);
+        getRandomTupleIndexes(maxTuples, nRows, tupleIndexes);
+
         uint64_t rowNumber = 0;
         if (maxTuples > nRows) {
             maxTuples = nRows;
@@ -206,7 +221,7 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBCo
             std::vector<uint64_t> tuple;
             std::string tupleString("<");
             for (int j = 0; j < nVars; ++j) {
-                uint64_t value = table->getPosAtRow(rowNumber, j);
+                uint64_t value = table->getPosAtRow(tupleIndexes[rowNumber], j);
                 tuple.push_back(value);
                 char supportText[MAX_TERM_SIZE];
                 db.getDictText(value, supportText);
@@ -214,7 +229,6 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBCo
                 tupleString += ",";
             }
             tupleString += ">";
-            LOG(INFOL) << "Tuple # " << rowNumber << " : " << tupleString;
             PredId_t idbPredId = getMatchingIDB(db, p, tuple);
             if (65535 == idbPredId) {
                 rowNumber++;
@@ -222,15 +236,15 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBCo
             }
             std::string predName = p.getPredicateName(idbPredId);
 
-            LOG(INFOL) << tupleString << " ==> " << predName << " : " << +idbPredId;
+            LOG(INFOL) << "Matched : " << tupleString << " ==> " << predName << " : " << +idbPredId;
             vector<Substitution> subs;
             for (int k = 0; k < card; ++k) {
                 subs.push_back(Substitution(vt[k], VTerm(0, tuple[k])));
             }
             // Find powerset of subs here
             std::vector<std::vector<Substitution>> options =  powerset<Substitution>(subs);
-            unsigned int seed = (unsigned int) ((clock() ^ 413711) % 105503);
-            srand(seed);
+            //unsigned int seed = (unsigned int) ((clock() ^ 413711) % 105503);
+            srand(time(0));
             for (int l = 0; l < options.size(); ++l) {
                 vector<Substitution> sigma = options[l];
                 PredId_t predId = edbPred.getId();
@@ -307,12 +321,8 @@ double Training::runAlgo(string& algo,
 
     std::chrono::duration<double> durationQuery;
     signal(SIGALRM, alarmHandler);
-    if (timedOut){
-        LOG(INFOL) << "some child had timed out. algo = " << algo;
-    }
     timedOut = false;
 
-    LOG(INFOL) << "trying to mmap";
     double* queryTime = (double*) mmap(NULL, sizeof(double), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
 
     pid = fork();
@@ -322,7 +332,6 @@ double Training::runAlgo(string& algo,
     } else if (pid == 0) {
         //Child work begins
         //+
-        LOG(INFOL) << " child started";
         std::chrono::system_clock::time_point queryStartTime = std::chrono::system_clock::now();
         bool printResults = false;
         int nVars = literal.getNVars();
@@ -330,12 +339,8 @@ double Training::runAlgo(string& algo,
 
         TupleIterator *iter;
         if (algo == "magic"){
-            LOG(INFOL) << "trying to get the magic iterator";
-            LOG(INFOL) << literal.toprettystring(&p, &edb);
             iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
-            LOG(INFOL) << "Got the iterator";
         } else if (algo == "qsqr") {
-            LOG(INFOL) << literal.toprettystring(&p, &edb);
             iter = reasoner.getTopDownIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
         } else {
             LOG(ERRORL) << "Algorithm not supported : " << algo;
@@ -343,7 +348,6 @@ double Training::runAlgo(string& algo,
         }
         long count = 0;
         int sz = iter->getTupleSize();
-        LOG(INFOL) << "checking the size :" << sz;
         if (nVars == 0) {
             ss << (iter->hasNext() ? "TRUE" : "FALSE") << endl;
             count = (iter->hasNext() ? 1 : 0);
@@ -370,9 +374,6 @@ double Training::runAlgo(string& algo,
         }
         std::chrono::system_clock::time_point queryEndTime = std::chrono::system_clock::now();
         durationQuery = queryEndTime - queryStartTime;
-        LOG(INFOL) << " count = " << count;
-        if (algo == "magic")
-            LOG(INFOL) << "QueryTime = " << durationQuery.count();
         *queryTime = durationQuery.count()*1000;
         exit(0);
         //-
@@ -390,7 +391,6 @@ double Training::runAlgo(string& algo,
         }
         double time = *queryTime;
         munmap(queryTime, sizeof(double));
-        //LOG(INFOL) << "returning time from parent: " << time;
         return time;
     }
 }
@@ -413,8 +413,8 @@ void parseQueriesLog(vector<string>& testQueriesLog,
         vector<int>& expectedDecisions) {
 
     for (auto line: testQueriesLog) {
-        // A line looks like this
-        // query_features_QSQTime_MagicTime_Decision
+        // A line looks like this (An underscore (_) represents a space)
+        // query_fe,a,t,u,r,es_QSQTime_MagicTime_Decision
         //RP29(<http://www.Department4.University60.edu/FullProfessor5>,B) 4.000000,4,1,1,2,0 1.290000 2.069000 1
         vector<string> tokens = split(line);
         vector<string> features = split(tokens[1], ',');
@@ -489,20 +489,18 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         Instance instance(label, features);
         dataset.push_back(instance);
     }
-
     LogisticRegression lr(6);
     lr.train(dataset);
 
     vector<Metrics> testMetrics;
     vector<int> testDecisions;
     parseQueriesLog(testQueriesLog, testMetrics, testDecisions);
-    LOG(INFOL) << "parse queries completed";
     int hit = 0;
     int totalQsqr = 0;
     int totalMagic = 0;
     int hitQsqr = 0;
     int hitMagic = 0;
-    LOG(INFOL) << " test queries size = " << testMetrics.size();
+    LOG(INFOL) << " # Test queries = " << testMetrics.size();
     for (int i = 0; i < testMetrics.size(); ++i) {
         vector<double> features;
         features.push_back(testMetrics[i].cost);
@@ -532,9 +530,9 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         }
     }
     accuracy = (double)hit/(double)testMetrics.size();
-    LOG(INFOL) << "accuracy : " << accuracy;
-    LOG(INFOL) << "QSQR accuracy : " << hitQsqr << " / " << totalQsqr << " = " <<  (double)hitQsqr/(double)totalQsqr;
-    LOG(INFOL) << "Magic accuracy : " << hitMagic << " / " << totalMagic << " = " <<  (double)hitMagic/(double)totalMagic;
+    LOG(INFOL) << "Overall Accuracy : " << accuracy;
+    LOG(INFOL) << "QSQR Accuracy : " << hitQsqr << " / " << totalQsqr << " = " <<  (double)hitQsqr/(double)totalQsqr;
+    LOG(INFOL) << "Magic Accuracy : " << hitMagic << " / " << totalMagic << " = " <<  (double)hitMagic/(double)totalMagic;
     LOG(INFOL) << "QSQR favouring Training Queries = " << trainingQsqr;
     LOG(INFOL) << "Magic favouring Training Queries = " << trainingMagic;
 }
@@ -593,23 +591,6 @@ void Training::execLiteralQueries(vector<string>& queryVector,
     jsonQsqrTime->put("qsqrtimes", allQsqrTimes);
     string allMagicTimes = stringJoin(strMagicTime);
     jsonMagicTime->put("magictimes", allMagicTimes);
-
-    //vector<Instance> dataset;
-    //for (int i = 0; i < featuresVector.size(); ++i) {
-    //    vector<double> features;
-    //    features.push_back(featuresVector[i].cost);
-    //    features.push_back(featuresVector[i].estimate);
-    //    features.push_back(featuresVector[i].countRules);
-    //    features.push_back(featuresVector[i].countUniqueRules);
-    //    features.push_back(featuresVector[i].countIntermediateQueries);
-    //    features.push_back(featuresVector[i].countIDBPredicates);
-    //    int label = decisionVector[i];
-    //    Instance instance(label, features);
-    //    dataset.push_back(instance);
-    //}
-
-    //LogisticRegression lr(6);
-    //lr.train(dataset);
 }
 
 void Training::execLiteralQuery(string& literalquery,
