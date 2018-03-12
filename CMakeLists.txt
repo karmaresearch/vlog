@@ -59,7 +59,7 @@ ELSE()
     add_library(trident-sparql SHARED IMPORTED)
     add_dependencies(trident-sparql git-trident)
     set_property(TARGET trident-sparql PROPERTY IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/trident/libtrident-sparql${CMAKE_SHARED_LIBRARY_SUFFIX}")
-     # KOGNAC
+    # KOGNAC
     add_library(kognac STATIC IMPORTED)
     add_dependencies(kognac git-trident)
     include_directories(${SOURCE_DIR}/kognac/include)
@@ -110,7 +110,7 @@ file(GLOB vlog_SRC
     "src/vlog/trident/*.cpp"
     "src/launcher/vloglayer.cpp"
     "src/launcher/vlogscan.cpp"
-)
+    )
 
 #Webserver support
 IF(WEBINTERFACE)
@@ -172,24 +172,27 @@ if (CMAKE_THREAD_LIBS_INIT)
 endif()
 
 #Set compiler options
-set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3")
-set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -DDEBUG")
-set(COMPILE_FLAGS "${COMPILE_FLAGS} -c -fPIC -MD -std=c++11 -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1")
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3")
+    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -DDEBUG")
+    set(COMPILE_FLAGS "${COMPILE_FLAGS} -c -fPIC -MD -std=c++11 -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1")
+endif()
+
 IF (JAVA)
-	set(COMPILE_FLAGS "${COMPILE_FLAGS} -fPIC")
+    set(COMPILE_FLAGS "${COMPILE_FLAGS} -fPIC")
 ENDIF()
 set_target_properties(vlog PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}")
 IF(JAVA)
-set_target_properties(vlog_jni PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}")
+    set_target_properties(vlog_jni PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}")
 ENDIF()
 set_target_properties(vlog_exec PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}" OUTPUT_NAME "vlog")
 
 #standard include
 include_directories(include/)
 if(WEBINTERFACE)
-TARGET_LINK_LIBRARIES(vlog trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log)
+    TARGET_LINK_LIBRARIES(vlog trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log)
 else()
-TARGET_LINK_LIBRARIES(vlog trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log)
+    TARGET_LINK_LIBRARIES(vlog trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log)
 endif()
 if(JAVA)
     file(GLOB javaSRC "src/vlog/java/karmaresearch/vlog/*.java")
