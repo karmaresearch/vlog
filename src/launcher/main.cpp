@@ -112,7 +112,7 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
                 return false;
             }
         } else if (cmd == "load") {
-            if (!vm.count("input") and !vm.count("comprinput")) {
+            if (!vm.count("input") && !vm.count("comprinput")) {
                 printErrorMsg(
                         "The parameter -i (path to the triple files) is not set. Also --comprinput (file with the compressed triples) is not set.");
                 return false;
@@ -1199,7 +1199,7 @@ int main(int argc, const char** argv) {
         int popArg = 1000;
         int nindices = 6;
         bool aggrIndices = false;
-        int fixedStrat = StorageStrat::FIXEDSTRAT5;
+        int fixedStrat = FIXEDSTRAT5;
         bool enableFixedStrat = true;
         bool storePlainList = false;
         double sampleRate = 0.01;

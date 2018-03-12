@@ -81,7 +81,7 @@ ENDIF()
 #LZ4
 find_library(lz4 lz4)
 find_path (lz4h lz4.h)
-IF ((${lz4} STREQUAL "lz4-NOTFOUND") OR (${lz4h} STREQUAL "lz4h-NOTFOUND"))
+IF (${lz4h} STREQUAL "lz4h-NOTFOUND")
     message("Could not find LZ4. I'm going to use the version from kognac")
     include_directories(${CMAKE_BINARY_DIR}/trident/kognac/external/lz4/lib/)
     LINK_DIRECTORIES(${CMAKE_BINARY_DIR}/trident/kognac/external/lz4/lib)
