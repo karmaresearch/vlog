@@ -106,6 +106,8 @@ class Test {
             throw new Error(
                     "Error in query, check file 'blabla', should contain 'c,d,e'");
         }
+        vlog.writeQueryResultsToCsv(
+                new Atom("p3", q1.toArray(new Term[q1.size()])), "blabla");
         Files.delete(Paths.get("blabla"));
         vlog.stop();
 

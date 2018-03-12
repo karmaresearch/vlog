@@ -1119,8 +1119,11 @@ Predicate Program::getPredicate(const PredId_t id) {
     if (kb->doesPredExists(id)) {
 	return Predicate(id, 0, EDB, kb->getPredArity(id));
     }
-    uint8_t card = cardPredicates.find(id)->second;
-    return Predicate(id, 0, IDB, card);
+    if (cardPredicates.find(id) != cardPredicates.end()) {
+	uint8_t card = cardPredicates.find(id)->second;
+	return Predicate(id, 0, IDB, card);
+    }
+    return Predicate(id, 0, IDB, 0);
 }
 
 Predicate Program::getPredicate(std::string & p, uint8_t adornment) {
@@ -1128,8 +1131,11 @@ Predicate Program::getPredicate(std::string & p, uint8_t adornment) {
     if (kb->doesPredExists(id)) {
         return Predicate(id, adornment, EDB, kb->getPredArity(id));
     }
-    uint8_t card = cardPredicates.find(id)->second;
-    return Predicate(id, adornment, IDB, card);
+    if (cardPredicates.find(id) != cardPredicates.end()) {
+	uint8_t card = cardPredicates.find(id)->second;
+	return Predicate(id, adornment, IDB, card);
+    }
+    return Predicate(id, 0, IDB, 0);
 }
 
 int64_t Program::getOrAddPredicate(std::string & p, uint8_t cardinality) {
