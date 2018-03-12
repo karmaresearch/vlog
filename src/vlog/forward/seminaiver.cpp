@@ -423,7 +423,7 @@ bool SemiNaiver::executeUntilSaturation(
             //CODE FOR Statistics
             LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". RulesWithDerivation=" <<
                 nRulesOnePass << " out of " << ruleset.size() << " Derivations so far " << countAllIDBs();
-	    printCountAllIDBs("After step " + to_string(iteration) + ": ");
+            printCountAllIDBs("After step " + to_string(iteration) + ": ");
             nRulesOnePass = 0;
 
             //Get the top 10 rules in the last iteration
@@ -457,7 +457,7 @@ void SemiNaiver::storeOnFile(std::string path, const PredId_t pred, const bool d
 
     std::ofstream streamout(path);
     if (streamout.fail()) {
-	throw("Could not open " + path + " for writing");
+        throw("Could not open " + path + " for writing");
     }
 
     if (table != NULL && !table->isEmpty()) {
@@ -533,7 +533,7 @@ void SemiNaiver::storeOnFiles(std::string path, const bool decompress,
     for (PredId_t i = 0; i < MAX_NPREDS; ++i) {
         FCTable *table = predicatesTables[i];
         if (table != NULL && !table->isEmpty()) {
-	    storeOnFile(path + "/" + program->getPredicateName(i), i, decompress, minLevel, csv);
+            storeOnFile(path + "/" + program->getPredicateName(i), i, decompress, minLevel, csv);
         }
     }
 }
@@ -685,12 +685,12 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
         }
     } else if (nBodyLiterals == 1) {
         const bool uniqueResults =
-	    ! ruleDetails.rule.isExistential()
-	    && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
+            ! ruleDetails.rule.isExistential()
+            && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
             && literalItr.getNTables() == 1 && heads.size() == 1;
         while (!literalItr.isEmpty()) {
             //Add the columns to the output container
-	    // Can lastLiteral be false if nBodyLiterals == 1??? --Ceriel
+            // Can lastLiteral be false if nBodyLiterals == 1??? --Ceriel
             if (!lastLiteral || ruleDetails.rule.isExistential() ||
                     heads.size() != 1 || !queryFilterer.
                     producedDerivationInPreviousSteps(
@@ -712,16 +712,16 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
 
                 table->releaseIterator(interitr);
             }
-	    // No else-clause here? Yes, can only be duplicates
+            // No else-clause here? Yes, can only be duplicates
             literalItr.moveNextCount();
         }
     } else {
         //Copy the iterator in the tmp container.
         //This process cannot derive duplicates if the number of variables is equivalent.
         const bool uniqueResults = heads.size() == 1
-	    && ! ruleDetails.rule.isExistential()
-	    && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
-	    && (!lastLiteral || firstEndTable->isEmpty());
+            && ! ruleDetails.rule.isExistential()
+            && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
+            && (!lastLiteral || firstEndTable->isEmpty());
 
         while (!literalItr.isEmpty()) {
             std::shared_ptr<const FCInternalTable> table = literalItr.getCurrentTable();
@@ -1387,10 +1387,10 @@ void SemiNaiver::printCountAllIDBs(string prefix) {
                 long count = predicatesTables[i]->getNAllRows();
                 if (count == 0) {
                     emptyRel++;
-		}
-		string predname = program->getPredicateName(i);
-		LOG(INFOL) << prefix << "Cardinality of " <<
-		    predname << ": " << count;
+                }
+                string predname = program->getPredicateName(i);
+                LOG(DEBUGL) << prefix << "Cardinality of " <<
+                    predname << ": " << count;
                 c += count;
             }
         }

@@ -389,11 +389,11 @@ void Exporter::generateTridentDiffIndex(string outputdir) {
 
     string diffdir = Updater::getPathForUpdate(outputdir);
 
-    DiffIndex3::createDiffIndex(DiffIndex::TypeUpdate::ADDITION,
-            diffdir, outputdir + "/_diff",
+    DiffIndex3::createDiffIndex(DiffIndex::TypeUpdate::ADDITION_df,
+            diffdir, outputdir + DIR_SEP + "_diff",
             all_s, all_p, all_o, false, q, true);
     //Write the type of file
-    string flagup = diffdir + "/ADD";
+    string flagup = diffdir + DIR_SEP + "ADD";
     //write also an additional dictionary (if any) TODO!
     // writeDict(kb.getDictMgmt(), locationupdate, tmpdict);
     ofstream ofs(flagup);
@@ -421,7 +421,7 @@ void Exporter::generateNTTriples(string outputdir, bool decompress) {
                 LOG(INFOL) << "So far exported " << i << " triples ...";
             }
             //Create the file. Close the previous one
-            string filename = outputdir + "/out-" + to_string(idx++) + ".nt.gz";
+            string filename = outputdir + DIR_SEP + "out-" + to_string(idx++) + ".nt.gz";
             LOG(DEBUGL) << "Creating file " << filename;
             out = std::unique_ptr<zstr::ofstream>(new zstr::ofstream(filename));
         }

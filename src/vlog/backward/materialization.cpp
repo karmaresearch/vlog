@@ -7,11 +7,14 @@
 
 #include <fstream>
 #include <string>
-#include <unistd.h>
-#include <signal.h>
 
+#if defined(_WIN32)
+#else
+#include <signal.h>
 #include <sys/types.h>
+#include <unistd.h>
 #include <sys/wait.h>
+#endif
 
 void Materialization::loadLiteralsFromFile(Program &p, std::string filePath) {
     std::ifstream stream(filePath);
@@ -158,6 +161,9 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
         QSQQuery *q,
         TupleTable **output,
         long timeoutMicros) {
+#if defined(_WIN32)
+	throw 10; //not supported
+#else
     //Create a pipe between the two processes
     int pipeID[2];
     pipe(pipeID);
@@ -241,6 +247,7 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
         }
     }
     return true;
+#endif
 }
 
 bool Materialization::execMatQuery(Literal &l, bool timeout, EDBLayer &kb,

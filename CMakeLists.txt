@@ -15,13 +15,6 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
-#TBB
-#find_library(tbb tbb PATHS ENV LD_LIBRARY_PATH)
-#find_path (tbbh tbb/task_scheduler_init.h PATHS ENV CPATH)
-#IF ((${tbb} STREQUAL "tbb-NOTFOUND") OR (${tbbh} STREQUAL "tbbh-NOTFOUND"))
-#    message(FATAL_ERROR "Could not find TBB (thread building blocks)")
-#ENDIF()
-
 #ZLIB
 find_package(ZLIB REQUIRED)
 
@@ -88,7 +81,7 @@ ENDIF()
 #LZ4
 find_library(lz4 lz4)
 find_path (lz4h lz4.h)
-IF ((${lz4} STREQUAL "lz4-NOTFOUND") OR (${lz4h} STREQUAL "lz4h-NOTFOUND"))
+IF (${lz4h} STREQUAL "lz4h-NOTFOUND")
     message("Could not find LZ4. I'm going to use the version from kognac")
     include_directories(${CMAKE_BINARY_DIR}/trident/kognac/external/lz4/lib/)
     LINK_DIRECTORIES(${CMAKE_BINARY_DIR}/trident/kognac/external/lz4/lib)
