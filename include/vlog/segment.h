@@ -364,12 +364,12 @@ class SegmentInserter {
     private:
         const uint8_t nfields;
         std::vector<ColumnWriter> columns;
-
         //This contains a copy of the first columns
         std::vector<std::shared_ptr<Column>> copyColumns;
 
         bool segmentSorted;
         bool duplicates;
+        bool empty;
 
         void copyArray(SegmentIterator &source);
 
@@ -412,7 +412,7 @@ class SegmentInserter {
 
     public:
         SegmentInserter(const uint8_t nfields) : nfields(nfields),
-        segmentSorted(true), duplicates(true) {
+        segmentSorted(true), duplicates(true), empty(true) {
             columns.resize(nfields);
             copyColumns.resize(nfields);
         }
