@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.8)
 
-set(CMAKE_CXX_COMPILER "g++")
-set(CMAKE_C_COMPILER "gcc")
+#set(CMAKE_CXX_COMPILER "g++")
+#set(CMAKE_C_COMPILER "gcc")
 
 project (vlog)
 include(ExternalProject)
@@ -12,8 +12,21 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     message(STATUS "Setting build type to 'Release' as none was specified.")
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
     # Set the possible values of build type for cmake-gui
-    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
 endif()
+
+#add files to compile
+file(GLOB vlog_SRC
+    "src/vlog/*.cpp"
+    "src/vlog/common/*.cpp"
+    "src/vlog/backward/*.cpp"
+    "src/vlog/forward/*.cpp"
+    "src/vlog/magic/*.cpp"
+    "src/vlog/inmemory/*.cpp"
+    "src/vlog/trident/*.cpp"
+    "src/launcher/vloglayer.cpp"
+    "src/launcher/vlogscan.cpp"
+    )
 
 #ZLIB
 find_package(ZLIB REQUIRED)
@@ -72,15 +85,15 @@ ELSE()
 ENDIF()
 
 #SPARSEHASH
-find_path (sparsehash sparsehash/sparse_hash_map)
+find_path(sparsehash sparsehash/sparse_hash_map)
 IF (${sparsehash} STREQUAL "sparsehash-NOTFOUND")
     message("Could not find sparsehash. I'm going to use the version from kognac ...")
     include_directories(${CMAKE_BINARY_DIR}/trident/kognac/external/sparsehash/src/)
 ENDIF()
 
 #LZ4
-find_library(lz4 lz4)
-find_path (lz4h lz4.h)
+find_library(lz4 lz4 REQUIRED)
+find_path(lz4h lz4.h)
 IF (${lz4h} STREQUAL "lz4h-NOTFOUND")
     message("Could not find LZ4. I'm going to use the version from kognac")
     include_directories(${CMAKE_BINARY_DIR}/trident/kognac/external/lz4/lib/)
@@ -98,19 +111,6 @@ IF (JAVA)
     find_package(JNI REQUIRED)
     include_directories(${JNI_INCLUDE_DIRS})
 ENDIF()
-
-#add files to compile
-file(GLOB vlog_SRC
-    "src/vlog/*.cpp"
-    "src/vlog/common/*.cpp"
-    "src/vlog/backward/*.cpp"
-    "src/vlog/forward/*.cpp"
-    "src/vlog/magic/*.cpp"
-    "src/vlog/inmemory/*.cpp"
-    "src/vlog/trident/*.cpp"
-    "src/launcher/vloglayer.cpp"
-    "src/launcher/vlogscan.cpp"
-    )
 
 #Webserver support
 IF(WEBINTERFACE)
@@ -159,20 +159,20 @@ IF(JAVA)
 ENDIF()
 
 #Create both a library and the executable program
-add_library(vlog STATIC ${vlog_SRC})
-add_executable(vlog_exec src/launcher/main.cpp)
+add_library(vlog-core SHARED ${vlog_SRC})
+add_executable(vlog src/launcher/main.cpp)
 
 #PTHREADS
 find_package(Threads REQUIRED)
 if (THREADS_HAVE_PTHREAD_ARG)
-    target_compile_options(PUBLIC vlog "-pthread")
+    target_compile_options(PUBLIC vlog-core "-pthread")
 endif()
 if (CMAKE_THREAD_LIBS_INIT)
-    target_link_libraries(vlog "${CMAKE_THREAD_LIBS_INIT}")
+    target_link_libraries(vlog-core "${CMAKE_THREAD_LIBS_INIT}")
 endif()
 
 #Set compiler options
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+if((${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang") OR (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU"))
     set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3")
     set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -DDEBUG")
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -c -fPIC -MD -std=c++11 -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1")
@@ -181,25 +181,22 @@ endif()
 IF (JAVA)
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -fPIC")
 ENDIF()
-set_target_properties(vlog PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}")
+set_target_properties(vlog-core PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}")
 IF(JAVA)
     set_target_properties(vlog_jni PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}")
 ENDIF()
-set_target_properties(vlog_exec PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}" OUTPUT_NAME "vlog")
+set_target_properties(vlog PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}" OUTPUT_NAME "vlog")
 
 #standard include
 include_directories(include/)
-if(WEBINTERFACE)
-    TARGET_LINK_LIBRARIES(vlog trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log)
-else()
-    TARGET_LINK_LIBRARIES(vlog trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log)
-endif()
+TARGET_LINK_LIBRARIES(vlog-core trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log)
+
 if(JAVA)
     file(GLOB javaSRC "src/vlog/java/karmaresearch/vlog/*.java")
     # Create_javah(TARGET headers CLASSES karmaresearch.vlog.VLog karmaresearch.vlog.QueryResultEnumeration CLASSPATH jvlog DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/jvlog.jar OUTPUT_NAME ${CMAKE_CURRENT_SOURCE_DIR}/src/vlog/java/native/vlog_native.h)
     Create_javadoc(vlog PACKAGES karmaresearch.vlog SOURCEPATH ${CMAKE_CURRENT_SOURCE_DIR}/src/vlog/java WINDOWTITLE "VLog JNI Interface")
     # add_dependencies(vlog_jni headers)
-    TARGET_LINK_LIBRARIES(vlog_jni vlog)
+    TARGET_LINK_LIBRARIES(vlog_jni vlog-core)
     #Terrible hack to make cmake actually find the shared library when adding it to the jar.
     #It won't find it in the binary directory ... so we copy it to the source directory, add it to the jar, and then remove it from the source directory
     add_custom_command(TARGET vlog_jni COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/${CMAKE_SHARED_LIBRARY_PREFIX}vlog_jni${CMAKE_SHARED_LIBRARY_SUFFIX} ${CMAKE_SOURCE_DIR})
@@ -207,4 +204,4 @@ if(JAVA)
     add_custom_command(TARGET jvlog COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_SOURCE_DIR}/${CMAKE_SHARED_LIBRARY_PREFIX}vlog_jni${CMAKE_SHARED_LIBRARY_SUFFIX})
     add_dependencies(jvlog vlog_jni)
 ENDIF()
-TARGET_LINK_LIBRARIES(vlog_exec vlog)
+TARGET_LINK_LIBRARIES(vlog vlog-core)
