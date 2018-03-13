@@ -6,10 +6,12 @@
 #include <vlog/edb.h>
 #include <vlog/seminaiver.h>
 #include <vlog/reasoner.h>
+#include <vlog/utils.h>
 #include <kognac/utils.h>
 #include <kognac/logs.h>
 
 #include <iostream>
+#include <fstream>
 #include <cstring>
 
 static SemiNaiver *sn = NULL;
@@ -23,6 +25,22 @@ std::string jstring2string(JNIEnv *env, jstring jstr) {
     std::string str = std::string(cstr);
     env->ReleaseStringUTFChars(jstr, cstr);
     return str;
+}
+
+// Utility method to convert a literal id to a string.
+std::string literalToString(uint64_t literalid) {
+    char supportText[MAX_TERM_SIZE];
+    if (!layer->getDictText(literalid, supportText)) {
+	std::string s = program->getFromAdditional((Term_t) literalid);
+	if (s == std::string("")) {
+	    s = "" + std::to_string(literalid >> 40) + "_"
+		    + std::to_string((literalid >> 32) & 0377) + "_"
+		    + std::to_string(literalid & 0xffffffff);
+	}
+
+	return s;
+    }
+    return std::string(supportText);
 }
 
 // Utility method to throw an exception
@@ -199,17 +217,78 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_start(JNIEnv *env, jobject o
  * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_stop(JNIEnv *env, jobject obj) {
-    if (program != NULL) {
+    if (layer != NULL) {
 	delete layer;
+	layer = NULL;
+    }
+    if (program != NULL) {
 	delete program;
 	program = NULL;
-	layer = NULL;
     }
     if (sn != NULL) {
 	delete sn;
 	sn = NULL;
     }
 }
+
+/*
+ * Class:     karmaresearch_vlog_VLog
+ * Method:    addData
+ * Signature: (Ljava/lang/String;[[Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_addData(JNIEnv *env, jobject obj, jstring jpred, jobjectArray data) {
+    if (layer == NULL) {
+	EDBConf conf("", false);
+	layer = new EDBLayer(conf, false);
+    }
+
+    std::string pred = jstring2string(env, jpred);
+
+    if (program != NULL) {
+	if (program->getNRules() > 0) {
+	    throwEDBConfigurationException(env, "Cannot add data if there already are rules");
+	    return;
+	}
+	delete program;
+    }
+
+    if (data == NULL) {
+	throwEDBConfigurationException(env, "null data");
+	return;
+    }
+    jsize nrows = env->GetArrayLength(data);
+    // For all rows:
+    std::vector<std::vector<std::string>> values;
+    for (int i = 0; i < nrows; i++) {
+	// First, get the atom.
+	std::vector<std::string> value;
+	jobjectArray atom = (jobjectArray) env->GetObjectArrayElement(data, (jsize) i);
+	if (atom == NULL) {
+	    throwEDBConfigurationException(env, "null data");
+	    return;
+	}
+	jint arity = env->GetArrayLength(atom);
+	for (int j = 0; j < arity; j++) {
+	    jstring v = (jstring) env->GetObjectArrayElement(atom, (jsize) j);
+	    if (v == NULL) {
+		throwEDBConfigurationException(env, "null data");
+		return;
+	    }
+	    value.push_back(jstring2string(env, v));
+	}
+	values.push_back(value);
+    }
+
+    try {
+	layer->addInmemoryTable(pred, values);
+    } catch(std::string s) {
+	throwEDBConfigurationException(env, s.c_str());
+	return;
+    }
+
+    program = new Program(layer->getNTerms(), layer);
+}
+
 
 /*
  * Class:     karmaresearch_vlog_VLog
@@ -257,7 +336,7 @@ JNIEXPORT jstring JNICALL Java_karmaresearch_vlog_VLog_getPredicate(JNIEnv *env,
  */
 JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_getConstantId(JNIEnv *env, jobject obj, jstring literal) {
 
-    if (program == NULL) {
+    if (layer == NULL) {
 	throwNotStartedException(env, "VLog is not started yet");
 	return -1;
     }
@@ -283,26 +362,10 @@ JNIEXPORT jstring JNICALL Java_karmaresearch_vlog_VLog_getConstant(JNIEnv *env, 
 	throwNotStartedException(env, "VLog is not started yet");
 	return NULL;
     }
-    char supportText[MAX_TERM_SIZE];
-    if (!layer->getDictText((uint64_t) literalid, supportText)) {
-	std::string s = program->getFromAdditional((Term_t) literalid);
-	if (s == std::string("")) {
-	    s = "" + std::to_string(literalid >> 40) + "_"
-		    + std::to_string((literalid >> 32) & 0377) + "_"
-		    + std::to_string(literalid & 0xffffffff);
-	}
-
-	return env->NewStringUTF(s.c_str());
-    }
-    return env->NewStringUTF(supportText);
+    return env->NewStringUTF(literalToString(literalid).c_str());
 }
 
-/*
- * Class:     karmaresearch_vlog_VLog
- * Method:    query
- * Signature: (I[J)Lkarmaresearch/vlog/QueryResultEnumeration;
- */
-JNIEXPORT jobject JNICALL Java_karmaresearch_vlog_VLog_query(JNIEnv * env, jobject obj, jint p, jlongArray els ) {
+static TupleIterator *getQueryIter(JNIEnv *env, PredId_t p, jlongArray els) {
     if (program == NULL) {
 	throwNotStartedException(env, "VLog is not started yet");
 	return NULL;
@@ -341,8 +404,16 @@ JNIEXPORT jobject JNICALL Java_karmaresearch_vlog_VLog_query(JNIEnv * env, jobje
 	std::shared_ptr<TupleTable> pt(table);
 	iter = new TupleTableItr(pt);
     }
+    return iter;
+}
 
-    // Now we have the tuple iterator. Encapsulate it with a QueryResultEnumeration.
+/*
+ * Class:     karmaresearch_vlog_VLog
+ * Method:    query
+ * Signature: (I[J)Lkarmaresearch/vlog/QueryResultEnumeration;
+ */
+JNIEXPORT jobject JNICALL Java_karmaresearch_vlog_VLog_query(JNIEnv * env, jobject obj, jint p, jlongArray els ) {
+    TupleIterator *iter = getQueryIter(env, (PredId_t) p, els);
     jclass jcls=env->FindClass("karmaresearch/vlog/QueryResultEnumeration");
     jmethodID mID = env->GetMethodID(jcls, "<init>", "(J)V");
     jobject jobj = env->NewObject(jcls, mID, (jlong) iter);
@@ -471,6 +542,43 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_writePredicateToCsv(JNIEnv *
     } catch(std::string s) {
 	throwIOException(env, s.c_str());
     }
+}
+
+/*
+ * Class:     karmaresearch_vlog_VLog
+ * Method:    queryToCsv
+ * Signature: (I[JLjava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_queryToCsv(JNIEnv *env, jobject obj, jint pred, jlongArray q, jstring jfile) {
+    char buffer[65536];
+    if (program == NULL) {
+        throwNotStartedException(env, "VLog is not started yet");
+        return;
+    }
+    std::string fn = jstring2string(env, jfile);
+    std::ofstream streamout(fn);
+    if (streamout.fail()) {
+        throwIOException(env, ("Could not open " + fn + " for writing").c_str());
+	return;
+    }
+    TupleIterator *iter = getQueryIter(env, (PredId_t) pred, q);
+    if (iter == NULL) {
+	return;
+    }
+    size_t sz = iter->getTupleSize();
+    while (iter->hasNext()) {
+	iter->next();
+	for (int i = 0; i < sz; i++) {
+	    if (i != 0) {
+		streamout << ",";
+	    }
+	    std::string v = literalToString(iter->getElementAt(i));
+	    streamout << VLogUtils::csvString(v);
+	}
+	streamout << std::endl;
+    }
+    delete iter;
+    streamout.close();
 }
 
 /*

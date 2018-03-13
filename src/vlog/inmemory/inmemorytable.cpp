@@ -34,7 +34,7 @@ bool InmemoryDict::getText(uint64_t id, char *text) {
     }
 }
 
-std::vector<std::string> readRow(ifstream &ifs) {
+std::vector<std::string> readRow(istream &ifs) {
     char buffer[65536];
     bool insideEscaped = false;
     char *p = &buffer[0];
@@ -133,9 +133,56 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
     // dump();
 }
 
+InmemoryTable::InmemoryTable(PredId_t predid, std::vector<std::vector<std::string>> &entries) {
+    arity = 0;
+    //Load the table in the database
+    std::vector<std::vector<Term_t>> vectors;
+    for (auto &row : entries) {
+	if (arity == 0) {
+	    arity = row.size();
+	}
+	if (row.size() == 0) {
+	    break;
+	} else if (row.size() != arity) {
+	    throw ("Multiple arities in input");
+	}
+	for (int i = 0; i < arity; i++) {
+	    if (i >= vectors.size()) {
+		std::vector<Term_t> v;
+		vectors.push_back(v);
+	    }
+	    vectors[i].push_back(singletonDict.getOrAdd(row[i]));
+	}
+    }
+    std::vector<std::shared_ptr<Column>> columns;
+    for(uint8_t i = 0; i < arity; ++i) {
+	columns.push_back(std::shared_ptr<Column>(new InmemoryColumn(
+			vectors[i])));
+    }
+    segment = std::shared_ptr<Segment>(new Segment(arity, columns));
+    // dump();
+}
+
 void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
         std::vector<uint8_t> *posToFilter,
         std::vector<Term_t> *valuesToFilter) {
+    Term_t row[128];
+    const Literal *lit = query->getLiteral();
+    uint8_t *pos = query->getPosToCopy();
+    const uint8_t npos = query->getNPosToCopy();
+    size_t sz = lit->getTupleSize();
+    EDBIterator *iter = getIterator(*lit);
+    if (posToFilter == NULL || posToFilter->size() == 0) {
+	while (iter->hasNext()) {
+	    iter->next();
+	    for (uint8_t i = 0; i < npos; ++i) {
+		row[i] = iter->getElementAt(pos[i]);
+	    }
+	    outputTable->addRow(row);
+        }
+	return;
+    }
+
     LOG(ERRORL) << "Not implemented yet";
     throw 10;
 }

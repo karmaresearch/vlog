@@ -122,6 +122,8 @@ class InmemoryTable : public EDBTable {
     public:
         InmemoryTable(string repository, string tablename, PredId_t predid);
 
+	InmemoryTable(PredId_t predid, std::vector<std::vector<std::string>> &entries);
+
         uint8_t getArity() const;
 
         void query(QSQQuery *query, TupleTable *outputTable,
