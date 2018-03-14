@@ -36,10 +36,8 @@ IF(TRIDENT_LIB)
     message("Using KOGNAC provided installation: ${KOGNAC_LIB} ${KOGNAC_INC}")
     include_directories(${KOGNAC_INC})
     LINK_DIRECTORIES("${KOGNAC_LIB}")
-    add_library(kognac STATIC IMPORTED)
-    set_property(TARGET kognac PROPERTY IMPORTED_LOCATION ${KOGNAC_LIB}/libkognac.a)
-    add_library(kognac-log SHARED IMPORTED)
-    set_property(TARGET kognac-log PROPERTY IMPORTED_LOCATION "${KOGNAC_LIB}/libkognac-log${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    add_library(kognac SHARED IMPORTED)
+    set_property(TARGET kognac PROPERTY IMPORTED_LOCATION ${KOGNAC_LIB}/${CMAKE_SHARED_LIBRARY_PREFIX}kognac${CMAKE_SHARED_LIBRARY_SUFFIX})
 
     message("Using Trident provided installation: ${TRIDENT_LIB} ${TRIDENT_INC}")
     include_directories(${TRIDENT_INC})
@@ -73,15 +71,11 @@ ELSE()
     add_dependencies(trident-sparql git-trident)
     set_property(TARGET trident-sparql PROPERTY IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/trident/libtrident-sparql${CMAKE_SHARED_LIBRARY_SUFFIX}")
     # KOGNAC
-    add_library(kognac STATIC IMPORTED)
+    add_library(kognac SHARED IMPORTED)
     add_dependencies(kognac git-trident)
     include_directories(${SOURCE_DIR}/kognac/include)
     LINK_DIRECTORIES("${CMAKE_BINARY_DIR}/trident/kognac/")
-    set_property(TARGET kognac PROPERTY IMPORTED_LOCATION trident/kognac/libkognac.a)
-    # KOGNAC LOG
-    add_library(kognac-log SHARED IMPORTED)
-    add_dependencies(kognac-log git-trident)
-    set_property(TARGET kognac-log PROPERTY IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/trident/kognac/libkognac-log${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    set_property(TARGET kognac PROPERTY IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/trident/kognac/${CMAKE_SHARED_LIBRARY_PREFIX}kognac${CMAKE_SHARED_LIBRARY_SUFFIX})
 ENDIF()
 
 #SPARSEHASH
@@ -189,7 +183,7 @@ set_target_properties(vlog PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}" OUTPUT_NA
 
 #standard include
 include_directories(include/)
-TARGET_LINK_LIBRARIES(vlog-core trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log)
+TARGET_LINK_LIBRARIES(vlog-core trident trident-sparql ${ZLIB_LIBRARIES} kognac)
 
 if(JAVA)
     file(GLOB javaSRC "src/vlog/java/karmaresearch/vlog/*.java")
