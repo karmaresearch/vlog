@@ -411,7 +411,7 @@ class SegmentInserter {
 
     public:
         SegmentInserter(const uint8_t nfields) : nfields(nfields),
-        segmentSorted(true), duplicates(true), empty(true) {
+        segmentSorted(true), duplicates(true) {
             columns.resize(nfields);
             copyColumns.resize(nfields);
         }
