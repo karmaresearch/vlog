@@ -1,6 +1,8 @@
 #ifndef _EDB_CONF_H
 #define _EDB_CONF_H
 
+#include <vlog/consts.h>
+
 #include <string>
 #include <vector>
 
@@ -21,7 +23,7 @@ private:
     void parse(string f);
 
 public:
-    EDBConf(string rawcontent, bool isFile);
+    VLIBEXP EDBConf(string rawcontent, bool isFile);
 
     EDBConf(string rawcontent) : EDBConf(rawcontent, true) {}
 

@@ -25,7 +25,7 @@ void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithread
     EDBInfoTable infot;
     const string pn = tableConf.predname;
     const string kbpath = tableConf.params[0];
-    if (!Utils::exists(kbpath) || !Utils::exists(kbpath + "/p0")) {
+    if (!Utils::exists(kbpath) || !Utils::exists(kbpath + DIR_SEP + "p0")) {
         LOG(ERRORL) << "The KB at " << kbpath << " does not exist. Check the edb.conf file.";
         throw 10;
     }

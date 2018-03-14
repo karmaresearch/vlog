@@ -2,6 +2,7 @@
 #define CONCEPTS_H
 
 #include <vlog/support.h>
+#include <vlog/consts.h>
 
 #include <kognac/logs.h>
 
@@ -209,9 +210,10 @@ struct Substitution {
     Substitution(uint8_t origin, VTerm destination) : origin(origin), destination(destination) {}
 };
 
-std::vector<Substitution> concat(std::vector<Substitution>&, std::vector<Substitution>&);
-std::vector<Substitution> inverse_concat(std::vector<Substitution>&, std::vector<Substitution>&);
-std::string extractFileName(std::string& filePath);
+VLIBEXP std::vector<Substitution> concat(std::vector<Substitution>&, std::vector<Substitution>&);
+VLIBEXP std::vector<Substitution> inverse_concat(std::vector<Substitution>&, std::vector<Substitution>&);
+VLIBEXP std::string extractFileName(std::string& filePath);
+
 /*** LITERALS ***/
 class Program;
 class Literal {
@@ -256,9 +258,9 @@ class Literal {
 
         bool sameVarSequenceAs(const Literal &l) const;
 
-        uint8_t getNVars() const;
+        VLIBEXP uint8_t getNVars() const;
 
-        uint8_t getNConstants() const;
+        VLIBEXP uint8_t getNConstants() const;
 
         uint8_t getNUniqueVars() const;
 
@@ -411,30 +413,30 @@ class Program {
         std::string rewriteRDFOWLConstants(std::string input);
 
     public:
-        Program(const uint64_t assignedIds,
+        VLIBEXP Program(const uint64_t assignedIds,
                 EDBLayer *kb);
 
 	EDBLayer *getKB() {
 	    return kb;
 	}
 
-        Literal parseLiteral(std::string literal, Dictionary &dictVariables);
+        VLIBEXP Literal parseLiteral(std::string literal, Dictionary &dictVariables);
 
-        void readFromFile(std::string pathFile, bool rewriteMultihead = false);
+        VLIBEXP void readFromFile(std::string pathFile, bool rewriteMultihead = false);
 
-        void readFromString(std::string rules, bool rewriteMultihead = false);
+        VLIBEXP void readFromString(std::string rules, bool rewriteMultihead = false);
 
         PredId_t getPredicateID(std::string &p, const uint8_t card);
 
-        std::string getPredicateName(const PredId_t id);
+        VLIBEXP std::string getPredicateName(const PredId_t id);
 
-        Predicate getPredicate(std::string &p);
+        VLIBEXP Predicate getPredicate(std::string &p);
 
-        Predicate getPredicate(std::string &p, uint8_t adornment);
+        VLIBEXP Predicate getPredicate(std::string &p, uint8_t adornment);
 
-        Predicate getPredicate(const PredId_t id);
+        VLIBEXP Predicate getPredicate(const PredId_t id);
 
-	int64_t getOrAddPredicate(std::string &p, uint8_t cardinality);
+		int64_t getOrAddPredicate(std::string &p, uint8_t cardinality);
 
         std::vector<Rule> getAllRulesByPredicate(PredId_t predid) const;
 
@@ -448,13 +450,13 @@ class Program {
             return additionalConstants.getRawValue(val);
         }
 
-	uint64_t getOrAddToAdditional(std::string term) {
-	    return additionalConstants.getOrAdd(term);
-	}
+		uint64_t getOrAddToAdditional(std::string term) {
+			return additionalConstants.getOrAdd(term);
+		}
 
-        void sortRulesByIDBPredicates();
+        VLIBEXP void sortRulesByIDBPredicates();
 
-        std::vector<Rule> getAllRules();
+        VLIBEXP std::vector<Rule> getAllRules();
 
         int getNRules() const;
 
@@ -470,7 +472,7 @@ class Program {
 
         void addAllRules(std::vector<Rule> &rules);
 
-        bool isPredicateIDB(const PredId_t id);
+        VLIBEXP bool isPredicateIDB(const PredId_t id);
 
         std::string getAllPredicates();
 
@@ -482,11 +484,11 @@ class Program {
 
         std::string tostring();
 
-        bool areExistentialRules();
+        VLIBEXP bool areExistentialRules();
 
         static std::string compressRDFOWLConstants(std::string input);
 
-        std::vector<PredId_t> getAllEDBPredicateIds();
+        VLIBEXP std::vector<PredId_t> getAllEDBPredicateIds();
 
         ~Program() {
         }
