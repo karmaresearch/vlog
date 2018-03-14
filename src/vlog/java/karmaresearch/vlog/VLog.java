@@ -16,9 +16,17 @@ import karmaresearch.vlog.Term.TermType;
 public class VLog {
 
     static {
+        /*
+         * loadLibrary("kognag-log"); loadLibrary("trident-core");
+         * loadLibrary("trident-sparql"); loadLibrary("vlog-core");
+         */
+        loadLibrary("vlog_jni");
+    };
+
+    private static void loadLibrary(String s) {
         // First try to just load the shared library.
         try {
-            System.loadLibrary("vlog_jni");
+            System.loadLibrary(s);
         } catch (Throwable ex) {
             // Did not work, now try to load it from the same directory as the
             // jar file. First determine prefix and suffix, depending on OS.
@@ -47,7 +55,7 @@ public class VLog {
             }
 
             // Determine library name.
-            String libName = nativePrefix + "vlog_jni" + nativeSuffix;
+            String libName = nativePrefix + s + nativeSuffix;
 
             try {
                 loadFromDir(jarFile, libName);
@@ -252,6 +260,11 @@ public class VLog {
                 }
             } else {
                 longTerms[i] = getConstantId(terms[i].getName());
+                if (longTerms[i] == -1) {
+                    // Non-existing ..., but make sure that VLog won't interpret
+                    // it as a variable.
+                    longTerms[i] = Long.MAX_VALUE;
+                }
             }
         }
         return longTerms;

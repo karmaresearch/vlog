@@ -268,6 +268,9 @@ void _literal2filter(const Literal &query, std::vector<uint8_t> &posVarsToCopy,
 
 EDBIterator *InmemoryTable::getIterator(const Literal &q) {
     std::vector<uint8_t> sortFields;
+    if (q.getTupleSize() != arity) {
+	return new InmemoryIterator(NULL, predid, sortFields);
+    }
     if (q.getNUniqueVars() == q.getTupleSize()) {
         return new InmemoryIterator(segment, predid, sortFields);
     }
@@ -282,7 +285,7 @@ EDBIterator *InmemoryTable::getIterator(const Literal &q) {
 
     _literal2filter(q, posVarsToCopy, posConstantsToFilter,
 	    valuesConstantsToFilter, repeatedVars);
-    
+
     writers.resize(nfields);
     for (uint8_t i = 0; i < nfields; ++i) {
 	writers[i] = new ColumnWriter();
@@ -401,6 +404,10 @@ std::shared_ptr<const Segment> InmemoryTable::getSortedCachedSegment(
 
 EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
         const std::vector<uint8_t> &fields) {
+
+    if (query.getTupleSize() != arity) {
+	return new InmemoryIterator(NULL, predid, fields);
+    }
     /*** Look at the query to see if we need filtering***/
     std::vector<uint8_t> posConstants;
     std::vector<uint8_t> vars;
@@ -419,10 +426,6 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
             if (!found)
                 vars.push_back(query.getTermAtPos(i).getId());
         }
-    }
-
-    if (vars.empty()) {
-	return new InmemoryIterator(NULL, predid, fields);
     }
 
     /*** If there are no constants, then just returned a sorted version of the
@@ -463,7 +466,7 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
                     }
                     currentidx++;
                 }
-                if (currentidx != 0) {
+                if (currentidx != start) {
                     map.insert(std::make_pair(prevkey, Coordinates(start,
                                     currentidx - start)));
                 }
