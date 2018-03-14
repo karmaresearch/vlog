@@ -1106,7 +1106,6 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
 }
 
 int main(int argc, const char** argv) {
-
     //Init params
     ProgramArgs vm;
     if (!initParams(argc, argv, vm)) {
@@ -1133,7 +1132,7 @@ int main(int argc, const char** argv) {
         //Get current directory
         string execFile = string(argv[0]);
         string dirExecFile = Utils::parentDir(execFile);
-        edbFile = dirExecFile + string("/edb.conf");
+        edbFile = dirExecFile + DIR_SEP + string("edb.conf");
     }
 
     if (cmd != "load" && !Utils::exists(edbFile)) {
@@ -1147,10 +1146,7 @@ int main(int argc, const char** argv) {
         parallelism = 2;    // Otherwise tbb aborts.
         // Actual parallelism will be controlled elsewhere.
     }
-    // Allow for older tbb versions: don't use global_control.
-    // tbb::global_control c(tbb::global_control::max_allowed_parallelism, parallelism);
     ParallelTasks::setNThreads(parallelism);
-    //tbb::task_scheduler_init init(parallelism);
 
     // For profiling:
     int seconds = vm["sleep"].as<int>();

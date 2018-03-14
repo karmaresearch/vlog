@@ -70,7 +70,8 @@ void RuleExecutionDetails::groupLiteralsBySharedVariables(std::vector<uint8_t> &
 
     for (std::vector<const Literal*>::iterator itr = set.begin(); itr != set.end();
             ++itr) {
-        std::vector<uint8_t> sharedVars = (*itr)->getSharedVars(startVars);
+		const Literal *lit = *itr;
+        std::vector<uint8_t> sharedVars = lit->getSharedVars(startVars);
         if (sharedVars.size() > 0 || startVars.size() == 0) {
             //copy the remaining
             std::vector<const Literal*> newSet;
@@ -84,7 +85,7 @@ void RuleExecutionDetails::groupLiteralsBySharedVariables(std::vector<uint8_t> &
 
             //copy the new vars
             std::vector<uint8_t> newvars(startVars);
-            std::vector<uint8_t> nv = (*itr)->getNewVars(newvars);
+            std::vector<uint8_t> nv = lit->getNewVars(newvars);
             std::copy(nv.begin(), nv.end(), std::back_inserter(newvars));
 
             groupLiteralsBySharedVariables(newvars, newSet, newleftElements);
@@ -92,7 +93,7 @@ void RuleExecutionDetails::groupLiteralsBySharedVariables(std::vector<uint8_t> &
                 startVars.clear();
                 set.clear();
                 leftelements.clear();
-                set.push_back(*itr);
+                set.push_back(lit);
                 std::copy(newSet.begin(), newSet.end(), std::back_inserter(set));
                 std::copy(newvars.begin(), newvars.end(), std::back_inserter(startVars));
                 return;
