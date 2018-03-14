@@ -345,7 +345,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             int nQueries = trainingQueries.size();
             LOG(INFOL) << nQueries << " queries generated in " << sec.count() << " seconds";
             vector<string> trainingQueriesVector;
-            int nMaxTrainingQueries = 500;
+            int nMaxTrainingQueries = nQueries;
             int i = 0;
             for (auto tq: trainingQueries) {
                 trainingQueriesVector.push_back(tq.first);

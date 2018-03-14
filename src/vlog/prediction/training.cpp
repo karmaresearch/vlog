@@ -128,6 +128,25 @@ void getRandomTupleIndexes(uint64_t m, uint64_t n, vector<int>& indexes) {
     }
 }
 
+int foundSubsumingQuery(string& testQuery,
+    vector<pair<string, int>>& trainingQueriesAndResult,
+    Program& p) {
+
+    Dictionary dictVariables;
+    Literal testLiteral = p.parseLiteral(testQuery, dictVariables);
+    for (auto qr: trainingQueriesAndResult) {
+        Literal trainingLiteral = p.parseLiteral(qr.first, dictVariables);
+        Substitution subs[SIZETUPLE];
+        int nsubs = Literal::subsumes(subs, trainingLiteral, testLiteral);
+        if (nsubs != -1) {
+            LOG(INFOL) << qr.first << " subsumes " << testQuery;
+            // return result of the test query
+            return qr.second;
+        }
+    }
+    return -1;
+}
+
 std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBConf &conf,
         EDBLayer &db,
         Program &p,
@@ -409,6 +428,7 @@ std::vector<std::string> split( std::string str, char sep = ' ' )
 }
 
 void parseQueriesLog(vector<string>& testQueriesLog,
+        vector<string>& testQueries,
         vector<Metrics>& testFeaturesVector,
         vector<int>& expectedDecisions) {
 
@@ -418,6 +438,7 @@ void parseQueriesLog(vector<string>& testQueriesLog,
         //RP29(<http://www.Department4.University60.edu/FullProfessor5>,B) 4.000000,4,1,1,2,0 1.290000 2.069000 1
         vector<string> tokens = split(line);
         vector<string> features = split(tokens[1], ',');
+        testQueries.push_back(tokens[0]);
         Metrics metrics;
         metrics.cost = stod(features[0]);
         metrics.estimate = stoul(features[1]);
@@ -469,6 +490,8 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         strMagicTime.push_back(magicTime);
     }
 
+    vector<pair<string, int>> trainingQueriesAndResult;
+
     int trainingQsqr = 0;
     int trainingMagic = 0;
     vector<Instance> dataset;
@@ -485,6 +508,7 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
             trainingQsqr++;
         } else {
             trainingMagic++;
+            trainingQueriesAndResult.push_back(std::make_pair(trainingQueriesVector[i], label));
         }
         Instance instance(label, features);
         dataset.push_back(instance);
@@ -493,8 +517,9 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
     lr.train(dataset);
 
     vector<Metrics> testMetrics;
+    vector<string> testQueries;
     vector<int> testDecisions;
-    parseQueriesLog(testQueriesLog, testMetrics, testDecisions);
+    parseQueriesLog(testQueriesLog, testQueries, testMetrics, testDecisions);
     int hit = 0;
     int totalQsqr = 0;
     int totalMagic = 0;
@@ -509,11 +534,16 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         features.push_back(testMetrics[i].countUniqueRules);
         features.push_back(testMetrics[i].countIntermediateQueries);
         features.push_back(testMetrics[i].countIDBPredicates);
-        //int label = testDecisions[i];
-        double probability = lr.classify(features);
-        int myDecision = 0;
-        if (probability > 0.5) {
-            myDecision = 1;
+
+        int result = foundSubsumingQuery(testQueries[i], trainingQueriesAndResult, p);
+        int myDecision = result;
+        if (myDecision == -1) {
+            double probability = lr.classify(features);
+            if (probability > 0.5) {
+                myDecision = 1;
+            } else {
+                myDecision = 0;
+            }
         }
         if (testDecisions[i] == 1) {
             totalQsqr++;
