@@ -369,7 +369,6 @@ class SegmentInserter {
 
         bool segmentSorted;
         bool duplicates;
-        bool empty;
 
         void copyArray(SegmentIterator &source);
 

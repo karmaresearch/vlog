@@ -650,6 +650,7 @@ void SegmentInserter::checkSizes() const {
 
 void SegmentInserter::addRow(const Term_t *row, const uint8_t *posToCopy) {
     if (segmentSorted) {
+        assert(nfields > 0);
         if (!columns[0].isEmpty()) {
             for (uint8_t i = 0; i < nfields; ++i) {
                 if (row[posToCopy[i]] < columns[posToCopy[i]].lastValue()) {
@@ -665,7 +666,6 @@ void SegmentInserter::addRow(const Term_t *row, const uint8_t *posToCopy) {
     for (int i = 0; i < nfields; ++i) {
         columns[i].add(row[posToCopy[i]]);
     }
-    empty = false;
 }
 
 /*void SegmentInserter::addRow(const Segment *seg, const uint32_t rowid) {
@@ -690,6 +690,7 @@ void SegmentInserter::addRow(const Term_t *row, const uint8_t *posToCopy) {
 
 void SegmentInserter::addRow(SegmentIterator &itr) {
     if (segmentSorted) {
+        assert(nfields > 0);
         if (!columns[0].isEmpty()) {
             for (uint8_t i = 0; i < nfields; ++i) {
                 if (itr.get(i) < columns[i].lastValue()) {
@@ -705,11 +706,11 @@ void SegmentInserter::addRow(SegmentIterator &itr) {
     for (uint8_t i = 0; i < nfields; ++i) {
         columns[i].add(itr.get(i));
     }
-    empty = false;
 }
 
 void SegmentInserter::addRow(FCInternalTableItr *itr, const uint8_t *posToCopy) {
     if (segmentSorted) {
+        assert(nfields > 0);
         if (!columns[0].isEmpty()) {
             for (uint8_t i = 0; i < nfields; ++i) {
                 if (itr->getCurrentValue(posToCopy[i]) < columns[posToCopy[i]].lastValue()) {
@@ -725,11 +726,11 @@ void SegmentInserter::addRow(FCInternalTableItr *itr, const uint8_t *posToCopy) 
     for (int i = 0; i < nfields; ++i) {
         columns[i].add(itr->getCurrentValue(posToCopy[i]));
     }
-    empty = false;
 }
 
 void SegmentInserter::addRow(const Term_t *row) {
     if (segmentSorted) {
+        assert(nfields > 0);
         if (!columns[0].isEmpty()) {
             for (uint8_t i = 0; i < nfields; ++i) {
                 if (row[i] < columns[i].lastValue()) {
@@ -745,11 +746,16 @@ void SegmentInserter::addRow(const Term_t *row) {
     for (size_t i = 0; i < nfields; ++i) {
         columns[i].add(row[i]);
     }
-    empty = false;
 }
 
 bool SegmentInserter::isEmpty() const {
-    return empty;
+    assert(nfields > 0);
+    if (copyColumns[0] != std::shared_ptr<Column>()) {
+        if (!copyColumns[0]->isEmpty()) {
+            return false;
+        }
+    }
+    return columns[0].isEmpty();
 }
 
 void SegmentInserter::addColumns(std::vector<std::shared_ptr<Column>> &c,
@@ -778,7 +784,6 @@ void SegmentInserter::addColumns(std::vector<std::shared_ptr<Column>> &c,
             columns[i].concatenate(c[i].get());
         }
     }
-    empty = false;
 }
 
 void SegmentInserter::addColumn(const uint8_t pos,
@@ -796,7 +801,6 @@ void SegmentInserter::addColumn(const uint8_t pos,
           }*/
         columns[pos].concatenate(column.get());
     }
-    empty = false;
 }
 
 std::shared_ptr<const Segment> SegmentInserter::getSegment() {
@@ -933,10 +937,8 @@ std::shared_ptr<const Segment> SegmentInserter::getSortedAndUniqueSegment() {
 }
 
 size_t SegmentInserter::getNRows() const {
+    assert(nfields > 0);
     size_t s = 0;
-    if (empty) {
-        return s;
-    }
     if (copyColumns[0] != std::shared_ptr<Column>()) {
         if (!copyColumns[0]->isEmpty())
             s = copyColumns[0]->size();
@@ -947,6 +949,7 @@ size_t SegmentInserter::getNRows() const {
 
 void SegmentInserter::addRow(FCInternalTableItr *itr) {
     if (segmentSorted) {
+        assert(nfields > 0);
         if (!isEmpty()) {
             for (uint8_t i = 0; i < nfields; ++i) {
                 if (itr->getCurrentValue(i) < columns[i].lastValue()) {
