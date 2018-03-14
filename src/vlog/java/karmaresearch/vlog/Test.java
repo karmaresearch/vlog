@@ -109,8 +109,36 @@ class Test {
         Files.delete(Paths.get("blabla"));
         vlog.stop();
 
-        vlog.start(fn, true);
+        vlog.start("", false);
+        vlog.addData("A", new String[][] { { "a" } });
+        vlog.addData("A", new String[][] { { "b" } });
+        StringQueryResultEnumeration e = vlog.query(new Atom("A",
+                new Term[] { new Term(Term.TermType.CONSTANT, "C") }));
+        if (e.hasMoreElements()) {
+            throw new Error("Error in query");
+        }
+        e.cleanup();
         ArrayList<Rule> rules = new ArrayList<>();
+        rules.add(
+                new Rule(
+                        new Atom[] { new Atom("B",
+                                new Term[] { new Term(Term.TermType.VARIABLE,
+                                        "C") }) },
+                        new Atom[] { new Atom("A", new Term[] {
+                                new Term(Term.TermType.VARIABLE, "C") }) }));
+        vlog.setRules(rules.toArray(new Rule[rules.size()]),
+                RuleRewriteStrategy.AGGRESSIVE);
+        vlog.materialize(false);
+        e = vlog.query(new Atom("B",
+                new Term[] { new Term(Term.TermType.CONSTANT, "C") }));
+        if (e.hasMoreElements()) {
+            throw new Error("Error in query");
+        }
+        e.cleanup();
+        vlog.stop();
+
+        vlog.start(fn, true);
+        rules = new ArrayList<>();
         rules.add(rule1);
 
         vlog.setRules(rules.toArray(new Rule[rules.size()]),
