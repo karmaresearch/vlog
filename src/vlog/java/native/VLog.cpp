@@ -1,7 +1,5 @@
 #include <jni.h>
 
-// #include "vlog_native.h"
-
 #include <vlog/concepts.h>
 #include <vlog/edb.h>
 #include <vlog/seminaiver.h>

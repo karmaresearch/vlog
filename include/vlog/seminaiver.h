@@ -137,13 +137,13 @@ class SemiNaiver {
                 bool fixpoint);
 
     public:
-        SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
+		VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 bool restrictedChase, int nthreads, bool shuffleRules);
 
         //disable restricted chase
-        SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
+		VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 int nthreads, bool shuffleRules) :
