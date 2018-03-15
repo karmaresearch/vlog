@@ -82,8 +82,8 @@ class Test {
         } catch (EDBConfigurationException e) {
             // Good!
         }
-        vlog.stop();
 
+        vlog = new VLog();
         // Test start with empty config
         vlog.start("", false);
         vlog.addData("p1", p1_contents);
@@ -109,8 +109,8 @@ class Test {
         vlog.writeQueryResultsToCsv(
                 new Atom("p3", q1.toArray(new Term[q1.size()])), "blabla");
         Files.delete(Paths.get("blabla"));
-        vlog.stop();
 
+        vlog = new VLog();
         vlog.start("", false);
         vlog.addData("A", new String[][] { { "a" } });
         vlog.addData("A", new String[][] { { "a" }, { "b" } });
@@ -144,8 +144,8 @@ class Test {
             throw new Error("Error in query");
         }
         e.cleanup();
-        vlog.stop();
 
+        vlog = new VLog();
         vlog.start(fn, true);
         rules = new ArrayList<>();
         rules.add(rule1);
@@ -192,7 +192,6 @@ class Test {
         }
         vlog.writePredicateToCsv("prescription", "testOutput");
         result.cleanup();
-
     }
 
 }

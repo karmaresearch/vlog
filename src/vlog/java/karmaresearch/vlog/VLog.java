@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import karmaresearch.vlog.Term.TermType;
 
@@ -16,6 +17,8 @@ import karmaresearch.vlog.Term.TermType;
 public class VLog {
 
     private static final boolean DEBUG = true;
+
+    private static final AtomicInteger VlogCounter = new AtomicInteger(0);
 
     static {
         loadLibrary("kognac-log");
@@ -116,6 +119,13 @@ public class VLog {
         }
     }
 
+    // Identification of this VLog instance.
+    private final int myVlog;
+
+    public VLog() {
+        myVlog = VlogCounter.getAndAdd(1);
+    }
+
     /**
      * Currently implemented rule rewriting strategies.
      *
@@ -177,9 +187,8 @@ public class VLog {
             throws EDBConfigurationException;
 
     /**
-     * Stops and de-allocates the reasoner. This method should be called before
-     * beginning runs on another database. If vlog is not started yet, this call
-     * does nothing, so it does no harm to call it more than once.
+     * Stops and de-allocates the reasoner. If vlog is not started yet, this
+     * call does nothing, so it does no harm to call it more than once.
      */
     public native void stop();
 
