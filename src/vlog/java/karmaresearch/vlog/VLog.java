@@ -18,11 +18,12 @@ public class VLog {
     private static final boolean DEBUG = true;
 
     static {
+        loadLibrary("kognac-log");
         loadLibrary("kognac");
         loadLibrary("trident-core");
         loadLibrary("trident-sparql");
         loadLibrary("vlog-core");
-        loadLibrary("vlog_jni");
+        loadLibrary("vlog-java");
     };
 
     private static void loadLibrary(String s) {
@@ -76,7 +77,9 @@ public class VLog {
                         System.out.println("Loaded " + s + " from the jar");
                     }
                 } catch (Throwable e1) {
-                    throw new UnsatisfiedLinkError(e1.getMessage());
+                    System.err.println("Could not load library " + s
+                            + ", exceptions are temporarily disabled to accomodate windows version");
+                    // throw new UnsatisfiedLinkError(e1.getMessage());
                 }
             }
         }
