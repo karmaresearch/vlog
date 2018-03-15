@@ -357,11 +357,11 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             //Get all query
             string form = req.substr(req.find("application/x-www-form-urlencoded"));
             string queries = _getValueParam(form, "query");
-            //string timeoutStr = _getValueParam(form, "timeout");
-            //string repeatQueryStr = _getValueParam(form, "repeatQuery");
+            string timeoutStr = _getValueParam(form, "timeout");
+            string repeatQueryStr = _getValueParam(form, "repeatQuery");
 
-            uint64_t timeout = 10000;//stoull(timeoutStr);
-            uint8_t repeatQuery = 1;//stoul(repeatQueryStr);
+            uint64_t timeout = stoull(timeoutStr);
+            uint8_t repeatQuery = stoul(repeatQueryStr);
             //Decode the query
             queries = HttpServer::unescape(queries);
             std::regex e1("\\+");

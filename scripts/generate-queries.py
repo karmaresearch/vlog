@@ -13,12 +13,12 @@ import functools
 STR_time = "query runtime ="
 STR_vector = "Vector:"
 
-def generateQueries(rule, arity, resultRecords):
+def generateQueries(predicate, arity, resultRecords):
 
     countQueries = 0
     # Generic query that results in all the possible records
     # Example : ?RP0(A,B)
-    query = rule + "("
+    query = predicate + "("
     for i in range(arity):
         query += chr(i+65)
         if (i != arity-1):
@@ -28,14 +28,17 @@ def generateQueries(rule, arity, resultRecords):
     stepsMaterialization = len(resultRecords)
 
     if (stepsMaterialization > 3):
-        print ("# of Materialization steps for predicate - ", rule , " : ", stepsMaterialization)
+        print ("# of Materialization steps for predicate - ", predicate , " : ", stepsMaterialization)
         if (104 in queries):
             queries[104].append(query)
         else:
             queries[104] = [query]
     else:
-        queries[100+stepsMaterialization] = [query]
-
+        if ((100+stepsMaterialization) in queries):
+            queries[100+stepsMaterialization].append(query)
+        else:
+            queries[100+stepsMaterialization] = [query]
+    print ("generic query generated: ", query )
     countQueries += 1
     # Queries by replacing each variable by a constant
     # We use variable for i and constants for other columns from result records
@@ -50,7 +53,7 @@ def generateQueries(rule, arity, resultRecords):
 
             for record in sampleRecords:
                 for a in range(arity):
-                    query = rule + "("
+                    query = predicate + "("
                     for j, column in enumerate(record):
                         if (a == j):
                             query += chr(j+65)
@@ -83,7 +86,7 @@ def generateQueries(rule, arity, resultRecords):
         # i will be the type for us
         for record in resultRecords[key]:
             for a in range(arity):
-                query = rule + "("
+                query = predicate + "("
                 for j, column in enumerate(record):
                     query += column
                     if (j != len(record) -1):
@@ -262,8 +265,8 @@ def isFileTooBig(fileName):
         return True
     return False
 
-def parseResultFile(name, resultFile, arity):
-    print (name)
+def parseResultFile(predicate, resultFile, arity):
+    print (predicate)
     results = defaultdict(list)
     if (arity > 2):
         print("Not supporting arity > 2")
@@ -296,8 +299,8 @@ def parseResultFile(name, resultFile, arity):
 
         results[int(columns[0])].append(operands)
 
-    nQueries = generateQueries(name, arity, results)
-    print (nQueries , " queries generated for predicate ", name)
+    nQueries = generateQueries(predicate, arity, results)
+    print (nQueries , " queries generated for predicate ", predicate)
 
 '''
 Takes rule file and rule names array as the input

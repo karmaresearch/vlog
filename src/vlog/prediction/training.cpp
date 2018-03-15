@@ -14,6 +14,17 @@ std::string makeGenericQuery(Program& p, PredId_t predId, uint8_t predCard) {
     query += ")";
     return query;
 }
+// http://www.cplusplus.com/forum/general/125094/
+std::vector<std::string> split( std::string str, char sep = ' ' )
+{
+    std::vector<std::string> ret ;
+
+    std::istringstream stm(str) ;
+    std::string token ;
+    while( std::getline( stm, token, sep ) ) ret.push_back(token) ;
+
+    return ret ;
+}
 
 std::string stringJoin(vector<string>& vec, char delimiter=','){
     string result;
@@ -128,21 +139,65 @@ void getRandomTupleIndexes(uint64_t m, uint64_t n, vector<int>& indexes) {
     }
 }
 
+bool isSimilar(string& query1, string& query2, EDBLayer& layer) {
+    vector<string> tokens1 = split(query1, '(');
+    vector<string> tokens2 = split(query2, '(');
+
+    string predicate1 = tokens1[0];
+    string predicate2 = tokens2[0];
+    if (predicate1 != predicate2) {
+        return false;
+    }
+    string tuple1 = tokens1[1];
+    string tuple2 = tokens2[1];
+    // Remove trailing closing paranthesis (')')
+    tuple1.pop_back();
+    tuple2.pop_back();
+    vector<string> terms1 = split(tuple1, ',');
+    vector<string> terms2 = split(tuple2, ',');
+    if (terms1.size() != terms2.size()) {
+        return false;
+    }
+    for (int i = 0; i < terms1.size(); ++i){
+        uint64_t value1;
+        bool isConstant1 = layer.getDictNumber((char*) terms1[i].c_str(), terms1[i].size(), value1);
+        uint64_t value2;
+        bool isConstant2 = layer.getDictNumber((char*) terms2[i].c_str(), terms2[i].size(), value2);
+        if (!isConstant1 && isConstant2) {
+            return false;
+        }
+    }
+    return true;
+}
+
 int foundSubsumingQuery(string& testQuery,
     vector<pair<string, int>>& trainingQueriesAndResult,
-    Program& p) {
+    Program& p,
+    EDBLayer& layer) {
 
     Dictionary dictVariables;
     Literal testLiteral = p.parseLiteral(testQuery, dictVariables);
     for (auto qr: trainingQueriesAndResult) {
-        Literal trainingLiteral = p.parseLiteral(qr.first, dictVariables);
-        Substitution subs[SIZETUPLE];
-        int nsubs = Literal::subsumes(subs, trainingLiteral, testLiteral);
-        if (nsubs != -1) {
-            LOG(INFOL) << qr.first << " subsumes " << testQuery;
-            // return result of the test query
+        // If the test query has occurred in the training, then return the result of that query
+        if (testQuery == qr.first) {
+            LOG(INFOL) << testQuery << " same as " << qr.first;
             return qr.second;
         }
+
+        // If the test query is similar to the training query, then return the result of that query
+        if (isSimilar(testQuery, qr.first, layer)){
+            LOG(INFOL) << testQuery << " similar to " << qr.first;
+            return qr.second;
+        }
+        //Literal trainingLiteral = p.parseLiteral(qr.first, dictVariables);
+        //Substitution subs[SIZETUPLE];
+        //int nsubs = Literal::subsumes(subs, testLiteral, trainingLiteral);
+        //if (nsubs != -1) {
+        //    LOG(INFOL) << testQuery << " subsumes " << qr.first;
+            // return result of the test query
+            //LOG(INFOL) << "returning " << qr.second;
+        //    return qr.second;
+        //}
     }
     return -1;
 }
@@ -415,17 +470,6 @@ double Training::runAlgo(string& algo,
 }
 
 
-// http://www.cplusplus.com/forum/general/125094/
-std::vector<std::string> split( std::string str, char sep = ' ' )
-{
-    std::vector<std::string> ret ;
-
-    std::istringstream stm(str) ;
-    std::string token ;
-    while( std::getline( stm, token, sep ) ) ret.push_back(token) ;
-
-    return ret ;
-}
 
 void parseQueriesLog(vector<string>& testQueriesLog,
         vector<string>& testQueries,
@@ -466,6 +510,7 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
     vector<string> strFeatures;
     vector<string> strQsqrTime;
     vector<string> strMagicTime;
+    ofstream logTrainingMagic("training-magic.log");
     for (auto q : trainingQueriesVector) {
         LOG(INFOL) << i++ << ") " << q;
         // Execute the literal query
@@ -509,13 +554,21 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         } else {
             trainingMagic++;
             trainingQueriesAndResult.push_back(std::make_pair(trainingQueriesVector[i], label));
+            logTrainingMagic << trainingQueriesVector[i] << endl;
         }
         Instance instance(label, features);
         dataset.push_back(instance);
     }
+
+    if (logTrainingMagic.fail()) {
+        LOG(ERRORL) << "Error writing to file";
+    }
+    logTrainingMagic.close();
+
     LogisticRegression lr(6);
     lr.train(dataset);
 
+    ofstream logCorrectlyGuessedMagic("correctly-guessed-magic.log");
     vector<Metrics> testMetrics;
     vector<string> testQueries;
     vector<int> testDecisions;
@@ -535,16 +588,19 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         features.push_back(testMetrics[i].countIntermediateQueries);
         features.push_back(testMetrics[i].countIDBPredicates);
 
-        int result = foundSubsumingQuery(testQueries[i], trainingQueriesAndResult, p);
-        int myDecision = result;
-        if (myDecision == -1) {
-            double probability = lr.classify(features);
-            if (probability > 0.5) {
-                myDecision = 1;
-            } else {
-                myDecision = 0;
-            }
+        int myDecision = 0;
+        double probability = lr.classify(features);
+        if (probability > 0.5) {
+            myDecision = 1;
         }
+        int result = -1;
+        if (myDecision != testDecisions[i]) {
+            result = foundSubsumingQuery(testQueries[i], trainingQueriesAndResult, p, edb);
+        }
+        if (result != -1) {
+            myDecision = result;
+        }
+
         if (testDecisions[i] == 1) {
             totalQsqr++;
         } else {
@@ -555,10 +611,17 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
                 hitQsqr++;
             } else {
                 hitMagic++;
+                logCorrectlyGuessedMagic << testQueries[i] << endl;
             }
             hit++;
         }
     }
+
+    if (logCorrectlyGuessedMagic.fail()) {
+        LOG(ERRORL) << "Error writing to file";
+    }
+    logCorrectlyGuessedMagic.close();
+
     accuracy = (double)hit/(double)testMetrics.size();
     LOG(INFOL) << "Overall Accuracy : " << accuracy;
     LOG(INFOL) << "QSQR Accuracy : " << hitQsqr << " / " << totalQsqr << " = " <<  (double)hitQsqr/(double)totalQsqr;
@@ -652,6 +715,12 @@ void Training::execLiteralQuery(string& literalquery,
     strFeatures += strMetrics.str();
 
     string algo="";
+    //uint8_t reps = 1;
+    //vector<double> qsqrTimes;
+    //vector<double> magicTimes;
+    //while (reps <= repeatQuery) {
+    //    reps++;
+    //}
     stringstream ssMagic;
     algo = "magic";
     double durationMagic = Training::runAlgo(algo, reasoner, edb, p, literal, ssMagic, timeout, repeatQuery);

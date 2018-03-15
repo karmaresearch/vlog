@@ -105,10 +105,10 @@ function trainAndTest() {
     var body = '';
     body += 'query=' + encodeURIComponent(queries);
 
-    //var timeout = document.getElementById('timeout').value;
-    //body += "&timeout=" + timeout;
-    //var repeatQuery = document.getElementById('repeatQuery').value;
-    //body += "&repeatQuery=" + repeatQuery;
+    var timeout = document.getElementById('timeoutTraining').value;
+    body += "&timeout=" + timeout;
+    var repeatQuery = document.getElementById('repeatQueryTraining').value;
+    body += "&repeatQuery=" + repeatQuery;
 
     body = body.replace('/%20/g','+');
     var http_request = new XMLHttpRequest();
