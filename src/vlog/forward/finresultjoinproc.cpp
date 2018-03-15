@@ -228,6 +228,10 @@ void SingleHeadFinalRuleProcessor::addColumns(const int blockid,
         std::vector<std::shared_ptr<Column>> c =
             itr->getColumn(nCopyFromSecond,
                     columns);
+	if (rowsize == 0) {
+	    assert(c.size() == 0);
+	    return;
+	}
         if (nCopyFromSecond > 1) {
             std::vector<std::shared_ptr<Column>> c2;
             int rowID = 0;
@@ -286,6 +290,9 @@ void SingleHeadFinalRuleProcessor::addColumns(const int blockid,
             itr->getColumn(nCopyFromSecond,
                     columns);
         assert(c.size() <= rowsize);
+	if (rowsize == 0) {
+	    return;
+	}
 
         if (nCopyFromSecond > 1) {
             std::vector<std::shared_ptr<Column>> c2;

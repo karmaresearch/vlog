@@ -75,7 +75,7 @@ class Test {
 
     static void runTest(String fn) throws Exception {
         VLog vlog = new VLog();
-        vlog.setLogLevel("debug");
+        vlog.setLogLevel("info");
         try {
             vlog.start("blabla", false);
             System.err.println("vlog.start() should have thrown an exception.");

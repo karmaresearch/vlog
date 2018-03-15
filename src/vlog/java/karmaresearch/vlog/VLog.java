@@ -15,11 +15,13 @@ import karmaresearch.vlog.Term.TermType;
  */
 public class VLog {
 
+    private static final boolean DEBUG = true;
+
     static {
-        /*
-         * loadLibrary("kognag-log"); loadLibrary("trident-core");
-         * loadLibrary("trident-sparql"); loadLibrary("vlog-core");
-         */
+        loadLibrary("kognac");
+        loadLibrary("trident-core");
+        loadLibrary("trident-sparql");
+        loadLibrary("vlog-core");
         loadLibrary("vlog_jni");
     };
 
@@ -27,6 +29,10 @@ public class VLog {
         // First try to just load the shared library.
         try {
             System.loadLibrary(s);
+            if (DEBUG) {
+                System.out
+                        .println("Loaded " + s + " with System.loadLibrary()");
+            }
         } catch (Throwable ex) {
             // Did not work, now try to load it from the same directory as the
             // jar file. First determine prefix and suffix, depending on OS.
@@ -59,9 +65,16 @@ public class VLog {
 
             try {
                 loadFromDir(jarFile, libName);
+                if (DEBUG) {
+                    System.out.println("Loaded " + s
+                            + " from the directory in which the jar resides");
+                }
             } catch (Throwable e) {
                 try {
                     loadFromJar(jarFile, libName, os);
+                    if (DEBUG) {
+                        System.out.println("Loaded " + s + " from the jar");
+                    }
                 } catch (Throwable e1) {
                     throw new UnsatisfiedLinkError(e1.getMessage());
                 }
@@ -82,7 +95,7 @@ public class VLog {
     private static void loadFromJar(File jarFile, String libName, String os)
             throws IOException {
         InputStream is = new BufferedInputStream(
-                VLog.class.getResourceAsStream("/" + libName));
+                VLog.class.getResourceAsStream("/resources/" + libName));
         File targetDir = Files.createTempDirectory("VLog-tmp").toFile();
         targetDir.deleteOnExit();
         File target = new File(targetDir, libName);
