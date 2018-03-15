@@ -1,6 +1,7 @@
 #include <vlog/training.h>
 #include <csignal>
 #include <ctime>
+#include <numeric>
 
 std::string makeGenericQuery(Program& p, PredId_t predId, uint8_t predCard) {
     std::string query = p.getPredicateName(predId);
@@ -388,8 +389,7 @@ double Training::runAlgo(string& algo,
         Program& p,
         Literal& literal,
         stringstream& ss,
-        uint64_t timeoutMillis,
-        uint8_t repeatQuery) {
+        uint64_t timeoutMillis) {
 
     int ret;
 
@@ -715,29 +715,35 @@ void Training::execLiteralQuery(string& literalquery,
     strFeatures += strMetrics.str();
 
     string algo="";
-    //uint8_t reps = 1;
-    //vector<double> qsqrTimes;
-    //vector<double> magicTimes;
-    //while (reps <= repeatQuery) {
-    //    reps++;
-    //}
+    uint8_t reps = 1;
+    vector<double> qsqrTimes;
+    vector<double> magicTimes;
     stringstream ssMagic;
-    algo = "magic";
-    double durationMagic = Training::runAlgo(algo, reasoner, edb, p, literal, ssMagic, timeout, repeatQuery);
-
     stringstream ssQsqr;
-    algo = "qsqr";
-    double durationQsqr = Training::runAlgo(algo, reasoner, edb, p, literal, ssQsqr, timeout, repeatQuery);
+    while (reps <= repeatQuery) {
+        algo = "magic";
+        double durationMagic = Training::runAlgo(algo, reasoner, edb, p, literal, ssMagic, timeout);
+        magicTimes.push_back(durationMagic);
 
+        algo = "qsqr";
+        double durationQsqr = Training::runAlgo(algo, reasoner, edb, p, literal, ssQsqr, timeout);
+        qsqrTimes.push_back(durationQsqr);
+        reps++;
+        if (durationMagic == timeout || durationQsqr == timeout) {
+            break;
+        }
+    }
 
-    LOG(INFOL) << "Qsqr time : " << durationQsqr;
-    LOG(INFOL) << "magic time: " << durationMagic;
+    double avgQsqrTime = accumulate(qsqrTimes.begin(), qsqrTimes.end(), 0.0)/qsqrTimes.size();
+    double avgMagicTime = accumulate(magicTimes.begin(), magicTimes.end(), 0.0)/magicTimes.size();
+    LOG(INFOL) << "Qsqr time : " << avgQsqrTime;
+    LOG(INFOL) << "magic time: " << avgMagicTime;
     int winner = 1; // 1 is for QSQR
-    if (durationMagic < durationQsqr) {
+    if (avgMagicTime < avgQsqrTime) {
         winner = 0;
     }
     decisionVector.push_back(winner);
     strResults += ssQsqr.str();
-    strQsqrTime += to_string(durationQsqr);
-    strMagicTime += to_string(durationMagic);
+    strQsqrTime += to_string(avgQsqrTime);
+    strMagicTime += to_string(avgMagicTime);
 }

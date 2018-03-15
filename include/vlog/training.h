@@ -42,8 +42,7 @@ class Training {
         Program& p,
         Literal& literal,
         stringstream& ss,
-        uint64_t timeoutMillis,
-        uint8_t repeatQuery);
+        uint64_t timeoutMillis);
 
     static void execLiteralQuery(string& literalquery,
         EDBLayer& edb,
