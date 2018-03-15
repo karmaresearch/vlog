@@ -113,11 +113,18 @@ class Test {
 
         vlog.start("", false);
         vlog.addData("A", new String[][] { { "a" } });
-        vlog.addData("A", new String[][] { { "b" } });
+        vlog.addData("A", new String[][] { { "a" }, { "b" } });
         StringQueryResultEnumeration e = vlog.query(new Atom("A",
                 new Term[] { new Term(Term.TermType.CONSTANT, "C") }));
         if (e.hasMoreElements()) {
             throw new Error("Error in query");
+        }
+        e.cleanup();
+        e = vlog.query(new Atom("A",
+                new Term[] { new Term(Term.TermType.VARIABLE, "C") }));
+        while (e.hasMoreElements()) {
+            String[] result = e.nextElement();
+            System.out.println("result: " + Arrays.toString(result));
         }
         e.cleanup();
         ArrayList<Rule> rules = new ArrayList<>();
