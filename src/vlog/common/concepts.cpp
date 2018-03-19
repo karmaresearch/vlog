@@ -795,12 +795,70 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
 
     //Calculate the tuple
     std::vector<VTerm> t;
+    std::string term;
     while (tuple.size() > 0) {
-        size_t posTerm = tuple.find(",");
-        std::string term;
-        if (posTerm != std::string::npos) {
+	size_t posTerm = 0;
+        while (posTerm < tuple.size()) {
+            if (tuple[posTerm] == ',' || tuple[posTerm] == ')') {
+                break;
+            }
+            switch(tuple[posTerm]) {
+            case '\'':
+                posTerm++;
+                while (posTerm < tuple.size()) {
+                    if (tuple[posTerm] == '\\') {
+                        posTerm++;
+                        if (posTerm != tuple.size()) {
+                            posTerm++;
+                        }
+                        continue;
+                    }
+                    if (tuple[posTerm] == '\'') {
+                        break;
+                    }
+                    posTerm++;
+                }
+                break;
+            case '\"':
+                posTerm++;
+                while (posTerm < tuple.size()) {
+                    if (tuple[posTerm] == '\\') {
+                        posTerm++;
+                        if (posTerm != tuple.size()) {
+                            posTerm++;
+                        }
+                        continue;
+                    }
+                    if (tuple[posTerm] == '\"') {
+                        break;
+                    }
+                    posTerm++;
+                }
+                break;
+            case '<':
+                posTerm++;
+                while (posTerm < tuple.size()) {
+                    if (tuple[posTerm] == '\\') {
+                        posTerm++;
+                        if (posTerm != tuple.size()) {
+                            posTerm++;
+                        }
+                        continue;
+                    }
+                    if (tuple[posTerm] == '>') {
+                        break;
+                    }
+                    posTerm++;
+                }
+                break;
+            default:
+                posTerm++;
+                break;
+            }
+        }
+        if (posTerm != tuple.size()) {
             term = tuple.substr(0, posTerm);
-            tuple = tuple.substr(posTerm + 1, std::string::npos);
+            tuple = tuple.substr(posTerm + 1, tuple.size());
         } else {
             term = tuple;
             tuple = "";
