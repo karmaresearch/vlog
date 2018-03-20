@@ -1,6 +1,7 @@
 #include <vlog/training.h>
 #include <csignal>
 #include <ctime>
+#include <stack>
 #include <numeric>
 
 std::string makeGenericQuery(Program& p, PredId_t predId, uint8_t predCard) {
@@ -410,7 +411,6 @@ double Training::runAlgo(string& algo,
         bool printResults = false;
         int nVars = literal.getNVars();
         bool onlyVars = nVars > 0;
-
         TupleIterator *iter;
         if (algo == "magic"){
             iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
@@ -469,7 +469,27 @@ double Training::runAlgo(string& algo,
     }
 }
 
+void separateQuery(string logLine, vector<string>& tokens) {
+    stack<int> spaceIndexes;
+    size_t index = string::npos;
+    int cntIndexes = 0;
+    while (cntIndexes < 4) {
+        index = logLine.find_last_of(" ", index);
+        assert(index != string::npos);
+        index--;
+        spaceIndexes.push(index);
+        cntIndexes++;
+    }
 
+    int startIndex = 0;
+    while(!spaceIndexes.empty()) {
+        int index = spaceIndexes.top();
+        spaceIndexes.pop();
+        tokens.push_back(logLine.substr(startIndex, (index - startIndex)+1));
+        startIndex = index+2;
+    }
+    tokens.push_back(logLine.substr(startIndex, (index - startIndex)+1));
+}
 
 void parseQueriesLog(vector<string>& testQueriesLog,
         vector<string>& testQueries,
@@ -480,7 +500,11 @@ void parseQueriesLog(vector<string>& testQueriesLog,
         // A line looks like this (An underscore (_) represents a space)
         // query_fe,a,t,u,r,es_QSQTime_MagicTime_Decision
         //RP29(<http://www.Department4.University60.edu/FullProfessor5>,B) 4.000000,4,1,1,2,0 1.290000 2.069000 1
-        vector<string> tokens = split(line);
+        // some queries can contain spaces, commas. To address these, we split tokens by scanning the string from the end
+        //RP1052(A,"(A)National Security (B) Public Accounts(C)Rules,Business & Privliges (D) Foreign Affairs (E) Kashmir"@en)
+        vector<string> tokens;
+        separateQuery(line, tokens);
+        assert (tokens.size() == 5);
         vector<string> features = split(tokens[1], ',');
         testQueries.push_back(tokens[0]);
         Metrics metrics;
@@ -728,6 +752,7 @@ void Training::execLiteralQuery(string& literalquery,
         algo = "qsqr";
         double durationQsqr = Training::runAlgo(algo, reasoner, edb, p, literal, ssQsqr, timeout);
         qsqrTimes.push_back(durationQsqr);
+        LOG(INFOL) << "Repetition " << reps << ") " << "Magic time = " << durationMagic << " , QSQR time = " << durationQsqr;
         reps++;
         if (durationMagic == timeout || durationQsqr == timeout) {
             break;

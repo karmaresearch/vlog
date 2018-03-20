@@ -732,7 +732,7 @@ void Program::readFromString(std::string rules, bool rewriteMultihead) {
     stringstream ss(rules);
     string rule;
     while (getline(ss, rule)) {
-        if (rule != "" && rule .substr(0, 2) != "//") {
+        if (rule != "" && rule.substr(0, 2) != "//") {
             LOG(DEBUGL) << "Parsing rule " << rule;
             parseRule(rule, rewriteMultihead);
         }
@@ -784,7 +784,7 @@ std::string Program::rewriteRDFOWLConstants(std::string input) {
     return input;
 }
 
-Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
+Literal Program::parseLiteral(std::string l, Dictionary& dictVariables) {
     size_t posBeginTuple = l.find("(");
     if (posBeginTuple == std::string::npos) {
         throw 10;
@@ -795,16 +795,80 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
 
     //Calculate the tuple
     std::vector<VTerm> t;
+    std::string term;
     while (tuple.size() > 0) {
-        size_t posTerm = tuple.find(",");
-        std::string term;
-        if (posTerm != std::string::npos) {
+	size_t posTerm = 0;
+	while (posTerm < tuple.size()) {
+	    if (tuple[posTerm] == ',' || tuple[posTerm] == ')') {
+		break;
+	    }
+	    switch(tuple[posTerm]) {
+	    case '\'':
+		posTerm++;
+		while (posTerm < tuple.size()) {
+		    if (tuple[posTerm] == '\\') {
+			posTerm++;
+			if (posTerm != tuple.size()) {
+			    posTerm++;
+			}
+			continue;
+		    }
+		    if (tuple[posTerm] == '\'') {
+			break;
+		    }
+		    posTerm++;
+		}
+		break;
+	    case '\"':
+		posTerm++;
+		while (posTerm < tuple.size()) {
+		    if (tuple[posTerm] == '\\') {
+			posTerm++;
+			if (posTerm != tuple.size()) {
+			    posTerm++;
+			}
+			continue;
+		    }
+		    if (tuple[posTerm] == '\"') {
+                // must increment index here
+                // otherwise, this double-quote is treated in the next
+                // iteration.
+                posTerm++;
+			    break;
+		    }
+		    posTerm++;
+		}
+		break;
+	    case '<':
+		posTerm++;
+		while (posTerm < tuple.size()) {
+		    if (tuple[posTerm] == '\\') {
+			posTerm++;
+			if (posTerm != tuple.size()) {
+			    posTerm++;
+			}
+			continue;
+		    }
+		    if (tuple[posTerm] == '>') {
+			break;
+		    }
+		    posTerm++;
+		}
+		break;
+	    default:
+		posTerm++;
+		break;
+	    }
+	}
+        if (posTerm != tuple.size()) {
             term = tuple.substr(0, posTerm);
-            tuple = tuple.substr(posTerm + 1, std::string::npos);
+            tuple = tuple.substr(posTerm + 1, tuple.size());
         } else {
             term = tuple;
             tuple = "";
         }
+
+	// BOOST_LOG_TRIVIAL(debug) << "Found term " << term;
 
         //Parse the term
         if (std::isupper(term.at(0))) {
@@ -833,10 +897,10 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     if (cardPredicates.find(predid) == cardPredicates.end()) {
         cardPredicates.insert(make_pair(predid, t.size()));
     } else {
-        if (cardPredicates.find(predid)->second != t.size()) {
-            LOG(INFOL) << "Wrong size in predicate: should be " << (int) cardPredicates.find(predid)->second;
-            throw 10;
-        }
+	if (cardPredicates.find(predid)->second != t.size()) {
+	    LOG(INFOL) << "Wrong size in predicate: should be " << (int) cardPredicates.find(predid)->second << " found " << (int) t.size();
+	    throw 10;
+	}
     }
     Predicate pred(predid, Predicate::calculateAdornment(t1), kb->doesPredExists(predid) ? EDB : IDB, (uint8_t) t.size());
 
