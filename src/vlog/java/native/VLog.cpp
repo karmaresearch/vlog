@@ -466,11 +466,11 @@ static TupleIterator *getQueryIter(JNIEnv *env, jobject obj, PredId_t p, jlongAr
 /*
  * Class:     karmaresearch_vlog_VLog
  * Method:    query
- * Signature: (I[J)Lkarmaresearch/vlog/QueryResultEnumeration;
+ * Signature: (I[J)Lkarmaresearch/vlog/QueryResultIterator;
  */
 JNIEXPORT jobject JNICALL Java_karmaresearch_vlog_VLog_query(JNIEnv * env, jobject obj, jint p, jlongArray els ) {
     TupleIterator *iter = getQueryIter(env, obj, (PredId_t) p, els);
-    jclass jcls=env->FindClass("karmaresearch/vlog/QueryResultEnumeration");
+    jclass jcls=env->FindClass("karmaresearch/vlog/QueryResultIterator");
     jmethodID mID = env->GetMethodID(jcls, "<init>", "(J)V");
     jobject jobj = env->NewObject(jcls, mID, (jlong) iter);
 
@@ -643,21 +643,21 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_queryToCsv(JNIEnv *env, jobj
 }
 
 /*
- * Class:     karmaresearch_vlog_QueryResultEnumeration
+ * Class:     karmaresearch_vlog_QueryResultIterator
  * Method:    hasMoreElements
  * Signature: (J)Z
  */
-JNIEXPORT jboolean JNICALL Java_karmaresearch_vlog_QueryResultEnumeration_hasMoreElements(JNIEnv *env, jobject obj, jlong ref) {
+JNIEXPORT jboolean JNICALL Java_karmaresearch_vlog_QueryResultIterator_hasNext(JNIEnv *env, jobject obj, jlong ref) {
     TupleIterator *iter = (TupleIterator *) ref;
     return (jboolean) iter->hasNext();
 }
 
 /*
- * Class:     karmaresearch_vlog_QueryResultEnumeration
+ * Class:     karmaresearch_vlog_QueryResultIterator
  * Method:    nextElement
  * Signature: (J)[J
  */
-JNIEXPORT jlongArray JNICALL Java_karmaresearch_vlog_QueryResultEnumeration_nextElement(JNIEnv *env, jobject obj, jlong ref) {
+JNIEXPORT jlongArray JNICALL Java_karmaresearch_vlog_QueryResultIterator_next(JNIEnv *env, jobject obj, jlong ref) {
     TupleIterator *iter = (TupleIterator *) ref;
     size_t sz = iter->getTupleSize();
     iter->next();
@@ -672,11 +672,11 @@ JNIEXPORT jlongArray JNICALL Java_karmaresearch_vlog_QueryResultEnumeration_next
 }
 
 /*
- * Class:     karmaresearch_vlog_QueryResultEnumeration
+ * Class:     karmaresearch_vlog_QueryResultIterator
  * Method:    cleanup
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_karmaresearch_vlog_QueryResultEnumeration_cleanup(JNIEnv *env, jobject obj, jlong ref) {
+JNIEXPORT void JNICALL Java_karmaresearch_vlog_QueryResultIterator_cleanup(JNIEnv *env, jobject obj, jlong ref) {
     TupleIterator *iter = (TupleIterator *) ref;
     delete iter;
 }

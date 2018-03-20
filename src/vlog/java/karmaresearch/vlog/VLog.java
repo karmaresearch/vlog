@@ -263,7 +263,7 @@ public class VLog {
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      */
-    private native QueryResultEnumeration query(int predicate, long[] terms)
+    private native QueryResultIterator query(int predicate, long[] terms)
             throws NotStartedException;
 
     private long[] extractTerms(Term[] terms) throws NotStartedException {
@@ -307,11 +307,11 @@ public class VLog {
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      */
-    public StringQueryResultEnumeration query(Atom query)
+    public StringQueryResultIterator query(Atom query)
             throws NotStartedException {
         int intPred = getPredicateId(query.getPredicate());
         long[] longTerms = extractTerms(query.getTerms());
-        return new StringQueryResultEnumeration(this,
+        return new StringQueryResultIterator(this,
                 query(intPred, longTerms));
     }
 
