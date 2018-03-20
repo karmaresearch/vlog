@@ -109,6 +109,8 @@ function trainAndTest() {
     body += "&timeout=" + timeout;
     var repeatQuery = document.getElementById('repeatQueryTraining').value;
     body += "&repeatQuery=" + repeatQuery;
+    var maxTrainingQueries = document.getElementById('maxTrainingQueries').value;
+    body += "&maxTraining=" + maxTrainingQueries;
 
     body = body.replace('/%20/g','+');
     var http_request = new XMLHttpRequest();
@@ -134,7 +136,7 @@ function trainAndTest() {
             } else {
                 console.log(http_request.status);
             }
-            document.getElementById('buttonQuery').disabled = false;
+            document.getElementById('buttonTrain').disabled = false;
         } else {
             msgbox('error', '#messageBox', 'http request failed', 2000);
         }

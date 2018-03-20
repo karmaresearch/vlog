@@ -319,11 +319,16 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             page = buf.str();
             isjson = true;
         } else if (path == "/gentq") {
-            // Here we will 
+            //Get all query
+            string form = req.substr(req.find("application/x-www-form-urlencoded"));
+            string queries = _getValueParam(form, "query");
+            string timeoutStr = _getValueParam(form, "timeout");
+            string repeatQueryStr = _getValueParam(form, "repeatQuery");
+            string maxTrainingStr = _getValueParam(form, "maxTraining");
             // 1. generate queries and run them and train model
             EDBConf conf(edbFile);
             int depth = 5;
-            uint64_t maxTuples = 500;
+            uint64_t maxTuples = 2000;
             uint8_t vt1 = 0;
             uint8_t vt2 = 1;
             uint8_t vt3 = 2;
@@ -345,7 +350,10 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             int nQueries = trainingQueries.size();
             LOG(INFOL) << nQueries << " queries generated in " << sec.count() << " seconds";
             vector<string> trainingQueriesVector;
-            int nMaxTrainingQueries = nQueries;
+            int nMaxTrainingQueries = stoi(maxTrainingStr);//nQueries;
+            if (nMaxTrainingQueries < 0) {
+                nMaxTrainingQueries = nQueries;
+            }
             int i = 0;
             for (auto tq: trainingQueries) {
                 trainingQueriesVector.push_back(tq.first);
@@ -354,11 +362,6 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                 }
             }
             // 2. test the model against test queries
-            //Get all query
-            string form = req.substr(req.find("application/x-www-form-urlencoded"));
-            string queries = _getValueParam(form, "query");
-            string timeoutStr = _getValueParam(form, "timeout");
-            string repeatQueryStr = _getValueParam(form, "repeatQuery");
 
             uint64_t timeout = stoull(timeoutStr);
             uint8_t repeatQuery = stoul(repeatQueryStr);
