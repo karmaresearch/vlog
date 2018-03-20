@@ -2,22 +2,24 @@
 
 //************** ROWS ***************
 uint64_t ChaseMgmt::Rows::addRow(uint64_t* row) {
-    if (!currentblock || blockCounter >= SIZE_BLOCK) {
-        //Create a new block
-        std::unique_ptr<uint64_t> n =
-            std::unique_ptr<uint64_t>(
-                    new uint64_t[sizerow * SIZE_BLOCK]);
-        currentblock = n.get();
-        blocks.push_back(std::move(n));
-        blockCounter = 0;
+    if (! restricted) {
+	if (!currentblock || blockCounter >= SIZE_BLOCK) {
+	    //Create a new block
+	    std::unique_ptr<uint64_t> n =
+		std::unique_ptr<uint64_t>(
+			new uint64_t[sizerow * SIZE_BLOCK]);
+	    currentblock = n.get();
+	    blocks.push_back(std::move(n));
+	    blockCounter = 0;
+	}
+	for(uint8_t i = 0; i < sizerow; ++i) {
+	    currentblock[i] = row[i];
+	}
+	ChaseRow r(sizerow, currentblock);
+	rows[r] = currentcounter;
+	currentblock += sizerow;
+	blockCounter++;
     }
-    for(uint8_t i = 0; i < sizerow; ++i) {
-        currentblock[i] = row[i];
-    }
-    ChaseRow r(sizerow, currentblock);
-    rows[r] = currentcounter;
-    currentblock += sizerow;
-    blockCounter++;
     if (startCounter == UINT32_MAX) {
         LOG(ERRORL) << "I can assign at most 2^32 new IDs to an ext. variable... Stop!";
         throw 10;
@@ -61,14 +63,14 @@ bool ChaseMgmt::Rows::existingRow(uint64_t *row, uint64_t &value) {
 //************** END ROWS *************
 
 //************** RULE CONTAINER ***************
-ChaseMgmt::Rows *ChaseMgmt::RuleContainer::getRows(uint8_t var) {
+ChaseMgmt::Rows *ChaseMgmt::RuleContainer::getRows(uint8_t var, bool restricted) {
     if (!vars2rows.count(var)) {
         uint8_t sizerow = dependencies[var].size();
         uint64_t startCounter = ruleBaseCounter;
         // The variable is encoded in the space between the rule ID and the
         // counter ID.
         startCounter += (uint64_t) var << 32;
-        vars2rows.insert(std::make_pair(var, Rows(startCounter, sizerow)));
+        vars2rows.insert(std::make_pair(var, Rows(startCounter, sizerow, restricted)));
     }
     return &vars2rows.find(var)->second;
 }
@@ -97,7 +99,7 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
         uint64_t sizecolumns) {
     assert(sizecolumns > 0);
     auto &ruleContainer = rules[ruleid];
-    auto rows = ruleContainer->getRows(var);
+    auto rows = ruleContainer->getRows(var, restricted);
     const uint8_t sizerow = rows->getSizeRow();
     assert(sizerow == columns.size());
     std::vector<Term_t> functerms;
@@ -117,7 +119,7 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
             row[j] = readers[j]->next();
         }
         uint64_t value;
-        if (!rows->existingRow(row, value))
+        if (restricted || !rows->existingRow(row, value))
             value = rows->addRow(row);
         functerms.push_back(value);
     }

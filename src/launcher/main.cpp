@@ -16,6 +16,7 @@
 #include <kognac/utils.h>
 #include <kognac/progargs.h>
 #include <layers/TridentLayer.hpp>
+#include <trident/utils/tridentutils.h>
 
 //RDF3X
 #include <cts/parser/SPARQLLexer.hpp>
@@ -112,7 +113,7 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
                 return false;
             }
         } else if (cmd == "load") {
-            if (!vm.count("input") and !vm.count("comprinput")) {
+            if (!vm.count("input") && !vm.count("comprinput")) {
                 printErrorMsg(
                         "The parameter -i (path to the triple files) is not set. Also --comprinput (file with the compressed triples) is not set.");
                 return false;
@@ -198,13 +199,13 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "Activate reasoning during query answering using the rules defined at this path. It is REQUIRED in case the command is <mat>. Default is '' (disabled).", false);
     query_options.add<bool>("", "rewriteMultihead", false,
             "try to split up rules with multiple heads.", false);
-    query_options.add<long>("", "reasoningThreshold", 1000000,
+    query_options.add<int64_t>("", "reasoningThreshold", 1000000,
             "This parameter sets a threshold to estimate the reasoning cost of a pattern. This cost can be broadly associated to the cardinality of the pattern. It is used to choose either TopDown or Magic evalution. Default is 1000000 (1M).", false);
     query_options.add<string>("", "reasoningAlgo", "",
             "Determines the reasoning algo (only for <queryLiteral>). Possible values are \"qsqr\", \"magic\", \"auto\".", false);
     query_options.add<string>("", "selectionStrategy", "",
             "Determines the selection strategy (only for <queryLiteral>, when \"auto\" is specified for the reasoningAlgorithm). Possible values are \"cardEst\", ... (to be extended) .", false);
-    query_options.add<long>("", "matThreshold", 10000000,
+    query_options.add<int64_t>("", "matThreshold", 10000000,
             "In case reasoning is activated, this parameter sets a threshold above which a full materialization is performed before we execute the query. Default is 10000000 (10M).", false);
     query_options.add<bool>("", "printResults", true,
             "Print the answers of a literal query.", false);
@@ -235,6 +236,10 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "Explain the query instead of executing it. Default is false.",false);
     query_options.add<bool>("","decompressmat", false,
             "Decompress the results of the materialization when we write it to a file. Default is false.",false);
+#if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
+    query_options.add<bool>("","monitorThread", false,
+            "Launch an additional thread which prints statistics about resource usage on the console. Uses the DEBUL level so logging must be properly instructed. Default is false.",false);
+#endif
 
 #ifdef WEBINTERFACE
     query_options.add<bool>("","webinterface", false,
@@ -264,7 +269,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     ProgramArgs::GroupArgs& lookup_options = *vm.newGroup("Options for <lookup>");
     lookup_options.add<string>("t","text", "",
             "Textual term to search", false);
-    lookup_options.add<int>("n","number", 0, "Numeric term to search",false);
+    lookup_options.add<int64_t>("n","number", 0, "Numeric term to search",false);
 
     ProgramArgs::GroupArgs& server_options = *vm.newGroup("Options for <server>");
     server_options.add<string>("","webpages", "../webinterface",
@@ -296,7 +301,7 @@ void lookup(EDBLayer &layer, ProgramArgs &vm) {
             cout << value << endl;
         }
     } else {
-        uint64_t key = vm["number"].as<long>();
+        int64_t key = vm["number"].as<int64_t>();
         char supportText[MAX_TERM_SIZE];
         if (!layer.getDictText(key, supportText)) {
             cout << "Term " << key << " not found" << endl;
@@ -424,161 +429,183 @@ void launchFullMat(int argc,
             webint->start(port);
         }
 #endif
-
-        LOG(INFOL) << "Starting full materialization";
-        std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-        sn->run();
-        std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-        LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
-        sn->printCountAllIDBs("");
-
-        if (vm["storemat_path"].as<string>() != "") {
-            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-
-            Exporter exp(sn);
-
-            string storemat_format = vm["storemat_format"].as<string>();
-
-            if (storemat_format == "files" || storemat_format == "csv") {
-                sn->storeOnFiles(vm["storemat_path"].as<string>(),
-                        vm["decompressmat"].as<bool>(), 0, storemat_format == "csv");
-            } else if (storemat_format == "db") {
-                //I will store the details on a Trident index
-                exp.generateTridentDiffIndex(vm["storemat_path"].as<string>());
-            } else if (storemat_format == "nt") {
-                exp.generateNTTriples(vm["storemat_path"].as<string>(), vm["decompressmat"].as<bool>());
-            } else {
-                LOG(ERRORL) << "Option 'storemat_format' not recognized";
-                throw 10;
+        //Starting monitoring thread
+#if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
+        std::thread monitor;
+        std::mutex mtx;
+        std::condition_variable cv;
+        bool isFinished = false;
+        if (vm["monitorThread"].as<bool>()) {
+                //Activate it only for Linux systems
+                monitor = std::thread(
+                        std::bind(TridentUtils::monitorPerformance, 
+                            1, &cv, &mtx, &isFinished));
             }
+#endif
 
+            LOG(INFOL) << "Starting full materialization";
+            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+            sn->run();
             std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-            LOG(INFOL) << "Time to index and store the materialization on disk = " << sec.count() << " seconds";
-        }
-#ifdef WEBINTERFACE
-        if (webint) {
-            //Sleep for max 1 second, to allow the fetching of the last statistics
-            LOG(INFOL) << "Sleeping for one second to allow the web interface to get the last stats ...";
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            LOG(INFOL) << "Done.";
-            webint->stop();
+            LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
+            sn->printCountAllIDBs("");
+
+#if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
+        if (vm["monitorThread"].as<bool>()) {
+            isFinished = true;
+            LOG(INFOL) << "Waiting until logging thread is finished ...";
+            monitor.join(); //Wait until the monitor thread is finished
         }
 #endif
-    }
-}
 
-void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
-    //Parse the rules and create a program
-    Program p(edb.getNTerms(), &edb);
-    string pathRules = vm["rules"].as<string>();
-    if (pathRules != "") {
-        p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
-        p.sortRulesByIDBPredicates();
-    }
 
-    //Set up the ruleset and perform the pre-materialization if necessary
-    if (pathRules != "") {
-        if (!vm["automat"].empty()) {
-            //Automatic prematerialization
-            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-            Materialization *mat = new Materialization();
-            mat->guessLiteralsFromRules(p, edb);
-            mat->getAndStorePrematerialization(edb, p, true,
-                    vm["timeoutPremat"].as<int>());
-            delete mat;
-            std::chrono::duration<double> sec = std::chrono::system_clock::now()
-                - start;
-            LOG(INFOL) << "Runtime pre-materialization = " <<
-                sec.count() * 1000 << " milliseconds";
-        } else if (vm["premat"].as<string>() != "") {
-            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-            Materialization *mat = new Materialization();
-            mat->loadLiteralsFromFile(p, vm["premat"].as<string>());
-            mat->getAndStorePrematerialization(edb, p, false, ~0l);
-            p.sortRulesByIDBPredicates();
-            delete mat;
-            std::chrono::duration<double> sec = std::chrono::system_clock::now()
-                - start;
-            LOG(INFOL) << "Runtime pre-materialization = " <<
-                sec.count() * 1000 << " milliseconds";
+            if (vm["storemat_path"].as<string>() != "") {
+                std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+
+                Exporter exp(sn);
+
+                string storemat_format = vm["storemat_format"].as<string>();
+
+                if (storemat_format == "files" || storemat_format == "csv") {
+                    sn->storeOnFiles(vm["storemat_path"].as<string>(),
+                            vm["decompressmat"].as<bool>(), 0, storemat_format == "csv");
+                } else if (storemat_format == "db") {
+                    //I will store the details on a Trident index
+                    exp.generateTridentDiffIndex(vm["storemat_path"].as<string>());
+                } else if (storemat_format == "nt") {
+                    exp.generateNTTriples(vm["storemat_path"].as<string>(), vm["decompressmat"].as<bool>());
+                } else {
+                    LOG(ERRORL) << "Option 'storemat_format' not recognized";
+                    throw 10;
+                }
+
+                std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+                LOG(INFOL) << "Time to index and store the materialization on disk = " << sec.count() << " seconds";
+            }
+#ifdef WEBINTERFACE
+            if (webint) {
+                //Sleep for max 1 second, to allow the fetching of the last statistics
+                LOG(INFOL) << "Sleeping for one second to allow the web interface to get the last stats ...";
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                LOG(INFOL) << "Done.";
+                webint->stop();
+            }
+#endif
         }
     }
 
-    DBLayer *db = NULL;
-    if (pathRules == "") {
-        PredId_t p = edb.getFirstEDBPredicate();
-        string typedb = edb.getTypeEDBPredicate(p);
-        if (typedb == "Trident") {
-            auto edbTable = edb.getEDBTable(p);
-            KB *kb = ((TridentTable*)edbTable.get())->getKB();
-            TridentLayer *tridentlayer = new TridentLayer(*kb);
-            tridentlayer->disableBifocalSampling();
-            db = tridentlayer;
-        }
-    }
-    if (db == NULL) {
-        if (pathRules == "") {
-            // Use default rule
+    void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
+        //Parse the rules and create a program
+        Program p(edb.getNTerms(), &edb);
+        string pathRules = vm["rules"].as<string>();
+        if (pathRules != "") {
             p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
             p.sortRulesByIDBPredicates();
         }
-        db = new VLogLayer(edb, p, vm["reasoningThreshold"].as<long>(), "TI", "TE");
-    }
-    string queryFileName = vm["query"].as<string>();
-    // Parse the query
-    std::fstream inFile;
-    inFile.open(queryFileName);//open the input file
-    std::stringstream strStream;
-    strStream << inFile.rdbuf();//read the file
 
-    //TODO
-    //WebInterface::execSPARQLQuery(strStream.str(), vm["explain"].as<bool>(),
-    //        edb.getNTerms(), *db, true, false, NULL, NULL,
-    //        NULL);
+        //Set up the ruleset and perform the pre-materialization if necessary
+        if (pathRules != "") {
+            if (!vm["automat"].empty()) {
+                //Automatic prematerialization
+                std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+                Materialization *mat = new Materialization();
+                mat->guessLiteralsFromRules(p, edb);
+                mat->getAndStorePrematerialization(edb, p, true,
+                        vm["timeoutPremat"].as<int>());
+                delete mat;
+                std::chrono::duration<double> sec = std::chrono::system_clock::now()
+                    - start;
+                LOG(INFOL) << "Runtime pre-materialization = " <<
+                    sec.count() * 1000 << " milliseconds";
+            } else if (vm["premat"].as<string>() != "") {
+                std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+                Materialization *mat = new Materialization();
+                mat->loadLiteralsFromFile(p, vm["premat"].as<string>());
+                mat->getAndStorePrematerialization(edb, p, false, ~0l);
+                p.sortRulesByIDBPredicates();
+                delete mat;
+                std::chrono::duration<double> sec = std::chrono::system_clock::now()
+                    - start;
+                LOG(INFOL) << "Runtime pre-materialization = " <<
+                    sec.count() * 1000 << " milliseconds";
+            }
+        }
 
-    delete db;
+        DBLayer *db = NULL;
+        if (pathRules == "") {
+            PredId_t p = edb.getFirstEDBPredicate();
+            string typedb = edb.getTypeEDBPredicate(p);
+            if (typedb == "Trident") {
+                auto edbTable = edb.getEDBTable(p);
+                KB *kb = ((TridentTable*)edbTable.get())->getKB();
+                TridentLayer *tridentlayer = new TridentLayer(*kb);
+                tridentlayer->disableBifocalSampling();
+                db = tridentlayer;
+            }
+        }
+        if (db == NULL) {
+            if (pathRules == "") {
+                // Use default rule
+                p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+                p.sortRulesByIDBPredicates();
+            }
+            db = new VLogLayer(edb, p, vm["reasoningThreshold"].as<int64_t>(), "TI", "TE");
+        }
+        string queryFileName = vm["query"].as<string>();
+        // Parse the query
+        std::fstream inFile;
+        inFile.open(queryFileName);//open the input file
+        std::stringstream strStream;
+        strStream << inFile.rdbuf();//read the file
 
-    /*QueryDict queryDict(edb.getNTerms());
-      QueryGraph queryGraph;
-      bool parsingOk;
+        //TODO
+        //WebInterface::execSPARQLQuery(strStream.str(), vm["explain"].as<bool>(),
+        //        edb.getNTerms(), *db, true, false, NULL, NULL,
+        //        NULL);
 
-      SPARQLLexer lexer(strStream.str());
-      SPARQLParser parser(lexer);
-      std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-      parseQuery(parsingOk, parser, queryGraph, queryDict, db);
-      if (!parsingOk) {
-      std::chrono::duration<double> duration = std::chrono::system_clock::now() - start;
-      LOG(INFOL) << "Runtime query: 0ms.";
-      LOG(INFOL) << "Runtime total: " << duration.count() * 1000 << "ms.";
-      LOG(INFOL) << "# rows = 0";
-      return;
-      }
+        delete db;
 
-    // Run the optimizer
-    PlanGen *plangen = new PlanGen();
-    Plan* plan = plangen->translate(db, queryGraph);
-    // delete plangen;  Commented out, because this also deletes all plans!
-    // In particular, it corrupts the current plan.
-    // --Ceriel
-    if (!plan) {
-    cerr << "internal error plan generation failed" << endl;
-    delete plangen;
-    return;
-    }
-    bool explain = vm["explain"].as<bool>();
-    if (explain)
-    plan->print(0);
+        /*QueryDict queryDict(edb.getNTerms());
+          QueryGraph queryGraph;
+          bool parsingOk;
 
-    // Build a physical plan
-    Runtime runtime(db, NULL, &queryDict);
-    Operator* operatorTree = CodeGen().translate(runtime, queryGraph, plan, false);
+          SPARQLLexer lexer(strStream.str());
+          SPARQLParser parser(lexer);
+          std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+          parseQuery(parsingOk, parser, queryGraph, queryDict, db);
+          if (!parsingOk) {
+          std::chrono::duration<double> duration = std::chrono::system_clock::now() - start;
+          LOG(INFOL) << "Runtime query: 0ms.";
+          LOG(INFOL) << "Runtime total: " << duration.count() * 1000 << "ms.";
+          LOG(INFOL) << "# rows = 0";
+          return;
+          }
 
-    // Execute it
-    if (explain) {
-    DebugPlanPrinter out(runtime, false);
-    operatorTree->print(out);
-    delete operatorTree;
-    } else {
+        // Run the optimizer
+        PlanGen *plangen = new PlanGen();
+        Plan* plan = plangen->translate(db, queryGraph);
+        // delete plangen;  Commented out, because this also deletes all plans!
+        // In particular, it corrupts the current plan.
+        // --Ceriel
+        if (!plan) {
+        cerr << "internal error plan generation failed" << endl;
+        delete plangen;
+        return;
+        }
+        bool explain = vm["explain"].as<bool>();
+        if (explain)
+        plan->print(0);
+
+        // Build a physical plan
+        Runtime runtime(db, NULL, &queryDict);
+        Operator* operatorTree = CodeGen().translate(runtime, queryGraph, plan, false);
+
+        // Execute it
+        if (explain) {
+        DebugPlanPrinter out(runtime, false);
+        operatorTree->print(out);
+        delete operatorTree;
+        } else {
 #if DEBUG
 DebugPlanPrinter out(runtime, false);
 operatorTree->print(out);
@@ -600,34 +627,34 @@ delete operatorTree;
 
 int times = vm["repeatQuery"].as<int>();
 if (times > 0) {
-    // Redirect output
-    ofstream file("/dev/null");
-    streambuf* strm_buffer = cout.rdbuf();
-    cout.rdbuf(file.rdbuf());
+        // Redirect output
+        ofstream file("/dev/null");
+        streambuf* strm_buffer = cout.rdbuf();
+        cout.rdbuf(file.rdbuf());
 
-    for (int i = 0; i < times; i++) {
-    PlanGen *plangen = new PlanGen();
-    Plan* plan = plangen->translate(db, queryGraph);
-    Runtime runtime(db, NULL, &queryDict);
-    operatorTree = CodeGen().translate(runtime, queryGraph, plan, false);
-    startQ = std::chrono::system_clock::now();
-    if (operatorTree->first()) {
-        while (operatorTree->next());
+        for (int i = 0; i < times; i++) {
+        PlanGen *plangen = new PlanGen();
+        Plan* plan = plangen->translate(db, queryGraph);
+        Runtime runtime(db, NULL, &queryDict);
+        operatorTree = CodeGen().translate(runtime, queryGraph, plan, false);
+        startQ = std::chrono::system_clock::now();
+        if (operatorTree->first()) {
+            while (operatorTree->next());
+        }
+        durationQ += std::chrono::system_clock::now() - startQ;
+        p = (ResultsPrinter*) operatorTree;
+        long n1 = p->getPrintedRows();
+        if (n1 != nElements) {
+            LOG(ERRORL) << "Number of records (" << n1 << ") is not the same. This should not happen...";
+        }
+        delete plangen;
+        delete operatorTree;
     }
-    durationQ += std::chrono::system_clock::now() - startQ;
-    p = (ResultsPrinter*) operatorTree;
-    long n1 = p->getPrintedRows();
-    if (n1 != nElements) {
-        LOG(ERRORL) << "Number of records (" << n1 << ") is not the same. This should not happen...";
+    LOG(INFOL) << "Repeated query runtime = " << (durationQ.count() / times) * 1000
+        << " milliseconds";
+    //Restore stdout
+    cout.rdbuf(strm_buffer);
     }
-    delete plangen;
-    delete operatorTree;
-}
-LOG(INFOL) << "Repeated query runtime = " << (durationQ.count() / times) * 1000
-<< " milliseconds";
-//Restore stdout
-cout.rdbuf(strm_buffer);
-}
 }*/
 }
 
@@ -809,12 +836,11 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     }
     Dictionary dictVariables;
     Literal literal = p.parseLiteral(query, dictVariables);
-    Reasoner reasoner(vm["reasoningThreshold"].as<long>());
+    Reasoner reasoner(vm["reasoningThreshold"].as<int64_t>());
     runLiteralQuery(edb, p, literal, reasoner, vm);
 }
 
 int main(int argc, const char** argv) {
-
     //Init params
     ProgramArgs vm;
     if (!initParams(argc, argv, vm)) {
@@ -841,7 +867,7 @@ int main(int argc, const char** argv) {
         //Get current directory
         string execFile = string(argv[0]);
         string dirExecFile = Utils::parentDir(execFile);
-        edbFile = dirExecFile + string("/edb.conf");
+        edbFile = dirExecFile + DIR_SEP + string("edb.conf");
     }
 
     if (cmd != "load" && !Utils::exists(edbFile)) {
@@ -855,10 +881,7 @@ int main(int argc, const char** argv) {
         parallelism = 2;    // Otherwise tbb aborts.
         // Actual parallelism will be controlled elsewhere.
     }
-    // Allow for older tbb versions: don't use global_control.
-    // tbb::global_control c(tbb::global_control::max_allowed_parallelism, parallelism);
     ParallelTasks::setNThreads(parallelism);
-    //tbb::task_scheduler_init init(parallelism);
 
     // For profiling:
     int seconds = vm["sleep"].as<int>();
@@ -907,7 +930,7 @@ int main(int argc, const char** argv) {
         int popArg = 1000;
         int nindices = 6;
         bool aggrIndices = false;
-        int fixedStrat = StorageStrat::FIXEDSTRAT5;
+        int fixedStrat = FIXEDSTRAT5;
         bool enableFixedStrat = true;
         bool storePlainList = false;
         double sampleRate = 0.01;

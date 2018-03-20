@@ -98,7 +98,7 @@ std::string Literal::tostring(Program *program, EDBLayer *db) const {
 
     std::string out = predName + std::string("[") +
         std::to_string(pred.getType()) + std::string("]") +
-        adornmentToString(pred.getAdornment(), tuple.getSize()) + std::string("(");
+        adornmentToString(pred.getAdorment(), tuple.getSize()) + std::string("(");
 
     for (int i = 0; i < tuple.getSize(); ++i) {
         if (tuple.get(i).isVariable()) {
@@ -732,7 +732,7 @@ void Program::readFromString(std::string rules, bool rewriteMultihead) {
     stringstream ss(rules);
     string rule;
     while (getline(ss, rule)) {
-        if (rule != "" && rule.substr(0, 2) != "//") {
+        if (rule != "" && rule .substr(0, 2) != "//") {
             LOG(DEBUGL) << "Parsing rule " << rule;
             parseRule(rule, rewriteMultihead);
         }
@@ -784,7 +784,7 @@ std::string Program::rewriteRDFOWLConstants(std::string input) {
     return input;
 }
 
-Literal Program::parseLiteral(std::string l, Dictionary& dictVariables) {
+Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     size_t posBeginTuple = l.find("(");
     if (posBeginTuple == std::string::npos) {
         throw 10;
@@ -798,68 +798,64 @@ Literal Program::parseLiteral(std::string l, Dictionary& dictVariables) {
     std::string term;
     while (tuple.size() > 0) {
 	size_t posTerm = 0;
-	while (posTerm < tuple.size()) {
-	    if (tuple[posTerm] == ',' || tuple[posTerm] == ')') {
-		break;
-	    }
-	    switch(tuple[posTerm]) {
-	    case '\'':
-		posTerm++;
-		while (posTerm < tuple.size()) {
-		    if (tuple[posTerm] == '\\') {
-			posTerm++;
-			if (posTerm != tuple.size()) {
-			    posTerm++;
-			}
-			continue;
-		    }
-		    if (tuple[posTerm] == '\'') {
-			break;
-		    }
-		    posTerm++;
-		}
-		break;
-	    case '\"':
-		posTerm++;
-		while (posTerm < tuple.size()) {
-		    if (tuple[posTerm] == '\\') {
-			posTerm++;
-			if (posTerm != tuple.size()) {
-			    posTerm++;
-			}
-			continue;
-		    }
-		    if (tuple[posTerm] == '\"') {
-                // must increment index here
-                // otherwise, this double-quote is treated in the next
-                // iteration.
+        while (posTerm < tuple.size()) {
+            if (tuple[posTerm] == ',' || tuple[posTerm] == ')') {
+                break;
+            }
+            switch(tuple[posTerm]) {
+            case '\'':
                 posTerm++;
-			    break;
-		    }
-		    posTerm++;
-		}
-		break;
-	    case '<':
-		posTerm++;
-		while (posTerm < tuple.size()) {
-		    if (tuple[posTerm] == '\\') {
-			posTerm++;
-			if (posTerm != tuple.size()) {
-			    posTerm++;
-			}
-			continue;
-		    }
-		    if (tuple[posTerm] == '>') {
-			break;
-		    }
-		    posTerm++;
-		}
-		break;
-	    default:
-		posTerm++;
-		break;
-	    }
-	}
+                while (posTerm < tuple.size()) {
+                    if (tuple[posTerm] == '\\') {
+                        posTerm++;
+                        if (posTerm != tuple.size()) {
+                            posTerm++;
+                        }
+                        continue;
+                    }
+                    if (tuple[posTerm] == '\'') {
+                        break;
+                    }
+                    posTerm++;
+                }
+                break;
+            case '\"':
+                posTerm++;
+                while (posTerm < tuple.size()) {
+                    if (tuple[posTerm] == '\\') {
+                        posTerm++;
+                        if (posTerm != tuple.size()) {
+                            posTerm++;
+                        }
+                        continue;
+                    }
+                    if (tuple[posTerm] == '\"') {
+                        break;
+                    }
+                    posTerm++;
+                }
+                break;
+            case '<':
+                posTerm++;
+                while (posTerm < tuple.size()) {
+                    if (tuple[posTerm] == '\\') {
+                        posTerm++;
+                        if (posTerm != tuple.size()) {
+                            posTerm++;
+                        }
+                        continue;
+                    }
+                    if (tuple[posTerm] == '>') {
+                        break;
+                    }
+                    posTerm++;
+                }
+                break;
+            default:
+                posTerm++;
+                break;
+            }
+        }
         if (posTerm != tuple.size()) {
             term = tuple.substr(0, posTerm);
             tuple = tuple.substr(posTerm + 1, tuple.size());
@@ -867,8 +863,6 @@ Literal Program::parseLiteral(std::string l, Dictionary& dictVariables) {
             term = tuple;
             tuple = "";
         }
-
-	// BOOST_LOG_TRIVIAL(debug) << "Found term " << term;
 
         //Parse the term
         if (std::isupper(term.at(0))) {
@@ -897,10 +891,10 @@ Literal Program::parseLiteral(std::string l, Dictionary& dictVariables) {
     if (cardPredicates.find(predid) == cardPredicates.end()) {
         cardPredicates.insert(make_pair(predid, t.size()));
     } else {
-	if (cardPredicates.find(predid)->second != t.size()) {
-	    LOG(INFOL) << "Wrong size in predicate: should be " << (int) cardPredicates.find(predid)->second << " found " << (int) t.size();
-	    throw 10;
-	}
+        if (cardPredicates.find(predid)->second != t.size()) {
+            LOG(INFOL) << "Wrong size in predicate: should be " << (int) cardPredicates.find(predid)->second;
+            throw 10;
+        }
     }
     Predicate pred(predid, Predicate::calculateAdornment(t1), kb->doesPredExists(predid) ? EDB : IDB, (uint8_t) t.size());
 
@@ -955,19 +949,20 @@ void Program::cleanAllRules() {
     allrules.clear();
 }
 
-void Program::addRule(Rule &rule) {
-    for (const auto &head : rule.getHeads()) {
-        rules[head.getPredicate().getId()].push_back(allrules.size());
+void Program::addRule(Rule &rule, bool rewriteMultihead) {
+    if (rewriteMultihead && rule.isExistential() && rule.getHeads().size() > 1) {
+	rewriteRule(rule);
+    } else {
+	for (const auto &head : rule.getHeads()) {
+	    rules[head.getPredicate().getId()].push_back(allrules.size());
+	}
+	allrules.push_back(rule);
     }
-    allrules.push_back(rule);
 }
 
-void Program::addRule(std::vector<Literal> heads, std::vector<Literal> body) {
+void Program::addRule(std::vector<Literal> heads, std::vector<Literal> body, bool rewriteMultihead) {
     Rule rule(allrules.size(), heads, body);
-    for (const auto &head : heads) {
-        rules[head.getPredicate().getId()].push_back(allrules.size());
-    }
-    allrules.push_back(rule);
+    addRule(rule, rewriteMultihead);
 }
 
 void Program::addAllRules(std::vector<Rule> &rules) {
@@ -1044,11 +1039,7 @@ void Program::parseRule(std::string rule, bool rewriteMultihead) {
 
         //Add the rule
         Rule r = Rule(allrules.size(), lHeads, lBody);
-        if (rewriteMultihead && r.isExistential() && lHeads.size() > 1) {
-            rewriteRule(lHeads, lBody);
-        } else {
-            addRule(r);
-        }
+	addRule(r, rewriteMultihead);
     } catch (int e) {
         LOG(ERRORL) << "Failed in parsing rule " << rule;
     }
@@ -1063,7 +1054,9 @@ static bool isInVector(uint8_t v, std::vector<uint8_t> &vec) {
     return false;
 }
 
-void Program::rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lBody) {
+void Program::rewriteRule(Rule &r) {
+    std::vector<Literal> lHeads = r.getHeads();
+    std::vector<Literal> lBody = r.getBody();
     LOG(DEBUGL) << "Trying to rewrite rule";
     std::vector<uint8_t> bodyVars;
     // First determine the non-existential variables.
@@ -1181,15 +1174,39 @@ Predicate Program::getPredicate(std::string & p) {
 }
 
 Predicate Program::getPredicate(const PredId_t id) {
-    uint8_t card = cardPredicates.find(id)->second;
-    return Predicate(id, 0, kb->doesPredExists(id) ? EDB : IDB,
-            card);
+    if (kb->doesPredExists(id)) {
+	return Predicate(id, 0, EDB, kb->getPredArity(id));
+    }
+    if (cardPredicates.find(id) != cardPredicates.end()) {
+	uint8_t card = cardPredicates.find(id)->second;
+	return Predicate(id, 0, IDB, card);
+    }
+    return Predicate(id, 0, IDB, 0);
 }
 
 Predicate Program::getPredicate(std::string & p, uint8_t adornment) {
     PredId_t id = (PredId_t) dictPredicates.getOrAdd(p);
-    return Predicate(id, adornment, kb->doesPredExists(id) ? EDB : IDB,
-            cardPredicates.find(id)->second);
+    if (kb->doesPredExists(id)) {
+        return Predicate(id, adornment, EDB, kb->getPredArity(id));
+    }
+    if (cardPredicates.find(id) != cardPredicates.end()) {
+	uint8_t card = cardPredicates.find(id)->second;
+	return Predicate(id, adornment, IDB, card);
+    }
+    return Predicate(id, 0, IDB, 0);
+}
+
+int64_t Program::getOrAddPredicate(std::string & p, uint8_t cardinality) {
+    PredId_t id = (PredId_t) dictPredicates.getOrAdd(p);
+    if (cardPredicates.find(id) == cardPredicates.end()) {
+	cardPredicates.insert(make_pair(id, cardinality));
+    } else {
+	if (cardPredicates.find(id)->second != cardinality) {
+	    LOG(INFOL) << "Wrong cardinality for predicate " << p << ": should be " << (int) cardPredicates.find(id)->second;
+	    return -1;
+        }
+    }
+    return id;
 }
 
 std::string Program::getAllPredicates() {

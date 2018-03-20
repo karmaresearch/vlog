@@ -25,7 +25,7 @@ void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithread
     EDBInfoTable infot;
     const string pn = tableConf.predname;
     const string kbpath = tableConf.params[0];
-    if (!Utils::exists(kbpath) || !Utils::exists(kbpath + "/p0")) {
+    if (!Utils::exists(kbpath) || !Utils::exists(kbpath + DIR_SEP + "p0")) {
         LOG(ERRORL) << "The KB at " << kbpath << " does not exist. Check the edb.conf file.";
         throw 10;
     }
@@ -101,6 +101,20 @@ void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
             tableConf.params[1], infot.id);
     infot.manager = std::shared_ptr<EDBTable>(table);
     infot.arity = table->getArity();
+    dbPredicates.insert(make_pair(infot.id, infot));
+}
+
+void EDBLayer::addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows) {
+    EDBInfoTable infot;
+    infot.id = (PredId_t) predDictionary.getOrAdd(predicate);
+    if (doesPredExists(infot.id)) {
+	LOG(WARNL) << "Rewriting table for predicate " << predicate;
+	dbPredicates.erase(infot.id);
+    }
+    infot.type = "INMEMORY";
+    InmemoryTable *table = new InmemoryTable(infot.id, rows);
+    infot.arity = table->getArity();
+    infot.manager = std::shared_ptr<EDBTable>(table);
     dbPredicates.insert(make_pair(infot.id, infot));
 }
 

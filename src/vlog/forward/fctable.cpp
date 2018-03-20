@@ -249,16 +249,17 @@ std::shared_ptr<const Segment> FCTable::retainFrom(
         int nthreads) const {
     bool passed = false;
 
-    size_t sz = 0;
-
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
+#if DEBUG
+    size_t sz = 0;
     for (std::vector<FCBlock>::const_iterator itr = blocks.cbegin();
             itr != blocks.cend();
             ++itr) {
         sz += itr->table->getNRows();
     }
     //    LOG(TRACEL) << "retainFrom: t.size() = " << t->getNRows() << ", blocks.size() = " << blocks.size() << ", sz = " << sz;
+#endif
     for (std::vector<FCBlock>::const_iterator itr = blocks.cbegin();
             itr != blocks.cend();
             ++itr) {

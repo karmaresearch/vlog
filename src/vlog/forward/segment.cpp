@@ -1276,7 +1276,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
     } else if (existingValues != NULL &&
             posToCopy.size() < existingValues->getRowSize()) {
         existingValues = existingValues->filter((uint8_t) posToCopy.size(),
-                &(posToCopy[0]), 0, NULL,
+                posToCopy.empty() ? NULL : &(posToCopy[0]), 0, NULL,
                 NULL, 0, NULL, nthreads);
     }
 

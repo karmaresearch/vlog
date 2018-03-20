@@ -78,7 +78,7 @@ class EDBLayer {
         Factory<EDBMemIterator> memItrFactory;
         IndexedTupleTable *tmpRelations[MAX_NPREDS];
 
-        void addTridentTable(const EDBConf::Table &tableConf, bool multithreaded);
+        VLIBEXP void addTridentTable(const EDBConf::Table &tableConf, bool multithreaded);
 
 #ifdef MYSQL
         void addMySQLTable(const EDBConf::Table &tableConf);
@@ -92,7 +92,7 @@ class EDBLayer {
 #ifdef MDLITE
         void addMDLiteTable(const EDBConf::Table &tableConf);
 #endif
-        void addInmemoryTable(const EDBConf::Table &tableConf);
+        VLIBEXP void addInmemoryTable(const EDBConf::Table &tableConf);
 
     public:
         EDBLayer(EDBConf &conf, bool multithreaded) {
@@ -150,7 +150,7 @@ class EDBLayer {
             return predDictionary;
         }
 
-        bool doesPredExists(PredId_t id) const;
+        VLIBEXP bool doesPredExists(PredId_t id) const;
 
         PredId_t getFirstEDBPredicate() {
             if (!dbPredicates.empty()) {
@@ -189,7 +189,7 @@ class EDBLayer {
                 uint8_t posInL2,
                 size_t &sizeOutput);
 
-        void query(QSQQuery *query, TupleTable *outputTable,
+        VLIBEXP void query(QSQQuery *query, TupleTable *outputTable,
                 std::vector<uint8_t> *posToFilter,
                 std::vector<Term_t> *valuesToFilter);
 
@@ -208,9 +208,9 @@ class EDBLayer {
         size_t getCardinalityColumn(const Literal &query,
                 uint8_t posColumn);
 
-        bool getDictNumber(const char *text, const size_t sizeText, uint64_t &id);
+        VLIBEXP bool getDictNumber(const char *text, const size_t sizeText, uint64_t &id);
 
-        bool getDictText(const uint64_t id, char *text);
+        VLIBEXP bool getDictText(const uint64_t id, char *text);
 
         Predicate getDBPredicate(int idx);
 
@@ -230,9 +230,12 @@ class EDBLayer {
             }
         }
 
-        uint64_t getNTerms();
+        VLIBEXP uint64_t getNTerms();
 
         void releaseIterator(EDBIterator *itr);
+
+	// For JNI interface ...
+        VLIBEXP void addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows);
 
         ~EDBLayer() {
             for (int i = 0; i < MAX_NPREDS; ++i) {

@@ -50,7 +50,7 @@ private:
 public:
     IndexedTupleTable(TupleTable *table);
 
-    ~IndexedTupleTable();
+    VLIBEXP ~IndexedTupleTable();
 
     uint8_t getSizeTuple() const {
         return sizeTuple;

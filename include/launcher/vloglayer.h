@@ -5,6 +5,7 @@
 
 #include <vlog/edb.h>
 #include <vlog/reasoner.h>
+#include <vlog/consts.h>
 
 #include <dblayer.hpp>
 
@@ -18,7 +19,7 @@ class VLogLayer : public DBLayer {
         char tmpText[MAX_TERM_SIZE];
         unordered_map<VTuple, double, hash_VTuple> edbCardinalities;
         unordered_map<VTuple, double, hash_VTuple> idbCardinalities;
-        void init();
+        VLIBEXP void init();
 
     public:
         VLogLayer(EDBLayer &edb, Program &p, uint64_t threshold,
@@ -28,27 +29,26 @@ class VLogLayer : public DBLayer {
             init();
         }
 
-        bool lookup(const std::string& text,
+        VLIBEXP bool lookup(const std::string& text,
                 ::Type::ID type,
                 unsigned subType,
                 uint64_t& id);
 
-        bool lookupById(uint64_t id,
+        VLIBEXP bool lookupById(uint64_t id,
                 const char*& start,
                 const char*& stop,
                 ::Type::ID& type,
                 unsigned& subType);
 
-        bool lookupById(uint64_t id,
+        VLIBEXP bool lookupById(uint64_t id,
                 char* start,
                 size_t& len,
                 ::Type::ID& type,
                 unsigned& subType);
 
+        VLIBEXP uint64_t getNextId();
 
-        uint64_t getNextId();
-
-        double getScanCost(DBLayer::DataOrder order,
+        VLIBEXP double getScanCost(DBLayer::DataOrder order,
                 uint64_t value1,
                 uint64_t value1C,
                 uint64_t value2,
@@ -56,17 +56,17 @@ class VLogLayer : public DBLayer {
                 uint64_t value3,
                 uint64_t value3C);
 
-        double getScanCost(DBLayer::DataOrder order,
+        VLIBEXP double getScanCost(DBLayer::DataOrder order,
                 uint64_t value1,
                 uint64_t value1C,
                 uint64_t value2,
                 uint64_t value2C);
 
-        double getScanCost(DBLayer::DataOrder order,
+        VLIBEXP double getScanCost(DBLayer::DataOrder order,
                 uint64_t value1,
                 uint64_t value1C);
 
-        double getJoinSelectivity(bool valueL1,
+        VLIBEXP double getJoinSelectivity(bool valueL1,
                 uint64_t value1CL,
                 bool value2L,
                 uint64_t value2CL,
@@ -79,15 +79,15 @@ class VLogLayer : public DBLayer {
                 bool value3R,
                 uint64_t value3CR);
 
-        uint64_t getCardinality(uint64_t c1,
+        VLIBEXP uint64_t getCardinality(uint64_t c1,
                 uint64_t c2,
                 uint64_t c3);
 
-        uint64_t getCardinality(VTuple tuple);
+        VLIBEXP uint64_t getCardinality(VTuple tuple);
 
-        uint64_t getCardinality();
+        VLIBEXP uint64_t getCardinality();
 
-        std::unique_ptr<DBLayer::Scan> getScan(const DBLayer::DataOrder order,
+        VLIBEXP std::unique_ptr<DBLayer::Scan> getScan(const DBLayer::DataOrder order,
                 const DBLayer::Aggr_t aggr,
                 DBLayer::Hint *hint);
 };

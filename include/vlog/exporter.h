@@ -1,4 +1,5 @@
 #include <vlog/seminaiver.h>
+#include <vlog/consts.h>
 
 #include <trident/tree/root.h>
 
@@ -29,9 +30,9 @@ private:
 public:
     Exporter(std::shared_ptr<SemiNaiver> sn) : sn(sn) {}
 
-    void generateTridentDiffIndex(string outputdir);
+    VLIBEXP void generateTridentDiffIndex(string outputdir);
 
     //void generateTridentDiffIndexTabByTab(string outputdir);
 
-    void generateNTTriples(string outputdir, bool decompress);
+    VLIBEXP void generateNTTriples(string outputdir, bool decompress);
 };

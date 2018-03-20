@@ -34,68 +34,155 @@ bool InmemoryDict::getText(uint64_t id, char *text) {
     }
 }
 
+std::vector<std::string> readRow(istream &ifs) {
+    char buffer[65536];
+    bool insideEscaped = false;
+    char *p = &buffer[0];
+    bool justSeenQuote = false;
+    int quoteCount = 0;		// keep track of number of concecutive quotes.
+    std::vector<std::string> result;
+    while (true) {
+	int c = ifs.get();
+	bool eof = (c == EOF);
+	if (eof) {
+	    if (p == buffer && result.size() == 0) {
+		return result;
+	    }
+	    c = '\n';
+	}
+	if (c == '\r') {
+	    // ignore these?
+	    continue;
+	}
+	if (p == buffer && ! justSeenQuote) {
+	    // Watch out for more than one initial quote ...
+	    if (c == '"') {
+		// Initial character is a quote.
+		insideEscaped = true;
+		justSeenQuote = true;
+		continue;
+	    }
+	} else if (c == '"') {
+	    quoteCount++;
+	    insideEscaped = (quoteCount & 1) == 0;
+	    if (insideEscaped) {
+		p--;
+	    }
+	} else {
+	    quoteCount = 0;
+	}
+	if (eof || (! insideEscaped && (c == '\n' || c == ','))) {
+	    if (justSeenQuote) {
+		*(p-1) = '\0';
+	    } else {
+		*p = '\0';
+	    }
+	    result.push_back(std::string(buffer));
+	    if (c == '\n') {
+		return result;
+	    }
+	    p = buffer;
+	    insideEscaped = false;
+	} else {
+	    if (p - buffer >= 65535) {
+		throw "Maximum field size exceeded in CSV file: 65535";
+	    }
+	    *p++ = c;
+	}
+	justSeenQuote = (c == '"');
+    }
+}
+
 InmemoryTable::InmemoryTable(string repository, string tablename,
         PredId_t predid) {
     arity = 0;
-//    string schemaFile = repository + "/" + tablename + ".schema";
-//    ifstream ifs;
-//    ifs.open(schemaFile);
-//    string line;
-//    while (std::getline(ifs, line)) {
-//        auto delim = line.find(':');
-//        string varname = line.substr(0, delim);
-//        varnames.push_back(varname);
-//        arity++;
-//    }
-//    ifs.close();
-//
     //Load the table in the database
     string tablefile = repository + "/" + tablename + ".csv";
-    if (Utils::exists(tablefile)) {
-	ifstream ifs;
-        ifs.open(tablefile);
-        string line;
-        std::vector<std::vector<Term_t>> vectors;
-	LOG(DEBUGL) << "Reading " << tablefile;
-        while(std::getline(ifs, line)) {
-            //Parse the row
-	    int i = 0;
-	    while (line.length() > 0) {
-                auto delim = line.find(',');
-                string sn = line.substr(0, delim);
-		if (arity == 0 && vectors.size() <= i) {
-		    std::vector<Term_t> v;
-		    vectors.push_back(v);
-		}
-                vectors[i].push_back(singletonDict.getOrAdd(sn));
-		if (delim == std::string::npos) {
-		    line = "";
-		} else {
-		    line = line.substr(delim + 1);
-		}
-		i++;
-            }
-	    if (arity == 0) {
-		arity = i;
-	    }
-        }
-        std::vector<std::shared_ptr<Column>> columns;
-        for(uint8_t i = 0; i < arity; ++i) {
-            columns.push_back(std::shared_ptr<Column>(new InmemoryColumn(
-                            vectors[i])));
-        }
-        segment = std::shared_ptr<Segment>(new Segment(arity, columns));
-        ifs.close();
-    } else {
-	LOG(WARNL) << "tablefile " << tablefile << " does not exist";
-        segment = NULL;
+    ifstream ifs;
+    ifs.open(tablefile);
+    if (ifs.fail()) {
+	throw ("Could not open file " + tablefile + " for reading");
     }
+    LOG(DEBUGL) << "Reading " << tablefile;
+    std::vector<std::vector<Term_t>> vectors;
+    while (! ifs.eof()) {
+	std::vector<std::string> row = readRow(ifs);
+	if (arity == 0) {
+	    arity = row.size();
+	}
+	if (row.size() == 0) {
+	    break;
+	} else if (row.size() != arity) {
+	    throw ("Multiple arities in file " + tablefile);
+	}
+	for (int i = 0; i < arity; i++) {
+	    if (i >= vectors.size()) {
+		std::vector<Term_t> v;
+		vectors.push_back(v);
+	    }
+	    vectors[i].push_back(singletonDict.getOrAdd(row[i]));
+	}
+    }
+    std::vector<std::shared_ptr<Column>> columns;
+    for(uint8_t i = 0; i < arity; ++i) {
+	columns.push_back(std::shared_ptr<Column>(new InmemoryColumn(
+			vectors[i])));
+    }
+    segment = std::shared_ptr<Segment>(new Segment(arity, columns));
+    ifs.close();
+    // dump();
+}
+
+InmemoryTable::InmemoryTable(PredId_t predid, std::vector<std::vector<std::string>> &entries) {
+    arity = 0;
+    //Load the table in the database
+    std::vector<std::vector<Term_t>> vectors;
+    for (auto &row : entries) {
+	if (arity == 0) {
+	    arity = row.size();
+	}
+	if (row.size() == 0) {
+	    break;
+	} else if (row.size() != arity) {
+	    throw ("Multiple arities in input");
+	}
+	for (int i = 0; i < arity; i++) {
+	    if (i >= vectors.size()) {
+		std::vector<Term_t> v;
+		vectors.push_back(v);
+	    }
+	    vectors[i].push_back(singletonDict.getOrAdd(row[i]));
+	}
+    }
+    std::vector<std::shared_ptr<Column>> columns;
+    for(uint8_t i = 0; i < arity; ++i) {
+	columns.push_back(std::shared_ptr<Column>(new InmemoryColumn(
+			vectors[i])));
+    }
+    segment = std::shared_ptr<Segment>(new Segment(arity, columns));
     // dump();
 }
 
 void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
         std::vector<uint8_t> *posToFilter,
         std::vector<Term_t> *valuesToFilter) {
+    Term_t row[128];
+    const Literal *lit = query->getLiteral();
+    uint8_t *pos = query->getPosToCopy();
+    const uint8_t npos = query->getNPosToCopy();
+    size_t sz = lit->getTupleSize();
+    EDBIterator *iter = getIterator(*lit);
+    if (posToFilter == NULL || posToFilter->size() == 0) {
+	while (iter->hasNext()) {
+	    iter->next();
+	    for (uint8_t i = 0; i < npos; ++i) {
+		row[i] = iter->getElementAt(pos[i]);
+	    }
+	    outputTable->addRow(row);
+        }
+	return;
+    }
+
     LOG(ERRORL) << "Not implemented yet";
     throw 10;
 }
@@ -181,6 +268,9 @@ void _literal2filter(const Literal &query, std::vector<uint8_t> &posVarsToCopy,
 
 EDBIterator *InmemoryTable::getIterator(const Literal &q) {
     std::vector<uint8_t> sortFields;
+    if (q.getTupleSize() != arity) {
+	return new InmemoryIterator(NULL, predid, sortFields);
+    }
     if (q.getNUniqueVars() == q.getTupleSize()) {
         return new InmemoryIterator(segment, predid, sortFields);
     }
@@ -195,7 +285,7 @@ EDBIterator *InmemoryTable::getIterator(const Literal &q) {
 
     _literal2filter(q, posVarsToCopy, posConstantsToFilter,
 	    valuesConstantsToFilter, repeatedVars);
-    
+
     writers.resize(nfields);
     for (uint8_t i = 0; i < nfields; ++i) {
 	writers[i] = new ColumnWriter();
@@ -314,6 +404,10 @@ std::shared_ptr<const Segment> InmemoryTable::getSortedCachedSegment(
 
 EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
         const std::vector<uint8_t> &fields) {
+
+    if (query.getTupleSize() != arity) {
+	return new InmemoryIterator(NULL, predid, fields);
+    }
     /*** Look at the query to see if we need filtering***/
     std::vector<uint8_t> posConstants;
     std::vector<uint8_t> vars;
@@ -332,10 +426,6 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
             if (!found)
                 vars.push_back(query.getTermAtPos(i).getId());
         }
-    }
-
-    if (vars.empty()) {
-	return new InmemoryIterator(NULL, predid, fields);
     }
 
     /*** If there are no constants, then just returned a sorted version of the
@@ -376,7 +466,7 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
                     }
                     currentidx++;
                 }
-                if (currentidx != 0) {
+                if (currentidx != start) {
                     map.insert(std::make_pair(prevkey, Coordinates(start,
                                     currentidx - start)));
                 }

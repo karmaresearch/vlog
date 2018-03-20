@@ -5,6 +5,7 @@
 #include <vlog/edb.h>
 #include <vlog/fctable.h>
 #include <vlog/seminaiver.h>
+#include <vlog/consts.h>
 
 #include <trident/kb/kb.h>
 #include <trident/kb/querier.h>
@@ -69,40 +70,45 @@ public:
 		    Metrics &metrics,
 		    int maxDepth);
 
-    ReasoningMode chooseMostEfficientAlgo(Literal &query,
+    VLIBEXP ReasoningMode chooseMostEfficientAlgo(Literal &query,
                                           EDBLayer &layer, Program &program,
                                           std::vector<uint8_t> *posBindings,
                                           std::vector<Term_t> *valueBindings);
 
-    TupleIterator *getIterator(Literal &query,
+    VLIBEXP TupleIterator *getIterator(Literal &query,
                                            std::vector<uint8_t> * posJoins,
                                            std::vector<Term_t> *possibleValuesJoins,
                                            EDBLayer &layer, Program &program,
                                            bool returnOnlyVars,
                                            std::vector<uint8_t> *sortByFields);
 
-    TupleIterator *getTopDownIterator(Literal &query,
+    VLIBEXP TupleIterator *getTopDownIterator(Literal &query,
             std::vector<uint8_t> * posJoins,
             std::vector<Term_t> *possibleValuesJoins,
             EDBLayer &layer, Program &program,
             bool returnOnlyVars,
             std::vector<uint8_t> *sortByFields);
 
-    TupleIterator *getMaterializationIterator(Literal &query,
+    VLIBEXP TupleIterator *getMaterializationIterator(Literal &query,
             std::vector<uint8_t> * posJoins,
             std::vector<Term_t> *possibleValuesJoins,
             EDBLayer &layer, Program &program,
             bool returnOnlyVars,
             std::vector<uint8_t> *sortByFields);
 
-    TupleIterator *getEDBIterator(Literal &query,
+    VLIBEXP TupleIterator *getIteratorWithMaterialization(SemiNaiver *sn,
+	    Literal &query,
+	    bool returnOnlyVars,
+	    std::vector<uint8_t> *sortByFields);
+
+    VLIBEXP TupleIterator *getEDBIterator(Literal &query,
             std::vector<uint8_t> * posJoins,
             std::vector<Term_t> *possibleValuesJoins,
             EDBLayer &layer,
             bool returnOnlyVars,
             std::vector<uint8_t> *sortByFields);
 
-    TupleIterator *getMagicIterator(Literal &query,
+    VLIBEXP TupleIterator *getMagicIterator(Literal &query,
                                            std::vector<uint8_t> * posJoins,
                                            std::vector<Term_t> *possibleValuesJoins,
                                            EDBLayer &layer, Program &program,
@@ -113,7 +119,7 @@ public:
             Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
             bool restrictedChase, int nthreads, int interRuleThreads, bool shuffleRules);
 
-    static std::shared_ptr<SemiNaiver> getSemiNaiver(EDBLayer &layer,
+    VLIBEXP static std::shared_ptr<SemiNaiver> getSemiNaiver(EDBLayer &layer,
             Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
             bool restrictedChase,
             int nthreads, int interRuleThreads, bool shuffleRules);

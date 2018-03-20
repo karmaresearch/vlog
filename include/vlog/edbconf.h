@@ -1,6 +1,8 @@
 #ifndef _EDB_CONF_H
 #define _EDB_CONF_H
 
+#include <vlog/consts.h>
+
 #include <string>
 #include <vector>
 
@@ -21,10 +23,9 @@ private:
     void parse(string f);
 
 public:
+    VLIBEXP EDBConf(string rawcontent, bool isFile);
 
-    EDBConf(string f) {
-        parse(f);
-    }
+    EDBConf(string rawcontent) : EDBConf(rawcontent, true) {}
 
     const std::vector<Table> &getTables() {
         return tables;

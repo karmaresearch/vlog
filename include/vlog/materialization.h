@@ -3,6 +3,7 @@
 
 #include <vlog/concepts.h>
 #include <vlog/edb.h>
+#include <vlog/consts.h>
 
 #include <vector>
 
@@ -30,13 +31,13 @@ public:
 
     Materialization() : repeatPrematerialization(false) {}
 
-    void loadLiteralsFromFile(Program &p, std::string filePath);
+    VLIBEXP void loadLiteralsFromFile(Program &p, std::string filePath);
 
     void loadLiteralsFromString(Program &p, std::string queries);
 
-    void guessLiteralsFromRules(Program &p, EDBLayer &layer);
+    VLIBEXP void guessLiteralsFromRules(Program &p, EDBLayer &layer);
 
-    void getAndStorePrematerialization(EDBLayer &layer, Program &p,
+    VLIBEXP void getAndStorePrematerialization(EDBLayer &layer, Program &p,
                                         bool timeout,
                                        long timeoutMicros);
 

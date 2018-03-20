@@ -1,6 +1,8 @@
 #include <vlog/bindingstable.h>
 #include <trident/model/table.h>
 
+#include <cstring>
+
 Term_t const * const EMPTY_TUPLE = {0};
 BindingsRow EMPTY_ROW(0, EMPTY_TUPLE);
 
@@ -225,7 +227,7 @@ TupleTable *BindingsTable::projectAndFilter(const Literal &l, const std::vector<
             ok = false;
             const size_t sizePosToFilter = posToFilter->size();
             const size_t sizeValuesToFilter = valuesToFilter->size();
-            uint8_t copyPosToFilter[sizePosToFilter];
+            std::unique_ptr<uint8_t> copyPosToFilter = std::unique_ptr<uint8_t>(new uint8_t[sizePosToFilter]);
 
 #if DEBUG
 	    if (! warn_done) {
@@ -235,13 +237,13 @@ TupleTable *BindingsTable::projectAndFilter(const Literal &l, const std::vector<
 	    }
 #endif
             for (uint8_t m = 0; m < sizePosToFilter; ++m) {
-                copyPosToFilter[m] = posToFilter->at(m);
+                copyPosToFilter.get()[m] = posToFilter->at(m);
             }
 
             for (size_t j = 0; j < sizeValuesToFilter && !ok; j += sizePosToFilter) {
                 bool okRow = true;
                 for (uint8_t m = 0; m < sizePosToFilter; ++m) {
-                    if (row[copyPosToFilter[m]] != valuesToFilter->at(j + m)) {
+                    if (row[copyPosToFilter.get()[m]] != valuesToFilter->at(j + m)) {
                         okRow = false;
                         break;
                     }

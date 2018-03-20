@@ -7,6 +7,7 @@
 #include <vlog/ruleexecplan.h>
 #include <vlog/ruleexecdetails.h>
 #include <vlog/chasemgmt.h>
+#include <vlog/consts.h>
 
 #include <trident/model/table.h>
 
@@ -136,13 +137,13 @@ class SemiNaiver {
                 bool fixpoint);
 
     public:
-        SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
+		VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 bool restrictedChase, int nthreads, bool shuffleRules);
 
         //disable restricted chase
-        SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
+		VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 int nthreads, bool shuffleRules) :
@@ -150,7 +151,7 @@ class SemiNaiver {
                     multithreaded, false, nthreads, shuffleRules) {
             }
 
-        void run() {
+        VLIBEXP void run() {
             run(0, 1);
         }
 
@@ -164,9 +165,12 @@ class SemiNaiver {
 
         virtual FCTable *getTable(const PredId_t pred, const uint8_t card);
 
-        void run(size_t lastIteration, size_t iteration);
+        VLIBEXP void run(size_t lastIteration, size_t iteration);
 
-        void storeOnFiles(std::string path, const bool decompress,
+        VLIBEXP void storeOnFile(std::string path, const PredId_t pred, const bool decompress,
+                const int minLevel, const bool csv);
+
+		VLIBEXP void storeOnFiles(std::string path, const bool decompress,
                 const int minLevel, const bool csv);
 
         FCIterator getTable(const Literal &literal, const size_t minIteration,
@@ -182,7 +186,7 @@ class SemiNaiver {
             return listDerivations;
         }
 
-        void createGraphRuleDependency(std::vector<int> &nodes,
+        VLIBEXP void createGraphRuleDependency(std::vector<int> &nodes,
                 std::vector<std::pair<int, int>> &edges);
 
         Program *getProgram() {
@@ -209,7 +213,7 @@ class SemiNaiver {
 
         //Statistics methods
 
-        void printCountAllIDBs(string prefix);
+        VLIBEXP void printCountAllIDBs(string prefix);
 
         size_t getCurrentIteration();
 

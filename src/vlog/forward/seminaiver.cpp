@@ -6,6 +6,7 @@
 #include <vlog/filterer.h>
 #include <vlog/finalresultjoinproc.h>
 #include <vlog/extresultjoinproc.h>
+#include <vlog/utils.h>
 #include <trident/model/table.h>
 #include <kognac/consts.h>
 #include <kognac/utils.h>
@@ -108,6 +109,8 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
             delete d;
         }
 
+#if 0
+	// Commented out rule-reordering for now. It is only needed for interrule-parallelism.
         if (multithreaded) {
             // newDetails will ultimately contain the new rule order.
             std::vector<int> newDetails;
@@ -193,6 +196,7 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 this->allIDBRules.push_back(saved[newDetails[i]]);
             }
         }
+#endif
     }
 
 bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
@@ -419,7 +423,7 @@ bool SemiNaiver::executeUntilSaturation(
             //CODE FOR Statistics
             LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". RulesWithDerivation=" <<
                 nRulesOnePass << " out of " << ruleset.size() << " Derivations so far " << countAllIDBs();
-	    printCountAllIDBs("After step " + to_string(iteration) + ": ");
+            printCountAllIDBs("After step " + to_string(iteration) + ": ");
             nRulesOnePass = 0;
 
             //Get the top 10 rules in the last iteration
@@ -447,74 +451,89 @@ bool SemiNaiver::executeUntilSaturation(
                     return newDer;
 }
 
+void SemiNaiver::storeOnFile(std::string path, const PredId_t pred, const bool decompress, const int minLevel, const bool csv) {
+    FCTable *table = predicatesTables[pred];
+    char buffer[MAX_TERM_SIZE];
+
+    std::ofstream streamout(path);
+    if (streamout.fail()) {
+        throw("Could not open " + path + " for writing");
+    }
+
+    if (table != NULL && !table->isEmpty()) {
+	FCIterator itr = table->read(0);
+	if (! itr.isEmpty()) {
+	    const uint8_t sizeRow = table->getSizeRow();
+	    while (!itr.isEmpty()) {
+		std::shared_ptr<const FCInternalTable> t = itr.getCurrentTable();
+		FCInternalTableItr *iitr = t->getIterator();
+		while (iitr->hasNext()) {
+		    iitr->next();
+		    std::string row = "";
+		    if (! csv) {
+			row = to_string(iitr->getCurrentIteration());
+		    }
+		    bool first = true;
+		    for (uint8_t m = 0; m < sizeRow; ++m) {
+			if (decompress || csv) {
+			    if (layer.getDictText(iitr->getCurrentValue(m), buffer)) {
+				if (csv) {
+				    if (first) {
+					first = false;
+				    } else {
+					row += ",";
+				    }
+				    row += VLogUtils::csvString(string(buffer));
+				} else {
+				    row += "\t";
+				    row += string(buffer);
+				}
+			    } else {
+				std::string t = program->getFromAdditional(iitr->getCurrentValue(m));
+				if (t == std::string("")) {
+				    uint64_t v = iitr->getCurrentValue(m);
+				    t = "" + std::to_string(v >> 40) + "_"
+					+ std::to_string((v >> 32) & 0377) + "_"
+					+ std::to_string(v & 0xffffffff);
+				    // t = std::to_string(iitr->getCurrentValue(m));
+				}
+				if (csv) {
+				    if (first) {
+					first = false;
+				    } else {
+					row += ",";
+				    }
+				    row += VLogUtils::csvString(t);
+				} else {
+				    row += "\t";
+				    row += t;
+				}
+			    }
+			} else {
+			    row += "\t" + to_string(iitr->getCurrentValue(m));
+			}
+		    }
+		    streamout << row << std::endl;
+		}
+		t->releaseIterator(iitr);
+		itr.moveNextCount();
+	    }
+	}
+    }
+    streamout.close();
+}
+
 void SemiNaiver::storeOnFiles(std::string path, const bool decompress,
         const int minLevel, const bool csv) {
-    //Create a directory if necessary
-    Utils::create_directories(path);
     char buffer[MAX_TERM_SIZE];
+
+    Utils::create_directories(path);
 
     //I create a new file for every idb predicate
     for (PredId_t i = 0; i < MAX_NPREDS; ++i) {
         FCTable *table = predicatesTables[i];
         if (table != NULL && !table->isEmpty()) {
-            FCIterator itr = table->read(minLevel); //1 contains all explicit facts
-            if (!itr.isEmpty()) {
-                std::ofstream streamout(path + "/" + program->getPredicateName(i));
-                const uint8_t sizeRow = table->getSizeRow();
-                while (!itr.isEmpty()) {
-                    std::shared_ptr<const FCInternalTable> t = itr.getCurrentTable();
-                    FCInternalTableItr *iitr = t->getIterator();
-                    while (iitr->hasNext()) {
-                        iitr->next();
-			std::string row = "";
-			if (! csv) {
-			    row = to_string(iitr->getCurrentIteration());
-			}
-			bool first = true;
-                        for (uint8_t m = 0; m < sizeRow; ++m) {
-                            if (decompress || csv) {
-                                if (layer.getDictText(iitr->getCurrentValue(m), buffer)) {
-				    if (csv) {
-					if (first) {
-					    first = false;
-					} else {
-					    row += ",";
-					}
-				    } else {
-					row += "\t";
-				    }
-				    row += string(buffer);
-                                } else {
-                                    std::string t = program->getFromAdditional(iitr->getCurrentValue(m));
-                                    if (t == std::string("")) {
-					uint64_t v = iitr->getCurrentValue(m);
-					t = "" + std::to_string(v >> 40) + "_"
-					    + std::to_string((v >> 32) & 0377) + "_"
-					    + std::to_string(v & 0xffffffff);
-                                        // t = std::to_string(iitr->getCurrentValue(m));
-                                    }
-				    if (csv) {
-					if (first) {
-					    first = false;
-					} else {
-					    row += ",";
-					}
-				    } else {
-					row += "\t";
-				    }
-                                    row += t;
-                                }
-                            } else {
-                                row += "\t" + to_string(iitr->getCurrentValue(m));
-                            }
-                        }
-                        streamout << row << std::endl;
-                    }
-                    t->releaseIterator(iitr);
-                    itr.moveNextCount();
-                }
-                streamout.close();
-            }
+            storeOnFile(path + "/" + program->getPredicateName(i), i, decompress, minLevel, csv);
         }
     }
 }
@@ -666,12 +685,12 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
         }
     } else if (nBodyLiterals == 1) {
         const bool uniqueResults =
-	    ! ruleDetails.rule.isExistential()
-	    && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
+            ! ruleDetails.rule.isExistential()
+            && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
             && literalItr.getNTables() == 1 && heads.size() == 1;
         while (!literalItr.isEmpty()) {
             //Add the columns to the output container
-	    // Can lastLiteral be false if nBodyLiterals == 1??? --Ceriel
+            // Can lastLiteral be false if nBodyLiterals == 1??? --Ceriel
             if (!lastLiteral || ruleDetails.rule.isExistential() ||
                     heads.size() != 1 || !queryFilterer.
                     producedDerivationInPreviousSteps(
@@ -693,16 +712,16 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
 
                 table->releaseIterator(interitr);
             }
-	    // No else-clause here? Yes, can only be duplicates
+            // No else-clause here? Yes, can only be duplicates
             literalItr.moveNextCount();
         }
     } else {
         //Copy the iterator in the tmp container.
         //This process cannot derive duplicates if the number of variables is equivalent.
         const bool uniqueResults = heads.size() == 1
-	    && ! ruleDetails.rule.isExistential()
-	    && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
-	    && (!lastLiteral || firstEndTable->isEmpty());
+            && ! ruleDetails.rule.isExistential()
+            && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
+            && (!lastLiteral || firstEndTable->isEmpty());
 
         while (!literalItr.isEmpty()) {
             std::shared_ptr<const FCInternalTable> table = literalItr.getCurrentTable();
@@ -1367,10 +1386,10 @@ void SemiNaiver::printCountAllIDBs(string prefix) {
                 long count = predicatesTables[i]->getNAllRows();
                 if (count == 0) {
                     emptyRel++;
-		}
-		string predname = program->getPredicateName(i);
-		LOG(INFOL) << prefix << "Cardinality of " <<
-		    predname << ": " << count;
+                }
+                string predname = program->getPredicateName(i);
+                LOG(DEBUGL) << prefix << "Cardinality of " <<
+                    predname << ": " << count;
                 c += count;
             }
         }

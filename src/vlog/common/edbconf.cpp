@@ -7,12 +7,27 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
+
+EDBConf::EDBConf(string rawcontent, bool isFile) {
+    if (isFile) {
+	LOG(INFOL) << "Parsing EDB configuration " << rawcontent;
+        //Read the input file line by line
+        string f = rawcontent;
+        std::ifstream file(f);
+        string line;
+        rawcontent = "";
+        while (std::getline(file, line)) {
+            rawcontent += line + "\n";
+        }
+    }
+    parse(rawcontent);
+}
 
 void EDBConf::parse(string f) {
-    //Read the input file line by line
-    std::ifstream file(f);
+    std::stringstream reader(f);
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(reader, line)) {
         if (line == "" || (line.size() > 0 && line[0] == '#')) {
             continue;
         }
@@ -21,7 +36,7 @@ void EDBConf::parse(string f) {
             std::size_t found = line.find("_");
             if (found == string::npos) {
                 LOG(ERRORL) << "Malformed line in edb.conf file: " << line;
-                throw 10;
+                throw ("Malformed line: " + line);
             }
 
             string idedb = line.substr(3, found - 3);
@@ -51,9 +66,11 @@ void EDBConf::parse(string f) {
             } else {
                 //I don't know what it is. Throw error.
                 LOG(ERRORL) << "Malformed line in edb.conf file: " << line;
-                throw 10;
+                throw ("Malformed line: " + line);
             }
-        }
+        } else {
+	    throw ("Malformed line: " + line);
+	}
     }
 
 #ifdef DEBUG

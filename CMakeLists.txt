@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.8)
 
-set(CMAKE_CXX_COMPILER "g++")
-set(CMAKE_C_COMPILER "gcc")
+#set(CMAKE_CXX_COMPILER "g++")
+#set(CMAKE_C_COMPILER "gcc")
 
 project (vlog)
 include(ExternalProject)
@@ -12,15 +12,22 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     message(STATUS "Setting build type to 'Release' as none was specified.")
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
     # Set the possible values of build type for cmake-gui
-    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
 endif()
 
-#TBB
-#find_library(tbb tbb PATHS ENV LD_LIBRARY_PATH)
-#find_path (tbbh tbb/task_scheduler_init.h PATHS ENV CPATH)
-#IF ((${tbb} STREQUAL "tbb-NOTFOUND") OR (${tbbh} STREQUAL "tbbh-NOTFOUND"))
-#    message(FATAL_ERROR "Could not find TBB (thread building blocks)")
-#ENDIF()
+#add files to compile
+file(GLOB vlog_SRC
+    "src/vlog/*.cpp"
+    "src/vlog/common/*.cpp"
+    "src/vlog/backward/*.cpp"
+    "src/vlog/forward/*.cpp"
+    "src/vlog/magic/*.cpp"
+    "src/vlog/inmemory/*.cpp"
+    "src/vlog/trident/*.cpp"
+    "src/launcher/vloglayer.cpp"
+    "src/launcher/vlogscan.cpp"
+    "src/vlog/prediction/*.cpp"
+    )
 
 #ZLIB
 find_package(ZLIB REQUIRED)
@@ -30,10 +37,8 @@ IF(TRIDENT_LIB)
     message("Using KOGNAC provided installation: ${KOGNAC_LIB} ${KOGNAC_INC}")
     include_directories(${KOGNAC_INC})
     LINK_DIRECTORIES("${KOGNAC_LIB}")
-    add_library(kognac STATIC IMPORTED)
-    set_property(TARGET kognac PROPERTY IMPORTED_LOCATION ${KOGNAC_LIB}/libkognac.a)
-    add_library(kognac-log SHARED IMPORTED)
-    set_property(TARGET kognac-log PROPERTY IMPORTED_LOCATION "${KOGNAC_LIB}/libkognac-log${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    add_library(kognac SHARED IMPORTED)
+    set_property(TARGET kognac PROPERTY IMPORTED_LOCATION ${KOGNAC_LIB}/${CMAKE_SHARED_LIBRARY_PREFIX}kognac${CMAKE_SHARED_LIBRARY_SUFFIX})
 
     message("Using Trident provided installation: ${TRIDENT_LIB} ${TRIDENT_INC}")
     include_directories(${TRIDENT_INC})
@@ -66,111 +71,139 @@ ELSE()
     add_library(trident-sparql SHARED IMPORTED)
     add_dependencies(trident-sparql git-trident)
     set_property(TARGET trident-sparql PROPERTY IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/trident/libtrident-sparql${CMAKE_SHARED_LIBRARY_SUFFIX}")
-     # KOGNAC
-    add_library(kognac STATIC IMPORTED)
+    # KOGNAC
+    add_library(kognac SHARED IMPORTED)
     add_dependencies(kognac git-trident)
     include_directories(${SOURCE_DIR}/kognac/include)
     LINK_DIRECTORIES("${CMAKE_BINARY_DIR}/trident/kognac/")
-    set_property(TARGET kognac PROPERTY IMPORTED_LOCATION trident/kognac/libkognac.a)
-    # KOGNAC LOG
-    add_library(kognac-log SHARED IMPORTED)
-    add_dependencies(kognac-log git-trident)
-    set_property(TARGET kognac-log PROPERTY IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/trident/kognac/libkognac-log${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    set_property(TARGET kognac PROPERTY IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/trident/kognac/${CMAKE_SHARED_LIBRARY_PREFIX}kognac${CMAKE_SHARED_LIBRARY_SUFFIX})
 ENDIF()
 
 #SPARSEHASH
-find_path (sparsehash sparsehash/sparse_hash_map)
+find_path(sparsehash sparsehash/sparse_hash_map)
 IF (${sparsehash} STREQUAL "sparsehash-NOTFOUND")
     message("Could not find sparsehash. I'm going to use the version from kognac ...")
     include_directories(${CMAKE_BINARY_DIR}/trident/kognac/external/sparsehash/src/)
 ENDIF()
 
 #LZ4
+# find_library(lz4 NAMES ${CMAKE_STATIC_LIBRARY_PREFIX}lz4${CMAKE_STATIC_LIBRARY_SUFFIX} lz4)
 find_library(lz4 lz4)
-find_path (lz4h lz4.h)
-IF ((${lz4} STREQUAL "lz4-NOTFOUND") OR (${lz4h} STREQUAL "lz4h-NOTFOUND"))
+find_path(lz4h lz4.h)
+IF (${lz4h} STREQUAL "lz4h-NOTFOUND")
     message("Could not find LZ4. I'm going to use the version from kognac")
     include_directories(${CMAKE_BINARY_DIR}/trident/kognac/external/lz4/lib/)
     LINK_DIRECTORIES(${CMAKE_BINARY_DIR}/trident/kognac/external/lz4/lib)
     add_library(lz4 STATIC IMPORTED)
-    set_property(TARGET lz4 PROPERTY IMPORTED_LOCATION trident/kognac/external/lz4/lib/liblz4.a)
+    set_property(TARGET lz4 PROPERTY IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/trident/kognac/external/lz4/lib/${CMAKE_STATIC_LIBRARY_PREFIX}lz4${CMAKE_STATIC_LIBRARY_SUFFIX})
 ELSE()
     include_directories(lz4h)
     message("-- Found LZ4")
 ENDIF()
 
-#add files to compile
-file(GLOB vlog_SRC
-    "src/vlog/*.cpp"
-    "src/vlog/common/*.cpp"
-    "src/vlog/backward/*.cpp"
-    "src/vlog/forward/*.cpp"
-    "src/vlog/magic/*.cpp"
-    "src/vlog/inmemory/*.cpp"
-    "src/vlog/trident/*.cpp"
-    "src/vlog/web/*.cpp"
-    "src/launcher/vloglayer.cpp"
-    "src/launcher/vlogscan.cpp"
-    "src/vlog/util/*.cpp"
-    "src/vlog/prediction/*.cpp"
-)
+IF (JAVA)
+    find_package(Java REQUIRED)
+    include(UseJava)
+    find_package(JNI REQUIRED)
+    include_directories(${JNI_INCLUDE_DIRS})
+ENDIF()
 
 #Webserver support
-if(WEBINTERFACE)
+IF(WEBINTERFACE)
+    file(GLOB vlog_webSRC "src/vlog/web/*.cpp")
+    set(vlog_SRC ${vlog_webSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DWEBINTERFACE=1")
 ENDIF()
 
-if(MYSQL)
+IF(MYSQL)
+    file(GLOB vlog_mysqlSRC "src/vlog/mysql/*.cpp")
+    set(vlog_SRC ${vlog_mysqlSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMYSQL=1")
     link_libraries("-lmysqlcppconn")
 ENDIF()
 
-if(ODBC)
+IF(ODBC)
+    file(GLOB vlog_odbcSRC "src/vlog/odbc/*.cpp")
+    set(vlog_SRC ${vlog_odbcSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DODBC=1")
     link_libraries("-lodbc")
 ENDIF()
 
-if(MAPI)
+IF(MAPI)
+    file(GLOB vlog_mapiSRC "src/vlog/mapi/*.cpp")
+    set(vlog_SRC ${vlog_mapiSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMAPI=1")
     link_libraries("-lmapi")
 ENDIF()
 
-if(MDLITE)
+IF(MDLITE)
+    file(GLOB vlog_mdliteSRC "src/vlog/mdlite/*.cpp")
+    set(vlog_SRC ${vlog_mdliteSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMDLITE=1")
     link_libraries("-lmonetdb5")
 ENDIF()
 
-if(ELASTIC)
+IF(ELASTIC)
     file(GLOB vlog_elasticSRC "src/vlog/text/elastictable.cpp")
     set(vlog_SRC ${vlog_elasticSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DELASTIC=1")
 ENDIF()
 
+IF(JAVA)
+    file(GLOB vlog_javaSRC "src/vlog/java/native/*.cpp")
+    add_library(vlog-java SHARED ${vlog_javaSRC})
+ENDIF()
+
 #Create both a library and the executable program
-add_library(vlog STATIC ${vlog_SRC})
-add_executable(vlog_exec src/launcher/main.cpp)
+add_library(vlog-core SHARED ${vlog_SRC})
+add_executable(vlog src/launcher/main.cpp)
 
 #PTHREADS
 find_package(Threads REQUIRED)
 if (THREADS_HAVE_PTHREAD_ARG)
-    target_compile_options(PUBLIC vlog "-pthread")
+    target_compile_options(PUBLIC vlog-core "-pthread")
 endif()
 if (CMAKE_THREAD_LIBS_INIT)
-    target_link_libraries(vlog "${CMAKE_THREAD_LIBS_INIT}")
+    target_link_libraries(vlog-core "${CMAKE_THREAD_LIBS_INIT}")
 endif()
 
 #Set compiler options
-set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3")
-set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -DDEBUG")
-set(COMPILE_FLAGS "${COMPILE_FLAGS} -c -MD -std=c++11 -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1")
-set_target_properties(vlog PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}")
-set_target_properties(vlog_exec PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}" OUTPUT_NAME "vlog")
+if((${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang") OR (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU"))
+    set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3")
+    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -DDEBUG")
+    set(COMPILE_FLAGS "${COMPILE_FLAGS} -c -fPIC -MD -std=c++11 -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1")
+endif()
+
+IF (JAVA)
+    set(COMPILE_FLAGS "${COMPILE_FLAGS} -fPIC")
+ENDIF()
+set_target_properties(vlog-core PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}")
+IF(JAVA)
+    set_target_properties(vlog-java PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}")
+ENDIF()
+set_target_properties(vlog PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}" OUTPUT_NAME "vlog")
 
 #standard include
 include_directories(include/)
-if(WEBINTERFACE)
-TARGET_LINK_LIBRARIES(vlog trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log)
-else()
-TARGET_LINK_LIBRARIES(vlog trident trident-sparql ${ZLIB_LIBRARIES} kognac kognac-log)
-endif()
-TARGET_LINK_LIBRARIES(vlog_exec vlog)
+TARGET_LINK_LIBRARIES(vlog-core trident trident-sparql ${ZLIB_LIBRARIES} kognac)
+
+if(JAVA)
+    file(GLOB javaSRC "src/vlog/java/karmaresearch/vlog/*.java")
+    Create_javadoc(vlog PACKAGES karmaresearch.vlog SOURCEPATH ${CMAKE_CURRENT_SOURCE_DIR}/src/vlog/java WINDOWTITLE "VLog JNI Interface")
+    # add_dependencies(vlog-java headers)
+    TARGET_LINK_LIBRARIES(vlog-java vlog-core trident trident-sparql kognac)
+    #Terrible hack to make cmake actually find the shared library when adding it to the jar.
+    #It won't find it in the binary directory ... so we copy it to the source directory, add it to the jar, and then remove it from the source directory
+    add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/resources)
+    add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:vlog-java> ${CMAKE_SOURCE_DIR}/resources)
+    add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:vlog-core> ${CMAKE_SOURCE_DIR}/resources)
+    add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:trident> ${CMAKE_SOURCE_DIR}/resources)
+    add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:trident-sparql> ${CMAKE_SOURCE_DIR}/resources)
+    add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:kognac> ${CMAKE_SOURCE_DIR}/resources)
+    add_jar(jvlog ${javaSRC} resources/${CMAKE_SHARED_LIBRARY_PREFIX}vlog-java${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}vlog-core${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}trident-core${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}trident-sparql${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}kognac${CMAKE_SHARED_LIBRARY_SUFFIX})
+    add_custom_command(TARGET jvlog POST_BUILD COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_SOURCE_DIR}/resources)
+    add_custom_command(TARGET jvlog POST_BUILD COMMAND ${CMAKE_COMMAND} -E remove $<TARGET_FILE:vlog-java>)
+    add_dependencies(jvlog vlog-java)
+    Create_javah(TARGET headers CLASSES karmaresearch.vlog.VLog karmaresearch.vlog.QueryResultEnumeration CLASSPATH jvlog DEPENDS ${javaSRC}  OUTPUT_NAME ${CMAKE_CURRENT_SOURCE_DIR}/src/vlog/java/native/vlog_native.h)
+ENDIF()
+TARGET_LINK_LIBRARIES(vlog vlog-core)

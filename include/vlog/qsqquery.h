@@ -2,6 +2,7 @@
 #define QUERY_H
 
 #include <vlog/concepts.h>
+#include <vlog/consts.h>
 
 class QSQQuery {
 private:
@@ -12,7 +13,7 @@ private:
     std::pair<uint8_t, uint8_t> repeatedVars[SIZETUPLE - 1];
 
 public:
-    QSQQuery(const Literal literal);
+    VLIBEXP QSQQuery(const Literal literal);
 
     const Literal *getLiteral() const {
         return &literal;
