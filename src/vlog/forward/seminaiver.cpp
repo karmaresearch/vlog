@@ -110,7 +110,7 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
         }
 
 #if 0
-	// Commented out rule-reordering for now. It is only needed for interrule-parallelism.
+        // Commented out rule-reordering for now. It is only needed for interrule-parallelism.
         if (multithreaded) {
             // newDetails will ultimately contain the new rule order.
             std::vector<int> newDetails;
@@ -461,64 +461,60 @@ void SemiNaiver::storeOnFile(std::string path, const PredId_t pred, const bool d
     }
 
     if (table != NULL && !table->isEmpty()) {
-	FCIterator itr = table->read(0);
-	if (! itr.isEmpty()) {
-	    const uint8_t sizeRow = table->getSizeRow();
-	    while (!itr.isEmpty()) {
-		std::shared_ptr<const FCInternalTable> t = itr.getCurrentTable();
-		FCInternalTableItr *iitr = t->getIterator();
-		while (iitr->hasNext()) {
-		    iitr->next();
-		    std::string row = "";
-		    if (! csv) {
-			row = to_string(iitr->getCurrentIteration());
-		    }
-		    bool first = true;
-		    for (uint8_t m = 0; m < sizeRow; ++m) {
-			if (decompress || csv) {
-			    if (layer.getDictText(iitr->getCurrentValue(m), buffer)) {
-				if (csv) {
-				    if (first) {
-					first = false;
-				    } else {
-					row += ",";
-				    }
-				    row += VLogUtils::csvString(string(buffer));
-				} else {
-				    row += "\t";
-				    row += string(buffer);
-				}
-			    } else {
-				std::string t = program->getFromAdditional(iitr->getCurrentValue(m));
-				if (t == std::string("")) {
-				    uint64_t v = iitr->getCurrentValue(m);
-				    t = "" + std::to_string(v >> 40) + "_"
-					+ std::to_string((v >> 32) & 0377) + "_"
-					+ std::to_string(v & 0xffffffff);
-				    // t = std::to_string(iitr->getCurrentValue(m));
-				}
-				if (csv) {
-				    if (first) {
-					first = false;
-				    } else {
-					row += ",";
-				    }
-				    row += VLogUtils::csvString(t);
-				} else {
-				    row += "\t";
-				    row += t;
-				}
-			    }
-			} else {
-			    row += "\t" + to_string(iitr->getCurrentValue(m));
-			}
-		    }
-		    streamout << row << std::endl;
-		}
-		t->releaseIterator(iitr);
-		itr.moveNextCount();
-	    }
-	}
+        FCIterator itr = table->read(0);
+        if (! itr.isEmpty()) {
+            const uint8_t sizeRow = table->getSizeRow();
+            while (!itr.isEmpty()) {
+                std::shared_ptr<const FCInternalTable> t = itr.getCurrentTable();
+                FCInternalTableItr *iitr = t->getIterator();
+                while (iitr->hasNext()) {
+                    iitr->next();
+                    std::string row = "";
+                    if (! csv) {
+                        row = to_string(iitr->getCurrentIteration());
+                    }
+                    bool first = true;
+                    for (uint8_t m = 0; m < sizeRow; ++m) {
+                        if (decompress || csv) {
+                            if (layer.getDictText(iitr->getCurrentValue(m), buffer)) {
+                                if (csv) {
+                                    if (first) {
+                                        first = false;
+                                    } else {
+                                        row += ",";
+                                    }
+                                    row += VLogUtils::csvString(string(buffer));
+                                } else {
+                                    row += "\t";
+                                    row += string(buffer);
+                                }
+                            } else {
+                                uint64_t v = iitr->getCurrentValue(m);
+                                std::string t = "" + std::to_string(v >> 40) + "_"
+                                    + std::to_string((v >> 32) & 0377) + "_"
+                                    + std::to_string(v & 0xffffffff);
+                                if (csv) {
+                                    if (first) {
+                                        first = false;
+                                    } else {
+                                        row += ",";
+                                    }
+                                    row += VLogUtils::csvString(t);
+                                } else {
+                                    row += "\t";
+                                    row += t;
+                                }
+                            }
+                        } else {
+                            row += "\t" + to_string(iitr->getCurrentValue(m));
+                        }
+                    }
+                    streamout << row << std::endl;
+                }
+                t->releaseIterator(iitr);
+                itr.moveNextCount();
+            }
+        }
     }
     streamout.close();
 }

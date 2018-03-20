@@ -53,6 +53,16 @@ public:
         }
     }
 
+    bool get(const std::string &rawValue, Term_t &id) {
+        SimpleHashmap::iterator itr = map.find(rawValue);
+        if (itr == map.end()) {
+            return false;
+        } else {
+            id = itr->second;
+            return true;
+        }
+    }
+
     std::vector<std::string> getKeys() {
         std::vector<std::string> output;
         for (SimpleHashmap::iterator itr = map.begin(); itr != map.end(); ++itr) {

@@ -72,11 +72,13 @@ class EDBLayer {
             std::shared_ptr<EDBTable> manager;
         };
 
-        Dictionary predDictionary;
+        std::unique_ptr<Dictionary> predDictionary;
         std::map<PredId_t, EDBInfoTable> dbPredicates;
 
         Factory<EDBMemIterator> memItrFactory;
         IndexedTupleTable *tmpRelations[MAX_NPREDS];
+
+        std::unique_ptr<Dictionary> termsDictionary;
 
         VLIBEXP void addTridentTable(const EDBConf::Table &tableConf, bool multithreaded);
 
@@ -127,6 +129,7 @@ class EDBLayer {
             for (int i = 0; i < MAX_NPREDS; ++i) {
                 tmpRelations[i] = NULL;
             }
+            predDictionary = std::unique_ptr<Dictionary>(new Dictionary());
         }
 
         std::vector<PredId_t> getAllPredicateIDs();
@@ -147,7 +150,8 @@ class EDBLayer {
         }
 
         const Dictionary &getPredDictionary() {
-            return predDictionary;
+            assert(predDictionary.get() != NULL);
+            return *(predDictionary.get());
         }
 
         VLIBEXP bool doesPredExists(PredId_t id) const;
@@ -208,9 +212,15 @@ class EDBLayer {
         size_t getCardinalityColumn(const Literal &query,
                 uint8_t posColumn);
 
-        VLIBEXP bool getDictNumber(const char *text, const size_t sizeText, uint64_t &id);
+        VLIBEXP bool getDictNumber(const char *text,
+                const size_t sizeText, uint64_t &id);
+
+        VLIBEXP bool getOrAddDictNumber(const char *text,
+                const size_t sizeText, uint64_t &id);
 
         VLIBEXP bool getDictText(const uint64_t id, char *text);
+
+        VLIBEXP std::string getDictText(const uint64_t id);
 
         Predicate getDBPredicate(int idx);
 
@@ -234,7 +244,7 @@ class EDBLayer {
 
         void releaseIterator(EDBIterator *itr);
 
-	// For JNI interface ...
+        // For JNI interface ...
         VLIBEXP void addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows);
 
         ~EDBLayer() {

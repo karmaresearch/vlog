@@ -429,22 +429,19 @@ void Exporter::generateNTTriples(string outputdir, bool decompress) {
             if (edb.getDictText(all_s[i], supportBuffer)) {
                 *out << supportBuffer << " ";
             } else {
-                std::string t = sn->getProgram()->getFromAdditional(all_s[i]);
-                if (t == std::string("")) t = std::to_string(all_s[i]);
+                std::string t = std::to_string(all_s[i]);
                 *out << t << " ";
             }
             if (edb.getDictText(all_p[i], supportBuffer)) {
                 *out << supportBuffer << " ";
             } else {
-                std::string t = sn->getProgram()->getFromAdditional(all_p[i]);
-                if (t == std::string("")) t = std::to_string(all_p[i]);
+                std::string t = std::to_string(all_p[i]);
                 *out << t << " ";
             }
             if (edb.getDictText(all_o[i], supportBuffer)) {
                 *out << supportBuffer << " ." << endl;
             } else {
-                std::string t = sn->getProgram()->getFromAdditional(all_o[i]);
-                if (t == std::string("")) t = std::to_string(all_o[i]);
+                std::string t = std::to_string(all_o[i]);
                 *out << t << " ." << endl;
             }
         } else {

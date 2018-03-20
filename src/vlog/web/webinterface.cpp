@@ -368,8 +368,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             setupTridentLayer();
 
             //Setup the program
-            program = std::unique_ptr<Program>(new Program(
-                        edb->getNTerms(), edb.get()));
+            program = std::unique_ptr<Program>(new Program(edb.get()));
             program->readFromString(srules, vm["rewriteMultihead"].as<bool>());
             program->sortRulesByIDBPredicates();
             //Set up the ruleset and perform the pre-materialization if necessary
