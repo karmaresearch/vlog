@@ -98,7 +98,7 @@ std::string Literal::tostring(Program *program, EDBLayer *db) const {
 
     std::string out = predName + std::string("[") +
         std::to_string(pred.getType()) + std::string("]") +
-        adornmentToString(pred.getAdorment(), tuple.getSize()) + std::string("(");
+        adornmentToString(pred.getAdornment(), tuple.getSize()) + std::string("(");
 
     for (int i = 0; i < tuple.getSize(); ++i) {
         if (tuple.get(i).isVariable()) {

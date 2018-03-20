@@ -27,6 +27,7 @@ file(GLOB vlog_SRC
     "src/launcher/vloglayer.cpp"
     "src/launcher/vlogscan.cpp"
     "src/vlog/prediction/*.cpp"
+    "src/vlog/util/*.cpp"
     )
 
 #ZLIB
