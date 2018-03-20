@@ -3,6 +3,7 @@
 #include <ctime>
 #include <stack>
 #include <numeric>
+#include <climits>
 
 std::string makeGenericQuery(Program& p, PredId_t predId, uint8_t predCard) {
     std::string query = p.getPredicateName(predId);
@@ -519,6 +520,24 @@ void parseQueriesLog(vector<string>& testQueriesLog,
     }
 }
 
+void normalize(vector<Metrics>& featuresVector) {
+    double minCost = numeric_limits<double>::max();
+    double maxCost = numeric_limits<double>::min();
+    for (int i = 0; i < featuresVector.size(); ++i) {
+        if (featuresVector[i].cost < minCost) {
+            minCost = featuresVector[i].cost;
+        }
+        if (featuresVector[i].cost > maxCost) {
+            maxCost = featuresVector[i].cost;
+        }
+    }
+    LOG(INFOL) << " Min cost = "<< minCost;
+    LOG(INFOL) << " Max cost = "<< maxCost;
+    for (int i = 0; i < featuresVector.size(); ++i) {
+        featuresVector[i].cost = (featuresVector[i].cost - minCost)/(maxCost - minCost);
+    }
+}
+
 void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         vector<string>& testQueriesLog,
         EDBLayer& edb,
@@ -558,6 +577,8 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         strQsqrTime.push_back(qsqrTime);
         strMagicTime.push_back(magicTime);
     }
+
+    normalize(featuresVector);
 
     vector<pair<string, int>> trainingQueriesAndResult;
 
