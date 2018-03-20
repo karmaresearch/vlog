@@ -75,15 +75,15 @@ class Test {
 
     static void runTest(String fn) throws Exception {
         VLog vlog = new VLog();
-        vlog.setLogLevel("debug");
+        vlog.setLogLevel("info");
         try {
             vlog.start("blabla", false);
             System.err.println("vlog.start() should have thrown an exception.");
         } catch (EDBConfigurationException e) {
             // Good!
         }
-        vlog.stop();
 
+        vlog = new VLog();
         // Test start with empty config
         vlog.start("", false);
         vlog.addData("p1", p1_contents);
@@ -106,11 +106,48 @@ class Test {
             throw new Error(
                     "Error in query, check file 'blabla', should contain 'c,d,e'");
         }
+        vlog.writeQueryResultsToCsv(
+                new Atom("p3", q1.toArray(new Term[q1.size()])), "blabla");
         Files.delete(Paths.get("blabla"));
-        vlog.stop();
 
-        vlog.start(fn, true);
+        vlog = new VLog();
+        vlog.start("", false);
+        vlog.addData("A", new String[][] { { "a" } });
+        vlog.addData("A", new String[][] { { "a" }, { "b" } });
+        StringQueryResultEnumeration e = vlog.query(new Atom("A",
+                new Term[] { new Term(Term.TermType.CONSTANT, "C") }));
+        if (e.hasMoreElements()) {
+            throw new Error("Error in query");
+        }
+        e.cleanup();
+        e = vlog.query(new Atom("A",
+                new Term[] { new Term(Term.TermType.VARIABLE, "C") }));
+        while (e.hasMoreElements()) {
+            String[] result = e.nextElement();
+            System.out.println("result: " + Arrays.toString(result));
+        }
+        e.cleanup();
         ArrayList<Rule> rules = new ArrayList<>();
+        rules.add(
+                new Rule(
+                        new Atom[] { new Atom("B",
+                                new Term[] { new Term(Term.TermType.VARIABLE,
+                                        "C") }) },
+                        new Atom[] { new Atom("A", new Term[] {
+                                new Term(Term.TermType.VARIABLE, "C") }) }));
+        vlog.setRules(rules.toArray(new Rule[rules.size()]),
+                RuleRewriteStrategy.AGGRESSIVE);
+        vlog.materialize(false);
+        e = vlog.query(new Atom("B",
+                new Term[] { new Term(Term.TermType.CONSTANT, "C") }));
+        if (e.hasMoreElements()) {
+            throw new Error("Error in query");
+        }
+        e.cleanup();
+
+        vlog = new VLog();
+        vlog.start(fn, true);
+        rules = new ArrayList<>();
         rules.add(rule1);
 
         vlog.setRules(rules.toArray(new Rule[rules.size()]),
@@ -155,7 +192,6 @@ class Test {
         }
         vlog.writePredicateToCsv("prescription", "testOutput");
         result.cleanup();
-
     }
 
 }

@@ -749,7 +749,9 @@ void SegmentInserter::addRow(const Term_t *row) {
 }
 
 bool SegmentInserter::isEmpty() const {
-    assert(nfields > 0);
+    if (nfields == 0) {
+	return true;
+    }
     if (copyColumns[0] != std::shared_ptr<Column>()) {
         if (!copyColumns[0]->isEmpty())
             return false;

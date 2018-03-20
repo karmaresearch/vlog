@@ -232,10 +232,10 @@ FCBlock Reasoner::getBlockFromQuery(Literal constantsQuery, Literal &boundQuery,
         table = std::shared_ptr<FCInternalTable>(new SingletonTable(0));
     } else {
         SegmentInserter inserter(nconstants);
-        Term_t tuple[3];
+        Term_t tuple[128];
         uint8_t nPosToCopy = 0;
-        uint8_t posToCopy[3];
-        assert(boundQuery.getTupleSize() <= 3);
+        uint8_t posToCopy[128];
+        assert(boundQuery.getTupleSize() <= 128);
         for (uint8_t i = 0; i < (uint8_t) boundQuery.getTupleSize(); ++i) {
             if (!boundQuery.getTermAtPos(i).isVariable()) {
                 posToCopy[nPosToCopy++] = i;
@@ -522,9 +522,9 @@ TupleIterator *Reasoner::getMagicIterator(Literal &query,
 
 
     //To use if the flag returnOnlyVars is set to false
-    uint64_t outputTuple[3];    // Used in trident method, so no Term_t
+    uint64_t outputTuple[128];    // Used in trident method, so no Term_t
     uint8_t nPosToCopy = 0;
-    uint8_t posToCopy[3];
+    uint8_t posToCopy[128];
     std::vector<uint8_t> newPosJoins; //This is used because I need the posJoins in the original triple, and not on the variables
     if (posJoins != NULL) {
         newPosJoins = *posJoins;
@@ -819,18 +819,19 @@ TupleIterator *Reasoner::getEDBIterator(Literal &query,
         std::vector<uint8_t> *sortByFields) {
     QSQQuery qsqquery(query);
     int nVars = query.getNVars();
+    int cardinality = query.getTupleSize();
     TupleTable *table = new TupleTable(nVars);
     edb.query(&qsqquery, table, posJoins, possibleValuesJoins);
     std::shared_ptr<TupleTable> ptable = std::shared_ptr<TupleTable>(table);
-    if (! returnOnlyVars && nVars != 3) {
+    if (! returnOnlyVars && nVars != cardinality) {
         VTuple v = query.getTuple();
-        TupleTable *newTable = new TupleTable(3);
+        TupleTable *newTable = new TupleTable(cardinality);
         TupleIterator *itr = new TupleTableItr(ptable);
         while (itr->hasNext()) {
             itr->next();
-            uint64_t row[3];
+            uint64_t row[128];
             int cnt = 0;
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < cardinality; i++) {
                 if (v.get(i).isVariable()) {
                     row[i] = itr->getElementAt(cnt);
                     cnt++;

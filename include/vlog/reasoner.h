@@ -77,7 +77,7 @@ public:
             bool returnOnlyVars,
             std::vector<uint8_t> *sortByFields);
 
-    TupleIterator *getIteratorWithMaterialization(SemiNaiver *sn,
+    VLIBEXP TupleIterator *getIteratorWithMaterialization(SemiNaiver *sn,
 	    Literal &query,
 	    bool returnOnlyVars,
 	    std::vector<uint8_t> *sortByFields);

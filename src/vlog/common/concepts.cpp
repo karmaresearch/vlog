@@ -795,12 +795,70 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
 
     //Calculate the tuple
     std::vector<VTerm> t;
+    std::string term;
     while (tuple.size() > 0) {
-        size_t posTerm = tuple.find(",");
-        std::string term;
-        if (posTerm != std::string::npos) {
+	size_t posTerm = 0;
+        while (posTerm < tuple.size()) {
+            if (tuple[posTerm] == ',' || tuple[posTerm] == ')') {
+                break;
+            }
+            switch(tuple[posTerm]) {
+            case '\'':
+                posTerm++;
+                while (posTerm < tuple.size()) {
+                    if (tuple[posTerm] == '\\') {
+                        posTerm++;
+                        if (posTerm != tuple.size()) {
+                            posTerm++;
+                        }
+                        continue;
+                    }
+                    if (tuple[posTerm] == '\'') {
+                        break;
+                    }
+                    posTerm++;
+                }
+                break;
+            case '\"':
+                posTerm++;
+                while (posTerm < tuple.size()) {
+                    if (tuple[posTerm] == '\\') {
+                        posTerm++;
+                        if (posTerm != tuple.size()) {
+                            posTerm++;
+                        }
+                        continue;
+                    }
+                    if (tuple[posTerm] == '\"') {
+                        break;
+                    }
+                    posTerm++;
+                }
+                break;
+            case '<':
+                posTerm++;
+                while (posTerm < tuple.size()) {
+                    if (tuple[posTerm] == '\\') {
+                        posTerm++;
+                        if (posTerm != tuple.size()) {
+                            posTerm++;
+                        }
+                        continue;
+                    }
+                    if (tuple[posTerm] == '>') {
+                        break;
+                    }
+                    posTerm++;
+                }
+                break;
+            default:
+                posTerm++;
+                break;
+            }
+        }
+        if (posTerm != tuple.size()) {
             term = tuple.substr(0, posTerm);
-            tuple = tuple.substr(posTerm + 1, std::string::npos);
+            tuple = tuple.substr(posTerm + 1, tuple.size());
         } else {
             term = tuple;
             tuple = "";
@@ -1119,8 +1177,11 @@ Predicate Program::getPredicate(const PredId_t id) {
     if (kb->doesPredExists(id)) {
 	return Predicate(id, 0, EDB, kb->getPredArity(id));
     }
-    uint8_t card = cardPredicates.find(id)->second;
-    return Predicate(id, 0, IDB, card);
+    if (cardPredicates.find(id) != cardPredicates.end()) {
+	uint8_t card = cardPredicates.find(id)->second;
+	return Predicate(id, 0, IDB, card);
+    }
+    return Predicate(id, 0, IDB, 0);
 }
 
 Predicate Program::getPredicate(std::string & p, uint8_t adornment) {
@@ -1128,8 +1189,11 @@ Predicate Program::getPredicate(std::string & p, uint8_t adornment) {
     if (kb->doesPredExists(id)) {
         return Predicate(id, adornment, EDB, kb->getPredArity(id));
     }
-    uint8_t card = cardPredicates.find(id)->second;
-    return Predicate(id, adornment, IDB, card);
+    if (cardPredicates.find(id) != cardPredicates.end()) {
+	uint8_t card = cardPredicates.find(id)->second;
+	return Predicate(id, adornment, IDB, card);
+    }
+    return Predicate(id, 0, IDB, 0);
 }
 
 int64_t Program::getOrAddPredicate(std::string & p, uint8_t cardinality) {

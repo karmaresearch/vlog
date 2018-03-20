@@ -150,7 +150,7 @@ class EDBLayer {
             return predDictionary;
         }
 
-        bool doesPredExists(PredId_t id) const;
+        VLIBEXP bool doesPredExists(PredId_t id) const;
 
         PredId_t getFirstEDBPredicate() {
             if (!dbPredicates.empty()) {
@@ -235,7 +235,7 @@ class EDBLayer {
         void releaseIterator(EDBIterator *itr);
 
 	// For JNI interface ...
-        void addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows);
+        VLIBEXP void addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows);
 
         ~EDBLayer() {
             for (int i = 0; i < MAX_NPREDS; ++i) {

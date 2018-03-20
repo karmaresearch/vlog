@@ -436,7 +436,7 @@ class Program {
 
         VLIBEXP Predicate getPredicate(const PredId_t id);
 
-		int64_t getOrAddPredicate(std::string &p, uint8_t cardinality);
+		VLIBEXP int64_t getOrAddPredicate(std::string &p, uint8_t cardinality);
 
         std::vector<Rule> getAllRulesByPredicate(PredId_t predid) const;
 
@@ -458,7 +458,7 @@ class Program {
 
         VLIBEXP std::vector<Rule> getAllRules();
 
-        int getNRules() const;
+        VLIBEXP int getNRules() const;
 
         Program clone() const;
 
@@ -466,9 +466,9 @@ class Program {
 
         void cleanAllRules();
 
-        void addRule(Rule &rule, bool rewriteMultihead = false);
+        VLIBEXP void addRule(Rule &rule, bool rewriteMultihead = false);
 
-        void addRule(std::vector<Literal> heads, std::vector<Literal> body, bool rewriteMultihead = false);
+        VLIBEXP void addRule(std::vector<Literal> heads, std::vector<Literal> body, bool rewriteMultihead = false);
 
         void addAllRules(std::vector<Rule> &rules);
 

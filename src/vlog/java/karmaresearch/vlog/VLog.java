@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import karmaresearch.vlog.Term.TermType;
 
@@ -15,10 +16,27 @@ import karmaresearch.vlog.Term.TermType;
  */
 public class VLog {
 
+    private static final boolean DEBUG = true;
+
+    private static final AtomicInteger VlogCounter = new AtomicInteger(0);
+
     static {
+        loadLibrary("kognac-log");
+        loadLibrary("kognac");
+        loadLibrary("trident-core");
+        loadLibrary("trident-sparql");
+        loadLibrary("vlog-core");
+        loadLibrary("vlog-java");
+    };
+
+    private static void loadLibrary(String s) {
         // First try to just load the shared library.
         try {
-            System.loadLibrary("vlog_jni");
+            System.loadLibrary(s);
+            if (DEBUG) {
+                System.out
+                        .println("Loaded " + s + " with System.loadLibrary()");
+            }
         } catch (Throwable ex) {
             // Did not work, now try to load it from the same directory as the
             // jar file. First determine prefix and suffix, depending on OS.
@@ -47,15 +65,24 @@ public class VLog {
             }
 
             // Determine library name.
-            String libName = nativePrefix + "vlog_jni" + nativeSuffix;
+            String libName = nativePrefix + s + nativeSuffix;
 
             try {
                 loadFromDir(jarFile, libName);
+                if (DEBUG) {
+                    System.out.println("Loaded " + s
+                            + " from the directory in which the jar resides");
+                }
             } catch (Throwable e) {
                 try {
                     loadFromJar(jarFile, libName, os);
+                    if (DEBUG) {
+                        System.out.println("Loaded " + s + " from the jar");
+                    }
                 } catch (Throwable e1) {
-                    throw new UnsatisfiedLinkError(e1.getMessage());
+                    System.err.println("Could not load library " + s
+                            + ", exceptions are temporarily disabled to accomodate windows version");
+                    // throw new UnsatisfiedLinkError(e1.getMessage());
                 }
             }
         }
@@ -74,7 +101,7 @@ public class VLog {
     private static void loadFromJar(File jarFile, String libName, String os)
             throws IOException {
         InputStream is = new BufferedInputStream(
-                VLog.class.getResourceAsStream("/" + libName));
+                VLog.class.getResourceAsStream("/resources/" + libName));
         File targetDir = Files.createTempDirectory("VLog-tmp").toFile();
         targetDir.deleteOnExit();
         File target = new File(targetDir, libName);
@@ -90,6 +117,13 @@ public class VLog {
                 targetDir.delete();
             }
         }
+    }
+
+    // Identification of this VLog instance.
+    private final int myVlog;
+
+    public VLog() {
+        myVlog = VlogCounter.getAndAdd(1);
     }
 
     /**
@@ -153,9 +187,8 @@ public class VLog {
             throws EDBConfigurationException;
 
     /**
-     * Stops and de-allocates the reasoner. This method should be called before
-     * beginning runs on another database. If vlog is not started yet, this call
-     * does nothing, so it does no harm to call it more than once.
+     * Stops and de-allocates the reasoner. If vlog is not started yet, this
+     * call does nothing, so it does no harm to call it more than once.
      */
     public native void stop();
 
@@ -252,6 +285,11 @@ public class VLog {
                 }
             } else {
                 longTerms[i] = getConstantId(terms[i].getName());
+                if (longTerms[i] == -1) {
+                    // Non-existing ..., but make sure that VLog won't interpret
+                    // it as a variable.
+                    longTerms[i] = Long.MAX_VALUE;
+                }
             }
         }
         return longTerms;
