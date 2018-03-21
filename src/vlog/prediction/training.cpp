@@ -179,7 +179,6 @@ int foundSubsumingQuery(string& testQuery,
     EDBLayer& layer) {
 
     Dictionary dictVariables;
-    Literal testLiteral = p.parseLiteral(testQuery, dictVariables);
     for (auto qr: trainingQueriesAndResult) {
         // If the test query has occurred in the training, then return the result of that query
         if (testQuery == qr.first) {
@@ -192,15 +191,6 @@ int foundSubsumingQuery(string& testQuery,
             LOG(INFOL) << testQuery << " similar to " << qr.first;
             return qr.second;
         }
-        //Literal trainingLiteral = p.parseLiteral(qr.first, dictVariables);
-        //Substitution subs[SIZETUPLE];
-        //int nsubs = Literal::subsumes(subs, testLiteral, trainingLiteral);
-        //if (nsubs != -1) {
-        //    LOG(INFOL) << testQuery << " subsumes " << qr.first;
-            // return result of the test query
-            //LOG(INFOL) << "returning " << qr.second;
-        //    return qr.second;
-        //}
     }
     return -1;
 }
@@ -548,12 +538,13 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
 
     vector<Metrics> featuresVector;
     vector<int> decisionVector;
-    int i = 1;
     vector<string> strResults;
     vector<string> strFeatures;
     vector<string> strQsqrTime;
     vector<string> strMagicTime;
     ofstream logTrainingMagic("training-magic.log");
+    int nMagicQueries = 0;
+    int i = 1;
     for (auto q : trainingQueriesVector) {
         LOG(INFOL) << i++ << ") " << q;
         // Execute the literal query
@@ -576,30 +567,57 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         strFeatures.push_back(features);
         strQsqrTime.push_back(qsqrTime);
         strMagicTime.push_back(magicTime);
+        if (decisionVector.back() == 0) {
+            nMagicQueries++;
+        }
     }
 
-    normalize(featuresVector);
+    LOG(INFOL) << "# magic queries = " << nMagicQueries;
+    vector<Metrics> balancedFeaturesVector;
+    vector<int> balancedDecisionVector;
+    vector<string> balancedTrainingQueriesVector;
+    int nQsqrQueries = 0;
+    for (int i = 0; i < featuresVector.size(); ++i) {
+        if (decisionVector[i] == 1) {
+            if (nQsqrQueries < nMagicQueries) {
+                balancedFeaturesVector.push_back(featuresVector[i]);
+                balancedDecisionVector.push_back(decisionVector[i]);
+                balancedTrainingQueriesVector.push_back(trainingQueriesVector[i]);
+                nQsqrQueries++;
+            }
+        } else {
+            balancedFeaturesVector.push_back(featuresVector[i]);
+            balancedDecisionVector.push_back(decisionVector[i]);
+            balancedTrainingQueriesVector.push_back(trainingQueriesVector[i]);
+        }
+    }
+
+    if(balancedFeaturesVector.size() != (2 * nMagicQueries)) {
+        LOG(WARNL) << "More magic queries than QSQR!!";
+    }
+
+    normalize(balancedFeaturesVector);
 
     vector<pair<string, int>> trainingQueriesAndResult;
 
     int trainingQsqr = 0;
     int trainingMagic = 0;
     vector<Instance> dataset;
-    for (int i = 0; i < featuresVector.size(); ++i) {
+    for (int i = 0; i < balancedFeaturesVector.size(); ++i) {
         vector<double> features;
-        features.push_back(featuresVector[i].cost);
-        features.push_back(featuresVector[i].estimate);
-        features.push_back(featuresVector[i].countRules);
-        features.push_back(featuresVector[i].countUniqueRules);
-        features.push_back(featuresVector[i].countIntermediateQueries);
-        features.push_back(featuresVector[i].countIDBPredicates);
-        int label = decisionVector[i];
+        features.push_back(balancedFeaturesVector[i].cost);
+        features.push_back(balancedFeaturesVector[i].estimate);
+        features.push_back(balancedFeaturesVector[i].countRules);
+        features.push_back(balancedFeaturesVector[i].countUniqueRules);
+        features.push_back(balancedFeaturesVector[i].countIntermediateQueries);
+        features.push_back(balancedFeaturesVector[i].countIDBPredicates);
+        int label = balancedDecisionVector[i];
         if (label == 1) {
             trainingQsqr++;
         } else {
             trainingMagic++;
-            trainingQueriesAndResult.push_back(std::make_pair(trainingQueriesVector[i], label));
-            logTrainingMagic << trainingQueriesVector[i] << endl;
+            trainingQueriesAndResult.push_back(std::make_pair(balancedTrainingQueriesVector[i], label));
+            logTrainingMagic << balancedTrainingQueriesVector[i] << endl;
         }
         Instance instance(label, features);
         dataset.push_back(instance);
@@ -638,13 +656,13 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         if (probability > 0.5) {
             myDecision = 1;
         }
-        int result = -1;
-        if (myDecision != testDecisions[i]) {
-            result = foundSubsumingQuery(testQueries[i], trainingQueriesAndResult, p, edb);
-        }
-        if (result != -1) {
-            myDecision = result;
-        }
+        //int result = -1;
+        //if (myDecision != testDecisions[i]) {
+        //    result = foundSubsumingQuery(testQueries[i], trainingQueriesAndResult, p, edb);
+        //}
+        //if (result != -1) {
+        //    myDecision = result;
+        //}
 
         if (testDecisions[i] == 1) {
             totalQsqr++;
@@ -744,7 +762,9 @@ void Training::execLiteralQuery(string& literalquery,
         vector<int>& decisionVector) {
 
     Dictionary dictVariables;
+    LOG(INFOL) << "parsing query : " << literalquery;
     Literal literal = p.parseLiteral(literalquery, dictVariables);
+    LOG(INFOL) << "parse literal : " << literal.toprettystring(&p, &edb);
     Reasoner reasoner(1000000);
 
     Metrics metrics;
