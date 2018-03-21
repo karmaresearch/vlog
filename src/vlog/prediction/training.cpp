@@ -762,9 +762,7 @@ void Training::execLiteralQuery(string& literalquery,
         vector<int>& decisionVector) {
 
     Dictionary dictVariables;
-    LOG(INFOL) << "parsing query : " << literalquery;
     Literal literal = p.parseLiteral(literalquery, dictVariables);
-    LOG(INFOL) << "parse literal : " << literal.toprettystring(&p, &edb);
     Reasoner reasoner(1000000);
 
     Metrics metrics;
