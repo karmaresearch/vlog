@@ -811,6 +811,9 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
                             continue;
                         }
                         if (tuple[posTerm] == '\'') {
+                            // Index must be incremented here, because otherwise
+                            // we have to deal with this quote in next iteration
+                            posTerm++;
                             break;
                         }
                         posTerm++;
@@ -827,6 +830,9 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
                             continue;
                         }
                         if (tuple[posTerm] == '\"') {
+                            // Index must be incremented here, because otherwise
+                            // we have to deal with this quote in next iteration
+                            posTerm++;
                             break;
                         }
                         posTerm++;
