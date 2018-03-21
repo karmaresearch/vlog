@@ -86,7 +86,6 @@ IF (${sparsehash} STREQUAL "sparsehash-NOTFOUND")
 ENDIF()
 
 #LZ4
-# find_library(lz4 NAMES ${CMAKE_STATIC_LIBRARY_PREFIX}lz4${CMAKE_STATIC_LIBRARY_SUFFIX} lz4)
 find_library(lz4 lz4)
 find_path(lz4h lz4.h)
 IF (${lz4h} STREQUAL "lz4h-NOTFOUND")
@@ -184,7 +183,7 @@ set_target_properties(vlog PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}" OUTPUT_NA
 
 #standard include
 include_directories(include/)
-TARGET_LINK_LIBRARIES(vlog-core trident trident-sparql ${ZLIB_LIBRARIES} kognac)
+TARGET_LINK_LIBRARIES(vlog-core trident trident-sparql ${ZLIB_LIBRARIES} kognac lz4)
 
 if(JAVA)
     file(GLOB javaSRC "src/vlog/java/karmaresearch/vlog/*.java")
