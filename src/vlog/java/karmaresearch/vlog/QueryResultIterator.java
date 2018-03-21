@@ -1,46 +1,46 @@
 package karmaresearch.vlog;
 
-import java.util.Enumeration;
+import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
  * Encapsulates the result of a query.
  */
-public class QueryResultEnumeration implements Enumeration<long[]> {
+public class QueryResultIterator implements Iterator<long[]> {
 
     private final long handle;
     private boolean cleaned = false;
 
     /**
-     * Creates a query result enumeration. The parameter provided is a handle to
-     * a native underlying object. This constructor is to be called from native
+     * Creates a query result iterator. The parameter provided is a handle to a
+     * native underlying object. This constructor is to be called from native
      * code.
      *
      * @param handle
      *            the handle.
      */
-    public QueryResultEnumeration(long handle) {
+    public QueryResultIterator(long handle) {
         this.handle = handle;
     }
 
     /**
      * Returns whether there are more results to the query.
-     * 
+     *
      * @return whether there are more results.
      */
-    public boolean hasMoreElements() {
-        return hasMoreElements(handle);
+    public boolean hasNext() {
+        return hasNext(handle);
     }
 
     /**
      * Returns the next result.
-     * 
+     *
      * @return the next result
      * @exception NoSuchElementException
      *                is thrown when no more elements exist.
      */
-    public long[] nextElement() {
-        long[] v = nextElement(handle);
+    public long[] next() {
+        long[] v = next(handle);
         if (v == null) {
             throw new NoSuchElementException("No more query results");
         }
@@ -65,7 +65,7 @@ public class QueryResultEnumeration implements Enumeration<long[]> {
 
     private native void cleanup(long handle);
 
-    private native boolean hasMoreElements(long handle);
+    private native boolean hasNext(long handle);
 
-    private native long[] nextElement(long handle);
+    private native long[] next(long handle);
 };

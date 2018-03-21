@@ -1,15 +1,15 @@
 package karmaresearch.vlog;
 
-import java.util.Enumeration;
+import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
  * Encapsulates the result of a query.
  */
-public class StringQueryResultEnumeration implements Enumeration<String[]> {
+public class StringQueryResultIterator implements Iterator<String[]> {
 
     private final VLog vlog;
-    private final QueryResultEnumeration iter;
+    private final QueryResultIterator iter;
 
     /**
      * Creates a query result enumeration with the results as strings.
@@ -19,8 +19,7 @@ public class StringQueryResultEnumeration implements Enumeration<String[]> {
      * @param iter
      *            the underlying vlog result enumeration.
      */
-    public StringQueryResultEnumeration(VLog vlog,
-            QueryResultEnumeration iter) {
+    public StringQueryResultIterator(VLog vlog, QueryResultIterator iter) {
         this.vlog = vlog;
         this.iter = iter;
     }
@@ -30,8 +29,8 @@ public class StringQueryResultEnumeration implements Enumeration<String[]> {
      *
      * @return whether there are more results.
      */
-    public boolean hasMoreElements() {
-        return iter.hasMoreElements();
+    public boolean hasNext() {
+        return iter.hasNext();
     }
 
     /**
@@ -41,8 +40,8 @@ public class StringQueryResultEnumeration implements Enumeration<String[]> {
      * @exception NoSuchElementException
      *                is thrown when no more elements exist.
      */
-    public String[] nextElement() {
-        long[] v = iter.nextElement();
+    public String[] next() {
+        long[] v = iter.next();
         String[] result = new String[v.length];
         for (int i = 0; i < v.length; i++) {
             try {

@@ -1,37 +1,16 @@
 #include <vlog/inmemory/inmemorytable.h>
 #include <vlog/fcinttable.h>
+#include <vlog/support.h>
 
 #include <kognac/utils.h>
 
-InmemoryDict singletonDict;
+Dictionary singletonDict;
 
 void dump() {
     ofstream ofs;
     ofs.open("dict", ofstream::out | ofstream::trunc);
-    for (uint64_t i = 1; i <= singletonDict.getNTerms(); i++) {
-	ofs << i << "\t" << singletonDict.get(i) << "\n";
-    }
+    ofs << singletonDict.tostring() << "\n";
     ofs.close();
-}
-
-bool InmemoryDict::getID(const char *text, uint64_t sizetext, uint64_t &id) {
-    string v = string(text, sizetext);
-    if (invdict.count(v)) {
-        id = invdict[v];
-        return true;
-    } else {
-        return false;
-    }
-}
-
-bool InmemoryDict::getText(uint64_t id, char *text) {
-    if (dict.count(id)) {
-        auto &str = dict[id];
-        strcpy(text, str.c_str());
-        return true;
-    } else {
-        return false;
-    }
 }
 
 std::vector<std::string> readRow(istream &ifs) {
@@ -534,15 +513,26 @@ size_t InmemoryTable::estimateCardinality(const Literal &query) {
 
 bool InmemoryTable::getDictNumber(const char *text, const size_t sizeText,
         uint64_t &id) {
-    return singletonDict.getID(text, sizeText, id);
+    std::string s(text, sizeText);
+    int64_t v = singletonDict.get(s);
+    if (v < 0) {
+	return false;
+    }
+    id = v;
+    return true;
 }
 
 bool InmemoryTable::getDictText(const uint64_t id, char *text) {
-    return singletonDict.getText(id, text);
+    std::string s = singletonDict.getRawValue(id);
+    if (s == "") {
+	return false;
+    }
+    strcpy(text, s.c_str());
+    return true;
 }
 
 uint64_t InmemoryTable::getNTerms() {
-    return singletonDict.getNTerms();
+    return singletonDict.size();
 }
 
 uint8_t InmemoryTable::getArity() const {

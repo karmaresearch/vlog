@@ -114,16 +114,16 @@ class Test {
         vlog.start("", false);
         vlog.addData("A", new String[][] { { "a" } });
         vlog.addData("A", new String[][] { { "a" }, { "b" } });
-        StringQueryResultEnumeration e = vlog.query(new Atom("A",
+        StringQueryResultIterator e = vlog.query(new Atom("A",
                 new Term[] { new Term(Term.TermType.CONSTANT, "C") }));
-        if (e.hasMoreElements()) {
+        if (e.hasNext()) {
             throw new Error("Error in query");
         }
         e.cleanup();
         e = vlog.query(new Atom("A",
                 new Term[] { new Term(Term.TermType.VARIABLE, "C") }));
-        while (e.hasMoreElements()) {
-            String[] result = e.nextElement();
+        while (e.hasNext()) {
+            String[] result = e.next();
             System.out.println("result: " + Arrays.toString(result));
         }
         e.cleanup();
@@ -140,7 +140,7 @@ class Test {
         vlog.materialize(false);
         e = vlog.query(new Atom("B",
                 new Term[] { new Term(Term.TermType.CONSTANT, "C") }));
-        if (e.hasMoreElements()) {
+        if (e.hasNext()) {
             throw new Error("Error in query");
         }
         e.cleanup();
@@ -161,9 +161,9 @@ class Test {
         q.add(new Term(TermType.VARIABLE, "?C1"));
         Atom query = new Atom("prescription", q.toArray(new Term[q.size()]));
 
-        StringQueryResultEnumeration result = vlog.query(query);
-        while (result.hasMoreElements()) {
-            String[] r = result.nextElement();
+        StringQueryResultIterator result = vlog.query(query);
+        while (result.hasNext()) {
+            String[] r = result.next();
             for (String s : r) {
                 System.out.print(s + " ");
             }
@@ -183,8 +183,8 @@ class Test {
                 RuleRewriteStrategy.AGGRESSIVE);
         vlog.materialize(false);
         result = vlog.query(query);
-        while (result.hasMoreElements()) {
-            String[] r = result.nextElement();
+        while (result.hasNext()) {
+            String[] r = result.next();
             for (String s : r) {
                 System.out.print(s + " ");
             }

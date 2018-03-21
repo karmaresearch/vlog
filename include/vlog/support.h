@@ -41,6 +41,14 @@ public:
         return map;
     }
 
+    int64_t get(const std::string &rawValue) {
+        SimpleHashmap::iterator itr = map.find(rawValue);
+        if (itr == map.end()) {
+	    return -1;
+	}
+	return itr->second;
+    }
+
     Term_t getOrAdd(const std::string &rawValue) {
         SimpleHashmap::iterator itr = map.find(rawValue);
         if (itr == map.end()) {

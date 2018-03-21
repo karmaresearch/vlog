@@ -6,54 +6,6 @@
 #include <vlog/edbiterator.h>
 #include <vlog/segment.h>
 
-class InmemoryDict {
-    private:
-	std::unordered_map<uint64_t, string> dict;
-        std::unordered_map<string, uint64_t> invdict;
-        // bool isloaded;
-	uint64_t nextNum;
-
-    public:
-        InmemoryDict() : /* isloaded(false), */ nextNum(1) {
-        }
-
-//        bool isDictLoaded() {
-//            return isloaded;
-//        }
-//
-//        void add(uint64_t id, string value) {
-//            dict.insert(make_pair(id, value));
-//            invdict.insert(make_pair(value, id));
-//        }
-//
-        uint64_t getOrAdd(string value) {
-	    if (invdict.count(value)) {
-		return invdict[value];
-	    }
-	    uint64_t id = nextNum++;
-            dict.insert(make_pair(id, value));
-            invdict.insert(make_pair(value, id));
-	    return id;
-        }
-
-	string get(uint64_t v) {
-	    if (dict.count(v)) {
-		return dict[v];
-	    }
-	    return "";
-	}
-
-        bool getText(uint64_t id, char *text);
-
-        bool getID(const char *text, uint64_t sizetext, uint64_t &id);
-
-        uint64_t getNTerms() {
-            return dict.size();
-        }
-
-//        void load(string pathfile);
-};
-
 class InmemoryIterator : public EDBIterator {
     private:
         std::shared_ptr<const Segment> segment;
