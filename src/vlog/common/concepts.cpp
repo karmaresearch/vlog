@@ -830,6 +830,7 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
                         continue;
                     }
                     if (tuple[posTerm] == '\"') {
+                        posTerm++;
                         break;
                     }
                     posTerm++;
