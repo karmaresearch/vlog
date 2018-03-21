@@ -933,6 +933,10 @@ bool TridentTable::getDictText(const uint64_t id, char *text) {
     return dict->getText(id, text);
 }
 
+bool TridentTable::getDictText(const uint64_t id, std::string &text) {
+    return dict->getText(id, text);
+}
+
 uint64_t TridentTable::getNTerms() {
     return kb->getNTerms();
 }

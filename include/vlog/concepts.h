@@ -396,7 +396,7 @@ class Rule {
 
 class Program {
     private:
-        const uint64_t assignedIds;
+        //const uint64_t assignedIds;
         EDBLayer *kb;
         std::vector<uint32_t> rules[MAX_NPREDS];
         std::vector<Rule> allrules;
@@ -404,7 +404,8 @@ class Program {
         Dictionary dictPredicates;
         std::unordered_map<PredId_t, uint8_t> cardPredicates;
 
-        Dictionary additionalConstants;
+        //Move them to the EDB layer ...
+        //Dictionary additionalConstants;
 
         void parseRule(std::string rule, bool rewriteMultihead);
 
@@ -413,12 +414,11 @@ class Program {
         std::string rewriteRDFOWLConstants(std::string input);
 
     public:
-        VLIBEXP Program(const uint64_t assignedIds,
-                EDBLayer *kb);
+        VLIBEXP Program(EDBLayer *kb);
 
-	EDBLayer *getKB() {
-	    return kb;
-	}
+        EDBLayer *getKB() {
+            return kb;
+        }
 
         VLIBEXP Literal parseLiteral(std::string literal, Dictionary &dictVariables);
 
@@ -436,7 +436,7 @@ class Program {
 
         VLIBEXP Predicate getPredicate(const PredId_t id);
 
-		VLIBEXP int64_t getOrAddPredicate(std::string &p, uint8_t cardinality);
+        VLIBEXP int64_t getOrAddPredicate(std::string &p, uint8_t cardinality);
 
         std::vector<Rule> getAllRulesByPredicate(PredId_t predid) const;
 
@@ -446,13 +446,13 @@ class Program {
 
         const Rule &getRule(uint32_t ruleid) const;
 
-        std::string getFromAdditional(Term_t val) {
-            return additionalConstants.getRawValue(val);
-        }
+        /*std::string getFromAdditional(Term_t val) {
+          return additionalConstants.getRawValue(val);
+          }
 
-		uint64_t getOrAddToAdditional(std::string term) {
-			return additionalConstants.getOrAdd(term);
-		}
+          uint64_t getOrAddToAdditional(std::string term) {
+          return additionalConstants.getOrAdd(term);
+          }*/
 
         VLIBEXP void sortRulesByIDBPredicates();
 
@@ -468,7 +468,8 @@ class Program {
 
         VLIBEXP void addRule(Rule &rule, bool rewriteMultihead = false);
 
-        VLIBEXP void addRule(std::vector<Literal> heads, std::vector<Literal> body, bool rewriteMultihead = false);
+        VLIBEXP void addRule(std::vector<Literal> heads,
+                std::vector<Literal> body, bool rewriteMultihead = false);
 
         void addAllRules(std::vector<Rule> &rules);
 

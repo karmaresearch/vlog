@@ -29,7 +29,7 @@ void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithread
         LOG(ERRORL) << "The KB at " << kbpath << " does not exist. Check the edb.conf file.";
         throw 10;
     }
-    infot.id = (PredId_t) predDictionary.getOrAdd(pn);
+    infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.arity = 3;
     infot.type = tableConf.type;
     infot.manager = std::shared_ptr<EDBTable>(new TridentTable(kbpath, multithreaded));
@@ -95,7 +95,7 @@ void EDBLayer::addMDLiteTable(const EDBConf::Table &tableConf) {
 void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
     const string pn = tableConf.predname;
-    infot.id = (PredId_t) predDictionary.getOrAdd(pn);
+    infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.type = tableConf.type;
     InmemoryTable *table = new InmemoryTable(tableConf.params[0],
             tableConf.params[1], infot.id);
@@ -106,10 +106,10 @@ void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
 
 void EDBLayer::addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows) {
     EDBInfoTable infot;
-    infot.id = (PredId_t) predDictionary.getOrAdd(predicate);
+    infot.id = (PredId_t) predDictionary->getOrAdd(predicate);
     if (doesPredExists(infot.id)) {
-	LOG(WARNL) << "Rewriting table for predicate " << predicate;
-	dbPredicates.erase(infot.id);
+        LOG(WARNL) << "Rewriting table for predicate " << predicate;
+        dbPredicates.erase(infot.id);
     }
     infot.type = "INMEMORY";
     InmemoryTable *table = new InmemoryTable(infot.id, rows);
@@ -129,20 +129,11 @@ void EDBLayer::query(QSQQuery *query, TupleTable *outputTable,
 
 
     if (dbPredicates.count(predid)) {
-        // LOG(DEBUGL) << "EDB: go into manager, posToFilter size = " << (posToFilter == NULL ? 0 : posToFilter->size())
-        //     << ", valuesToFilter size = " << (valuesToFilter == NULL ? 0 : valuesToFilter->size());
         auto el = dbPredicates.find(predid);
         el->second.manager->query(query, outputTable, posToFilter, valuesToFilter);
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
         uint8_t size = rel->getSizeTuple();
-
-        /*
-           LOG(DEBUGL) << "Query = " << query->tostring();
-           if (posToFilter != NULL) {
-           LOG(DEBUGL) << "posToFilter.size() = " << posToFilter->size();
-           }
-           */
         switch (size) {
             case 1: {
                         uint64_t row[1];
@@ -354,7 +345,6 @@ void EDBLayer::query(QSQQuery *query, TupleTable *outputTable,
                     throw 10;
         }
     }
-    // LOG(DEBUGL) << "result size = " << outputTable->getNRows();
 }
 
 EDBIterator *EDBLayer::getIterator(const Literal &query) {
@@ -377,7 +367,6 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
         if (c2)
             vc2 = literal->getTermAtPos(1).getValue();
 
-        // LOG(DEBUGL) << "getIterator, equalFields = " << equalFields << ", c1 = " << c1 << ", c2 = " << c2 << ", size = " << size;
         EDBMemIterator *itr;
         switch (size) {
             case 1:
@@ -417,10 +406,6 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
 
         IndexedTupleTable *rel = tmpRelations[predid];
         uint8_t size = rel->getSizeTuple();
-        // LOG(DEBUGL) << "getSortedIterator, equalFields = " << equalFields << ", c1 = " << c1 << ", c2 = " << c2 << ", size = " << (int) size << ", fields.size() = " << fields.size();
-        for (int i = 0; i < fields.size(); i++) {
-            // LOG(DEBUGL) << "fields[" << i << "] = " << (int) fields[i];
-        }
         EDBMemIterator *itr;
         switch (size) {
             case 1:
@@ -521,9 +506,6 @@ size_t EDBLayer::estimateCardinality(const Literal &query) {
         auto p = dbPredicates.find(predid);
         return p->second.manager->estimateCardinality(query);
     } else {
-        // if (literal->getNVars() != literal->getTupleSize()) {
-        //     LOG(DEBUGL) << "Estimate is not very precise";
-        // }
         IndexedTupleTable *rel = tmpRelations[predid];
         return rel->getNTuples();
     }
@@ -539,13 +521,6 @@ bool EDBLayer::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
         assert(literal->getTupleSize() <= 2);
-        /*
-           if (posToFilter != NULL) {
-           LOG(DEBUGL) << "isEmpty literal = " << literal->tostring()
-           << ", posToFilter->size() = " << posToFilter->size()
-           << ", valuesToFilter->size() = " << valuesToFilter->size();
-           }
-           */
 
         std::unique_ptr<Literal> rewrittenLiteral;
         if (posToFilter != NULL) {
@@ -634,7 +609,7 @@ void EDBLayer::releaseIterator(EDBIterator * itr) {
     }
 }
 
-std::vector<std::shared_ptr<Column>>  EDBLayer::checkNewIn(
+std::vector<std::shared_ptr<Column>> EDBLayer::checkNewIn(
         std::vector <
         std::shared_ptr<Column >> &valuesToCheck,
         const Literal &l,
@@ -654,109 +629,109 @@ static std::vector<std::shared_ptr<Column>> checkNewInGeneric(const Literal &l1,
     std::vector<uint8_t> posVars1 = l1.getPosVars();
     std::vector<uint8_t> fieldsToSort1;
     for (int i = 0; i < posInL1.size(); i++) {
-	fieldsToSort1.push_back(posVars1[posInL1[i]]);
+        fieldsToSort1.push_back(posVars1[posInL1[i]]);
     }
     std::vector<uint8_t> posVars2 = l2.getPosVars();
     std::vector<uint8_t> fieldsToSort2;
     std::vector<uint64_t> savedVal;
     for (int i = 0; i < posInL2.size(); i++) {
-	fieldsToSort2.push_back(posVars2[posInL2[i]]);
+        fieldsToSort2.push_back(posVars2[posInL2[i]]);
     }
     EDBIterator *itr1 = p->getSortedIterator(l1, fieldsToSort1);
     EDBIterator *itr2 = p2->getSortedIterator(l2, fieldsToSort2);
 
     std::vector<std::shared_ptr<ColumnWriter>> cols;
     for (int i = 0; i < fieldsToSort1.size(); i++) {
-	cols.push_back(std::shared_ptr<ColumnWriter>(new ColumnWriter()));
+        cols.push_back(std::shared_ptr<ColumnWriter>(new ColumnWriter()));
     }
 
     bool more = false;
     if (itr1->hasNext() && itr2->hasNext()) {
-	itr1->next();
-	itr2->next();
-	while (true) {
-	    bool equal = true;
-	    bool lt = false;
-	    for (int i = 0; i < fieldsToSort1.size(); i++) {
-		if (itr1->getElementAt(fieldsToSort1[i]) != itr2->getElementAt(fieldsToSort2[i])) {
-		    equal = false;
-		    lt = itr1->getElementAt(fieldsToSort1[i]) < itr2->getElementAt(fieldsToSort2[i]);
-		    break;
-		}
-	    }
-	    if (equal) {
-		if (itr1->hasNext()) {
-		    itr1->next();
-		} else {
-		    break;
-		}
-	    } else if (lt) {
-		if (savedVal.size() == 0) {
-		    for (int i = 0; i < fieldsToSort1.size(); i++) {
-			savedVal.push_back(itr1->getElementAt(fieldsToSort1[i]));
-			cols[i]->add(savedVal[i]);
-		    }
-		} else {
-		    bool present = true;
-		    for (int i = 0; i < fieldsToSort1.size(); i++) {
-			if (savedVal[i] != itr1->getElementAt(fieldsToSort1[i])) {
-			    present = false;
-			    savedVal[i] = itr1->getElementAt(fieldsToSort1[i]);
-			}
-		    }
-		    if (! present) {
-			for (int i = 0; i < fieldsToSort1.size(); i++) {
-			    cols[i]->add(savedVal[i]);
-			}
-		    }
-		}
-		if (itr1->hasNext()) {
-		    itr1->next();
-		} else {
-		    break;
-		}
-	    } else {
-		if (itr2->hasNext()) {
-		    itr2->next();
-		} else {
-		    more = true;
-		    break;
-		}
-	    }
-	}
+        itr1->next();
+        itr2->next();
+        while (true) {
+            bool equal = true;
+            bool lt = false;
+            for (int i = 0; i < fieldsToSort1.size(); i++) {
+                if (itr1->getElementAt(fieldsToSort1[i]) != itr2->getElementAt(fieldsToSort2[i])) {
+                    equal = false;
+                    lt = itr1->getElementAt(fieldsToSort1[i]) < itr2->getElementAt(fieldsToSort2[i]);
+                    break;
+                }
+            }
+            if (equal) {
+                if (itr1->hasNext()) {
+                    itr1->next();
+                } else {
+                    break;
+                }
+            } else if (lt) {
+                if (savedVal.size() == 0) {
+                    for (int i = 0; i < fieldsToSort1.size(); i++) {
+                        savedVal.push_back(itr1->getElementAt(fieldsToSort1[i]));
+                        cols[i]->add(savedVal[i]);
+                    }
+                } else {
+                    bool present = true;
+                    for (int i = 0; i < fieldsToSort1.size(); i++) {
+                        if (savedVal[i] != itr1->getElementAt(fieldsToSort1[i])) {
+                            present = false;
+                            savedVal[i] = itr1->getElementAt(fieldsToSort1[i]);
+                        }
+                    }
+                    if (! present) {
+                        for (int i = 0; i < fieldsToSort1.size(); i++) {
+                            cols[i]->add(savedVal[i]);
+                        }
+                    }
+                }
+                if (itr1->hasNext()) {
+                    itr1->next();
+                } else {
+                    break;
+                }
+            } else {
+                if (itr2->hasNext()) {
+                    itr2->next();
+                } else {
+                    more = true;
+                    break;
+                }
+            }
+        }
     } else {
-	more = itr1->hasNext();
+        more = itr1->hasNext();
     }
 
     while (more) {
-	if (savedVal.size() == 0) {
-	    for (int i = 0; i < fieldsToSort1.size(); i++) {
-		savedVal.push_back(itr1->getElementAt(fieldsToSort1[i]));
-		cols[i]->add(savedVal[i]);
-	    }
-	} else {
-	    bool present = true;
-	    for (int i = 0; i < fieldsToSort1.size(); i++) {
-		if (savedVal[i] != itr1->getElementAt(fieldsToSort1[i])) {
-		    present = false;
-		    savedVal[i] = itr1->getElementAt(fieldsToSort1[i]);
-		}
-	    }
-	    if (! present) {
-		for (int i = 0; i < fieldsToSort1.size(); i++) {
-		    cols[i]->add(savedVal[i]);
-		}
-	    }
-	}
-	more = itr1->hasNext();
-	if (more) {
-	    itr1->next();
-	}
+        if (savedVal.size() == 0) {
+            for (int i = 0; i < fieldsToSort1.size(); i++) {
+                savedVal.push_back(itr1->getElementAt(fieldsToSort1[i]));
+                cols[i]->add(savedVal[i]);
+            }
+        } else {
+            bool present = true;
+            for (int i = 0; i < fieldsToSort1.size(); i++) {
+                if (savedVal[i] != itr1->getElementAt(fieldsToSort1[i])) {
+                    present = false;
+                    savedVal[i] = itr1->getElementAt(fieldsToSort1[i]);
+                }
+            }
+            if (! present) {
+                for (int i = 0; i < fieldsToSort1.size(); i++) {
+                    cols[i]->add(savedVal[i]);
+                }
+            }
+        }
+        more = itr1->hasNext();
+        if (more) {
+            itr1->next();
+        }
     }
 
     std::vector<std::shared_ptr<Column>> output;
     for (auto &writer : cols) {
-	output.push_back(writer->getColumn());
+        output.push_back(writer->getColumn());
     }
 
     itr1->clear();
@@ -780,8 +755,8 @@ std::vector<std::shared_ptr<Column>> EDBLayer::checkNewIn(const Literal &l1,
     auto p2 = dbPredicates.find(l2.getPredicate().getId());
 
     if (p->second.manager != p2->second.manager) {
-	// We have to do it ourselves.
-	return checkNewInGeneric(l1, posInL1, l2, posInL2, p->second.manager.get(), p2->second.manager.get());
+        // We have to do it ourselves.
+        return checkNewInGeneric(l1, posInL1, l2, posInL2, p->second.manager.get(), p2->second.manager.get());
     }
 
     return p->second.manager->checkNewIn(l1, posInL1, l2, posInL2);
@@ -806,28 +781,74 @@ std::shared_ptr<Column> EDBLayer::checkIn(
 }
 
 bool EDBLayer::getDictNumber(const char *text, const size_t sizeText, uint64_t &id) {
+    bool resp = false;
     if (dbPredicates.size() > 0) {
-        //Get the number from the first edb table
-        return dbPredicates.begin()->second.manager->
+        resp = dbPredicates.begin()->second.manager->
             getDictNumber(text, sizeText, id);
     }
-    return false;
+    if (!resp && termsDictionary.get()) {
+        std::string t(text, sizeText);
+        resp = termsDictionary->get(t, id);
+    }
+    return resp;
+}
+
+bool EDBLayer::getOrAddDictNumber(const char *text, const size_t sizeText,
+        uint64_t &id) {
+    bool resp = false;
+    if (dbPredicates.size() > 0) {
+        resp = dbPredicates.begin()->second.manager->
+            getDictNumber(text, sizeText, id);
+    }
+    if (!resp) {
+        if (!termsDictionary.get()) {
+            LOG(DEBUGL) << "The additional terms will start from " << getNTerms();
+            termsDictionary = std::unique_ptr<Dictionary>(
+                    new Dictionary(getNTerms()));
+        }
+        std::string t(text, sizeText);
+        id = termsDictionary->getOrAdd(t);
+        resp = true;
+    }
+    return resp;
 }
 
 bool EDBLayer::getDictText(const uint64_t id, char *text) {
+    bool resp = false;
     if (dbPredicates.size() > 0) {
-        //Get the number from the first edb table
-        return dbPredicates.begin()->second.manager->getDictText(id, text);
+        resp = dbPredicates.begin()->second.manager->getDictText(id, text);
     }
-    return false;
+    if (!resp && termsDictionary.get()) {
+        std::string t = termsDictionary->getRawValue(id);
+        if (t != "") {
+            memcpy(text, t.c_str(), t.size());
+            return true;
+        }
+    }
+    return resp;
+}
+
+std::string EDBLayer::getDictText(const uint64_t id) {
+    std::string t = "";
+    bool resp = false;
+    if (dbPredicates.size() > 0) {
+        resp = dbPredicates.begin()->second.manager->getDictText(id, t);
+    }
+    if (!resp && termsDictionary.get()) {
+        t = termsDictionary->getRawValue(id);
+    }
+    return t;
 }
 
 uint64_t EDBLayer::getNTerms() {
+    uint64_t size = 0;
     if (dbPredicates.size() > 0) {
-        //Get the number from the first edb table
-        return dbPredicates.begin()->second.manager->getNTerms();
+        size = dbPredicates.begin()->second.manager->getNTerms();
     }
-    return 0;
+    if (termsDictionary.get()) {
+        size += termsDictionary->size();
+    }
+    return size;
 }
 
 Predicate EDBLayer::getDBPredicate(int idPredicate) {
@@ -862,7 +883,7 @@ string EDBLayer::getPredType(PredId_t id) {
 
 string EDBLayer::getPredName(PredId_t id) {
     if (dbPredicates.count(id)) {
-        return predDictionary.getRawValue(id);
+        return predDictionary->getRawValue(id);
     }
     return 0;
 }
@@ -1053,24 +1074,24 @@ Term_t EDBMemIterator::getElementAt(const uint8_t p) {
 }
 
 std::vector<std::shared_ptr<Column>> EDBTable::checkNewIn(const Literal &l1,
-                                  std::vector<uint8_t> &posInL1,
-                                  const Literal &l2,
-std::vector<uint8_t> &posInL2) {
+        std::vector<uint8_t> &posInL1,
+        const Literal &l2,
+        std::vector<uint8_t> &posInL2) {
     return checkNewInGeneric(l1, posInL1, l2, posInL2, this, this);
 }
 
 std::vector<std::shared_ptr<Column>> EDBTable::checkNewIn(
-                                      std::vector <
-                                      std::shared_ptr<Column >> &checkValues,
-                                      const Literal &l,
-std::vector<uint8_t> &posInL) {
+        std::vector <
+        std::shared_ptr<Column >> &checkValues,
+        const Literal &l,
+        std::vector<uint8_t> &posInL) {
 
     LOG(DEBUGL) << "checkNewIn version 2";
 
     std::vector<uint8_t> posVars = l.getPosVars();
     std::vector<uint8_t> fieldsToSort;
     for (int i = 0; i < posInL.size(); i++) {
-	fieldsToSort.push_back(posVars[posInL[i]]);
+        fieldsToSort.push_back(posVars[posInL[i]]);
     }
 
     EDBIterator *iter = getSortedIterator(l, fieldsToSort);
@@ -1079,14 +1100,14 @@ std::vector<uint8_t> &posInL) {
 
     std::vector<std::shared_ptr<ColumnWriter>> cols;
     for (int i = 0; i < fieldsToSort.size(); i++) {
-	cols.push_back(std::shared_ptr<ColumnWriter>(new ColumnWriter()));
+        cols.push_back(std::shared_ptr<ColumnWriter>(new ColumnWriter()));
     }
 
     std::vector<std::unique_ptr<ColumnReader>> valuesToChReader;
 
     for (int i = 0; i < checkValues.size(); i++) {
-	std::shared_ptr<Column> valuesToCh = checkValues[i];
-	valuesToChReader.push_back(valuesToCh->getReader());
+        std::shared_ptr<Column> valuesToCh = checkValues[i];
+        valuesToChReader.push_back(valuesToCh->getReader());
     }
 
     std::vector<Term_t> prevcv;
@@ -1094,45 +1115,45 @@ std::vector<uint8_t> &posInL) {
     std::vector<Term_t> vi;
 
     for (int i = 0; i < sz; i++) {
-	prevcv.push_back((Term_t) -1);
-	cv.push_back((Term_t) -1);
-	vi.push_back((Term_t) -1);
+        prevcv.push_back((Term_t) -1);
+        cv.push_back((Term_t) -1);
+        vi.push_back((Term_t) -1);
     }
 
     if (iter->hasNext()) {
-	iter->next();
-	for (int i = 0; i < sz; i++) {
-	    if (! valuesToChReader[i]->hasNext()) {
-		throw 10;
-	    }
-	    cv[i] = valuesToChReader[i]->next();
-	}
+        iter->next();
+        for (int i = 0; i < sz; i++) {
+            if (! valuesToChReader[i]->hasNext()) {
+                throw 10;
+            }
+            cv[i] = valuesToChReader[i]->next();
+        }
 
-	bool equal;
+        bool equal;
 
-	while (true) {
-	    for (int i = 0; i < sz; i++) {
-		vi[i] = iter->getElementAt(fieldsToSort[i]);
-	    }
-	    equal = true;
-	    bool lt = false;
-	    for (int i = 0; i < sz; i++) {
-		if (vi[i] == cv[i]) {
-		} else {
-		    if (vi[i] < cv[i]) {
-			lt = true;
-		    }
-		    equal = false;
-		    break;
-		}
-	    }
-	    if (equal) {
-		for (int i = 0; i < sz; i++) {
-		    prevcv[i] = cv[i];
-		}
-		if (iter->hasNext()) {
-		    iter->next();
-		    for (int i = 0; i < sz; i++) {
+        while (true) {
+            for (int i = 0; i < sz; i++) {
+                vi[i] = iter->getElementAt(fieldsToSort[i]);
+            }
+            equal = true;
+            bool lt = false;
+            for (int i = 0; i < sz; i++) {
+                if (vi[i] == cv[i]) {
+                } else {
+                    if (vi[i] < cv[i]) {
+                        lt = true;
+                    }
+                    equal = false;
+                    break;
+                }
+            }
+            if (equal) {
+                for (int i = 0; i < sz; i++) {
+                    prevcv[i] = cv[i];
+                }
+                if (iter->hasNext()) {
+                    iter->next();
+                    for (int i = 0; i < sz; i++) {
                         if (!valuesToChReader[i]->hasNext()) {
                             cv[0] = (Term_t) - 1;
                             break;
@@ -1140,69 +1161,69 @@ std::vector<uint8_t> &posInL) {
                             cv[i] = valuesToChReader[i]->next();
                         }
                     }
-		    if (cv[0] == (Term_t) -1) {
-			break;
-		    }
-		} else {
-		    break;
-		}
-	    } else if (lt) {
-		if (iter->hasNext()) {
-		    iter->next();
-		} else {
-		    break;
-		}
-	    } else {
-		equal = true;
-		for (int i = 0; i < sz; i++) {
-		    if (cv[i] != prevcv[i]) {
-			equal = false;
-			break;
-		    }
-		}
-		if (! equal) {
-		    for (int i = 0; i < sz; i++) {
-			cols[i]->add(cv[i]);
+                    if (cv[0] == (Term_t) -1) {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            } else if (lt) {
+                if (iter->hasNext()) {
+                    iter->next();
+                } else {
+                    break;
+                }
+            } else {
+                equal = true;
+                for (int i = 0; i < sz; i++) {
+                    if (cv[i] != prevcv[i]) {
+                        equal = false;
+                        break;
+                    }
+                }
+                if (! equal) {
+                    for (int i = 0; i < sz; i++) {
+                        cols[i]->add(cv[i]);
                         prevcv[i] = cv[i];
                     }
-		}
-		for (int i = 0; i < sz; i++) {
-		    if (!valuesToChReader[i]->hasNext()) {
-			cv[0] = (Term_t) - 1;
-			break;
-		    } else {
-			cv[i] = valuesToChReader[i]->next();
-		    }
-		}
-		if (cv[0] == (Term_t) -1) {
-		    break;
-		}
+                }
+                for (int i = 0; i < sz; i++) {
+                    if (!valuesToChReader[i]->hasNext()) {
+                        cv[0] = (Term_t) - 1;
+                        break;
+                    } else {
+                        cv[i] = valuesToChReader[i]->next();
+                    }
+                }
+                if (cv[0] == (Term_t) -1) {
+                    break;
+                }
             }
         }
 
         while (cv[0] != (Term_t) - 1) {
-	    equal = true;
-	    for (int i = 0; i < sz; i++) {
-		if (cv[i] != prevcv[i]) {
-		    equal = false;
-		    break;
-		}
-	    }
-	    if (! equal) {
-		for (int i = 0; i < sz; i++) {
-		    cols[i]->add(cv[i]);
-		    prevcv[i] = cv[i];
-		}
-	    }
-	    for (int i = 0; i < sz; i++) {
-		if (!valuesToChReader[i]->hasNext()) {
-		    cv[0] = (Term_t) - 1;
-		    break;
-		} else {
-		    cv[i] = valuesToChReader[i]->next();
-		}
-	    }
-	}
+            equal = true;
+            for (int i = 0; i < sz; i++) {
+                if (cv[i] != prevcv[i]) {
+                    equal = false;
+                    break;
+                }
+            }
+            if (! equal) {
+                for (int i = 0; i < sz; i++) {
+                    cols[i]->add(cv[i]);
+                    prevcv[i] = cv[i];
+                }
+            }
+            for (int i = 0; i < sz; i++) {
+                if (!valuesToChReader[i]->hasNext()) {
+                    cv[0] = (Term_t) - 1;
+                    break;
+                } else {
+                    cv[i] = valuesToChReader[i]->next();
+                }
+            }
+        }
     }
 
     std::vector<std::shared_ptr<Column>> output;
@@ -1214,15 +1235,15 @@ std::vector<uint8_t> &posInL) {
 }
 
 std::shared_ptr<Column> EDBTable::checkIn(
-    std::vector<Term_t> &values,
-    const Literal &l,
-    uint8_t posInL,
-    size_t &sizeOutput) {
+        std::vector<Term_t> &values,
+        const Literal &l,
+        uint8_t posInL,
+        size_t &sizeOutput) {
 
-//    if (l.getNVars() == 0 || l.getNVars() == l.getTupleSize()) {
-//	LOG(ERRORL) << "EDBTable::checkIn() with getNVars() == " << l.getNVars() << " is not supported.";
-//	throw 10;
-//    }
+    //    if (l.getNVars() == 0 || l.getNVars() == l.getTupleSize()) {
+    //  LOG(ERRORL) << "EDBTable::checkIn() with getNVars() == " << l.getNVars() << " is not supported.";
+    //  throw 10;
+    //    }
 
     LOG(DEBUGL) << "EDBTable::checkIn";
     std::vector<uint8_t> posVars = l.getPosVars();
@@ -1236,25 +1257,25 @@ std::shared_ptr<Column> EDBTable::checkIn(
     const uint8_t varIndex = posVars[posInL];
     sizeOutput = 0;
     while (iter->hasNext()) {
-	iter->next();
-	const Term_t v2 = iter->getElementAt(varIndex);
-	while (values[idx1] < v2) {
-	    idx1++;
-	    if (idx1 == values.size()) {
-		break;
-	    }
-	}
-	if (idx1 == values.size()) {
-	    break;
-	}
-	if (values[idx1] == v2) {
-	    col->add(v2);
-	    sizeOutput++;
-	    idx1++;
-	    if (idx1 == values.size()) {
-		break;
-	    }
-	}
+        iter->next();
+        const Term_t v2 = iter->getElementAt(varIndex);
+        while (values[idx1] < v2) {
+            idx1++;
+            if (idx1 == values.size()) {
+                break;
+            }
+        }
+        if (idx1 == values.size()) {
+            break;
+        }
+        if (values[idx1] == v2) {
+            col->add(v2);
+            sizeOutput++;
+            idx1++;
+            if (idx1 == values.size()) {
+                break;
+            }
+        }
     }
     iter->clear();
     delete iter;

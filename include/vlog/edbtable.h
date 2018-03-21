@@ -51,9 +51,15 @@ public:
 
     virtual bool getDictText(const uint64_t id, char *text) = 0;
 
+    virtual bool getDictText(const uint64_t id, std::string &text) = 0;
+
     virtual uint64_t getNTerms() = 0;
 
     virtual uint64_t getSize() = 0;
+
+    virtual bool areTermsEncoded() {
+        return true;
+    }
 };
 
 

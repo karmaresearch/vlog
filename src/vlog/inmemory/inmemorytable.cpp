@@ -7,10 +7,6 @@
 Dictionary singletonDict;
 
 void dump() {
-    ofstream ofs;
-    ofs.open("dict", ofstream::out | ofstream::trunc);
-    ofs << singletonDict.tostring() << "\n";
-    ofs.close();
 }
 
 std::vector<std::string> readRow(istream &ifs) {
@@ -18,57 +14,57 @@ std::vector<std::string> readRow(istream &ifs) {
     bool insideEscaped = false;
     char *p = &buffer[0];
     bool justSeenQuote = false;
-    int quoteCount = 0;		// keep track of number of concecutive quotes.
+    int quoteCount = 0;     // keep track of number of concecutive quotes.
     std::vector<std::string> result;
     while (true) {
-	int c = ifs.get();
-	bool eof = (c == EOF);
-	if (eof) {
-	    if (p == buffer && result.size() == 0) {
-		return result;
-	    }
-	    c = '\n';
-	}
-	if (c == '\r') {
-	    // ignore these?
-	    continue;
-	}
-	if (p == buffer && ! justSeenQuote) {
-	    // Watch out for more than one initial quote ...
-	    if (c == '"') {
-		// Initial character is a quote.
-		insideEscaped = true;
-		justSeenQuote = true;
-		continue;
-	    }
-	} else if (c == '"') {
-	    quoteCount++;
-	    insideEscaped = (quoteCount & 1) == 0;
-	    if (insideEscaped) {
-		p--;
-	    }
-	} else {
-	    quoteCount = 0;
-	}
-	if (eof || (! insideEscaped && (c == '\n' || c == ','))) {
-	    if (justSeenQuote) {
-		*(p-1) = '\0';
-	    } else {
-		*p = '\0';
-	    }
-	    result.push_back(std::string(buffer));
-	    if (c == '\n') {
-		return result;
-	    }
-	    p = buffer;
-	    insideEscaped = false;
-	} else {
-	    if (p - buffer >= 65535) {
-		throw "Maximum field size exceeded in CSV file: 65535";
-	    }
-	    *p++ = c;
-	}
-	justSeenQuote = (c == '"');
+        int c = ifs.get();
+        bool eof = (c == EOF);
+        if (eof) {
+            if (p == buffer && result.size() == 0) {
+                return result;
+            }
+            c = '\n';
+        }
+        if (c == '\r') {
+            // ignore these?
+            continue;
+        }
+        if (p == buffer && ! justSeenQuote) {
+            // Watch out for more than one initial quote ...
+            if (c == '"') {
+                // Initial character is a quote.
+                insideEscaped = true;
+                justSeenQuote = true;
+                continue;
+            }
+        } else if (c == '"') {
+            quoteCount++;
+            insideEscaped = (quoteCount & 1) == 0;
+            if (insideEscaped) {
+                p--;
+            }
+        } else {
+            quoteCount = 0;
+        }
+        if (eof || (! insideEscaped && (c == '\n' || c == ','))) {
+            if (justSeenQuote) {
+                *(p-1) = '\0';
+            } else {
+                *p = '\0';
+            }
+            result.push_back(std::string(buffer));
+            if (c == '\n') {
+                return result;
+            }
+            p = buffer;
+            insideEscaped = false;
+        } else {
+            if (p - buffer >= 65535) {
+                throw "Maximum field size exceeded in CSV file: 65535";
+            }
+            *p++ = c;
+        }
+        justSeenQuote = (c == '"');
     }
 }
 
@@ -80,32 +76,32 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
     ifstream ifs;
     ifs.open(tablefile);
     if (ifs.fail()) {
-	throw ("Could not open file " + tablefile + " for reading");
+        throw ("Could not open file " + tablefile + " for reading");
     }
     LOG(DEBUGL) << "Reading " << tablefile;
     std::vector<std::vector<Term_t>> vectors;
     while (! ifs.eof()) {
-	std::vector<std::string> row = readRow(ifs);
-	if (arity == 0) {
-	    arity = row.size();
-	}
-	if (row.size() == 0) {
-	    break;
-	} else if (row.size() != arity) {
-	    throw ("Multiple arities in file " + tablefile);
-	}
-	for (int i = 0; i < arity; i++) {
-	    if (i >= vectors.size()) {
-		std::vector<Term_t> v;
-		vectors.push_back(v);
-	    }
-	    vectors[i].push_back(singletonDict.getOrAdd(row[i]));
-	}
+        std::vector<std::string> row = readRow(ifs);
+        if (arity == 0) {
+            arity = row.size();
+        }
+        if (row.size() == 0) {
+            break;
+        } else if (row.size() != arity) {
+            throw ("Multiple arities in file " + tablefile);
+        }
+        for (int i = 0; i < arity; i++) {
+            if (i >= vectors.size()) {
+                std::vector<Term_t> v;
+                vectors.push_back(v);
+            }
+            vectors[i].push_back(singletonDict.getOrAdd(row[i]));
+        }
     }
     std::vector<std::shared_ptr<Column>> columns;
     for(uint8_t i = 0; i < arity; ++i) {
-	columns.push_back(std::shared_ptr<Column>(new InmemoryColumn(
-			vectors[i])));
+        columns.push_back(std::shared_ptr<Column>(new InmemoryColumn(
+                        vectors[i])));
     }
     segment = std::shared_ptr<Segment>(new Segment(arity, columns));
     ifs.close();
@@ -117,26 +113,26 @@ InmemoryTable::InmemoryTable(PredId_t predid, std::vector<std::vector<std::strin
     //Load the table in the database
     std::vector<std::vector<Term_t>> vectors;
     for (auto &row : entries) {
-	if (arity == 0) {
-	    arity = row.size();
-	}
-	if (row.size() == 0) {
-	    break;
-	} else if (row.size() != arity) {
-	    throw ("Multiple arities in input");
-	}
-	for (int i = 0; i < arity; i++) {
-	    if (i >= vectors.size()) {
-		std::vector<Term_t> v;
-		vectors.push_back(v);
-	    }
-	    vectors[i].push_back(singletonDict.getOrAdd(row[i]));
-	}
+        if (arity == 0) {
+            arity = row.size();
+        }
+        if (row.size() == 0) {
+            break;
+        } else if (row.size() != arity) {
+            throw ("Multiple arities in input");
+        }
+        for (int i = 0; i < arity; i++) {
+            if (i >= vectors.size()) {
+                std::vector<Term_t> v;
+                vectors.push_back(v);
+            }
+            vectors[i].push_back(singletonDict.getOrAdd(row[i]));
+        }
     }
     std::vector<std::shared_ptr<Column>> columns;
     for(uint8_t i = 0; i < arity; ++i) {
-	columns.push_back(std::shared_ptr<Column>(new InmemoryColumn(
-			vectors[i])));
+        columns.push_back(std::shared_ptr<Column>(new InmemoryColumn(
+                        vectors[i])));
     }
     segment = std::shared_ptr<Segment>(new Segment(arity, columns));
     // dump();
@@ -152,14 +148,14 @@ void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
     size_t sz = lit->getTupleSize();
     EDBIterator *iter = getIterator(*lit);
     if (posToFilter == NULL || posToFilter->size() == 0) {
-	while (iter->hasNext()) {
-	    iter->next();
-	    for (uint8_t i = 0; i < npos; ++i) {
-		row[i] = iter->getElementAt(pos[i]);
-	    }
-	    outputTable->addRow(row);
+        while (iter->hasNext()) {
+            iter->next();
+            for (uint8_t i = 0; i < npos; ++i) {
+                row[i] = iter->getElementAt(pos[i]);
+            }
+            outputTable->addRow(row);
         }
-	return;
+        return;
     }
 
     LOG(ERRORL) << "Not implemented yet";
@@ -188,23 +184,23 @@ size_t InmemoryTable::getCardinality(const Literal &q) {
             }
         }
     } else {
-	// Not efficient, just to get it to run ... TODO!
-	size_t cnt = 0;
-	EDBIterator *iter = getIterator(q);
-	while (iter->hasNext()) {
-	    iter->next();
-	    cnt++;
-	}
-	iter->clear();
-	delete iter;
-	return cnt;
+        // Not efficient, just to get it to run ... TODO!
+        size_t cnt = 0;
+        EDBIterator *iter = getIterator(q);
+        while (iter->hasNext()) {
+            iter->next();
+            cnt++;
+        }
+        iter->clear();
+        delete iter;
+        return cnt;
     }
 }
 
 size_t InmemoryTable::getCardinalityColumn(const Literal &q, uint8_t posColumn) {
     if (q.getNUniqueVars() == q.getTupleSize()) {
-	std::shared_ptr<Column> col = segment->getColumn(posColumn);
-	return col->sort_and_unique()->size();
+        std::shared_ptr<Column> col = segment->getColumn(posColumn);
+        return col->sort_and_unique()->size();
     }
     std::vector<uint8_t> fields;
     fields.push_back(posColumn);
@@ -212,8 +208,8 @@ size_t InmemoryTable::getCardinalityColumn(const Literal &q, uint8_t posColumn) 
     EDBIterator *iter = getSortedIterator(q, fields);
     size_t cnt = 0;
     while (iter->hasNext()) {
-	iter->next();
-	cnt++;
+        iter->next();
+        cnt++;
     }
     iter->clear();
     delete iter;
@@ -248,7 +244,7 @@ void _literal2filter(const Literal &query, std::vector<uint8_t> &posVarsToCopy,
 EDBIterator *InmemoryTable::getIterator(const Literal &q) {
     std::vector<uint8_t> sortFields;
     if (q.getTupleSize() != arity) {
-	return new InmemoryIterator(NULL, predid, sortFields);
+        return new InmemoryIterator(NULL, predid, sortFields);
     }
     if (q.getNUniqueVars() == q.getTupleSize()) {
         return new InmemoryIterator(segment, predid, sortFields);
@@ -263,54 +259,54 @@ EDBIterator *InmemoryTable::getIterator(const Literal &q) {
     std::vector<ColumnWriter *> writers;
 
     _literal2filter(q, posVarsToCopy, posConstantsToFilter,
-	    valuesConstantsToFilter, repeatedVars);
+            valuesConstantsToFilter, repeatedVars);
 
     writers.resize(nfields);
     for (uint8_t i = 0; i < nfields; ++i) {
-	writers[i] = new ColumnWriter();
+        writers[i] = new ColumnWriter();
     }
-    
+
     while (segIter->hasNext()) {
-	segIter->next();
-	bool match = true;
-	// First filter out non-matching constants
-	for (uint8_t i = 0; i < posConstantsToFilter.size(); i++) {
-	    if (segIter->get(posConstantsToFilter[i]) != valuesConstantsToFilter[i]) {
-		match = false;
-		break;
-	    }
-	}
+        segIter->next();
+        bool match = true;
+        // First filter out non-matching constants
+        for (uint8_t i = 0; i < posConstantsToFilter.size(); i++) {
+            if (segIter->get(posConstantsToFilter[i]) != valuesConstantsToFilter[i]) {
+                match = false;
+                break;
+            }
+        }
 
-	if (! match) {
-	    continue;
-	}
+        if (! match) {
+            continue;
+        }
 
-	if (repeatedVars.size() > 0) {
-	    for (int i = 0; i < repeatedVars.size(); i++) {
-		if (segIter->get(repeatedVars[i].first) != segIter->get(posVarsToCopy[repeatedVars[i].second])) {
-		    match = false;
-		    break;
-		}
-	    }
-	    if (! match) {
-		continue;
-	    }
-	}
-	
-	for (uint8_t i = 0; i < nfields; ++i) {
-	    writers[i]->add(segIter->get(i));
-	}
+        if (repeatedVars.size() > 0) {
+            for (int i = 0; i < repeatedVars.size(); i++) {
+                if (segIter->get(repeatedVars[i].first) != segIter->get(posVarsToCopy[repeatedVars[i].second])) {
+                    match = false;
+                    break;
+                }
+            }
+            if (! match) {
+                continue;
+            }
+        }
+
+        for (uint8_t i = 0; i < nfields; ++i) {
+            writers[i]->add(segIter->get(i));
+        }
     }
 
     std::vector<std::shared_ptr<Column>> columns;
     for (uint8_t i = 0; i < nfields; ++i) {
-	columns.push_back(writers[i]->getColumn());
+        columns.push_back(writers[i]->getColumn());
     }
 
     std::shared_ptr<Segment> filteredSegment = std::shared_ptr<Segment>(new Segment(nfields, columns));
-    
+
     for (uint8_t i = 0; i < nfields; ++i) {
-	delete writers[i];
+        delete writers[i];
     }
 
     return new InmemoryIterator(filteredSegment, predid, sortFields);
@@ -321,17 +317,17 @@ std::vector<uint8_t> __mergeSortingFields(std::vector<uint8_t> v1,
     int sz = v1.size();
     if (sz != 0) {
         for(auto f : v2) {
-	    bool found = false;
-	    for (int i = 0; i < sz; i++) {
-		if (v1[i] == f) {
-		    found = true;
-		    break;
-		}
-	    }
-	    if (! found) {
-		v1.push_back(f);
-	    }
-	}
+            bool found = false;
+            for (int i = 0; i < sz; i++) {
+                if (v1[i] == f) {
+                    found = true;
+                    break;
+                }
+            }
+            if (! found) {
+                v1.push_back(f);
+            }
+        }
         return v1;
     } else {
         return v2;
@@ -385,7 +381,7 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
         const std::vector<uint8_t> &fields) {
 
     if (query.getTupleSize() != arity) {
-	return new InmemoryIterator(NULL, predid, fields);
+        return new InmemoryIterator(NULL, predid, fields);
     }
     /*** Look at the query to see if we need filtering***/
     std::vector<uint8_t> posConstants;
@@ -493,9 +489,9 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
                     posConstantsToFilter.size(), posConstantsToFilter.data(),
                     valuesConstantsToFilter.data(), repeatedVars.size(),
                     repeatedVars.data(), 1); //no multithread
-	    if (fTable == NULL) {
+            if (fTable == NULL) {
                 return new InmemoryIterator(NULL, predid, fields);
-	    }
+            }
             auto filteredSegment = ((InmemoryFCInternalTable*)(fTable.get()))->
                 getUnderlyingSegment();
             return new InmemoryIterator(filteredSegment, predid, fields);
@@ -516,7 +512,7 @@ bool InmemoryTable::getDictNumber(const char *text, const size_t sizeText,
     std::string s(text, sizeText);
     int64_t v = singletonDict.get(s);
     if (v < 0) {
-	return false;
+        return false;
     }
     id = v;
     return true;
@@ -525,10 +521,14 @@ bool InmemoryTable::getDictNumber(const char *text, const size_t sizeText,
 bool InmemoryTable::getDictText(const uint64_t id, char *text) {
     std::string s = singletonDict.getRawValue(id);
     if (s == "") {
-	return false;
+        return false;
     }
     strcpy(text, s.c_str());
     return true;
+}
+
+bool InmemoryTable::getDictText(const uint64_t id, std::string &text) {
+    return singletonDict.getText(id, text);
 }
 
 uint64_t InmemoryTable::getNTerms() {
@@ -548,46 +548,46 @@ InmemoryTable::~InmemoryTable() {
 
 bool InmemoryIterator::hasNext() {
     if (hasNextChecked) {
-	return hasNextValue;
+        return hasNextValue;
     }
     if (isFirst || ! skipDuplicatedFirst) {
-	hasNextValue = iterator && iterator->hasNext();
+        hasNextValue = iterator && iterator->hasNext();
     } else {
-	int elNo = 0;
-	if (sortFields.size() == 1) {
-	    elNo = sortFields[0];
-	}
-	if (sortFields.size() <= 1) {
-	    Term_t oldval = getElementAt(elNo);
-	    bool stop = false;
-	    while (! stop && iterator->hasNext()) {
-		iterator->next();
-		// This may be a problem, because now hasNext has the side effect of already shifting the
-		// iterator ...
-		if (getElementAt(elNo) != oldval) {
-		    stop = true;
-		}
-	    }
-	    hasNextValue = stop;
-	} else {
-	    std::vector<Term_t> oldval;
-	    for (int i = 0; i < sortFields.size(); i++) {
-		oldval.push_back(getElementAt(sortFields[i]));
-	    }
-	    bool stop = false;
-	    while (! stop && iterator->hasNext()) {
-		iterator->next();
-		// This may be a problem, because now hasNext has the side effect of already shifting the
-		// iterator ...
-		for (int i = 0; i < sortFields.size(); i++) {
-		    if (oldval[i] != getElementAt(sortFields[i])) {
-			stop = true;
-			break;
-		    }
-		}
-	    }
-	    hasNextValue = stop;
-	}
+        int elNo = 0;
+        if (sortFields.size() == 1) {
+            elNo = sortFields[0];
+        }
+        if (sortFields.size() <= 1) {
+            Term_t oldval = getElementAt(elNo);
+            bool stop = false;
+            while (! stop && iterator->hasNext()) {
+                iterator->next();
+                // This may be a problem, because now hasNext has the side effect of already shifting the
+                // iterator ...
+                if (getElementAt(elNo) != oldval) {
+                    stop = true;
+                }
+            }
+            hasNextValue = stop;
+        } else {
+            std::vector<Term_t> oldval;
+            for (int i = 0; i < sortFields.size(); i++) {
+                oldval.push_back(getElementAt(sortFields[i]));
+            }
+            bool stop = false;
+            while (! stop && iterator->hasNext()) {
+                iterator->next();
+                // This may be a problem, because now hasNext has the side effect of already shifting the
+                // iterator ...
+                for (int i = 0; i < sortFields.size(); i++) {
+                    if (oldval[i] != getElementAt(sortFields[i])) {
+                        stop = true;
+                        break;
+                    }
+                }
+            }
+            hasNextValue = stop;
+        }
     }
     hasNextChecked = true;
     return hasNextValue;
@@ -595,16 +595,16 @@ bool InmemoryIterator::hasNext() {
 
 void InmemoryIterator::next() {
     if (! hasNextChecked) {
-	LOG(ERRORL) << "InmemoryIterator::next called without hasNext check";
-	throw 10;
+        LOG(ERRORL) << "InmemoryIterator::next called without hasNext check";
+        throw 10;
     }
     if (! hasNextValue) {
-	LOG(ERRORL) << "InmemoryIterator::next called while hasNext returned false";
-	throw 10;
+        LOG(ERRORL) << "InmemoryIterator::next called while hasNext returned false";
+        throw 10;
     }
     if (isFirst || ! skipDuplicatedFirst) {
-	// otherwise we already did next() on the iterator. See hasNext().
-	iterator->next();
+        // otherwise we already did next() on the iterator. See hasNext().
+        iterator->next();
     }
     isFirst = false;
     hasNextChecked = false;
