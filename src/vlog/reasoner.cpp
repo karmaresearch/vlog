@@ -637,12 +637,16 @@ TupleIterator *Reasoner::getMagicIterator(Literal &query,
 
         // itrTable contains only variables.
         if (returnOnlyVars) {
-            //const uint8_t rowSize = table->getRowSize();
             while (itrTable->hasNext()) {
                 itrTable->next();
-                for (uint8_t j = 0; j < posVars.size(); ++j) {
-                    finalTable->addValue(itrTable->getCurrentValue(j));
-                }
+		if (finalTable->getSizeRow() == 0) {
+		    Term_t row = 0;
+		    finalTable->addRow(&row);
+		} else {
+		    for (uint8_t j = 0; j < posVars.size(); ++j) {
+			finalTable->addValue(itrTable->getCurrentValue(j));
+		    }
+		}
                 // Not sure about this. Was:
                 // for (uint8_t j = 0; j < rowsize; ++j) {
                 //     finalTable->addValue(itrTable->getCurrentValue(j));
@@ -737,12 +741,16 @@ TupleIterator *Reasoner::getIteratorWithMaterialization(SemiNaiver *sn, Literal 
             if (! copy) {
                 continue;
             }
-            for (int i = 0; i < tuple.getSize(); i++) {
-                if (! returnOnlyVars || tuple.get(i).isVariable()) {
-                    finalTable->addValue(itrTable->getCurrentValue(i));
-                }
-            }
-
+	    if (finalTable->getSizeRow() == 0) {
+		Term_t row = 0;
+		finalTable->addRow(&row);
+	    } else {
+		for (int i = 0; i < tuple.getSize(); i++) {
+		    if (! returnOnlyVars || tuple.get(i).isVariable()) {
+			finalTable->addValue(itrTable->getCurrentValue(i));
+		    }
+		}
+	    }
         }
         table->releaseIterator(itrTable);
         tableIt.moveNextCount();
