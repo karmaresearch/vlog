@@ -54,18 +54,16 @@ std::string jstring2string(JNIEnv *env, jstring jstr) {
 
 // Utility method to convert a literal id to a string.
 std::string literalToString(VLogInfo *f, uint64_t literalid) {
-    char supportText[MAX_TERM_SIZE];
-    if (!f->layer->getDictText(literalid, supportText)) {
-	std::string s = f->program->getFromAdditional((Term_t) literalid);
-	if (s == std::string("")) {
-	    s = "" + std::to_string(literalid >> 40) + "_"
-		    + std::to_string((literalid >> 32) & 0377) + "_"
-		    + std::to_string(literalid & 0xffffffff);
-	}
 
-	return s;
+    std::string s = f->layer->getDictText(literalid);
+
+    if (s == std::string("")) {
+	s = "" + std::to_string(literalid >> 40) + "_"
+		+ std::to_string((literalid >> 32) & 0377) + "_"
+		+ std::to_string(literalid & 0xffffffff);
     }
-    return std::string(supportText);
+
+    return s;
 }
 
 jint getVLogId(JNIEnv *env, jobject jobj) {
@@ -164,10 +162,7 @@ std::vector<Literal> getVectorLiteral(JNIEnv *env, VLogInfo *f, jobjectArray h, 
 		// Constant
 		// name = program->rewriteRDFOWLConstants(name);
 		uint64_t dictTerm;
-		if (!f->layer->getDictNumber(name.c_str(), name.size(), dictTerm)) {
-		    //Get an ID from the temporary dictionary
-		    dictTerm = f->program->getOrAddToAdditional(name);
-		}
+		f->layer->getOrAddDictNumber(name.c_str(), name.size(), dictTerm);
 		t.push_back(VTerm(0, dictTerm));
 	    }
 	}
@@ -251,7 +246,7 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_start(JNIEnv *env, jobject o
 	    throwIOException(env, s.c_str());
 	    return;
 	}
-	f->program = new Program(f->layer->getNTerms(), f->layer);
+	f->program = new Program(f->layer);
     } catch(std::string s) {
 	throwEDBConfigurationException(env, s.c_str());
     }
@@ -336,7 +331,7 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_addData(JNIEnv *env, jobject
 	return;
     }
 
-    f->program = new Program(f->layer->getNTerms(), f->layer);
+    f->program = new Program(f->layer);
 }
 
 
@@ -492,7 +487,7 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setRules(JNIEnv *env, jobjec
     if (rules != NULL) {
 	// Create a new program, to remove any left-overs from old rule stuff
 	delete f->program;
-	f->program = new Program(f->layer->getNTerms(), f->layer);
+	f->program = new Program(f->layer);
 
 	// Get rewrite flag
 	jclass enumClass = env->GetObjectClass(rewriteHeads);
@@ -538,7 +533,7 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setRulesFile(JNIEnv *env, jo
     }
 
     delete f->program;
-    f->program = new Program(f->layer->getNTerms(), f->layer);
+    f->program = new Program(f->layer);
 
     // Get rewrite flag
     jclass enumClass = env->GetObjectClass(rewriteHeads);

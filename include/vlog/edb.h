@@ -99,6 +99,9 @@ class EDBLayer {
     public:
         EDBLayer(EDBConf &conf, bool multithreaded) {
             const std::vector<EDBConf::Table> tables = conf.getTables();
+
+            predDictionary = std::unique_ptr<Dictionary>(new Dictionary());
+
             for (const auto &table : tables) {
                 if (table.type == "Trident") {
                     addTridentTable(table, multithreaded);
@@ -129,7 +132,6 @@ class EDBLayer {
             for (int i = 0; i < MAX_NPREDS; ++i) {
                 tmpRelations[i] = NULL;
             }
-            predDictionary = std::unique_ptr<Dictionary>(new Dictionary());
         }
 
         std::vector<PredId_t> getAllPredicateIDs();

@@ -528,7 +528,12 @@ bool InmemoryTable::getDictText(const uint64_t id, char *text) {
 }
 
 bool InmemoryTable::getDictText(const uint64_t id, std::string &text) {
-    return singletonDict.getText(id, text);
+    std::string s = singletonDict.getRawValue(id);
+    if (s == "") {
+	return false;
+    }
+    text = s;
+    return true;
 }
 
 uint64_t InmemoryTable::getNTerms() {
