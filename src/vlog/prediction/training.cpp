@@ -511,8 +511,8 @@ void parseQueriesLog(vector<string>& testQueriesLog,
 }
 
 void normalize(vector<Metrics>& featuresVector) {
-    double minCost = numeric_limits<double>::max();
-    double maxCost = numeric_limits<double>::min();
+    double minCost = 1000000;
+    double maxCost = 0.0;
     for (int i = 0; i < featuresVector.size(); ++i) {
         if (featuresVector[i].cost < minCost) {
             minCost = featuresVector[i].cost;
@@ -542,7 +542,7 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
     vector<string> strFeatures;
     vector<string> strQsqrTime;
     vector<string> strMagicTime;
-    ofstream logTrainingMagic("training-magic.log");
+    ofstream logTraining("training-queries.log");
     int nMagicQueries = 0;
     int i = 1;
     for (auto q : trainingQueriesVector) {
@@ -566,6 +566,7 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         strResults.push_back(results);
         strFeatures.push_back(features);
         strQsqrTime.push_back(qsqrTime);
+        logTraining << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back() << endl;
         strMagicTime.push_back(magicTime);
         if (decisionVector.back() == 0) {
             nMagicQueries++;
@@ -617,16 +618,15 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         } else {
             trainingMagic++;
             trainingQueriesAndResult.push_back(std::make_pair(balancedTrainingQueriesVector[i], label));
-            logTrainingMagic << balancedTrainingQueriesVector[i] << endl;
         }
         Instance instance(label, features);
         dataset.push_back(instance);
     }
 
-    if (logTrainingMagic.fail()) {
+    if (logTraining.fail()) {
         LOG(ERRORL) << "Error writing to file";
     }
-    logTrainingMagic.close();
+    logTraining.close();
 
     LogisticRegression lr(6);
     lr.train(dataset);
