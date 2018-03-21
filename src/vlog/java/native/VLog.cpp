@@ -415,7 +415,7 @@ JNIEXPORT jstring JNICALL Java_karmaresearch_vlog_VLog_getConstant(JNIEnv *env, 
     return env->NewStringUTF(literalToString(f, literalid).c_str());
 }
 
-static TupleIterator *getQueryIter(JNIEnv *env, jobject obj, PredId_t p, jlongArray els) {
+static TupleIterator *getQueryIter(JNIEnv *env, jobject obj, PredId_t p, jlongArray els, jboolean includeConstants) {
     VLogInfo *f = getVLogInfo(env, obj);
     if (f == NULL || f->program == NULL) {
 	throwNotStartedException(env, "VLog is not started yet");
@@ -446,9 +446,9 @@ static TupleIterator *getQueryIter(JNIEnv *env, jobject obj, PredId_t p, jlongAr
     TupleIterator *iter = NULL;
     Reasoner r((uint64_t) 0);
     if (pred.getType() == EDB) {
-	iter = r.getEDBIterator(query, NULL, NULL, *(f->layer), false, NULL);
+	iter = r.getEDBIterator(query, NULL, NULL, *(f->layer), ! (bool) includeConstants, NULL);
     } else if (f->sn != NULL) {
-	iter = r.getIteratorWithMaterialization(f->sn, query, false, NULL);
+	iter = r.getIteratorWithMaterialization(f->sn, query, ! (bool) includeConstants, NULL);
     } else {
 	// No materialization yet, but non-EDB predicate ... so, empty.
 	TupleTable *table = new TupleTable(sz);
@@ -461,10 +461,10 @@ static TupleIterator *getQueryIter(JNIEnv *env, jobject obj, PredId_t p, jlongAr
 /*
  * Class:     karmaresearch_vlog_VLog
  * Method:    query
- * Signature: (I[J)Lkarmaresearch/vlog/QueryResultIterator;
+ * Signature: (I[JZ)Lkarmaresearch/vlog/QueryResultIterator;
  */
-JNIEXPORT jobject JNICALL Java_karmaresearch_vlog_VLog_query(JNIEnv * env, jobject obj, jint p, jlongArray els ) {
-    TupleIterator *iter = getQueryIter(env, obj, (PredId_t) p, els);
+JNIEXPORT jobject JNICALL Java_karmaresearch_vlog_VLog_query(JNIEnv * env, jobject obj, jint p, jlongArray els, jboolean includeConstants) {
+    TupleIterator *iter = getQueryIter(env, obj, (PredId_t) p, els, includeConstants);
     jclass jcls=env->FindClass("karmaresearch/vlog/QueryResultIterator");
     jmethodID mID = env->GetMethodID(jcls, "<init>", "(J)V");
     jobject jobj = env->NewObject(jcls, mID, (jlong) iter);
@@ -617,7 +617,7 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_queryToCsv(JNIEnv *env, jobj
         throwIOException(env, ("Could not open " + fn + " for writing").c_str());
 	return;
     }
-    TupleIterator *iter = getQueryIter(env, obj, (PredId_t) pred, q);
+    TupleIterator *iter = getQueryIter(env, obj, (PredId_t) pred, q, (jboolean) true);
     if (iter == NULL) {
 	return;
     }

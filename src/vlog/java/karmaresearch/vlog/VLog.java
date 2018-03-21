@@ -259,12 +259,14 @@ public class VLog {
      * @param terms
      *            the constant values or variables. If the term is negative, it
      *            is assumed to be a variable.
+     * @param includeConstants
+     *            whether to include the constants in the results.
      * @return the result iterator.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      */
-    private native QueryResultIterator query(int predicate, long[] terms)
-            throws NotStartedException;
+    private native QueryResultIterator query(int predicate, long[] terms,
+            boolean includeConstants) throws NotStartedException;
 
     private long[] extractTerms(Term[] terms) throws NotStartedException {
         ArrayList<String> variables = new ArrayList<>();
@@ -309,10 +311,30 @@ public class VLog {
      */
     public StringQueryResultIterator query(Atom query)
             throws NotStartedException {
+        return query(query, true);
+    }
+
+    /**
+     * Queries the current, so possibly materialized, database, and returns an
+     * iterator that delivers the answers, one by one.
+     *
+     * TODO: deal with not-found predicates, terms.
+     *
+     * @param query
+     *            the query, as an atom.
+     * @param includeConstants
+     *            whether to include the constants of the query in the results.
+     * @return the result iterator.
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet.
+     */
+
+    public StringQueryResultIterator query(Atom query, boolean includeConstants)
+            throws NotStartedException {
         int intPred = getPredicateId(query.getPredicate());
         long[] longTerms = extractTerms(query.getTerms());
         return new StringQueryResultIterator(this,
-                query(intPred, longTerms));
+                query(intPred, longTerms, includeConstants));
     }
 
     private native void queryToCsv(int predicate, long[] term, String fileName)
