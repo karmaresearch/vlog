@@ -511,7 +511,7 @@ void parseQueriesLog(vector<string>& testQueriesLog,
 }
 
 void normalize(vector<Metrics>& featuresVector) {
-    double minCost = 1000000;
+    double minCost = numeric_limits<double>::max();
     double maxCost = 0.0;
     for (int i = 0; i < featuresVector.size(); ++i) {
         if (featuresVector[i].cost < minCost) {
