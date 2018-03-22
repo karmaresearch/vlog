@@ -41,22 +41,21 @@ class Test {
     private static Term HOSPITAL1 = new Term(TermType.VARIABLE, "HOSPITAL1");
     private static Term NAME = new Term(TermType.VARIABLE, "NAME");
 
-    private static Atom prescription1 = new Atom("prescription",
-            new Term[] { ID, PATIENT, NPI, C1 });
-    private static Atom treatment1 = new Atom("treatment",
-            new Term[] { ID, PATIENT, HOSPITAL, NPI, CONF1 });
-    private static Atom physician1 = new Atom("physician",
-            new Term[] { NPI, NAME, SPEC, CONF2 });
-    private static Atom medprescription = new Atom("medprescription",
-            new Term[] { ID, PATIENT, NPI, DOCTOR, SPEC, CONF });
-    private static Atom doctor1 = new Atom("doctor",
-            new Term[] { NPI, DOCTOR, SPEC, H, C2 });
-    private static Atom doctor2 = new Atom("doctor",
-            new Term[] { NPI, DOCTOR, SPEC, HOSPITAL, C2 });
-    private static Atom targethospital = new Atom("targethospital",
-            new Term[] { DOCTOR, SPEC, HOSPITAL1, NPI1, HCONF1 });
-    private static Atom hospital = new Atom("hospital",
-            new Term[] { DOCTOR, SPEC, HOSPITAL1, NPI1, HCONF1 });
+    private static Atom prescription1 = new Atom("prescription", ID, PATIENT,
+            NPI, C1);
+    private static Atom treatment1 = new Atom("treatment", ID, PATIENT,
+            HOSPITAL, NPI, CONF1);
+    private static Atom physician1 = new Atom("physician", NPI, NAME, SPEC,
+            CONF2);
+    private static Atom medprescription = new Atom("medprescription", ID,
+            PATIENT, NPI, DOCTOR, SPEC, CONF);
+    private static Atom doctor1 = new Atom("doctor", NPI, DOCTOR, SPEC, H, C2);
+    private static Atom doctor2 = new Atom("doctor", NPI, DOCTOR, SPEC,
+            HOSPITAL, C2);
+    private static Atom targethospital = new Atom("targethospital", DOCTOR,
+            SPEC, HOSPITAL1, NPI1, HCONF1);
+    private static Atom hospital = new Atom("hospital", DOCTOR, SPEC, HOSPITAL1,
+            NPI1, HCONF1);
 
     private static Rule rule1 = new Rule(new Atom[] { prescription1 },
             new Atom[] { treatment1, physician1 });
@@ -73,7 +72,23 @@ class Test {
     private static String[][] p2_contents = { { "c", "d", "e" },
             { "f", "g", "h" } };
 
+    public static void testEmpty() throws Exception {
+        VLog vlog = new VLog();
+        vlog.setLogLevel("info");
+        vlog.start("", false);
+        vlog.writeQueryResultsToCsv(
+                new Atom("p2", new Term(TermType.VARIABLE, "v1")), "blabla");
+        ArrayList<Rule> rules = new ArrayList<>();
+        rules.add(rule1);
+        vlog.setRules(rules.toArray(new Rule[rules.size()]),
+                RuleRewriteStrategy.AGGRESSIVE);
+        vlog.materialize(false);
+        vlog.writeQueryResultsToCsv(
+                new Atom("p2", new Term(TermType.VARIABLE, "v1")), "blabla");
+    }
+
     static void runTest(String fn) throws Exception {
+        testEmpty();
         VLog vlog = new VLog();
         vlog.setLogLevel("info");
         try {
@@ -114,32 +129,90 @@ class Test {
         vlog.start("", false);
         vlog.addData("A", new String[][] { { "a" } });
         vlog.addData("A", new String[][] { { "a" }, { "b" } });
-        StringQueryResultIterator e = vlog.query(new Atom("A",
-                new Term[] { new Term(Term.TermType.CONSTANT, "C") }));
+        StringQueryResultIterator e = vlog
+                .query(new Atom("A", new Term(Term.TermType.CONSTANT, "C")));
+        if (e.hasNext()) {
+            throw new Error("Error in query");
+        }
+        System.out.println("Trying EDB query without constants ...");
+        e = vlog.query(new Atom("A", new Term(Term.TermType.CONSTANT, "a")),
+                false);
+        if (!e.hasNext()) {
+            throw new Error("Error in query");
+        }
+        String[] v = e.next();
+        if (v.length > 0) {
+            throw new Error("Error in query");
+        }
         if (e.hasNext()) {
             throw new Error("Error in query");
         }
         e.cleanup();
-        e = vlog.query(new Atom("A",
-                new Term[] { new Term(Term.TermType.VARIABLE, "C") }));
+        System.out.println("Trying same EDB query with constants ...");
+        e = vlog.query(new Atom("A", new Term(Term.TermType.CONSTANT, "a")),
+                true);
+        if (!e.hasNext()) {
+            throw new Error("Error in query");
+        }
+        v = e.next();
+        if (v.length != 1) {
+            throw new Error("Error in query");
+        }
+        if (!v[0].equals("a")) {
+            throw new Error("Error in query");
+        }
+        if (e.hasNext()) {
+            throw new Error("Error in query");
+        }
+        e.cleanup();
+        System.out.println("Trying EDB query with variable ...");
+        e = vlog.query(new Atom("A", new Term(Term.TermType.VARIABLE, "C")));
         while (e.hasNext()) {
             String[] result = e.next();
             System.out.println("result: " + Arrays.toString(result));
         }
         e.cleanup();
         ArrayList<Rule> rules = new ArrayList<>();
-        rules.add(
-                new Rule(
-                        new Atom[] { new Atom("B",
-                                new Term[] { new Term(Term.TermType.VARIABLE,
-                                        "C") }) },
-                        new Atom[] { new Atom("A", new Term[] {
-                                new Term(Term.TermType.VARIABLE, "C") }) }));
+        rules.add(new Rule(
+                new Atom[] {
+                        new Atom("B", new Term(Term.TermType.VARIABLE, "C")) },
+                new Atom[] { new Atom("A",
+                        new Term(Term.TermType.VARIABLE, "C")) }));
         vlog.setRules(rules.toArray(new Rule[rules.size()]),
                 RuleRewriteStrategy.AGGRESSIVE);
         vlog.materialize(false);
-        e = vlog.query(new Atom("B",
-                new Term[] { new Term(Term.TermType.CONSTANT, "C") }));
+        e = vlog.query(new Atom("B", new Term(Term.TermType.CONSTANT, "C")));
+        if (e.hasNext()) {
+            throw new Error("Error in query");
+        }
+        e.cleanup();
+        System.out.println("Trying IDB query without constants ...");
+        e = vlog.query(new Atom("B", new Term(Term.TermType.CONSTANT, "a")),
+                false);
+        if (!e.hasNext()) {
+            throw new Error("Error in query");
+        }
+        v = e.next();
+        if (v.length > 0) {
+            throw new Error("Error in query");
+        }
+        if (e.hasNext()) {
+            throw new Error("Error in query");
+        }
+        e.cleanup();
+        System.out.println("Trying same IDB query with constants ...");
+        e = vlog.query(new Atom("B", new Term(Term.TermType.CONSTANT, "a")),
+                true);
+        if (!e.hasNext()) {
+            throw new Error("Error in query");
+        }
+        v = e.next();
+        if (v.length != 1) {
+            throw new Error("Error in query");
+        }
+        if (!v[0].equals("a")) {
+            throw new Error("Error in query");
+        }
         if (e.hasNext()) {
             throw new Error("Error in query");
         }

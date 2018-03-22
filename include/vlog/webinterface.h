@@ -58,12 +58,6 @@ class WebInterface {
 
         void processMaterialization();
 
-        static void parseQuery(bool &success,
-                SPARQLParser &parser,
-                std::shared_ptr<QueryGraph> &queryGraph,
-                QueryDict &queryDict,
-                DBLayer &db);
-
         void processRequest(std::string req, std::string &resp);
 
     public:
@@ -103,16 +97,6 @@ class WebInterface {
         }
 
         static string lookup(string sId, DBLayer &db);
-
-        static void execSPARQLQuery(string sparqlquery,
-                bool explain,
-                long nterms,
-                DBLayer &db,
-                bool printstdout,
-                bool jsonoutput,
-                JSON *jsonvars,
-                JSON *jsonresults,
-                JSON *jsonstats);
 };
 #endif
 #endif

@@ -1312,6 +1312,9 @@ FCIterator SemiNaiver::getTable(const Literal & literal,
 }
 
 FCIterator SemiNaiver::getTable(const PredId_t predid) {
+    if (predicatesTables[predid] == NULL) {
+	return FCIterator();
+    }
     return predicatesTables[predid]->read(0);
 }
 

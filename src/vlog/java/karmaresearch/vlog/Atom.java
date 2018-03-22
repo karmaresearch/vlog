@@ -17,18 +17,25 @@ public class Atom {
      * @param terms
      *            the terms
      */
-    public Atom(String predicate, Term[] terms) {
+    public Atom(String predicate, Term... terms) {
         if (predicate == null || terms == null) {
             throw new IllegalArgumentException(
                     "null argument to Atom constructor");
         }
+        for (Term t : terms) {
+            if (t == null) {
+                throw new IllegalArgumentException(
+                        "null term in Atom constructor");
+            }
+        }
+
         this.predicate = predicate;
         this.terms = terms.clone();
     }
 
     /**
      * Returns the predicate of this atom.
-     * 
+     *
      * @return the predicate
      */
     public String getPredicate() {
@@ -37,7 +44,7 @@ public class Atom {
 
     /**
      * Returns the terms of this atom.
-     * 
+     *
      * @return the terms.
      */
     public Term[] getTerms() {

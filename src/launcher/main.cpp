@@ -7,6 +7,7 @@
 #include <vlog/webinterface.h>
 #include <vlog/fcinttable.h>
 #include <vlog/exporter.h>
+#include <vlog/utils.h>
 
 //Used to load a Trident KB
 #include <vlog/trident/tridenttable.h>
@@ -836,10 +837,9 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     std::stringstream strStream;
     strStream << inFile.rdbuf();//read the file
 
-    //TODO
-    //WebInterface::execSPARQLQuery(strStream.str(), vm["explain"].as<bool>(),
-    //        edb.getNTerms(), *db, true, false, NULL, NULL,
-    //        NULL);
+    VLogUtils::execSPARQLQuery(strStream.str(), vm["explain"].as<bool>(),
+            edb.getNTerms(), *db, true, false, NULL, NULL,
+            NULL);
 
     delete db;
 }
