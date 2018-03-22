@@ -110,7 +110,7 @@ static string _getValueParam(string req, string param) {
     }
 }
 
-void WebInterface::parseQuery(bool &success,
+/*void WebInterface::parseQuery(bool &success,
         SPARQLParser &parser,
         std::shared_ptr<QueryGraph> &queryGraph,
         QueryDict &queryDict,
@@ -144,7 +144,7 @@ void WebInterface::parseQuery(bool &success,
 
     success = true;
     return;
-}
+}*/
 
 string WebInterface::lookup(string sId, DBLayer &db) {
     const char *start;
