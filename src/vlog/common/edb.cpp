@@ -17,6 +17,7 @@
 #include <vlog/mdlite/mdlitetable.h>
 #endif
 #include <vlog/inmemory/inmemorytable.h>
+#include <vlog/sparql/sparqltable.h>
 
 #include <unordered_map>
 #include <climits>
@@ -113,6 +114,21 @@ void EDBLayer::addInmemoryTable(std::string predicate, std::vector<std::vector<s
     }
     infot.type = "INMEMORY";
     InmemoryTable *table = new InmemoryTable(infot.id, rows);
+    infot.arity = table->getArity();
+    infot.manager = std::shared_ptr<EDBTable>(table);
+    dbPredicates.insert(make_pair(infot.id, infot));
+}
+
+void EDBLayer::addSparqlTable(const EDBConf::Table &tableConf) {
+    EDBInfoTable infot;
+    const string predicate = tableConf.predname;
+    infot.id = (PredId_t) predDictionary->getOrAdd(predicate);
+    if (doesPredExists(infot.id)) {
+        LOG(WARNL) << "Rewriting table for predicate " << predicate;
+        dbPredicates.erase(infot.id);
+    }
+    infot.type = "SPARQL";
+    SparqlTable *table = new SparqlTable(tableConf.params[0]);
     infot.arity = table->getArity();
     infot.manager = std::shared_ptr<EDBTable>(table);
     dbPredicates.insert(make_pair(infot.id, infot));

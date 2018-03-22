@@ -23,6 +23,7 @@ file(GLOB vlog_SRC
     "src/vlog/forward/*.cpp"
     "src/vlog/magic/*.cpp"
     "src/vlog/inmemory/*.cpp"
+    "src/vlog/sparql/*.cpp"
     "src/vlog/trident/*.cpp"
     "src/launcher/vloglayer.cpp"
     "src/launcher/vlogscan.cpp"

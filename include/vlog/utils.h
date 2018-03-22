@@ -10,23 +10,23 @@
 #ifndef __VLOG_UTILS_INCLUDED
 #define __VLOG_UTILS_INCLUDED
 class VLogUtils {
-private:
-    static void parseQuery(bool &success,
-	SPARQLParser &parser,
-	std::shared_ptr<QueryGraph> &queryGraph,
-	QueryDict &queryDict,
-	DBLayer &db);
-public:
-    VLIBEXP static std::string csvString(std::string);
-    VLIBEXP static void execSPARQLQuery(std::string sparqlquery,
-        bool explain,
-        long nterms,
-        DBLayer &db,
-        bool printstdout,
-        bool jsonoutput,
-        JSON *jsonvars,
-        JSON *jsonresults, 
-        JSON *jsonstats);
+    private:
+        static void parseQuery(bool &success,
+                SPARQLParser &parser,
+                std::shared_ptr<QueryGraph> &queryGraph,
+                QueryDict &queryDict,
+                DBLayer &db);
+    public:
+        VLIBEXP static std::string csvString(std::string);
+        VLIBEXP static void execSPARQLQuery(std::string sparqlquery,
+                bool explain,
+                long nterms,
+                DBLayer &db,
+                bool printstdout,
+                bool jsonoutput,
+                JSON *jsonvars,
+                JSON *jsonresults,
+                JSON *jsonstats);
 
 };
 #endif
