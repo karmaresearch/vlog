@@ -261,12 +261,15 @@ public class VLog {
      *            is assumed to be a variable.
      * @param includeConstants
      *            whether to include the constants in the results.
+     * @param filterBlanks
+     *            whether results with blanks in them should be filtered out
      * @return the result iterator.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      */
-    private native QueryResultIterator query(int predicate, long[] terms,
-            boolean includeConstants) throws NotStartedException;
+    public native QueryResultIterator query(int predicate, long[] terms,
+            boolean includeConstants, boolean filterBlanks)
+            throws NotStartedException;
 
     private long[] extractTerms(Term[] terms) throws NotStartedException {
         ArrayList<String> variables = new ArrayList<>();
@@ -311,7 +314,7 @@ public class VLog {
      */
     public StringQueryResultIterator query(Atom query)
             throws NotStartedException {
-        return query(query, true);
+        return query(query, true, false);
     }
 
     /**
@@ -324,17 +327,19 @@ public class VLog {
      *            the query, as an atom.
      * @param includeConstants
      *            whether to include the constants of the query in the results.
+     * @param filterBlanks
+     *            whether results with blanks in them should be filtered out
      * @return the result iterator.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      */
 
-    public StringQueryResultIterator query(Atom query, boolean includeConstants)
-            throws NotStartedException {
+    public StringQueryResultIterator query(Atom query, boolean includeConstants,
+            boolean filterBlanks) throws NotStartedException {
         int intPred = getPredicateId(query.getPredicate());
         long[] longTerms = extractTerms(query.getTerms());
         return new StringQueryResultIterator(this,
-                query(intPred, longTerms, includeConstants));
+                query(intPred, longTerms, includeConstants, filterBlanks));
     }
 
     private native void queryToCsv(int predicate, long[] term, String fileName)

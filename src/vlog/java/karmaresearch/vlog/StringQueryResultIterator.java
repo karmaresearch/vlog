@@ -6,7 +6,8 @@ import java.util.NoSuchElementException;
 /**
  * Encapsulates the result of a query.
  */
-public class StringQueryResultIterator implements Iterator<String[]> {
+public class StringQueryResultIterator
+        implements Iterator<String[]>, AutoCloseable {
 
     private final VLog vlog;
     private final QueryResultIterator iter;
@@ -53,7 +54,12 @@ public class StringQueryResultIterator implements Iterator<String[]> {
         return result;
     }
 
+    @Deprecated
     public void cleanup() {
-        iter.cleanup();
+        close();
+    }
+
+    public void close() {
+        iter.close();
     }
 };

@@ -11,6 +11,7 @@
 #include <iostream>
 #include <fstream>
 #include <cstring>
+#include <cstdint>
 
 class VLogInfo {
 public:
@@ -412,7 +413,11 @@ JNIEXPORT jstring JNICALL Java_karmaresearch_vlog_VLog_getConstant(JNIEnv *env, 
 	throwNotStartedException(env, "VLog is not started yet");
 	return NULL;
     }
-    return env->NewStringUTF(literalToString(f, literalid).c_str());
+    std::string s = f->layer->getDictText(literalid);
+    if (s == std::string("")) {
+	return NULL;
+    }
+    return env->NewStringUTF(s.c_str());
 }
 
 static TupleIterator *getQueryIter(JNIEnv *env, jobject obj, PredId_t p, jlongArray els, jboolean includeConstants) {
@@ -461,13 +466,13 @@ static TupleIterator *getQueryIter(JNIEnv *env, jobject obj, PredId_t p, jlongAr
 /*
  * Class:     karmaresearch_vlog_VLog
  * Method:    query
- * Signature: (I[JZ)Lkarmaresearch/vlog/QueryResultIterator;
+ * Signature: (I[JZZ)Lkarmaresearch/vlog/QueryResultIterator;
  */
-JNIEXPORT jobject JNICALL Java_karmaresearch_vlog_VLog_query(JNIEnv * env, jobject obj, jint p, jlongArray els, jboolean includeConstants) {
+JNIEXPORT jobject JNICALL Java_karmaresearch_vlog_VLog_query(JNIEnv * env, jobject obj, jint p, jlongArray els, jboolean includeConstants, jboolean filterBlanks) {
     TupleIterator *iter = getQueryIter(env, obj, (PredId_t) p, els, includeConstants);
     jclass jcls=env->FindClass("karmaresearch/vlog/QueryResultIterator");
-    jmethodID mID = env->GetMethodID(jcls, "<init>", "(J)V");
-    jobject jobj = env->NewObject(jcls, mID, (jlong) iter);
+    jmethodID mID = env->GetMethodID(jcls, "<init>", "(JZ)V");
+    jobject jobj = env->NewObject(jcls, mID, (jlong) iter, filterBlanks);
 
     return jobj;
 }
@@ -674,6 +679,24 @@ JNIEXPORT jlongArray JNICALL Java_karmaresearch_vlog_QueryResultIterator_next(JN
 JNIEXPORT void JNICALL Java_karmaresearch_vlog_QueryResultIterator_cleanup(JNIEnv *env, jobject obj, jlong ref) {
     TupleIterator *iter = (TupleIterator *) ref;
     delete iter;
+}
+
+/*
+ * Class:     karmaresearch_vlog_QueryResultIterator
+ * Method:    hasBlanks
+ * Signature: ([J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_karmaresearch_vlog_QueryResultIterator_hasBlanks(JNIEnv * env, jobject obj, jlongArray jv) {
+    jsize sz = env->GetArrayLength(jv);
+    jlong *e = env->GetLongArrayElements(jv, NULL);
+    for (int i = 0; i < sz; i++) {
+	if (e[i] >= (INT64_C(1) << 40)) {
+	    env->ReleaseLongArrayElements(jv, e, JNI_ABORT);
+	    return (jboolean) true;
+	}
+    }
+    env->ReleaseLongArrayElements(jv, e, JNI_ABORT);
+    return (jboolean) false;
 }
 
 
