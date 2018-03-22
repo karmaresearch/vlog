@@ -16,6 +16,7 @@
 
 #include <kognac/utils.h>
 #include <trident/utils/json.h>
+#include <trident/utils/httpclient.h>
 
 #include <string>
 #include <fstream>
@@ -266,7 +267,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             string printresults = _getValueParam(form, "print");
             string sparqlquery = _getValueParam(form, "query");
             //Decode the query
-            sparqlquery = HttpServer::unescape(sparqlquery);
+            sparqlquery = HttpClient::unescape(sparqlquery);
             std::regex e1("\\+");
             std::string replacedString;
             std::regex_replace(std::back_inserter(replacedString),
@@ -336,7 +337,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             string sauto = _getValueParam(form, "automat");
             int automatThreshold = 1000000; // microsecond timeout
 
-            srules = HttpServer::unescape(srules);
+            srules = HttpClient::unescape(srules);
             std::regex e1("\\+");
             std::string replacedString;
             std::regex_replace(std::back_inserter(replacedString),
@@ -349,7 +350,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                     srules.begin(), srules.end(), e2, "$1\n");
             srules = replacedString;
 
-            spremat = HttpServer::unescape(spremat);
+            spremat = HttpClient::unescape(spremat);
             replacedString = "";
             std::regex_replace(std::back_inserter(replacedString),
                     spremat.begin(), spremat.end(),

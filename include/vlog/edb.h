@@ -95,6 +95,7 @@ class EDBLayer {
         void addMDLiteTable(const EDBConf::Table &tableConf);
 #endif
         VLIBEXP void addInmemoryTable(const EDBConf::Table &tableConf);
+        VLIBEXP void addSparqlTable(const EDBConf::Table &tableConf);
 
     public:
         EDBLayer(EDBConf &conf, bool multithreaded) {
@@ -123,6 +124,8 @@ class EDBLayer {
 #endif
                 } else if (table.type == "INMEMORY") {
                     addInmemoryTable(table);
+                } else if (table.type == "SPARQL") {
+                    addSparqlTable(table);
                 } else {
                     LOG(ERRORL) << "Type of table is not supported";
                     throw 10;
