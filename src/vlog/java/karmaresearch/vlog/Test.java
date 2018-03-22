@@ -72,7 +72,23 @@ class Test {
     private static String[][] p2_contents = { { "c", "d", "e" },
             { "f", "g", "h" } };
 
+    public static void testEmpty() throws Exception {
+        VLog vlog = new VLog();
+        vlog.setLogLevel("info");
+        vlog.start("", false);
+        vlog.writeQueryResultsToCsv(
+                new Atom("p2", new Term(TermType.VARIABLE, "v1")), "blabla");
+        ArrayList<Rule> rules = new ArrayList<>();
+        rules.add(rule1);
+        vlog.setRules(rules.toArray(new Rule[rules.size()]),
+                RuleRewriteStrategy.AGGRESSIVE);
+        vlog.materialize(false);
+        vlog.writeQueryResultsToCsv(
+                new Atom("p2", new Term(TermType.VARIABLE, "v1")), "blabla");
+    }
+
     static void runTest(String fn) throws Exception {
+        testEmpty();
         VLog vlog = new VLog();
         vlog.setLogLevel("info");
         try {
