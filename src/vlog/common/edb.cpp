@@ -128,7 +128,7 @@ void EDBLayer::addSparqlTable(const EDBConf::Table &tableConf) {
         dbPredicates.erase(infot.id);
     }
     infot.type = "SPARQL";
-    SparqlTable *table = new SparqlTable(tableConf.params[0]);
+    SparqlTable *table = new SparqlTable(tableConf.params[0], this);
     infot.arity = table->getArity();
     infot.manager = std::shared_ptr<EDBTable>(table);
     dbPredicates.insert(make_pair(infot.id, infot));

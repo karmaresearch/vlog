@@ -12,9 +12,10 @@ class SparqlTable : public EDBTable {
         HttpClient::URL endpoint;
         HttpClient client;
         bool isConnected;
+	EDBLayer *layer;
 
         std::string literalToSparql(const Literal &query,
-                const std::vector<uint8_t> &fields);
+                const std::vector<uint8_t> &fields, bool count);
 
     public:
         uint8_t getArity() const {
@@ -25,7 +26,7 @@ class SparqlTable : public EDBTable {
             return false;
         }
 
-        SparqlTable(string repository);
+        SparqlTable(string repository, EDBLayer *layer);
 
         void query(QSQQuery *query, TupleTable *outputTable,
                 std::vector<uint8_t> *posToFilter,

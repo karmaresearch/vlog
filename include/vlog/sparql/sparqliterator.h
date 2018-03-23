@@ -5,23 +5,44 @@
 #include <vlog/edbtable.h>
 #include <vlog/edbiterator.h>
 
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
+
 class SparqlIterator : public EDBIterator {
     private:
+	EDBLayer *layer;
+	json queryResult;
+	json::iterator it;
+	uint64_t row[128];
+	Literal query;
+	bool skipDuplicated;
+	bool hasNextChecked;
+	bool hasNextValue;
+	bool isFirst;
+	int vars[128];	// for every position, indicates which variable number to use
+	std::vector<uint8_t> sortFields;
 
     public:
-        SparqlIterator();
+        SparqlIterator(const json &qr, EDBLayer *l, const Literal &q, const std::vector<uint8_t> &sf);
 
         bool hasNext();
 
         void next();
 
-        Term_t getElementAt(const uint8_t p);
+        Term_t getElementAt(const uint8_t p) {
+	    return row[p];
+	}
 
-        PredId_t getPredicateID();
+        PredId_t getPredicateID() {
+	    return query.getPredicate().getId();
+	}
 
-        void skipDuplicatedFirstColumn();
+        void skipDuplicatedFirstColumn() {
+	    skipDuplicated = true;
+	}
 
-        void clear();
+        void clear() {
+	}
 };
 
 #endif
