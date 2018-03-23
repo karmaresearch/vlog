@@ -252,6 +252,7 @@ class Test {
         }
 
         vlog.writeQueryResultsToCsv(query, "queryResult");
+        vlog.writeQueryResultsToCsv(query, "filteredQueryResult", true);
 
         rules.clear();
         rules.add(rule1);

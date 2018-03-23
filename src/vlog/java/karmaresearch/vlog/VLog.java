@@ -342,8 +342,8 @@ public class VLog {
                 query(intPred, longTerms, includeConstants, filterBlanks));
     }
 
-    private native void queryToCsv(int predicate, long[] term, String fileName)
-            throws IOException;
+    private native void queryToCsv(int predicate, long[] term, String fileName,
+            boolean filterBlanks) throws IOException;
 
     /**
      * Writes the result of a query to a CSV file.
@@ -361,9 +361,30 @@ public class VLog {
      */
     public void writeQueryResultsToCsv(Atom query, String fileName)
             throws NotStartedException, IOException {
+        writeQueryResultsToCsv(query, fileName, false);
+    }
+
+    /**
+     * Writes the result of a query to a CSV file.
+     *
+     * @param query
+     *            the query
+     * @param fileName
+     *            the file to write to.
+     * @param filterBlanks
+     *            whether results with blanks in them should be filtered out
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet, or materialization
+     *                has not run yet
+     * @exception IOException
+     *                is thrown when the file could not be written for some
+     *                reason
+     */
+    public void writeQueryResultsToCsv(Atom query, String fileName,
+            boolean filterBlanks) throws NotStartedException, IOException {
         int intPred = getPredicateId(query.getPredicate());
         long[] longTerms = extractTerms(query.getTerms());
-        queryToCsv(intPred, longTerms, fileName);
+        queryToCsv(intPred, longTerms, fileName, filterBlanks);
     }
 
     /**

@@ -13,6 +13,8 @@
 #include <cstring>
 #include <cstdint>
 
+#define IS_BLANK(c) (c >= (INT64_C(1) << 40))
+
 class VLogInfo {
 public:
     SemiNaiver *sn;
@@ -607,9 +609,9 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_writePredicateToCsv(JNIEnv *
 /*
  * Class:     karmaresearch_vlog_VLog
  * Method:    queryToCsv
- * Signature: (I[JLjava/lang/String;)V
+ * Signature: (I[JLjava/lang/String;Z)V
  */
-JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_queryToCsv(JNIEnv *env, jobject obj, jint pred, jlongArray q, jstring jfile) {
+JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_queryToCsv(JNIEnv *env, jobject obj, jint pred, jlongArray q, jstring jfile, jboolean filterBlanks) {
     char buffer[65536];
     VLogInfo *f = getVLogInfo(env, obj);
     if (f == NULL || f->program == NULL) {
@@ -629,6 +631,19 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_queryToCsv(JNIEnv *env, jobj
     size_t sz = iter->getTupleSize();
     while (iter->hasNext()) {
 	iter->next();
+	if (filterBlanks) {
+	    bool filter = false;
+	    for (int i = 0; i < sz; i++) {
+		if (IS_BLANK(iter->getElementAt(i))) {
+		    // It is a blank.
+		    filter = true;
+		    break;
+		}
+	    }
+	    if (filter) {
+		continue;
+	    }
+	}
 	for (int i = 0; i < sz; i++) {
 	    if (i != 0) {
 		streamout << ",";
@@ -690,7 +705,7 @@ JNIEXPORT jboolean JNICALL Java_karmaresearch_vlog_QueryResultIterator_hasBlanks
     jsize sz = env->GetArrayLength(jv);
     jlong *e = env->GetLongArrayElements(jv, NULL);
     for (int i = 0; i < sz; i++) {
-	if (e[i] >= (INT64_C(1) << 40)) {
+	if (IS_BLANK(e[i])) {
 	    env->ReleaseLongArrayElements(jv, e, JNI_ABORT);
 	    return (jboolean) true;
 	}
