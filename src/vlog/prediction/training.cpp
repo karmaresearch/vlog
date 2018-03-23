@@ -510,24 +510,6 @@ void parseQueriesLog(vector<string>& testQueriesLog,
     }
 }
 
-void normalize(vector<Metrics>& featuresVector) {
-    double minCost = numeric_limits<double>::max();
-    double maxCost = 0.0;
-    for (int i = 0; i < featuresVector.size(); ++i) {
-        if (featuresVector[i].cost < minCost) {
-            minCost = featuresVector[i].cost;
-        }
-        if (featuresVector[i].cost > maxCost) {
-            maxCost = featuresVector[i].cost;
-        }
-    }
-    LOG(INFOL) << " Min cost = "<< minCost;
-    LOG(INFOL) << " Max cost = "<< maxCost;
-    for (int i = 0; i < featuresVector.size(); ++i) {
-        featuresVector[i].cost = (featuresVector[i].cost - minCost)/(maxCost - minCost);
-    }
-}
-
 void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         vector<string>& testQueriesLog,
         EDBLayer& edb,
@@ -597,30 +579,42 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         LOG(WARNL) << "More magic queries than QSQR!!";
     }
 
-    normalize(balancedFeaturesVector);
-
     vector<pair<string, int>> trainingQueriesAndResult;
+
+    bool use5050 = false;
+    vector<Metrics>* ptrFeatures = NULL;
+    vector<int>* ptrDecisions = NULL;
+    vector<string>* ptrQueries = NULL;
+    if (use5050){
+        ptrFeatures = &balancedFeaturesVector;
+        ptrDecisions = &balancedDecisionVector;
+        ptrQueries = &balancedTrainingQueriesVector;
+    } else {
+        ptrFeatures = &featuresVector;
+        ptrDecisions = &decisionVector;
+        ptrQueries = &trainingQueriesVector;
+    }
 
     int trainingQsqr = 0;
     int trainingMagic = 0;
-    vector<Instance> dataset;
-    for (int i = 0; i < balancedFeaturesVector.size(); ++i) {
+    vector<Instance> instances;
+    for (int i = 0; i < ptrFeatures->size(); ++i) {
         vector<double> features;
-        features.push_back(balancedFeaturesVector[i].cost);
-        features.push_back(balancedFeaturesVector[i].estimate);
-        features.push_back(balancedFeaturesVector[i].countRules);
-        features.push_back(balancedFeaturesVector[i].countUniqueRules);
-        features.push_back(balancedFeaturesVector[i].countIntermediateQueries);
-        features.push_back(balancedFeaturesVector[i].countIDBPredicates);
-        int label = balancedDecisionVector[i];
+        features.push_back((*ptrFeatures)[i].cost);
+        features.push_back((*ptrFeatures)[i].estimate);
+        features.push_back((*ptrFeatures)[i].countRules);
+        features.push_back((*ptrFeatures)[i].countUniqueRules);
+        features.push_back((*ptrFeatures)[i].countIntermediateQueries);
+        features.push_back((*ptrFeatures)[i].countIDBPredicates);
+        int label = (*ptrDecisions)[i];
         if (label == 1) {
             trainingQsqr++;
         } else {
             trainingMagic++;
-            trainingQueriesAndResult.push_back(std::make_pair(balancedTrainingQueriesVector[i], label));
+            trainingQueriesAndResult.push_back(std::make_pair((*ptrQueries)[i], label));
         }
         Instance instance(label, features);
-        dataset.push_back(instance);
+        instances.push_back(instance);
     }
 
     if (logTraining.fail()) {
@@ -628,8 +622,19 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
     }
     logTraining.close();
 
+    // Normalization
+    for (int i =0; i < instances.size(); ++i) {
+        instances[i].x[0] = std::log1p(instances[i].x[0]);
+        instances[i].x[1] = std::log1p(instances[i].x[1]);
+        instances[i].x[2] = std::log1p(instances[i].x[2]);
+        instances[i].x[3] = std::log1p(instances[i].x[3]);
+        instances[i].x[4] = std::log1p(instances[i].x[4]);
+        instances[i].x[5] = std::log1p(instances[i].x[5]);
+    }
+    int totalTraining = instances.size();
+    double k = ((double)trainingQsqr / (double)totalTraining);//*100;
     LogisticRegression lr(6);
-    lr.train(dataset);
+    lr.train(instances);
 
     ofstream logCorrectlyGuessedMagic("correctly-guessed-magic.log");
     vector<Metrics> testMetrics;
@@ -642,6 +647,7 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
     int hitQsqr = 0;
     int hitMagic = 0;
     LOG(INFOL) << " # Test queries = " << testMetrics.size();
+    vector<Instance> testInst;
     for (int i = 0; i < testMetrics.size(); ++i) {
         vector<double> features;
         features.push_back(testMetrics[i].cost);
@@ -651,9 +657,25 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         features.push_back(testMetrics[i].countIntermediateQueries);
         features.push_back(testMetrics[i].countIDBPredicates);
 
+        int label = testDecisions[i];
+        Instance instance(label, features);
+        testInst.push_back(instance);
+    }
+
+    for (int i =0; i < testInst.size(); ++i) {
+        testInst[i].x[0] = std::log1p(testInst[i].x[0]);
+        testInst[i].x[1] = std::log1p(testInst[i].x[1]);
+        testInst[i].x[2] = std::log1p(testInst[i].x[2]);
+        testInst[i].x[3] = std::log1p(testInst[i].x[3]);
+        testInst[i].x[4] = std::log1p(testInst[i].x[4]);
+        testInst[i].x[5] = std::log1p(testInst[i].x[5]);
+    }
+
+    for (int i = 0; i < testInst.size(); ++i){
         int myDecision = 0;
-        double probability = lr.classify(features);
-        if (probability > 0.5) {
+        double probability = lr.classify(testInst[i].x);
+        // k was 0.5
+        if (probability > k) {
             myDecision = 1;
         }
         //int result = -1;
@@ -664,12 +686,12 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         //    myDecision = result;
         //}
 
-        if (testDecisions[i] == 1) {
+        if (testInst[i].label == 1) {
             totalQsqr++;
         } else {
             totalMagic++;
         }
-        if (myDecision == testDecisions[i]) {
+        if (myDecision == testInst[i].label) {
             if (myDecision == 1) {
                 hitQsqr++;
             } else {

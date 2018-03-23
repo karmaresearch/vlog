@@ -9,13 +9,13 @@ using namespace std;
 LogisticRegression::LogisticRegression(int n) {
     this->rate = 0.0001;
     this->ITERATIONS = 3000;
-    for (int i = 0; i < n-2; ++i) {
+    for (int i = 0; i < n; ++i) {
         weights.push_back(0.0);
     }
 }
 
 double LogisticRegression::sigmoid(double z) {
-    return 1.0 / (1.0 + exp(-z));
+    return (double)1.0 /(double) (1.0 + exp(-z));
 }
 
 void LogisticRegression::train(vector<Instance>& instances) {
@@ -30,7 +30,7 @@ void LogisticRegression::train(vector<Instance>& instances) {
             }
 
             // Not necessary for learning
-            lik += label * log(classify(x)) + (1-label) * log(1 - classify(x));
+            //lik += label * log(classify(x)) + (1-label) * log(1 - classify(x));
         }
 
         std::ostringstream strs;
@@ -45,7 +45,7 @@ double LogisticRegression::classify(vector<double>& x) {
         logit += weights[i] * x[i];
     }
 
-    return (sigmoid(logit) > 0.5) ? 0.0 : 1.0;
+    return sigmoid(logit);// > 0.5) ? 0.0 : 1.0;
 }
 
 vector<Instance> LogisticRegression::readDataset(std::string fileName) {
@@ -71,7 +71,7 @@ vector<Instance> LogisticRegression::readDataset(std::string fileName) {
         int i = 0;
         vector<double> data(columns.size() - 1, 0);
         for (i = 0; i < columns.size() - 1; ++i) {
-            data[i-1] = atoi(columns[i].c_str());
+            data[i-1] = atof(columns[i].c_str());
         }
         int label = atoi(columns[i].c_str());
         Instance instance(label, data);
