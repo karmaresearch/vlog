@@ -312,7 +312,7 @@ public class VLog {
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      */
-    public StringQueryResultIterator query(Atom query)
+    public TermQueryResultIterator query(Atom query)
             throws NotStartedException {
         return query(query, true, false);
     }
@@ -334,11 +334,11 @@ public class VLog {
      *                is thrown when vlog is not started yet.
      */
 
-    public StringQueryResultIterator query(Atom query, boolean includeConstants,
+    public TermQueryResultIterator query(Atom query, boolean includeConstants,
             boolean filterBlanks) throws NotStartedException {
         int intPred = getPredicateId(query.getPredicate());
         long[] longTerms = extractTerms(query.getTerms());
-        return new StringQueryResultIterator(this,
+        return new TermQueryResultIterator(this,
                 query(intPred, longTerms, includeConstants, filterBlanks));
     }
 

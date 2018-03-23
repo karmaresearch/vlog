@@ -129,20 +129,20 @@ class Test {
         vlog.start("", false);
         vlog.addData("A", new String[][] { { "a" } });
         vlog.addData("A", new String[][] { { "a" }, { "b" } });
-        try (StringQueryResultIterator e = vlog
+        try (TermQueryResultIterator e = vlog
                 .query(new Atom("A", new Term(Term.TermType.CONSTANT, "C")))) {
             if (e.hasNext()) {
                 throw new Error("Error in query");
             }
             System.out.println("Trying EDB query without constants ...");
         }
-        try (StringQueryResultIterator e = vlog.query(
+        try (TermQueryResultIterator e = vlog.query(
                 new Atom("A", new Term(Term.TermType.CONSTANT, "a")), false,
                 false)) {
             if (!e.hasNext()) {
                 throw new Error("Error in query");
             }
-            String[] v = e.next();
+            Term[] v = e.next();
             if (v.length > 0) {
                 throw new Error("Error in query");
             }
@@ -151,17 +151,17 @@ class Test {
             }
         }
         System.out.println("Trying same EDB query with constants ...");
-        try (StringQueryResultIterator e = vlog.query(
+        try (TermQueryResultIterator e = vlog.query(
                 new Atom("A", new Term(Term.TermType.CONSTANT, "a")), true,
                 false)) {
             if (!e.hasNext()) {
                 throw new Error("Error in query");
             }
-            String[] v = e.next();
+            Term[] v = e.next();
             if (v.length != 1) {
                 throw new Error("Error in query");
             }
-            if (!v[0].equals("a")) {
+            if (!v[0].getName().equals("a")) {
                 throw new Error("Error in query");
             }
             if (e.hasNext()) {
@@ -169,10 +169,10 @@ class Test {
             }
         }
         System.out.println("Trying EDB query with variable ...");
-        try (StringQueryResultIterator e = vlog
+        try (TermQueryResultIterator e = vlog
                 .query(new Atom("A", new Term(Term.TermType.VARIABLE, "C")))) {
             while (e.hasNext()) {
-                String[] result = e.next();
+                Term[] result = e.next();
                 System.out.println("result: " + Arrays.toString(result));
             }
         }
@@ -185,20 +185,20 @@ class Test {
         vlog.setRules(rules.toArray(new Rule[rules.size()]),
                 RuleRewriteStrategy.AGGRESSIVE);
         vlog.materialize(false);
-        try (StringQueryResultIterator e = vlog
+        try (TermQueryResultIterator e = vlog
                 .query(new Atom("B", new Term(Term.TermType.CONSTANT, "C")))) {
             if (e.hasNext()) {
                 throw new Error("Error in query");
             }
         }
         System.out.println("Trying IDB query without constants ...");
-        try (StringQueryResultIterator e = vlog.query(
+        try (TermQueryResultIterator e = vlog.query(
                 new Atom("B", new Term(Term.TermType.CONSTANT, "a")), false,
                 false)) {
             if (!e.hasNext()) {
                 throw new Error("Error in query");
             }
-            String[] v = e.next();
+            Term[] v = e.next();
             if (v.length > 0) {
                 throw new Error("Error in query");
             }
@@ -207,17 +207,17 @@ class Test {
             }
         }
         System.out.println("Trying same IDB query with constants ...");
-        try (StringQueryResultIterator e = vlog.query(
+        try (TermQueryResultIterator e = vlog.query(
                 new Atom("B", new Term(Term.TermType.CONSTANT, "a")), true,
                 false)) {
             if (!e.hasNext()) {
                 throw new Error("Error in query");
             }
-            String[] v = e.next();
+            Term[] v = e.next();
             if (v.length != 1) {
                 throw new Error("Error in query");
             }
-            if (!v[0].equals("a")) {
+            if (!v[0].getName().equals("a")) {
                 throw new Error("Error in query");
             }
             if (e.hasNext()) {
@@ -241,10 +241,10 @@ class Test {
         q.add(new Term(TermType.VARIABLE, "?C1"));
         Atom query = new Atom("prescription", q.toArray(new Term[q.size()]));
 
-        try (StringQueryResultIterator result = vlog.query(query)) {
+        try (TermQueryResultIterator result = vlog.query(query)) {
             while (result.hasNext()) {
-                String[] r = result.next();
-                for (String s : r) {
+                Term[] r = result.next();
+                for (Term s : r) {
                     System.out.print(s + " ");
                 }
                 System.out.println();
@@ -264,10 +264,10 @@ class Test {
         vlog.setRules(rules.toArray(new Rule[rules.size()]),
                 RuleRewriteStrategy.AGGRESSIVE);
         vlog.materialize(false);
-        try (StringQueryResultIterator result = vlog.query(query, true, true)) {
+        try (TermQueryResultIterator result = vlog.query(query, true, true)) {
             while (result.hasNext()) {
-                String[] r = result.next();
-                for (String s : r) {
+                Term[] r = result.next();
+                for (Term s : r) {
                     System.out.print(s + " ");
                 }
                 System.out.println();
