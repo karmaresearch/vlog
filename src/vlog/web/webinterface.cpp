@@ -110,42 +110,6 @@ static string _getValueParam(string req, string param) {
     }
 }
 
-/*void WebInterface::parseQuery(bool &success,
-        SPARQLParser &parser,
-        std::shared_ptr<QueryGraph> &queryGraph,
-        QueryDict &queryDict,
-        DBLayer &db) {
-
-    //Sometimes the query introduces new constants which need an ID
-    try {
-        parser.parse();
-    } catch (const SPARQLParser::ParserException& e) {
-        cerr << "parse error: " << e.message << endl;
-        success = false;
-        return;
-    }
-
-    queryGraph = std::shared_ptr<QueryGraph>(new QueryGraph(parser.getVarCount()));
-
-    // And perform the semantic anaylsis
-    try {
-        SemanticAnalysis semana(db, queryDict);
-        semana.transform(parser, *queryGraph.get());
-    } catch (const SemanticAnalysis::SemanticException& e) {
-        cerr << "semantic error: " << e.message << endl;
-        success = false;
-        return;
-    }
-    if (queryGraph->knownEmpty()) {
-        cout << "<empty result -- known empty>" << endl;
-        success = false;
-        return;
-    }
-
-    success = true;
-    return;
-}*/
-
 string WebInterface::lookup(string sId, DBLayer &db) {
     const char *start;
     const char *end;
