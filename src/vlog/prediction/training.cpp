@@ -513,6 +513,7 @@ void parseQueriesLog(vector<string>& testQueriesLog,
         vector<int>& expectedDecisions) {
 
     for (auto line: testQueriesLog) {
+        LOG(INFOL) << "Parsing line : " << line;
         // A line looks like this (An underscore (_) represents a space)
         // query_fe,a,t,u,r,es_QSQTime_MagicTime_Decision
         //RP29(<http://www.Department4.University60.edu/FullProfessor5>,B) 4.000000,4,1,1,2,0 1.290000 2.069000 1
@@ -557,13 +558,13 @@ double computeAccuracy(vector<Instance>& testInst, LogisticRegression& lr, doubl
         //    myDecision = result;
         //}
 
-        if (testInst[i].label == 1) {
+        if (testInst[i].label == 0) {
             totalQsqr++;
         } else {
             totalMagic++;
         }
         if (myDecision == testInst[i].label) {
-            if (myDecision == 1) {
+            if (myDecision == 0) {
                 hitQsqr++;
                 //LOG(INFOL)<< " ###### Qsqr picked at probability : " << probability;
             } else {
@@ -623,7 +624,7 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         strQsqrTime.push_back(qsqrTime);
         logTraining << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back() << endl;
         strMagicTime.push_back(magicTime);
-        if (decisionVector.back() == 0) {
+        if (decisionVector.back() == 1) {
             nMagicQueries++;
         }
     }
@@ -633,7 +634,7 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
     vector<string> balancedTrainingQueriesVector;
     int nQsqrQueries = 0;
     for (int i = 0; i < featuresVector.size(); ++i) {
-        if (decisionVector[i] == 1) {
+        if (decisionVector[i] == 0) {
             if (nQsqrQueries < nMagicQueries) {
                 balancedFeaturesVector.push_back(featuresVector[i]);
                 balancedDecisionVector.push_back(decisionVector[i]);
@@ -648,7 +649,7 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
     }
 
     if(balancedFeaturesVector.size() != (2 * nMagicQueries)) {
-        LOG(WARNL) << "More magic queries than QSQR!!";
+        LOG(INFOL) << "More magic queries than QSQR!!";
     }
 
     vector<pair<string, int>> trainingQueriesAndResult;
@@ -679,7 +680,7 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         features.push_back((*ptrFeatures)[i].countIntermediateQueries);
         features.push_back((*ptrFeatures)[i].countIDBPredicates);
         int label = (*ptrDecisions)[i];
-        if (label == 1) {
+        if (label == 0) {
             trainingQsqr++;
         } else {
             trainingMagic++;
