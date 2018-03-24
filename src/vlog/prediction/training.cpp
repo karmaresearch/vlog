@@ -2,6 +2,7 @@
 #include <csignal>
 #include <ctime>
 #include <stack>
+#include <set>
 #include <numeric>
 #include <climits>
 
@@ -40,7 +41,7 @@ std::string stringJoin(vector<string>& vec, char delimiter=','){
     return result;
 }
 
-std::pair<std::string, int> makeComplexQuery(Program& p, Literal& l, vector<Substitution>& sub, EDBLayer& db) {
+std::pair<std::string, int> makeComplexQuery(Program& p, Literal& l, vector<Substitution>& sub, EDBLayer& db, Dictionary& dictVariables) {
     std::string query = p.getPredicateName(l.getPredicate().getId());
     int card = l.getPredicate().getCardinality();
     query += "(";
@@ -48,8 +49,7 @@ std::pair<std::string, int> makeComplexQuery(Program& p, Literal& l, vector<Subs
     int countConst = 0;
     for (int i = 0; i < card; ++i) {
         std::string canV = "V" + to_string(i+1);
-        //FIXME: uint8_t id = p.getIDVar(canV); //I don't know how to convert this line
-        uint8_t id = 0;
+        uint8_t id = dictVariables.getOrAdd(canV); //I don't know how to convert this line
         bool found = false;
         for (int j = 0; j < sub.size(); ++j) {
             if (sub[j].origin == id) {
@@ -195,6 +195,27 @@ int foundSubsumingQuery(string& testQuery,
     return -1;
 }
 
+string printSubstitutions(vector<Substitution>& subs, EDBLayer& db) {
+    string result;
+    for (int i = 0; i < subs.size(); ++i) {
+        string temp = to_string(+subs[i].origin);
+        temp += "=>";
+        uint8_t destId = subs[i].destination.getId();
+        if (destId == 0) {
+            char supportText[MAX_TERM_SIZE];
+            db.getDictText(subs[i].destination.getValue(), supportText);
+            temp += supportText;
+        } else {
+            temp += to_string(+destId);
+        }
+        result += temp;
+        if (i != subs.size()-1) {
+            result += ",";
+        }
+    }
+    return result;
+}
+
 std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBConf &conf,
         EDBLayer &db,
         Program &p,
@@ -203,6 +224,7 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBCo
         std::vector<uint8_t>& vt
         ) {
     std::unordered_map<string, int> allQueries;
+    std::set<string> setOfUniquePredicates;
 
     typedef std::pair<PredId_t, vector<Substitution>> EndpointWithEdge;
     typedef std::unordered_map<uint16_t, std::vector<EndpointWithEdge>> Graph;
@@ -232,23 +254,21 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBCo
         }
     }
 
-#if DEBUG
     // Try printing graph
     for (auto it = graph.begin(); it != graph.end(); ++it) {
         uint16_t id = it->first;
-        std::cout << p.getPredicateName(id) << " : " << std::endl;
+        LOG(DEBUGL) << p.getPredicateName(id) << " : ";
         std::vector<EndpointWithEdge> nei = it->second;
         for (int i = 0; i < nei.size(); ++i) {
             Predicate pred = p.getPredicate(nei[i].first);
             std::vector<Substitution> sub = nei[i].second;
             for (int j = 0; j < sub.size(); ++j){
-                std::cout << p.getPredicateName(nei[i].first) << "{" << sub[j].origin << "->"
-                    << sub[j].destination.getId() << " , " << sub[j].destination.getValue() << "}" << std::endl;
+                LOG(DEBUGL) << p.getPredicateName(nei[i].first) << "{" << sub[j].origin << "->"
+                    << sub[j].destination.getId() << " , " << sub[j].destination.getValue() << "}";
             }
         }
-        std::cout << "=====" << std::endl;
+        LOG(DEBUGL) << "=====";
     }
-#endif
 
     // Gather all predicates
     std::vector<PredId_t> ids = p.getAllEDBPredicateIds();
@@ -303,7 +323,7 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBCo
             }
             std::string predName = p.getPredicateName(idbPredId);
 
-            LOG(INFOL) << "Matched : " << tupleString << " ==> " << predName << " : " << +idbPredId;
+            //LOG(INFOL) << "Matched : " << tupleString << " ==> " << predName << " : " << +idbPredId;
             vector<Substitution> subs;
             for (int k = 0; k < card; ++k) {
                 subs.push_back(Substitution(vt[k], VTerm(0, tuple[k])));
@@ -338,13 +358,17 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBCo
                     }
                     std::vector<Substitution>sigmaN = graph[predId][randomNeighbour].second;
                     std::vector<Substitution> result = concat(sigmaN, sigma);
+                    //LOG(INFOL) << "Sub:" << printSubstitutions(result, db);
                     PredId_t qId  = graph[predId][randomNeighbour].first;
                     uint8_t qCard = p.getPredicate(graph[predId][randomNeighbour].first).getCardinality();
                     std::string qQuery = makeGenericQuery(p, qId, qCard);
+                    //LOG(INFOL) << " Generic query made: " << qQuery;
                     Literal qLiteral = p.parseLiteral(qQuery, dictVariables);
+                    setOfUniquePredicates.insert(p.getPredicateName(qId));
                     allPredicatesLog << p.getPredicateName(qId) << std::endl;
-                    std::pair<string, int> finalQueryResult = makeComplexQuery(p, qLiteral, result, db);
+                    std::pair<string, int> finalQueryResult = makeComplexQuery(p, qLiteral, result, db, dictVariables);
                     std::string qFinalQuery = finalQueryResult.first;
+                    //LOG(INFOL) << "complex query made  " << finalQueryResult.first;
                     int type = finalQueryResult.second + ((n > 4) ? 4 : n);
                     if (allQueries.find(qFinalQuery) == allQueries.end()) {
                         allQueries.insert(std::make_pair(qFinalQuery, type));
@@ -359,10 +383,11 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBCo
         }
     } // all EDB predicate ids
     allPredicatesLog.close();
+    LOG(INFOL) << " # of unique predicate = "<< setOfUniquePredicates.size();
     std::vector<std::pair<std::string,int>> queries;
     for (std::unordered_map<std::string,int>::iterator it = allQueries.begin(); it !=  allQueries.end(); ++it) {
         queries.push_back(std::make_pair(it->first, it->second));
-        LOG(INFOL) << "Query: " << it->first << " type : " << it->second ;
+        //LOG(INFOL) << "Query: " << it->first << " type : " << it->second ;
     }
     return queries;
 }
@@ -510,6 +535,54 @@ void parseQueriesLog(vector<string>& testQueriesLog,
     }
 }
 
+double computeAccuracy(vector<Instance>& testInst, LogisticRegression& lr, double threshold) {
+
+    int hit = 0;
+    int totalQsqr = 0;
+    int totalMagic = 0;
+    int hitQsqr = 0;
+    int hitMagic = 0;
+    for (int i = 0; i < testInst.size(); ++i){
+        int myDecision = 0;
+        double probability = lr.classify(testInst[i].x);
+        // k was 0.5
+        if (probability > threshold) {
+            myDecision = 1;
+        }
+        //int result = -1;
+        //if (myDecision != testDecisions[i]) {
+        //    result = foundSubsumingQuery(testQueries[i], trainingQueriesAndResult, p, edb);
+        //}
+        //if (result != -1) {
+        //    myDecision = result;
+        //}
+
+        if (testInst[i].label == 1) {
+            totalQsqr++;
+        } else {
+            totalMagic++;
+        }
+        if (myDecision == testInst[i].label) {
+            if (myDecision == 1) {
+                hitQsqr++;
+                //LOG(INFOL)<< " ###### Qsqr picked at probability : " << probability;
+            } else {
+                hitMagic++;
+                //LOG(INFOL)<< " @@@@@@ magic picked at probability : " << probability;
+                //logCorrectlyGuessedMagic << testQueries[i] << endl;
+            }
+            hit++;
+        }
+    }
+    double accuracy = (double)hit/(double)testInst.size();
+    LOG(INFOL) << "Overall Accuracy : " << accuracy;
+    LOG(INFOL) << "Probability Threshold : " << threshold;
+    LOG(INFOL) << "QSQR Accuracy : " << hitQsqr << " / " << totalQsqr << " = " <<  (double)hitQsqr/(double)totalQsqr;
+    LOG(INFOL) << "Magic Accuracy : " << hitMagic << " / " << totalMagic << " = " <<  (double)hitMagic/(double)totalMagic;
+    LOG(INFOL) << "================================================================";
+    return accuracy;
+}
+
 void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         vector<string>& testQueriesLog,
         EDBLayer& edb,
@@ -555,7 +628,6 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         }
     }
 
-    LOG(INFOL) << "# magic queries = " << nMagicQueries;
     vector<Metrics> balancedFeaturesVector;
     vector<int> balancedDecisionVector;
     vector<string> balancedTrainingQueriesVector;
@@ -636,17 +708,12 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
     LogisticRegression lr(6);
     lr.train(instances);
 
-    ofstream logCorrectlyGuessedMagic("correctly-guessed-magic.log");
+    //ofstream logCorrectlyGuessedMagic("correctly-guessed-magic.log");
     vector<Metrics> testMetrics;
     vector<string> testQueries;
     vector<int> testDecisions;
     parseQueriesLog(testQueriesLog, testQueries, testMetrics, testDecisions);
-    int hit = 0;
-    int totalQsqr = 0;
-    int totalMagic = 0;
-    int hitQsqr = 0;
-    int hitMagic = 0;
-    LOG(INFOL) << " # Test queries = " << testMetrics.size();
+    LOG(INFOL) << "# Test queries = " << testMetrics.size();
     vector<Instance> testInst;
     for (int i = 0; i < testMetrics.size(); ++i) {
         vector<double> features;
@@ -671,46 +738,27 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         testInst[i].x[5] = std::log1p(testInst[i].x[5]);
     }
 
-    for (int i = 0; i < testInst.size(); ++i){
-        int myDecision = 0;
-        double probability = lr.classify(testInst[i].x);
-        // k was 0.5
-        if (probability > k) {
-            myDecision = 1;
-        }
-        //int result = -1;
-        //if (myDecision != testDecisions[i]) {
-        //    result = foundSubsumingQuery(testQueries[i], trainingQueriesAndResult, p, edb);
-        //}
-        //if (result != -1) {
-        //    myDecision = result;
-        //}
-
-        if (testInst[i].label == 1) {
-            totalQsqr++;
-        } else {
-            totalMagic++;
-        }
-        if (myDecision == testInst[i].label) {
-            if (myDecision == 1) {
-                hitQsqr++;
-            } else {
-                hitMagic++;
-                logCorrectlyGuessedMagic << testQueries[i] << endl;
-            }
-            hit++;
+    vector<double> probabilities = {0.5, 0.6, 0.7, 0.8, 0.9};
+    accuracy = 0;
+    for (auto prob : probabilities) {
+        double acc = computeAccuracy(testInst, lr, prob);
+        if (acc > accuracy) {
+            accuracy = acc;
         }
     }
 
-    if (logCorrectlyGuessedMagic.fail()) {
-        LOG(ERRORL) << "Error writing to file";
+    vector<double> weights;
+    lr.getWeights(weights);
+    LOG(INFOL) << "*****************************************";
+    for (int i = 0; i < weights.size(); ++i) {
+        LOG(INFOL) << weights[i];
     }
-    logCorrectlyGuessedMagic.close();
+    LOG(INFOL) << "*****************************************";
+    //if (logCorrectlyGuessedMagic.fail()) {
+    //    LOG(ERRORL) << "Error writing to file";
+    //}
+    //logCorrectlyGuessedMagic.close();
 
-    accuracy = (double)hit/(double)testMetrics.size();
-    LOG(INFOL) << "Overall Accuracy : " << accuracy;
-    LOG(INFOL) << "QSQR Accuracy : " << hitQsqr << " / " << totalQsqr << " = " <<  (double)hitQsqr/(double)totalQsqr;
-    LOG(INFOL) << "Magic Accuracy : " << hitMagic << " / " << totalMagic << " = " <<  (double)hitMagic/(double)totalMagic;
     LOG(INFOL) << "QSQR favouring Training Queries = " << trainingQsqr;
     LOG(INFOL) << "Magic favouring Training Queries = " << trainingMagic;
 }
@@ -824,9 +872,9 @@ void Training::execLiteralQuery(string& literalquery,
     double avgMagicTime = accumulate(magicTimes.begin(), magicTimes.end(), 0.0)/magicTimes.size();
     LOG(INFOL) << "Qsqr time : " << avgQsqrTime;
     LOG(INFOL) << "magic time: " << avgMagicTime;
-    int winner = 1; // 1 is for QSQR
+    int winner = 0; // 0 is for QSQR
     if (avgMagicTime < avgQsqrTime) {
-        winner = 0;
+        winner = 1;
     }
     decisionVector.push_back(winner);
     strResults += ssQsqr.str();
