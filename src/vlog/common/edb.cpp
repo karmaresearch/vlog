@@ -16,8 +16,10 @@
 #ifdef MDLITE
 #include <vlog/mdlite/mdlitetable.h>
 #endif
-#include <vlog/inmemory/inmemorytable.h>
+#ifdef SPARQL
 #include <vlog/sparql/sparqltable.h>
+#endif
+#include <vlog/inmemory/inmemorytable.h>
 
 #include <unordered_map>
 #include <climits>
@@ -119,6 +121,7 @@ void EDBLayer::addInmemoryTable(std::string predicate, std::vector<std::vector<s
     dbPredicates.insert(make_pair(infot.id, infot));
 }
 
+#ifdef SPARQL
 void EDBLayer::addSparqlTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
     const string predicate = tableConf.predname;
@@ -133,6 +136,7 @@ void EDBLayer::addSparqlTable(const EDBConf::Table &tableConf) {
     infot.manager = std::shared_ptr<EDBTable>(table);
     dbPredicates.insert(make_pair(infot.id, infot));
 }
+#endif
 
 bool EDBLayer::doesPredExists(PredId_t id) const {
     return dbPredicates.count(id);

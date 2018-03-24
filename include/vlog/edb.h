@@ -124,8 +124,10 @@ class EDBLayer {
 #endif
                 } else if (table.type == "INMEMORY") {
                     addInmemoryTable(table);
+#ifdef SPARQL
                 } else if (table.type == "SPARQL") {
                     addSparqlTable(table);
+#endif
                 } else {
                     LOG(ERRORL) << "Type of table is not supported";
                     throw 10;

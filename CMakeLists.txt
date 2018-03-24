@@ -23,7 +23,6 @@ file(GLOB vlog_SRC
     "src/vlog/forward/*.cpp"
     "src/vlog/magic/*.cpp"
     "src/vlog/inmemory/*.cpp"
-    "src/vlog/sparql/*.cpp"
     "src/vlog/trident/*.cpp"
     "src/launcher/vloglayer.cpp"
     "src/launcher/vlogscan.cpp"
@@ -133,6 +132,12 @@ IF(MAPI)
     set(vlog_SRC ${vlog_mapiSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DMAPI=1")
     link_libraries("-lmapi")
+ENDIF()
+
+IF(SPARQL)
+    file(GLOB vlog_sparqlSRC "src/vlog/sparql/*.cpp")
+    set(vlog_SRC ${vlog_sparqlSRC} ${vlog_SRC})
+    set(COMPILE_FLAGS "${COMPILE_FLAGS} -DSPARQL=1")
 ENDIF()
 
 IF(MDLITE)
