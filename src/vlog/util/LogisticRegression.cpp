@@ -20,7 +20,7 @@ double LogisticRegression::sigmoid(double z) {
 
 void LogisticRegression::train(vector<Instance>& instances) {
     for (int n = 0; n < ITERATIONS; ++n) {
-        double lik = 0.0;
+        //double lik = 0.0;
         for (int i = 0; i < instances.size(); ++i) {
             vector<double> x (instances.at(i).x);
             double predicted = classify(x);
@@ -33,9 +33,9 @@ void LogisticRegression::train(vector<Instance>& instances) {
             //lik += label * log(classify(x)) + (1-label) * log(1 - classify(x));
         }
 
-        std::ostringstream strs;
-        strs << lik;
-        std::string strDouble = strs.str();
+        //std::ostringstream strs;
+        //strs << lik;
+        //std::string strDouble = strs.str();
     }
 }
 
@@ -46,6 +46,12 @@ double LogisticRegression::classify(vector<double>& x) {
     }
 
     return sigmoid(logit);// > 0.5) ? 0.0 : 1.0;
+}
+
+void LogisticRegression::getWeights(vector<double>& wt) {
+    for (int i = 0; i < weights.size(); ++i) {
+        wt.push_back(weights[i]);
+    }
 }
 
 vector<Instance> LogisticRegression::readDataset(std::string fileName) {

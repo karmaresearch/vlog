@@ -32,6 +32,7 @@ class LogisticRegression {
         LogisticRegression(int n);
         void train(vector<Instance>& instances);
         double classify(vector<double>&); // predict() function
+        void getWeights(vector<double>& wt);
         static vector<Instance> readDataset(std::string file);
 };
 
