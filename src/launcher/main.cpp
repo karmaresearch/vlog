@@ -1024,10 +1024,10 @@ int main(int argc, const char** argv) {
         int depth = vm["depth"].as<unsigned int>();
         EDBLayer *layer = new EDBLayer(conf, false);
         Program p(layer->getNTerms(), layer);
-        uint8_t vt1 = 0;
-        uint8_t vt2 = 1;
-        uint8_t vt3 = 2;
-        uint8_t vt4 = 3;
+        uint8_t vt1 = 1;
+        uint8_t vt2 = 2;
+        uint8_t vt3 = 3;
+        uint8_t vt4 = 4;
         std::vector<uint8_t> vt;
         vt.push_back(vt1);
         vt.push_back(vt2);

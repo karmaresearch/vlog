@@ -328,11 +328,11 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             // 1. generate queries and run them and train model
             EDBConf conf(edbFile);
             int depth = 5;
-            uint64_t maxTuples = 2000;
-            uint8_t vt1 = 0;
-            uint8_t vt2 = 1;
-            uint8_t vt3 = 2;
-            uint8_t vt4 = 3;
+            uint64_t maxTuples = 5000;
+            uint8_t vt1 = 1;
+            uint8_t vt2 = 2;
+            uint8_t vt3 = 3;
+            uint8_t vt4 = 4;
             std::vector<uint8_t> vt;
             vt.push_back(vt1);
             vt.push_back(vt2);
@@ -506,8 +506,6 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             spremat = replacedString;
 
             LOG(INFOL) << "Setting up the KB with the given rules ...";
-
-            LOG(INFOL) << "pid = " << getpid();
 
             //Cleanup and install the EDB layer
             EDBConf conf(edbFile, true);
