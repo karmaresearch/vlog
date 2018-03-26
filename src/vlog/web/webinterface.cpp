@@ -17,6 +17,7 @@
 
 #include <kognac/utils.h>
 #include <trident/utils/json.h>
+#include <trident/utils/httpclient.h>
 
 #include <string>
 #include <fstream>
@@ -267,7 +268,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             string printresults = _getValueParam(form, "print");
             string sparqlquery = _getValueParam(form, "query");
             //Decode the query
-            sparqlquery = HttpServer::unescape(sparqlquery);
+            sparqlquery = HttpClient::unescape(sparqlquery);
             std::regex e1("\\+");
             std::string replacedString;
             std::regex_replace(std::back_inserter(replacedString),
@@ -366,7 +367,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             uint64_t timeout = stoull(timeoutStr);
             uint8_t repeatQuery = stoul(repeatQueryStr);
             //Decode the query
-            queries = HttpServer::unescape(queries);
+            queries = HttpClient::unescape(queries);
             std::regex e1("\\+");
             std::string replacedString;
             std::regex_replace(std::back_inserter(replacedString),
@@ -413,7 +414,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             uint64_t timeout = stoull(timeoutStr);
             uint8_t repeatQuery = stoul(repeatQueryStr);
             //Decode the query
-            queries = HttpServer::unescape(queries);
+            queries = HttpClient::unescape(queries);
             std::regex e1("\\+");
             std::string replacedString;
             std::regex_replace(std::back_inserter(replacedString),
@@ -479,7 +480,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             string sauto = _getValueParam(form, "automat");
             int automatThreshold = 1000000; // microsecond timeout
 
-            srules = HttpServer::unescape(srules);
+            srules = HttpClient::unescape(srules);
             std::regex e1("\\+");
             std::string replacedString;
             std::regex_replace(std::back_inserter(replacedString),
@@ -494,7 +495,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
 
             LOG(INFOL) << srules;
             LOG(INFOL) << "size = "<< srules.size();
-            spremat = HttpServer::unescape(spremat);
+            spremat = HttpClient::unescape(spremat);
             replacedString = "";
             std::regex_replace(std::back_inserter(replacedString),
                     spremat.begin(), spremat.end(),
