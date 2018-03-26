@@ -336,6 +336,7 @@ public class VLog {
 
     public TermQueryResultIterator query(Atom query, boolean includeConstants,
             boolean filterBlanks) throws NotStartedException {
+        query.checkNoBlank();
         int intPred = getPredicateId(query.getPredicate());
         long[] longTerms = extractTerms(query.getTerms());
         return new TermQueryResultIterator(this,
@@ -382,6 +383,7 @@ public class VLog {
      */
     public void writeQueryResultsToCsv(Atom query, String fileName,
             boolean filterBlanks) throws NotStartedException, IOException {
+        query.checkNoBlank();
         int intPred = getPredicateId(query.getPredicate());
         long[] longTerms = extractTerms(query.getTerms());
         queryToCsv(intPred, longTerms, fileName, filterBlanks);
