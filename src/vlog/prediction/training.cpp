@@ -196,7 +196,7 @@ int foundSubsumingQuery(string& testQuery,
 }
 
 string printSubstitutions(vector<Substitution>& subs, EDBLayer& db) {
-    string result;
+    string result = "{";
     for (int i = 0; i < subs.size(); ++i) {
         string temp = to_string(+subs[i].origin);
         temp += "=>";
@@ -213,7 +213,164 @@ string printSubstitutions(vector<Substitution>& subs, EDBLayer& db) {
             result += ",";
         }
     }
+    result += "}";
     return result;
+}
+
+std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(EDBConf &conf,
+        EDBLayer &db,
+        Program &p,
+        int depth,
+        uint64_t maxTuples,
+        std::vector<uint8_t>& vt
+        ) {
+    std::unordered_map<string, int> allQueries;
+    std::set<string> setOfUniquePredicates;
+
+    typedef std::pair<PredId_t, vector<Substitution>> EndpointWithEdge;
+    typedef std::unordered_map<uint16_t, std::vector<EndpointWithEdge>> Graph;
+    Graph graph;
+
+    std::vector<Rule> rules = p.getAllRules();
+    for (int i = 0; i < rules.size(); ++i) {
+        Rule ri = rules[i];
+        Predicate ph = ri.getFirstHead().getPredicate();
+        std::vector<Substitution> sigmaH;
+        for (int j = 0; j < ph.getCardinality(); ++j) {
+            VTerm dest = ri.getFirstHead().getTuple().get(j);
+            sigmaH.push_back(Substitution(vt[j], dest));
+        }
+        std::vector<Literal> body = ri.getBody();
+        for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end(); ++itr) {
+            Predicate pb = itr->getPredicate();
+            std::vector<Substitution> sigmaB;
+            for (int j = 0; j < pb.getCardinality(); ++j) {
+                VTerm dest = itr->getTuple().get(j);
+                sigmaB.push_back(Substitution(vt[j], dest));
+            }
+            // Calculate sigmaH * sigmaB
+            std::vector<Substitution> edge_label = inverse_concat(sigmaH, sigmaB);
+            EndpointWithEdge neighbour = std::make_pair(pb.getId(), edge_label);
+            graph[ph.getId()].push_back(neighbour);
+        }
+    }
+
+    // Try printing graph
+    for (auto it = graph.begin(); it != graph.end(); ++it) {
+        uint16_t id = it->first;
+        LOG(DEBUGL) << p.getPredicateName(id) << " : ";
+        std::vector<EndpointWithEdge> nei = it->second;
+        for (int i = 0; i < nei.size(); ++i) {
+            Predicate pred = p.getPredicate(nei[i].first);
+            std::vector<Substitution> sub = nei[i].second;
+            for (int j = 0; j < sub.size(); ++j){
+                LOG(DEBUGL) << p.getPredicateName(nei[i].first) << "{" << sub[j].origin << "->"
+                    << sub[j].destination.getId() << " , " << sub[j].destination.getValue() << "}";
+            }
+        }
+        LOG(DEBUGL) << "=====";
+    }
+
+        //QSQQuery qsqQuery(literal);
+        //TupleTable *table = new TupleTable(nVars);
+        //db.query(&qsqQuery, table, NULL, NULL);
+        //uint64_t nRows = table->getNRows();
+        //std::vector<std::vector<uint64_t>> output;
+    // Gather all predicates
+    std::vector<PredId_t> ids = p.getAllIDBPredicateIds();
+    std::ofstream allPredicatesLog("allPredicatesInQueries.log");
+    Dictionary dictVariables;
+    for (int i = 0; i < ids.size(); ++i) {
+        /*
+        For every IDB predicate, we will start from its node in the dependency graph
+        and try to traverse until we reach the EDB node.
+        */
+        int neighbours = graph[ids[i]].size();
+        LOG(INFOL) << i+1 << ") " <<p.getPredicateName(ids[i]) << " is IDB  with " << neighbours << " neighbours";
+        Predicate idbPred = p.getPredicate(ids[i]);
+        int card = idbPred.getCardinality();
+        std::vector<Substitution> sigma;
+        for (int j = 0; j < card; ++j) {
+            VTerm dest(((int)'A')+j, 0);// = idbPred.getTuple().get(j);
+            sigma.push_back(Substitution(vt[j], dest));
+        }
+        std::string query = makeGenericQuery(p, idbPred.getId(), idbPred.getCardinality());
+        Literal literal = p.parseLiteral(query, dictVariables);
+        int nVars = literal.getNVars();
+
+        PredId_t predId = idbPred.getId();
+        bool reachedEDB = false;
+        int n = 1;
+        //srand(time(0));
+        stack<pair<PredId_t, vector<Substitution>>> path;
+        while (n != depth+1) {
+            uint32_t nNeighbours = graph[predId].size();
+            if (0 == nNeighbours) {
+                break;
+            }
+            uint32_t randomNeighbour = -1;
+            if (n == depth) {
+                // Try to find out the EDB node neighbour
+                int index = 0;
+                for(auto neighbour : graph[predId]) {
+                    if (!p.isPredicateIDB(neighbour.first)) {
+                        randomNeighbour = index;
+                    }
+                    index++;
+                }
+            }
+            if (randomNeighbour == -1) {
+                srand(time(0) + (n + i));
+                randomNeighbour = rand() % nNeighbours;
+            }
+            PredId_t qId = graph[predId][randomNeighbour].first;
+            std::vector<Substitution> sigmaN = graph[predId][randomNeighbour].second;
+            path.push(make_pair(qId, sigmaN));
+
+            predId = qId;
+            n++;
+            if (!p.isPredicateIDB(predId)) {
+                reachedEDB = true;
+                break;
+            }
+
+        } // while the depth of exploration is reached
+
+        string pathlog = "";
+        int pathLength = 0;
+        while(!path.empty()) {
+            string substi = printSubstitutions(path.top().second, db);
+            string nodestr = p.getPredicateName(path.top().first);
+            pathlog += nodestr + "," + substi;
+                pathlog += "=>";
+            path.pop();
+            pathLength++;
+        }
+        pathlog += p.getPredicateName(idbPred.getId());
+        LOG(INFOL) << pathlog;
+            //std::vector<Substitution> result;// = concat(sigmaN, sigma);
+            //uint8_t qCard = p.getPredicate(qId).getCardinality();
+            //std::string qQuery = makeGenericQuery(p, qId, qCard);
+            //LOG(INFOL) << " Generic query made: " << qQuery;
+            //Literal qLiteral = p.parseLiteral(qQuery, dictVariables);
+            //setOfUniquePredicates.insert(p.getPredicateName(qId));
+            //allPredicatesLog << p.getPredicateName(qId) << std::endl;
+            //std::pair<string, int> finalQueryResult = makeComplexQuery(p, qLiteral, result, db, dictVariables);
+            //std::string qFinalQuery = finalQueryResult.first;
+            //LOG(INFOL) << "complex query made  " << finalQueryResult.first;
+            //int type = finalQueryResult.second + ((n > 4) ? 4 : n);
+            //if (allQueries.find(qFinalQuery) == allQueries.end()) {
+            //    allQueries.insert(std::make_pair(qFinalQuery, type));
+            //}
+    }//For all IDB predicates
+    allPredicatesLog.close();
+    LOG(INFOL) << " # of unique predicate = "<< setOfUniquePredicates.size();
+    std::vector<std::pair<std::string,int>> queries;
+    for (std::unordered_map<std::string,int>::iterator it = allQueries.begin(); it !=  allQueries.end(); ++it) {
+        queries.push_back(std::make_pair(it->first, it->second));
+        //LOG(INFOL) << "Query: " << it->first << " type : " << it->second ;
+    }
+    return queries;
 }
 
 std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBConf &conf,
@@ -546,17 +703,9 @@ double computeAccuracy(vector<Instance>& testInst, LogisticRegression& lr, doubl
     for (int i = 0; i < testInst.size(); ++i){
         int myDecision = 0;
         double probability = lr.classify(testInst[i].x);
-        // k was 0.5
         if (probability > threshold) {
             myDecision = 1;
         }
-        //int result = -1;
-        //if (myDecision != testDecisions[i]) {
-        //    result = foundSubsumingQuery(testQueries[i], trainingQueriesAndResult, p, edb);
-        //}
-        //if (result != -1) {
-        //    myDecision = result;
-        //}
 
         if (testInst[i].label == 0) {
             totalQsqr++;
@@ -573,6 +722,11 @@ double computeAccuracy(vector<Instance>& testInst, LogisticRegression& lr, doubl
                 //logCorrectlyGuessedMagic << testQueries[i] << endl;
             }
             hit++;
+        } else {
+            // miss
+            if(testInst[i].label == 1) {
+                LOG(INFOL) << "Probability= "<< probability;
+            }
         }
     }
     double accuracy = (double)hit/(double)testInst.size();

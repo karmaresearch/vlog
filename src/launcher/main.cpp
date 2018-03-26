@@ -1035,7 +1035,7 @@ int main(int argc, const char** argv) {
         vt.push_back(vt4);
         p.readFromFile(rulesFile);
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-        std::vector<std::pair<std::string,int>> trainingQueries = Training::generateTrainingQueries(conf,
+        std::vector<std::pair<std::string,int>> trainingQueries = Training::generateNewTrainingQueries(conf,
                 *layer,
                 p,
                 depth,

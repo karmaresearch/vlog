@@ -36,6 +36,13 @@ class Training {
         uint64_t maxTuples,
         std::vector<uint8_t>& vt);
 
+    static std::vector<pair<string, int>> generateNewTrainingQueries(EDBConf& conf,
+        EDBLayer& layer,
+        Program& p,
+        int depth,
+        uint64_t maxTuples,
+        std::vector<uint8_t>& vt);
+
     static double runAlgo (string& algo,
         Reasoner& reasoner,
         EDBLayer& edb,
