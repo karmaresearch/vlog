@@ -23,6 +23,12 @@ public class Rule {
             throw new IllegalArgumentException(
                     "null argument to Rule constructor");
         }
+        for (Atom h : head) {
+            h.checkNoBlank();
+        }
+        for (Atom h : body) {
+            h.checkNoBlank();
+        }
         // Clone, so we don't keep references to user-arrays.
         this.head = head.clone();
         this.body = body.clone();

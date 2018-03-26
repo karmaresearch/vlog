@@ -68,4 +68,16 @@ public class Atom {
         return predicate.equals(atom.predicate)
                 && Arrays.equals(terms, atom.terms);
     }
+
+    /**
+     * Checks that the Atom does not contain a blank, and throws an
+     * IllegalArgumentException if it does.
+     */
+    public void checkNoBlank() {
+        for (Term t : terms) {
+            if (t.getTermType() == Term.TermType.BLANK) {
+                throw new IllegalArgumentException("Blank not allowed here");
+            }
+        }
+    }
 }
