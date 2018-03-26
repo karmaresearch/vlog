@@ -1235,6 +1235,18 @@ std::vector<PredId_t> Program::getAllEDBPredicateIds() {
     return output;
 }
 
+std::vector<PredId_t> Program::getAllIDBPredicateIds() {
+    std::vector<PredId_t> output;
+    std::vector<std::string> predicateStrings = this->getAllPredicateStrings();
+    for (int i = 0; i < predicateStrings.size(); ++i) {
+        PredId_t pid = this->getPredicate(predicateStrings[i]).getId();
+        if (!kb->doesPredExists(pid)) {
+            output.push_back(pid);
+        }
+    }
+    return output;
+}
+
 std::string Program::tostring() {
     std::string output = "";
     /*for (int i = 0; i < MAX_NPREDS; ++i) {

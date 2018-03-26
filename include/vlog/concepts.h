@@ -490,6 +490,8 @@ class Program {
 
         VLIBEXP std::vector<PredId_t> getAllEDBPredicateIds();
 
+        VLIBEXP std::vector<PredId_t> getAllIDBPredicateIds();
+
         ~Program() {
         }
 };
