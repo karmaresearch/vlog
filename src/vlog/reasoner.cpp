@@ -724,6 +724,9 @@ TupleIterator *Reasoner::getIteratorWithMaterialization(SemiNaiver *sn, Literal 
     } else {
         finalTable = new TupleTable(query.getTupleSize());
     }
+
+    std::vector<std::pair<uint8_t, uint8_t>> repeated = query.getRepeatedVars();
+
     while (! tableIt.isEmpty()) {
         std::shared_ptr<const FCInternalTable> table = tableIt.getCurrentTable();
         FCInternalTableItr *itrTable = table->getIterator();
@@ -738,6 +741,14 @@ TupleIterator *Reasoner::getIteratorWithMaterialization(SemiNaiver *sn, Literal 
                     }
                 }
             }
+	    if (copy) {
+		for (uint8_t i = 0; i < repeated.size(); ++i) {
+		    if (itrTable->getCurrentValue(repeated[i].first) != itrTable->getCurrentValue(repeated[i].second)) {
+			copy = false;
+			break;
+		    }
+		}
+	    }
             if (! copy) {
                 continue;
             }

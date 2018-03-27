@@ -289,7 +289,7 @@ public class VLog {
         for (int i = 0; i < terms.length; i++) {
             if (terms[i].getTermType() == TermType.VARIABLE) {
                 boolean found = false;
-                for (int j = 0; i < variables.size(); j++) {
+                for (int j = 0; j < variables.size(); j++) {
                     if (variables.get(j).equals(terms[i].getName())) {
                         found = true;
                         longTerms[i] = -j - 1;

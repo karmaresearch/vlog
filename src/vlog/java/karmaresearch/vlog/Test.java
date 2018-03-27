@@ -133,6 +133,7 @@ class Test {
         vlog.start("", false);
         vlog.addData("A", new String[][] { { "a" } });
         vlog.addData("A", new String[][] { { "a" }, { "b" } });
+        vlog.addData("X", new String[][] { { "d", "e" }, { "c", "c" } });
         try (TermQueryResultIterator e = vlog
                 .query(new Atom("A", new Term(Term.TermType.CONSTANT, "C")))) {
             if (e.hasNext()) {
@@ -186,6 +187,14 @@ class Test {
                         new Atom("B", new Term(Term.TermType.VARIABLE, "C")) },
                 new Atom[] { new Atom("A",
                         new Term(Term.TermType.VARIABLE, "C")) }));
+        rules.add(
+                new Rule(
+                        new Atom[] { new Atom("C",
+                                new Term(Term.TermType.VARIABLE, "C"),
+                                new Term(Term.TermType.VARIABLE, "D")) },
+                        new Atom[] { new Atom("X",
+                                new Term(Term.TermType.VARIABLE, "C"), new Term(
+                                        Term.TermType.VARIABLE, "D")) }));
         vlog.setRules(rules.toArray(new Rule[rules.size()]),
                 RuleRewriteStrategy.AGGRESSIVE);
         vlog.materialize(false);
@@ -222,6 +231,46 @@ class Test {
                 throw new Error("Error in query");
             }
             if (!v[0].getName().equals("a")) {
+                throw new Error("Error in query");
+            }
+            if (e.hasNext()) {
+                throw new Error("Error in query");
+            }
+        }
+        System.out.println("Trying EDB query with same variable ...");
+        try (TermQueryResultIterator e = vlog
+                .query(new Atom("X", new Term(Term.TermType.VARIABLE, "x"),
+                        new Term(Term.TermType.VARIABLE, "x")), true, false)) {
+            if (!e.hasNext()) {
+                throw new Error("Error in query");
+            }
+            Term[] v = e.next();
+            System.out.println("Terms: " + Arrays.toString(v));
+
+            if (!v[0].getName().equals("c")) {
+                throw new Error("Error in query");
+            }
+            if (!v[1].getName().equals("c")) {
+                throw new Error("Error in query");
+            }
+            if (e.hasNext()) {
+                throw new Error("Error in query");
+            }
+        }
+        System.out.println("Trying IDB query with same variable ...");
+        try (TermQueryResultIterator e = vlog
+                .query(new Atom("C", new Term(Term.TermType.VARIABLE, "x"),
+                        new Term(Term.TermType.VARIABLE, "x")), true, false)) {
+            if (!e.hasNext()) {
+                throw new Error("Error in query");
+            }
+            Term[] v = e.next();
+            System.out.println("Terms: " + Arrays.toString(v));
+
+            if (!v[0].getName().equals("c")) {
+                throw new Error("Error in query");
+            }
+            if (!v[1].getName().equals("c")) {
                 throw new Error("Error in query");
             }
             if (e.hasNext()) {
