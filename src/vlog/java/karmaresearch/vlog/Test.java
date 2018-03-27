@@ -103,6 +103,10 @@ class Test {
         vlog.start("", false);
         vlog.addData("p1", p1_contents);
         vlog.addData("p2", p2_contents);
+        System.out.println("Arity of p1 = " + vlog.getPredicateArity("p1")
+                + ", arity of p2 = " + vlog.getPredicateArity("p2"));
+        System.out.println("Arity of non-existing predicate "
+                + vlog.getPredicateArity("blabla"));
         List<Term> q1 = new ArrayList<Term>();
         q1.add(new Term(TermType.VARIABLE, "v1"));
         q1.add(new Term(TermType.CONSTANT, "d"));

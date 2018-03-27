@@ -221,6 +221,18 @@ public class VLog {
             throws NotStartedException;
 
     /**
+     * Returns the arity of the predicate.
+     *
+     * @param predicate
+     *            the predicate to look up
+     * @return the predicate arity, or -1 if not found.
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet.
+     */
+    public native int getPredicateArity(String predicate)
+            throws NotStartedException;
+
+    /**
      * Returns the internal representation of the constant. Internally, VLog
      * uses longs to represent constants. This method allows the user to look up
      * this internal number.

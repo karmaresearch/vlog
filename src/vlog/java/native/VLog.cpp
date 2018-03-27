@@ -115,6 +115,10 @@ void throwEDBConfigurationException(JNIEnv *env, const char *message) {
     throwException(env, "karmaresearch/vlog/EDBConfigurationException", message);
 }
 
+void throwIllegalArgumentException(JNIEnv *env, const char *message) {
+    throwException(env, "java/lang/IllegalArgumentException", message);
+}
+
 // Converts a vector of Atoms into VLog representation.
 std::vector<Literal> getVectorLiteral(JNIEnv *env, VLogInfo *f, jobjectArray h, Dictionary &dict) {
     std::vector<Literal> result;
@@ -178,7 +182,7 @@ std::vector<Literal> getVectorLiteral(JNIEnv *env, VLogInfo *f, jobjectArray h, 
 
 	int64_t predid = f->program->getOrAddPredicate(predicate, (uint8_t) vtuplesz);
 	if (predid < 0) {
-	    // TODO: throw something
+	    throwIllegalArgumentException(env, ("wrong cardinality in predicate " + predicate).c_str());
 	}
 
 	Predicate pred((PredId_t) predid, adornment, f->layer->doesPredExists((PredId_t) predid) ? EDB : IDB, (uint8_t) vtuplesz);
@@ -363,6 +367,31 @@ JNIEXPORT jint JNICALL Java_karmaresearch_vlog_VLog_getPredicateId(JNIEnv *env, 
 
 /*
  * Class:     karmaresearch_vlog_VLog
+ * Method:    getPredicateArity
+ * Signature: (Ljava/lang/String;)I
+ */
+JNIEXPORT jint JNICALL Java_karmaresearch_vlog_VLog_getPredicateArity(JNIEnv *env, jobject obj, jstring p) {
+
+    VLogInfo *f = getVLogInfo(env, obj);
+    if (f == NULL || f->program == NULL) {
+	throwNotStartedException(env, "VLog is not started yet");
+	return (jint) -1;
+    }
+
+    //Transform the string into a C++ string
+    std::string predName = jstring2string(env, p);
+
+    // TODO: fix this: this might create a new predicate if it does not exist.
+    // There should be a way to just do a lookup???
+    Predicate pred = f->program->getPredicate(predName);
+    if (pred.getCardinality() == 0) {
+	return (jint) -1;
+    }
+    return (jint) pred.getCardinality();
+}
+
+/*
+ * Class:     karmaresearch_vlog_VLog
  * Method:    getPredicate
  * Signature: (I)Ljava/lang/String;
  */
@@ -399,7 +428,6 @@ JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_getConstantId(JNIEnv *env, 
     if (f->layer->getDictNumber(cliteral, strlen(cliteral), value)) {
 	retval = value;
     }
-    // TODO: lookup in additional, and deal with results of chases.
     env->ReleaseStringUTFChars(literal, cliteral);
     return retval;
 }
