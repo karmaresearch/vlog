@@ -52,8 +52,10 @@ std::pair<std::string, int> makeComplexQuery(Program& p, Literal& l, vector<Subs
         uint8_t id = dictVariables.getOrAdd(canV); //I don't know how to convert this line
         bool found = false;
         for (int j = 0; j < sub.size(); ++j) {
-            if (sub[j].origin == id) {
+            if (sub[j].origin == +id && sub[j].destination.getId() == 0) {
                 char supportText[MAX_TERM_SIZE];
+                LOG(INFOL) << "destination id is : " << sub[j].destination.getId();
+                LOG(INFOL) << "destination value is : " << sub[j].destination.getValue();
                 db.getDictText(sub[j].destination.getValue(), supportText);
                 query += supportText;
                 found = true;
@@ -206,7 +208,7 @@ string printSubstitutions(vector<Substitution>& subs, EDBLayer& db) {
             db.getDictText(subs[i].destination.getValue(), supportText);
             temp += supportText;
         } else {
-            temp += to_string(+destId);
+            temp += to_string(destId);
         }
         result += temp;
         if (i != subs.size()-1) {
@@ -255,12 +257,6 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
             for (int j = 0; j < pb.getCardinality(); ++j) {
                 VTerm dest = itr->getTuple().get(j);
                 sigmaB.push_back(Substitution(vt[j], dest));
-                //if (isEDB) {
-                    //if (!dest.isVariable()) {
-                    //    uint64_t val = dest.getValue();
-                        //bodyAtomEDBMap[ph.getId()].push_back(make_pair(j, val));
-                    //}
-                //}
             }
 
             Edge edge;
@@ -268,6 +264,23 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
                 //TODO: 
                 // add sigmaB as a substitution to this edge too
                 // This will be useful when creating the edb query with constraints
+                LOG(INFOL) << "For IDB predicate " << p.getPredicateName(ph.getId()) << " : " << printSubstitutions(sigmaB, db);
+                LOG(INFOL) << "EDB predicate was " << p.getPredicateName(pb.getId());
+
+                LOG(INFOL) << "Rule was : " << ri.toprettystring(&p, &db);
+                for (int j = 0; j < pb.getCardinality(); ++j) {
+                    VTerm dest = itr->getTuple().get(j);
+                    LOG(INFOL) << "id : " << dest.getId();
+                    LOG(INFOL) << "val : " << dest.getValue();
+                    uint8_t temp = dest.getId();
+                    if (temp == 0) {
+                        char supportText[MAX_TERM_SIZE];
+                        db.getDictText(dest.getValue(), supportText);
+                        LOG(INFOL) << "Value in DB is  " << supportText;
+                    }
+                    //sigmaB.push_back(Substitution(vt[j], dest));
+                }
+                LOG(INFOL) << "==================================================";
                 edge.backEdge = sigmaB;
             }
 
@@ -279,23 +292,23 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
     }
 
     // Try printing graph
-    for (auto it = graph.begin(); it != graph.end(); ++it) {
-        uint16_t id = it->first;
-        LOG(INFOL) << p.getPredicateName(id) << " : ";
-            std::vector<Edge> nei = it->second;
-            for (int i = 0; i < nei.size(); ++i) {
-                Predicate pred = p.getPredicate(nei[i].endpoint.first);
-                std::vector<Substitution> sub = nei[i].endpoint.second;
-                string atomStr = p.getPredicateName(nei[i].endpoint.first) + " : ";
-                atomStr += printSubstitutions(nei[i].endpoint.second, db);
-                LOG(INFOL) << atomStr;
-                if (nei[i].backEdge.size() != 0) {
-                    LOG(INFOL) << "%%%%%%%%%%%%%%%%%%%%%%%%%%";
-                    LOG(INFOL) << printSubstitutions(nei[i].backEdge, db);
-                }
-            }
-        LOG(INFOL) << "=====";
-    }
+    //for (auto it = graph.begin(); it != graph.end(); ++it) {
+    //    uint16_t id = it->first;
+    //    LOG(INFOL) << p.getPredicateName(id) << " : ";
+    //        std::vector<Edge> nei = it->second;
+    //        for (int i = 0; i < nei.size(); ++i) {
+    //            Predicate pred = p.getPredicate(nei[i].endpoint.first);
+    //            std::vector<Substitution> sub = nei[i].endpoint.second;
+    //            string atomStr = p.getPredicateName(nei[i].endpoint.first) + " : ";
+    //            atomStr += printSubstitutions(nei[i].endpoint.second, db);
+    //            LOG(INFOL) << atomStr;
+    //            if (nei[i].backEdge.size() != 0) {
+    //                LOG(INFOL) << "%%%%%%%%%%%%%%%%%%%%%%%%%%";
+    //                LOG(INFOL) << printSubstitutions(nei[i].backEdge, db);
+    //            }
+    //        }
+    //    LOG(INFOL) << "=====";
+    //}
     std::vector<PredId_t> ids = p.getAllIDBPredicateIds();
     std::ofstream allPredicatesLog("allPredicatesInQueries.log");
     Dictionary dictVariables;
@@ -376,7 +389,8 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
             vector<Substitution> subLiteral;
             subLiteral = path.back().backEdge;
             string workingQuery = makeGenericQuery(p, edbPred.getId(), edbPred.getCardinality());
-            printSubstitutions(subLiteral, db);
+            LOG(INFOL) << " working Query : " << workingQuery;
+            LOG(INFOL) << "Substitution of literal query: " << printSubstitutions(subLiteral, db);
             Literal workingLiteral = p.parseLiteral(workingQuery, dictVariables);
             pair<string, int> queryAndType = makeComplexQuery(p, workingLiteral, subLiteral, db, dictVariables);
             LOG(INFOL) << "Query to fire at EDB layer : " << queryAndType.first;
@@ -412,9 +426,14 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
             //    maxTuples = nRows;
             //}
             //LOG(INFOL) << "Next node : "<< p.getPredicateName(nextNode) << "  ### size = " << bodyAtomEDBMap[nextNode].size();
-            int matchCount = 0;
+            int count = 0;
+            LOG(INFOL) << "Printing my log.... >>>>>>>>>>>>";
             while (table->hasNext()) {
                 table->next();
+                count++;
+                if (count > maxTuples) {
+                    break;
+                }
                 string strTuple = "";
                 for (int i = 0; i < edbPred.getCardinality(); ++i) {
                     Term_t term = table->getElementAt(i);
