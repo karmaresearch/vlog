@@ -385,7 +385,6 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
         if (reachedEDB == true) {
             // Construct the query to find EDB tuples
             Predicate edbPred = p.getPredicate(predId);
-            // FIXME:
             vector<Substitution> subLiteral;
             subLiteral = path.back().backEdge;
             string workingQuery = makeGenericQuery(p, edbPred.getId(), edbPred.getCardinality());
@@ -398,16 +397,6 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
             int nVars = literal.getNVars();
 
             EDBIterator* table = db.getIterator(literal);
-            //QSQQuery qsqQuery(literal);
-            //TupleTable *table = new TupleTable(nVars);
-
-            // Execute the query and populate the table
-            //db.query(&qsqQuery, table, NULL, NULL);
-            //uint64_t nRows = table->getNRows();
-
-            // Generate random tuple indexes
-            //vector<int> tupleIndexes(maxTuples);
-            //getRandomTupleIndexes(maxTuples, nRows, tupleIndexes);
 
             // Pop the EDB predicate id and substitution from the top
             vector<Substitution> sigmaH = path.back().endpoint.second;
@@ -422,12 +411,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
             // We will check whether this predicate appeared as the head of any rule
             // such that the body contained only one atom (with EDB predicate)
             uint64_t rowNumber = 0;
-            //if (maxTuples > nRows) {
-            //    maxTuples = nRows;
-            //}
-            //LOG(INFOL) << "Next node : "<< p.getPredicateName(nextNode) << "  ### size = " << bodyAtomEDBMap[nextNode].size();
             int count = 0;
-            LOG(INFOL) << "Printing my log.... >>>>>>>>>>>>";
             while (table->hasNext()) {
                 table->next();
                 count++;
@@ -435,53 +419,16 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
                     break;
                 }
                 string strTuple = "";
+                vector<Substitution> subs;
                 for (int i = 0; i < edbPred.getCardinality(); ++i) {
                     Term_t term = table->getElementAt(i);
+                    subs.push_back(Substitution(vt[i], VTerm(0, term)));
                     char supportText[MAX_TERM_SIZE];
                     db.getDictText(term, supportText);
                     strTuple += supportText;
                 }
-                    LOG(INFOL) << strTuple;
-                //std::vector<uint64_t> tuple;
-                //std::string tupleString("<");
-                ////for (int a = 0; a < bodyAtomEDBMap[nextNode].size(); ++a) {
-                //// if (table->getPosAtRow(rowNumber, bodyAtomEDBMap[nextNode][a].first) != bodyAtomEDBMap[nextNode][a].second){
-                //// }
-                ////}
-                //for (int j = 0; j < nVars; ++j) {
-                //    uint64_t value = table->getPosAtRow(rowNumber, j);
-                //    tuple.push_back(value);
-                //    char supportText[MAX_TERM_SIZE];
-                //    db.getDictText(value, supportText);
-                //    tupleString += supportText;
-                //    tupleString += ",";
-                //}
-                //tupleString += ">";
-                ////PredId_t idbPredId = getMatchingIDB(db, p, tuple);
-                //bool constantMismatch = false;
-                //for (auto nextNodeConstant: bodyAtomEDBMap[nextNode]) {
-                //    if (tuple[nextNodeConstant.first] != nextNodeConstant.second) {
-                //        constantMismatch = true;
-                //        break;
-                //    }
-                //}
-                //if (constantMismatch) {
-                //    rowNumber++;
-                //    continue;
-                //}
-                //std::string predName = p.getPredicateName(nextNode);
-
-                //vector<Substitution> subs;
-                //LOG(INFOL) << "Matched : " << tupleString << " ==> " << predName << " : " << +nextNode;
-                //for (int k = 0; k < edbPred.getCardinality(); ++k) {
-                //    subs.push_back(Substitution(vt[k], VTerm(0, tuple[k])));
-                //}
-                //tuplesSubstitution.push_back(subs);
-                //rowNumber++;
-                //matchCount++;
-                //if (matchCount == maxTuples) {
-                //    break;
-                //}
+                tuplesSubstitution.push_back(subs);
+                LOG(INFOL) << strTuple;
             }
 
             for (auto ts: tuplesSubstitution) {
@@ -499,9 +446,13 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
                         workingIDBCard = idbPred.getCardinality();
                     }
                     string qQuery = makeGenericQuery(p, workingIDB, workingIDBCard);
+                    setOfUniquePredicates.insert(p.getPredicateName(workingIDB));
                     Literal qLiteral = p.parseLiteral(qQuery, dictVariables);
                     pair<string,int> finalQueryResult = makeComplexQuery(p, qLiteral, result, db, dictVariables);
                     LOG(INFOL) << "Query : " << finalQueryResult.first;
+                    if (allQueries.find(finalQueryResult.first) == allQueries.end()) {
+                        allQueries.insert(finalQueryResult);
+                    }
                     workingSigma = result;
                 }
                 //LOG(INFOL) << printSubstitutions(ts, db);
