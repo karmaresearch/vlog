@@ -5,6 +5,7 @@
 #include <stack>
 #include <numeric>
 #include <climits>
+#include <sys/wait.h>
 
 std::string makeGenericQuery(Program& p, PredId_t predId, uint8_t predCard) {
     std::string query = p.getPredicateName(predId);
@@ -54,8 +55,6 @@ std::pair<std::string, int> makeComplexQuery(Program& p, Literal& l, vector<Subs
         for (int j = 0; j < sub.size(); ++j) {
             if (sub[j].origin == +id && sub[j].destination.getId() == 0) {
                 char supportText[MAX_TERM_SIZE];
-                LOG(INFOL) << "destination id is : " << sub[j].destination.getId();
-                LOG(INFOL) << "destination value is : " << sub[j].destination.getValue();
                 db.getDictText(sub[j].destination.getValue(), supportText);
                 query += supportText;
                 found = true;
@@ -184,13 +183,11 @@ int foundSubsumingQuery(string& testQuery,
     for (auto qr: trainingQueriesAndResult) {
         // If the test query has occurred in the training, then return the result of that query
         if (testQuery == qr.first) {
-            LOG(INFOL) << testQuery << " same as " << qr.first;
             return qr.second;
         }
 
         // If the test query is similar to the training query, then return the result of that query
         if (isSimilar(testQuery, qr.first, layer)){
-            LOG(INFOL) << testQuery << " similar to " << qr.first;
             return qr.second;
         }
     }
@@ -229,16 +226,6 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
     std::unordered_map<string, int> allQueries;
     std::set<string> setOfUniquePredicates;
 
-    // this map stores for every IDB predicate, array of constant values that appear in the body of some rule
-    // where the IDB predicate is the head and body contains an EDB predicate
-    /*
-    RP311 :- TE(A, "xyz", "pqr")
-
-    In this case we shall store
-    [RP311]=> {1->xyz, 2->"pqr"}
-
-    EDB tuple <4, "xyz", "lmn"> will not match.
-    */
     Graph graph;
 
     std::vector<Rule> rules = p.getAllRules();
@@ -261,26 +248,16 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
 
             Edge edge;
             if (!p.isPredicateIDB(pb.getId())) {
-                //TODO: 
                 // add sigmaB as a substitution to this edge too
                 // This will be useful when creating the edb query with constraints
-                LOG(INFOL) << "For IDB predicate " << p.getPredicateName(ph.getId()) << " : " << printSubstitutions(sigmaB, db);
-                LOG(INFOL) << "EDB predicate was " << p.getPredicateName(pb.getId());
-
-                LOG(INFOL) << "Rule was : " << ri.toprettystring(&p, &db);
                 for (int j = 0; j < pb.getCardinality(); ++j) {
                     VTerm dest = itr->getTuple().get(j);
-                    LOG(INFOL) << "id : " << dest.getId();
-                    LOG(INFOL) << "val : " << dest.getValue();
                     uint8_t temp = dest.getId();
                     if (temp == 0) {
                         char supportText[MAX_TERM_SIZE];
                         db.getDictText(dest.getValue(), supportText);
-                        LOG(INFOL) << "Value in DB is  " << supportText;
                     }
-                    //sigmaB.push_back(Substitution(vt[j], dest));
                 }
-                LOG(INFOL) << "==================================================";
                 edge.backEdge = sigmaB;
             }
 
@@ -388,11 +365,8 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
             vector<Substitution> subLiteral;
             subLiteral = path.back().backEdge;
             string workingQuery = makeGenericQuery(p, edbPred.getId(), edbPred.getCardinality());
-            LOG(INFOL) << " working Query : " << workingQuery;
-            LOG(INFOL) << "Substitution of literal query: " << printSubstitutions(subLiteral, db);
             Literal workingLiteral = p.parseLiteral(workingQuery, dictVariables);
             pair<string, int> queryAndType = makeComplexQuery(p, workingLiteral, subLiteral, db, dictVariables);
-            LOG(INFOL) << "Query to fire at EDB layer : " << queryAndType.first;
             Literal literal = p.parseLiteral(queryAndType.first, dictVariables);
             int nVars = literal.getNVars();
 
@@ -420,26 +394,25 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
                 }
                 string strTuple = "";
                 vector<Substitution> subs;
-                for (int i = 0; i < edbPred.getCardinality(); ++i) {
-                    Term_t term = table->getElementAt(i);
-                    subs.push_back(Substitution(vt[i], VTerm(0, term)));
+                for (int j = 0; j < edbPred.getCardinality(); ++j) {
+                    Term_t term = table->getElementAt(j);
+                    subs.push_back(Substitution(vt[j], VTerm(0, term)));
                     char supportText[MAX_TERM_SIZE];
                     db.getDictText(term, supportText);
                     strTuple += supportText;
                 }
                 tuplesSubstitution.push_back(subs);
-                LOG(INFOL) << strTuple;
             }
 
             for (auto ts: tuplesSubstitution) {
                 vector<Substitution> workingSigma = ts;
                 PredId_t workingIDB;// = nextNode;
                 int workingIDBCard;// = nextNodeCard;
-                for(int i = path.size()-1; i >= 0; --i) {
-                    vector<Substitution> sigmaH = path[i].endpoint.second;
+                for(int k = path.size()-1; k >= 0; --k) {
+                    vector<Substitution> sigmaH = path[k].endpoint.second;
                     vector<Substitution> result = concat(sigmaH, workingSigma);
-                    if (i != 0) {
-                        workingIDB = path[i-1].endpoint.first;
+                    if (k != 0) {
+                        workingIDB = path[k-1].endpoint.first;
                         workingIDBCard = p.getPredicate(workingIDB).getCardinality();
                     } else {
                         workingIDB = idbPred.getId();
@@ -449,13 +422,12 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
                     setOfUniquePredicates.insert(p.getPredicateName(workingIDB));
                     Literal qLiteral = p.parseLiteral(qQuery, dictVariables);
                     pair<string,int> finalQueryResult = makeComplexQuery(p, qLiteral, result, db, dictVariables);
-                    LOG(INFOL) << "Query : " << finalQueryResult.first;
+                    int type = finalQueryResult.second + ((n > 4) ? 4 : n);
                     if (allQueries.find(finalQueryResult.first) == allQueries.end()) {
-                        allQueries.insert(finalQueryResult);
+                        allQueries.insert(make_pair(finalQueryResult.first,type));
                     }
                     workingSigma = result;
                 }
-                //LOG(INFOL) << printSubstitutions(ts, db);
             }
             delete table;
         }
@@ -466,7 +438,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
     std::vector<std::pair<std::string,int>> queries;
     for (std::unordered_map<std::string,int>::iterator it = allQueries.begin(); it !=  allQueries.end(); ++it) {
         queries.push_back(std::make_pair(it->first, it->second));
-        //LOG(INFOL) << "Query: " << it->first << " type : " << it->second ;
+        LOG(INFOL) << "Query: " << it->first << " type : " << it->second ;
     }
     return queries;
 }
