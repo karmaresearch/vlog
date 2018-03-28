@@ -21,9 +21,10 @@ class SparqlIterator : public EDBIterator {
 	bool isFirst;
 	int vars[128];	// for every position, indicates which variable number to use
 	std::vector<uint8_t> sortFields;
+	std::vector<std::string> fieldVars;
 
     public:
-        SparqlIterator(const json &qr, EDBLayer *l, const Literal &q, const std::vector<uint8_t> &sf);
+        SparqlIterator(const json &qr, EDBLayer *l, const Literal &q, const std::vector<uint8_t> &sf, const std::vector<std::string> &fv);
 
         bool hasNext();
 

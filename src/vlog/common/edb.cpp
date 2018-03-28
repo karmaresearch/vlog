@@ -131,7 +131,7 @@ void EDBLayer::addSparqlTable(const EDBConf::Table &tableConf) {
         dbPredicates.erase(infot.id);
     }
     infot.type = "SPARQL";
-    SparqlTable *table = new SparqlTable(tableConf.params[0], this);
+    SparqlTable *table = new SparqlTable(tableConf.params[0], this, tableConf.params[1], tableConf.params[2]);
     infot.arity = table->getArity();
     infot.manager = std::shared_ptr<EDBTable>(table);
     dbPredicates.insert(make_pair(infot.id, infot));
@@ -842,6 +842,7 @@ bool EDBLayer::getDictText(const uint64_t id, char *text) {
         std::string t = termsDictionary->getRawValue(id);
         if (t != "") {
             memcpy(text, t.c_str(), t.size());
+	    text[t.size()] = '\0';
             return true;
         }
     }

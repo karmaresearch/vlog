@@ -7,26 +7,33 @@
 
 #include <trident/utils/httpclient.h>
 
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
+
 class SparqlTable : public EDBTable {
     private:
         HttpClient::URL endpoint;
         HttpClient client;
         bool isConnected;
 	EDBLayer *layer;
+	std::vector<string> fieldVars;
+	std::string whereBody;
 
-        std::string literalToSparql(const Literal &query,
-                const std::vector<uint8_t> &fields, bool count);
+        std::string generateQuery(const Literal &query,
+                const std::vector<uint8_t> *fields = NULL);
+
+	json launchQuery(std::string sparqlQuery);
 
     public:
         uint8_t getArity() const {
-            return 3;
+            return fieldVars.size();
         }
 
         bool areTermsEncoded() {
             return false;
         }
 
-        SparqlTable(string repository, EDBLayer *layer);
+        SparqlTable(string repository, EDBLayer *layer, string fields, string whereBody);
 
         void query(QSQQuery *query, TupleTable *outputTable,
                 std::vector<uint8_t> *posToFilter,

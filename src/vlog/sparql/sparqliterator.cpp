@@ -1,33 +1,10 @@
 #include <vlog/sparql/sparqliterator.h>
 
-SparqlIterator::SparqlIterator(const json &qr, EDBLayer *l, const Literal &q, const std::vector<uint8_t> &sf) :
+SparqlIterator::SparqlIterator(const json &qr, EDBLayer *l, const Literal &q, const std::vector<uint8_t> &sf, const std::vector<std::string> &fv) :
     layer(l), queryResult(qr), query(q),
     skipDuplicated(false), hasNextChecked(false), isFirst(true),
-    sortFields(sf) {
+    sortFields(sf), fieldVars(fv) {
     it = queryResult.begin();
-    // Analyze query: fill in constants in row, and determine which variable goes where.
-    std::vector<uint8_t> variables;
-    for (int i = 0; i < q.getTupleSize(); i++) {
-	VTerm t = q.getTermAtPos(i);
-	if (t.isVariable()) {
-	    uint8_t v = t.getId();
-	    bool found = false;
-	    for (int j = 0; j < variables.size(); j++) {
-		if (variables[j] == v) {
-		    vars[i] = j;
-		    found = true;
-		    break;
-		}
-	    }
-	    if (! found) {
-		vars[i] = variables.size();
-		variables.push_back(v);
-	    }
-	} else {
-	    row[i] = t.getValue();
-	    vars[i] = -1;
-	}
-    }
 }
 
 bool SparqlIterator::hasNext() {
@@ -46,8 +23,9 @@ bool SparqlIterator::hasNext() {
             bool stop = false;
             while (! stop && it != queryResult.end()) {
                 // Note that it points at the next value.
-		std::string val = (*it)["x" + to_string(vars[elNo])]["value"];
+		std::string val = (*it)[fieldVars[elNo]]["value"];
 		uint64_t v;
+		LOG(DEBUGL) << "String: " << val;
 		layer->getOrAddDictNumber(val.c_str(), val.size(), v);
                 if (v != oldval) {
                     stop = true;
@@ -64,8 +42,9 @@ bool SparqlIterator::hasNext() {
             bool stop = false;
             while (! stop && it != queryResult.end()) {
                 for (int i = 0; i < sortFields.size(); i++) {
-		    std::string val = (*it)["x" + to_string(vars[sortFields[i]])]["value"];
+		    std::string val = (*it)[fieldVars[sortFields[i]]]["value"];
 		    uint64_t v;
+		    LOG(DEBUGL) << "String: " << val;
 		    layer->getOrAddDictNumber(val.c_str(), val.size(), v);
                     if (oldval[i] != v) {
                         stop = true;
@@ -85,19 +64,24 @@ bool SparqlIterator::hasNext() {
 
 void SparqlIterator::next() {
         if (! hasNextChecked) {
-        LOG(ERRORL) << "InmemoryIterator::next called without hasNext check";
+        LOG(ERRORL) << "SparqlIterator::next called without hasNext check";
         throw 10;
     }
     if (! hasNextValue) {
-        LOG(ERRORL) << "InmemoryIterator::next called while hasNext returned false";
+        LOG(ERRORL) << "SparqlIterator::next called while hasNext returned false";
         throw 10;
     }
     for (int i = 0; i < query.getTupleSize(); i++) {
-	if (vars[i] != -1) {
-	    std::string val = (*it)["x" + to_string(vars[i])]["value"];
+	VTerm t = query.getTermAtPos(i);
+	if (t.isVariable()) {
+	    std::string val = (*it)[fieldVars[i]]["value"];
 	    uint64_t v;
+	    LOG(DEBUGL) << "String: " << val;
 	    layer->getOrAddDictNumber(val.c_str(), val.size(), v);
 	    row[i] = v;
+
+	} else {
+	    row[i] = t.getValue();
 	}
     }
     it++;
