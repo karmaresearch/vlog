@@ -276,7 +276,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "Path to the webpages relative to where the executable is. Default is ../webinterface", false);
 
     ProgramArgs::GroupArgs& generateTraining_options = *vm.newGroup("Options for command <gentq>");
-    generateTraining_options.add<int>("", "maxTuples", 500, "Number of EDB tuples to consider for training", false);
+    generateTraining_options.add<int>("", "maxTuples", 50, "Number of EDB tuples per IDB predicate to consider for training", false);
     generateTraining_options.add<int>("", "depth", 5, "Recursion level of training generation procedure", false);
 
     ProgramArgs::GroupArgs& cmdline_options = *vm.newGroup("Parameters");

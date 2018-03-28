@@ -15,7 +15,12 @@
 #include <kognac/progargs.h>
 
 typedef std::pair<PredId_t, vector<Substitution>> EndpointWithEdge;
-typedef std::unordered_map<uint16_t, std::vector<EndpointWithEdge>> Graph;
+typedef struct Edge {
+    EndpointWithEdge endpoint;
+    vector<Substitution> backEdge;
+} Edge;
+
+typedef std::unordered_map<uint16_t, vector<Edge>> Graph;
 
 typedef enum QueryType{
     QUERY_TYPE_MIXED = 0,

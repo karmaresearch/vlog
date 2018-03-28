@@ -1,8 +1,8 @@
 #include <vlog/training.h>
 #include <csignal>
 #include <ctime>
-#include <stack>
 #include <set>
+#include <stack>
 #include <numeric>
 #include <climits>
 
@@ -227,8 +227,16 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
     std::unordered_map<string, int> allQueries;
     std::set<string> setOfUniquePredicates;
 
-    typedef std::pair<PredId_t, vector<Substitution>> EndpointWithEdge;
-    typedef std::unordered_map<uint16_t, std::vector<EndpointWithEdge>> Graph;
+    // this map stores for every IDB predicate, array of constant values that appear in the body of some rule
+    // where the IDB predicate is the head and body contains an EDB predicate
+    /*
+    RP311 :- TE(A, "xyz", "pqr")
+
+    In this case we shall store
+    [RP311]=> {1->xyz, 2->"pqr"}
+
+    EDB tuple <4, "xyz", "lmn"> will not match.
+    */
     Graph graph;
 
     std::vector<Rule> rules = p.getAllRules();
@@ -247,53 +255,60 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
             for (int j = 0; j < pb.getCardinality(); ++j) {
                 VTerm dest = itr->getTuple().get(j);
                 sigmaB.push_back(Substitution(vt[j], dest));
+                //if (isEDB) {
+                    //if (!dest.isVariable()) {
+                    //    uint64_t val = dest.getValue();
+                        //bodyAtomEDBMap[ph.getId()].push_back(make_pair(j, val));
+                    //}
+                //}
             }
+
+            Edge edge;
+            if (!p.isPredicateIDB(pb.getId())) {
+                //TODO: 
+                // add sigmaB as a substitution to this edge too
+                // This will be useful when creating the edb query with constraints
+                edge.backEdge = sigmaB;
+            }
+
             // Calculate sigmaH * sigmaB
-            std::vector<Substitution> edge_label = inverse_concat(sigmaH, sigmaB);
-            EndpointWithEdge neighbour = std::make_pair(pb.getId(), edge_label);
-            graph[ph.getId()].push_back(neighbour);
+            std::vector<Substitution> edge_label = inverse_concat(sigmaB, sigmaH);
+            edge.endpoint = std::make_pair(pb.getId(), edge_label);
+            graph[ph.getId()].push_back(edge);
         }
     }
 
     // Try printing graph
     for (auto it = graph.begin(); it != graph.end(); ++it) {
         uint16_t id = it->first;
-        LOG(DEBUGL) << p.getPredicateName(id) << " : ";
-        std::vector<EndpointWithEdge> nei = it->second;
-        for (int i = 0; i < nei.size(); ++i) {
-            Predicate pred = p.getPredicate(nei[i].first);
-            std::vector<Substitution> sub = nei[i].second;
-            for (int j = 0; j < sub.size(); ++j){
-                LOG(DEBUGL) << p.getPredicateName(nei[i].first) << "{" << sub[j].origin << "->"
-                    << sub[j].destination.getId() << " , " << sub[j].destination.getValue() << "}";
+        LOG(INFOL) << p.getPredicateName(id) << " : ";
+            std::vector<Edge> nei = it->second;
+            for (int i = 0; i < nei.size(); ++i) {
+                Predicate pred = p.getPredicate(nei[i].endpoint.first);
+                std::vector<Substitution> sub = nei[i].endpoint.second;
+                string atomStr = p.getPredicateName(nei[i].endpoint.first) + " : ";
+                atomStr += printSubstitutions(nei[i].endpoint.second, db);
+                LOG(INFOL) << atomStr;
+                if (nei[i].backEdge.size() != 0) {
+                    LOG(INFOL) << "%%%%%%%%%%%%%%%%%%%%%%%%%%";
+                    LOG(INFOL) << printSubstitutions(nei[i].backEdge, db);
+                }
             }
-        }
-        LOG(DEBUGL) << "=====";
+        LOG(INFOL) << "=====";
     }
-
-        //QSQQuery qsqQuery(literal);
-        //TupleTable *table = new TupleTable(nVars);
-        //db.query(&qsqQuery, table, NULL, NULL);
-        //uint64_t nRows = table->getNRows();
-        //std::vector<std::vector<uint64_t>> output;
-    // Gather all predicates
     std::vector<PredId_t> ids = p.getAllIDBPredicateIds();
     std::ofstream allPredicatesLog("allPredicatesInQueries.log");
     Dictionary dictVariables;
     for (int i = 0; i < ids.size(); ++i) {
         /*
         For every IDB predicate, we will start from its node in the dependency graph
-        and try to traverse until we reach the EDB node.
+        and try to traverse randomly so that we generate queries that induce reasoning.
         */
         int neighbours = graph[ids[i]].size();
         LOG(INFOL) << i+1 << ") " <<p.getPredicateName(ids[i]) << " is IDB  with " << neighbours << " neighbours";
         Predicate idbPred = p.getPredicate(ids[i]);
-        int card = idbPred.getCardinality();
-        std::vector<Substitution> sigma;
-        for (int j = 0; j < card; ++j) {
-            VTerm dest(((int)'A')+j, 0);// = idbPred.getTuple().get(j);
-            sigma.push_back(Substitution(vt[j], dest));
-        }
+
+        // This generic query could be added to list/set of all queries we generate
         std::string query = makeGenericQuery(p, idbPred.getId(), idbPred.getCardinality());
         Literal literal = p.parseLiteral(query, dictVariables);
         int nVars = literal.getNVars();
@@ -302,7 +317,8 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
         bool reachedEDB = false;
         int n = 1;
         //srand(time(0));
-        stack<pair<PredId_t, vector<Substitution>>> path;
+        //vector<pair<PredId_t, vector<Substitution>>> path;
+        vector<Edge> path;
         while (n != depth+1) {
             uint32_t nNeighbours = graph[predId].size();
             if (0 == nNeighbours) {
@@ -313,7 +329,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
                 // Try to find out the EDB node neighbour
                 int index = 0;
                 for(auto neighbour : graph[predId]) {
-                    if (!p.isPredicateIDB(neighbour.first)) {
+                    if (!p.isPredicateIDB(neighbour.endpoint.first)) {
                         randomNeighbour = index;
                     }
                     index++;
@@ -323,9 +339,13 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
                 srand(time(0) + (n + i));
                 randomNeighbour = rand() % nNeighbours;
             }
-            PredId_t qId = graph[predId][randomNeighbour].first;
-            std::vector<Substitution> sigmaN = graph[predId][randomNeighbour].second;
-            path.push(make_pair(qId, sigmaN));
+            PredId_t qId = graph[predId][randomNeighbour].endpoint.first;
+            vector<Substitution> sigmaN = graph[predId][randomNeighbour].endpoint.second;
+            vector<Substitution> backEdge = graph[predId][randomNeighbour].backEdge;
+            Edge e;
+            e.endpoint = make_pair(qId, sigmaN);
+            e.backEdge = backEdge;
+            path.push_back(e);
 
             predId = qId;
             n++;
@@ -336,32 +356,140 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
 
         } // while the depth of exploration is reached
 
-        string pathlog = "";
+        string pathlog = p.getPredicateName(idbPred.getId());
+        pathlog += "=>";
         int pathLength = 0;
-        while(!path.empty()) {
-            string substi = printSubstitutions(path.top().second, db);
-            string nodestr = p.getPredicateName(path.top().first);
+        for(auto node : path) {
+            string substi = printSubstitutions(node.endpoint.second, db);
+            string nodestr = p.getPredicateName(node.endpoint.first);
             pathlog += nodestr + "," + substi;
+            if (pathLength != path.size()-1)
                 pathlog += "=>";
-            path.pop();
             pathLength++;
         }
-        pathlog += p.getPredicateName(idbPred.getId());
         LOG(INFOL) << pathlog;
-            //std::vector<Substitution> result;// = concat(sigmaN, sigma);
-            //uint8_t qCard = p.getPredicate(qId).getCardinality();
-            //std::string qQuery = makeGenericQuery(p, qId, qCard);
-            //LOG(INFOL) << " Generic query made: " << qQuery;
-            //Literal qLiteral = p.parseLiteral(qQuery, dictVariables);
-            //setOfUniquePredicates.insert(p.getPredicateName(qId));
-            //allPredicatesLog << p.getPredicateName(qId) << std::endl;
-            //std::pair<string, int> finalQueryResult = makeComplexQuery(p, qLiteral, result, db, dictVariables);
-            //std::string qFinalQuery = finalQueryResult.first;
-            //LOG(INFOL) << "complex query made  " << finalQueryResult.first;
-            //int type = finalQueryResult.second + ((n > 4) ? 4 : n);
-            //if (allQueries.find(qFinalQuery) == allQueries.end()) {
-            //    allQueries.insert(std::make_pair(qFinalQuery, type));
+         vector<vector<Substitution>> tuplesSubstitution;
+        if (reachedEDB == true) {
+            // Construct the query to find EDB tuples
+            Predicate edbPred = p.getPredicate(predId);
+            // FIXME:
+            vector<Substitution> subLiteral;
+            subLiteral = path.back().backEdge;
+            string workingQuery = makeGenericQuery(p, edbPred.getId(), edbPred.getCardinality());
+            printSubstitutions(subLiteral, db);
+            Literal workingLiteral = p.parseLiteral(workingQuery, dictVariables);
+            pair<string, int> queryAndType = makeComplexQuery(p, workingLiteral, subLiteral, db, dictVariables);
+            LOG(INFOL) << "Query to fire at EDB layer : " << queryAndType.first;
+            Literal literal = p.parseLiteral(queryAndType.first, dictVariables);
+            int nVars = literal.getNVars();
+
+            EDBIterator* table = db.getIterator(literal);
+            //QSQQuery qsqQuery(literal);
+            //TupleTable *table = new TupleTable(nVars);
+
+            // Execute the query and populate the table
+            //db.query(&qsqQuery, table, NULL, NULL);
+            //uint64_t nRows = table->getNRows();
+
+            // Generate random tuple indexes
+            //vector<int> tupleIndexes(maxTuples);
+            //getRandomTupleIndexes(maxTuples, nRows, tupleIndexes);
+
+            // Pop the EDB predicate id and substitution from the top
+            vector<Substitution> sigmaH = path.back().endpoint.second;
+            PredId_t nextNode;
+            if (path.size() == 1) {
+                nextNode = idbPred.getId();
+            } else {
+                nextNode = path[path.size()-2].endpoint.first;
+            }
+            int nextNodeCard = p.getPredicate(nextNode).getCardinality();
+            // This nextNode must be an IDB predicate
+            // We will check whether this predicate appeared as the head of any rule
+            // such that the body contained only one atom (with EDB predicate)
+            uint64_t rowNumber = 0;
+            //if (maxTuples > nRows) {
+            //    maxTuples = nRows;
             //}
+            //LOG(INFOL) << "Next node : "<< p.getPredicateName(nextNode) << "  ### size = " << bodyAtomEDBMap[nextNode].size();
+            int matchCount = 0;
+            while (table->hasNext()) {
+                table->next();
+                string strTuple = "";
+                for (int i = 0; i < edbPred.getCardinality(); ++i) {
+                    Term_t term = table->getElementAt(i);
+                    char supportText[MAX_TERM_SIZE];
+                    db.getDictText(term, supportText);
+                    strTuple += supportText;
+                }
+                    LOG(INFOL) << strTuple;
+                //std::vector<uint64_t> tuple;
+                //std::string tupleString("<");
+                ////for (int a = 0; a < bodyAtomEDBMap[nextNode].size(); ++a) {
+                //// if (table->getPosAtRow(rowNumber, bodyAtomEDBMap[nextNode][a].first) != bodyAtomEDBMap[nextNode][a].second){
+                //// }
+                ////}
+                //for (int j = 0; j < nVars; ++j) {
+                //    uint64_t value = table->getPosAtRow(rowNumber, j);
+                //    tuple.push_back(value);
+                //    char supportText[MAX_TERM_SIZE];
+                //    db.getDictText(value, supportText);
+                //    tupleString += supportText;
+                //    tupleString += ",";
+                //}
+                //tupleString += ">";
+                ////PredId_t idbPredId = getMatchingIDB(db, p, tuple);
+                //bool constantMismatch = false;
+                //for (auto nextNodeConstant: bodyAtomEDBMap[nextNode]) {
+                //    if (tuple[nextNodeConstant.first] != nextNodeConstant.second) {
+                //        constantMismatch = true;
+                //        break;
+                //    }
+                //}
+                //if (constantMismatch) {
+                //    rowNumber++;
+                //    continue;
+                //}
+                //std::string predName = p.getPredicateName(nextNode);
+
+                //vector<Substitution> subs;
+                //LOG(INFOL) << "Matched : " << tupleString << " ==> " << predName << " : " << +nextNode;
+                //for (int k = 0; k < edbPred.getCardinality(); ++k) {
+                //    subs.push_back(Substitution(vt[k], VTerm(0, tuple[k])));
+                //}
+                //tuplesSubstitution.push_back(subs);
+                //rowNumber++;
+                //matchCount++;
+                //if (matchCount == maxTuples) {
+                //    break;
+                //}
+            }
+
+            for (auto ts: tuplesSubstitution) {
+                vector<Substitution> workingSigma = ts;
+                PredId_t workingIDB;// = nextNode;
+                int workingIDBCard;// = nextNodeCard;
+                for(int i = path.size()-1; i >= 0; --i) {
+                    vector<Substitution> sigmaH = path[i].endpoint.second;
+                    vector<Substitution> result = concat(sigmaH, workingSigma);
+                    if (i != 0) {
+                        workingIDB = path[i-1].endpoint.first;
+                        workingIDBCard = p.getPredicate(workingIDB).getCardinality();
+                    } else {
+                        workingIDB = idbPred.getId();
+                        workingIDBCard = idbPred.getCardinality();
+                    }
+                    string qQuery = makeGenericQuery(p, workingIDB, workingIDBCard);
+                    Literal qLiteral = p.parseLiteral(qQuery, dictVariables);
+                    pair<string,int> finalQueryResult = makeComplexQuery(p, qLiteral, result, db, dictVariables);
+                    LOG(INFOL) << "Query : " << finalQueryResult.first;
+                    workingSigma = result;
+                }
+                //LOG(INFOL) << printSubstitutions(ts, db);
+            }
+            delete table;
+        }
+
     }//For all IDB predicates
     allPredicatesLog.close();
     LOG(INFOL) << " # of unique predicate = "<< setOfUniquePredicates.size();
@@ -383,8 +511,8 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBCo
     std::unordered_map<string, int> allQueries;
     std::set<string> setOfUniquePredicates;
 
-    typedef std::pair<PredId_t, vector<Substitution>> EndpointWithEdge;
-    typedef std::unordered_map<uint16_t, std::vector<EndpointWithEdge>> Graph;
+    typedef pair<PredId_t, vector<Substitution>> EndpointWithEdge;
+    typedef unordered_map<uint16_t, vector<EndpointWithEdge>> Graph;
     Graph graph;
 
     std::vector<Rule> rules = p.getAllRules();
@@ -538,6 +666,8 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBCo
             } // for each partial substitution
             rowNumber++;
         }
+
+        delete table;
     } // all EDB predicate ids
     allPredicatesLog.close();
     LOG(INFOL) << " # of unique predicate = "<< setOfUniquePredicates.size();
