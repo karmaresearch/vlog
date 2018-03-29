@@ -477,9 +477,4 @@ public class VLog {
     protected void finalize() {
         stop();
     }
-
-    // For testing purposes ...
-    public static void main(String[] args) throws Exception {
-        Test.runTest(args[0]);
-    }
 }

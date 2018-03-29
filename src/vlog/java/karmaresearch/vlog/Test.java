@@ -329,4 +329,8 @@ class Test {
         }
     }
 
+    public static void main(String[] args) throws Exception {
+        runTest(args[0]);
+    }
+
 }
