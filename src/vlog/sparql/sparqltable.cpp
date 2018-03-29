@@ -1,13 +1,14 @@
 #include <vlog/sparql/sparqltable.h>
 #include <vlog/sparql/sparqliterator.h>
+#include <vlog/inmemory/inmemorytable.h>
 
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
 static bool curl_initialized = false;
 
-SparqlTable::SparqlTable(string repository, EDBLayer *layer, string f, string whereBody) :
-    repository(repository), layer(layer), whereBody(whereBody) {
+SparqlTable::SparqlTable(PredId_t predid, string repository, EDBLayer *layer, string f, string whereBody) :
+    predid(predid), repository(repository), layer(layer), whereBody(whereBody) {
 	if (! curl_initialized) {
 	    curl_global_init(CURL_GLOBAL_ALL);
 	    curl_initialized = true;
@@ -22,7 +23,7 @@ SparqlTable::SparqlTable(string repository, EDBLayer *layer, string f, string wh
     }
 
 
-std::string SparqlTable::generateQuery(const Literal &query, const std::vector<uint8_t> *fields) {
+std::string SparqlTable::generateQuery(const Literal &query) {
     //Convert the literal into a sparql query
     // First, analyze query: and determine which variable goes where.
     std::vector<uint8_t> variables;
@@ -68,20 +69,21 @@ std::string SparqlTable::generateQuery(const Literal &query, const std::vector<u
 	    std::string val = layer->getDictText(t.getValue());
 	    // TODO: escape needed for string? And if value is not found in dictionary,
 	    // what to do then?
-	    binds += " BIND (\"" + val + "\" AS ?" + fieldVars[i] + ") ";
+	    // Also, the bracketing may depend on the type of the value (which we don't keep track of in VLog).
+	    // Or should we add bracketing when we put stuff in the dictionary???
+	    // TODO!!!
+	    if (val.find('<') == 0) {
+		binds += " BIND (" + val + " AS ?" + fieldVars[i] + ") ";
+	    } else {
+		binds += " BIND \"" + val + "\" AS ?" + fieldVars[i] + ") ";
+	    }
+	    select += " ?" + fieldVars[i];
 	    vars.push_back(-1);
 	}
     }
 
     std::string sparqlQuery = select + " WHERE {" + binds + wb + "}";
 
-    if (fields != NULL && fields->size() > 0) {
-	sparqlQuery += " ORDER BY";
-	for (int i = 0; i < fields->size(); i++) {
-	    uint8_t fieldNo = (*fields)[i];
-	    sparqlQuery += " ?" + fieldVars[fieldNo];
-	}
-    }
     return sparqlQuery;
 }
 
@@ -172,6 +174,7 @@ json SparqlTable::launchQuery(std::string sparqlQuery) {
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     
     CURLcode resp = curl_easy_perform(curl);
+    LOG(DEBUGL) << "output = " << response.substr(0, 1000) << ((response.size() > 1000) ? " ..." : "");
     json output;
     if (resp == 0) {
 	output = json::parse(response);
@@ -237,7 +240,17 @@ bool SparqlTable::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilte
 
 EDBIterator *SparqlTable::getIterator(const Literal &query) {
     std::vector<uint8_t> sorting;
-    return getSortedIterator(query, sorting);
+
+    size_t sz = query.getTupleSize();
+
+    if (sz != fieldVars.size()) {
+	LOG(WARNL) << "Wrong arity in query for getIterator";
+	return 0;
+    }
+
+    std::string sparqlQuery = generateQuery(query);
+    json output = launchQuery(sparqlQuery);
+    return new SparqlIterator(output, layer, query, fieldVars);
 }
 
 EDBIterator *SparqlTable::getSortedIterator(const Literal &query,
@@ -250,9 +263,35 @@ EDBIterator *SparqlTable::getSortedIterator(const Literal &query,
 	return 0;
     }
 
-    std::string sparqlQuery = generateQuery(query, &fields);
+    std::string sparqlQuery = generateQuery(query);
     json output = launchQuery(sparqlQuery);
-    return new SparqlIterator(output, layer, query, fields, fieldVars);
+    EDBIterator *it = getIterator(query);
+    std::vector<ColumnWriter *> writers;
+    writers.resize(sz);
+    for (uint8_t i = 0; i < sz; ++i) {
+        writers[i] = new ColumnWriter();
+    }
+    while (it->hasNext()) {
+	it->next();
+	for (uint8_t i = 0; i < sz; ++i) {
+            writers[i]->add(it->getElementAt(i));
+        }
+    }
+
+    std::vector<std::shared_ptr<Column>> columns;
+    for (uint8_t i = 0; i < sz; ++i) {
+        columns.push_back(writers[i]->getColumn());
+    }
+
+    std::shared_ptr<Segment> segment = std::shared_ptr<Segment>(new Segment(sz, columns));
+
+    for (uint8_t i = 0; i < sz; ++i) {
+        delete writers[i];
+    }
+
+    segment = segment->sortBy(&fields);
+
+    return new InmemoryIterator(segment, predid, fields);
 }
 
 bool SparqlTable::getDictNumber(const char *text, const size_t sizeText,

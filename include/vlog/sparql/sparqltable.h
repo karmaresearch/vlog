@@ -12,14 +12,14 @@ using json = nlohmann::json;
 
 class SparqlTable : public EDBTable {
     private:
+	PredId_t predid;
         CURL *curl;
 	std::string repository;
 	EDBLayer *layer;
 	std::vector<string> fieldVars;
 	std::string whereBody;
 
-        std::string generateQuery(const Literal &query,
-                const std::vector<uint8_t> *fields = NULL);
+        std::string generateQuery(const Literal &query);
 
 	json launchQuery(std::string sparqlQuery);
 
@@ -32,7 +32,7 @@ class SparqlTable : public EDBTable {
             return false;
         }
 
-        SparqlTable(string repository, EDBLayer *layer, string fields, string whereBody);
+        SparqlTable(PredId_t predid, string repository, EDBLayer *layer, string fields, string whereBody);
 
         void query(QSQQuery *query, TupleTable *outputTable,
                 std::vector<uint8_t> *posToFilter,

@@ -90,7 +90,7 @@ public:
     std::string tostring() {
         std::string output = "";
         for (SimpleHashmap::iterator itr = map.begin(); itr != map.end(); ++itr) {
-            output += itr->first + std::string(" ") + std::to_string(itr->second) + std::string(" ");
+            output += itr->first + std::string(" ") + std::to_string(itr->second) + std::string("\n");
         }
         return output;
     }

@@ -15,16 +15,13 @@ class SparqlIterator : public EDBIterator {
 	json::iterator it;
 	uint64_t row[128];
 	Literal query;
-	bool skipDuplicated;
 	bool hasNextChecked;
 	bool hasNextValue;
-	bool isFirst;
 	int vars[128];	// for every position, indicates which variable number to use
-	std::vector<uint8_t> sortFields;
 	std::vector<std::string> fieldVars;
 
     public:
-        SparqlIterator(const json &qr, EDBLayer *l, const Literal &q, const std::vector<uint8_t> &sf, const std::vector<std::string> &fv);
+        SparqlIterator(const json &qr, EDBLayer *l, const Literal &q, const std::vector<std::string> &fv);
 
         bool hasNext();
 
@@ -39,7 +36,7 @@ class SparqlIterator : public EDBIterator {
 	}
 
         void skipDuplicatedFirstColumn() {
-	    skipDuplicated = true;
+	    throw 10;	// Should not happen on unsorted iterator.
 	}
 
         void clear() {
