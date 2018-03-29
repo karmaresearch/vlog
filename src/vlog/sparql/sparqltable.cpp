@@ -243,29 +243,47 @@ EDBIterator *SparqlTable::getIterator(const Literal &query) {
 
     size_t sz = query.getTupleSize();
 
-    if (sz != fieldVars.size()) {
-	LOG(WARNL) << "Wrong arity in query for getIterator";
-	return 0;
+    json output;
+    if (sz == fieldVars.size()) {
+	std::string sparqlQuery = generateQuery(query);
+	output = launchQuery(sparqlQuery);
     }
-
-    std::string sparqlQuery = generateQuery(query);
-    json output = launchQuery(sparqlQuery);
     return new SparqlIterator(output, layer, query, fieldVars);
+}
+
+static uint64_t __getKeyFromFields(const std::vector<uint8_t> &fields) {
+    assert(fields.size() <= 8);
+    uint64_t key = 0;
+    for(uint8_t i = 0; i < fields.size(); ++i) {
+        uint8_t field = fields[i];
+        key = (key << 8) + (uint64_t)(field+1);
+    }
+    return key;
 }
 
 EDBIterator *SparqlTable::getSortedIterator(const Literal &query,
         const std::vector<uint8_t> &fields) {
 
     size_t sz = query.getTupleSize();
-
     if (sz != fieldVars.size()) {
-	LOG(WARNL) << "Wrong arity in query for getSortedIterator";
-	return 0;
+	json output;
+	return new SparqlIterator(output, layer, query, fieldVars);
     }
 
-    std::string sparqlQuery = generateQuery(query);
-    json output = launchQuery(sparqlQuery);
+    uint64_t key = 0;
+    if (sz <= 8 && query.getNUniqueVars() == sz) {
+	// See if we can find it in the cache.
+	key = __getKeyFromFields(fields);
+	if (cachedSegments.count(key)) {
+	    auto segment = cachedSegments[key];
+	    return new InmemoryIterator(segment, predid, fields);
+	}
+    }
+
     EDBIterator *it = getIterator(query);
+    if (! it->hasNext()) {
+	return it;
+    }
     std::vector<ColumnWriter *> writers;
     writers.resize(sz);
     for (uint8_t i = 0; i < sz; ++i) {
@@ -290,6 +308,10 @@ EDBIterator *SparqlTable::getSortedIterator(const Literal &query,
     }
 
     segment = segment->sortBy(&fields);
+    if (sz <= 8 && query.getNUniqueVars() == sz) {
+	// put it in the cache.
+	cachedSegments[key] = segment;
+    }
 
     return new InmemoryIterator(segment, predid, fields);
 }

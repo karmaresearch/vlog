@@ -4,6 +4,7 @@
 #include <vlog/column.h>
 #include <vlog/edbtable.h>
 #include <vlog/edbiterator.h>
+#include <vlog/segment.h>
 
 #include <curl/curl.h>
 
@@ -18,6 +19,7 @@ class SparqlTable : public EDBTable {
 	EDBLayer *layer;
 	std::vector<string> fieldVars;
 	std::string whereBody;
+	std::unordered_map<uint64_t, std::shared_ptr<const Segment>> cachedSegments;
 
         std::string generateQuery(const Literal &query);
 

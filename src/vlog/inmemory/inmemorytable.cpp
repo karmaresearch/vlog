@@ -312,7 +312,7 @@ EDBIterator *InmemoryTable::getIterator(const Literal &q) {
     return new InmemoryIterator(filteredSegment, predid, sortFields);
 }
 
-std::vector<uint8_t> __mergeSortingFields(std::vector<uint8_t> v1,
+static std::vector<uint8_t> __mergeSortingFields(std::vector<uint8_t> v1,
         std::vector<uint8_t> v2) {
     int sz = v1.size();
     if (sz != 0) {
@@ -334,7 +334,7 @@ std::vector<uint8_t> __mergeSortingFields(std::vector<uint8_t> v1,
     }
 }
 
-uint64_t __getKeyFromFields(const std::vector<uint8_t> &fields) {
+static uint64_t __getKeyFromFields(const std::vector<uint8_t> &fields) {
     assert(fields.size() <= 8);
     uint64_t key = 0;
     for(uint8_t i = 0; i < fields.size(); ++i) {

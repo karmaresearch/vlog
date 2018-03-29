@@ -249,22 +249,13 @@ class Test {
         vlog = new VLog();
         vlog.start(edbConf, false);
         vlog.setRules(parentRules, RuleRewriteStrategy.AGGRESSIVE);
-        if (!vlog.materialize(false, 1)) {
+        if (!vlog.materialize(false, 100)) {
             System.out.println("Timeout ... try again without ...");
             vlog.materialize(false);
         }
 
         vlog.writeQueryResultsToCsv(isParentOf, "isParentOf");
-
-        try (TermQueryResultIterator result = vlog.query(isParent)) {
-            while (result.hasNext()) {
-                Term[] r = result.next();
-                for (Term s : r) {
-                    System.out.print(s + " ");
-                }
-                System.out.println();
-            }
-        }
+        vlog.writeQueryResultsToCsv(isParent, "isParent");
     }
 
     public static void main(String[] args) throws Exception {
