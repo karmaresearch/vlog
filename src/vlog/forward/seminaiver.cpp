@@ -389,6 +389,14 @@ bool SemiNaiver::executeUntilSaturation(
         costRules.push_back(stat);
         ruleset[currentRule].lastExecution = iteration++;
 
+	if (timeout != NULL && *timeout != 0) {
+	    std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
+	    if (s.count() > *timeout) {
+		*timeout = 0;	// To indicate materialization was stopped because of timeout.
+		return newDer;
+	    }
+	}
+
         if (response) {
             if (ruleset[currentRule].rule.isRecursive()) {
                 //Is the rule recursive? Go until saturation...
@@ -409,6 +417,13 @@ bool SemiNaiver::executeUntilSaturation(
                     stat.time = sec.count() * 1000;
                     stat.derived = response;
                     costRules.push_back(stat);
+		    if (timeout != NULL && *timeout != 0) {
+			std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
+			if (s.count() > *timeout) {
+			    *timeout = 0;	// To indicate materialization was stopped because of timeout.
+			    return newDer;
+			}
+		    }
                 } while (response);
                     LOG(DEBUGL) << "Rules " <<
                         ruleset[currentRule].rule.tostring(program, &layer) <<
