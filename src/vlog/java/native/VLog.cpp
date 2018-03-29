@@ -444,6 +444,29 @@ JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_getConstantId(JNIEnv *env, 
 
 /*
  * Class:     karmaresearch_vlog_VLog
+ * Method:    getOrAddConstantId
+ * Signature: (Ljava/lang/String;)J
+ */
+JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_getOrAddConstantId(JNIEnv *env, jobject obj, jstring literal) {
+
+    VLogInfo *f = getVLogInfo(env, obj);
+    if (f == NULL || f->layer == NULL) {
+	throwNotStartedException(env, "VLog is not started yet");
+	return (jint) -1;
+    }
+
+    const char *cliteral = env->GetStringUTFChars(literal, 0);
+    uint64_t value;
+    jlong retval = -1;
+    if (f->layer->getOrAddDictNumber(cliteral, strlen(cliteral), value)) {
+	retval = value;
+    }
+    env->ReleaseStringUTFChars(literal, cliteral);
+    return retval;
+}
+
+/*
+ * Class:     karmaresearch_vlog_VLog
  * Method:    getConstant
  * Signature: (J)Ljava/lang/String;
  */
@@ -598,13 +621,13 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setRulesFile(JNIEnv *env, jo
 /*
  * Class:     karmaresearch_vlog_VLog
  * Method:    materialize
- * Signature: (Z)V
+ * Signature: (ZI)Z
  */
-JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_materialize(JNIEnv *env, jobject obj, jboolean skolem) {
+JNIEXPORT jboolean JNICALL Java_karmaresearch_vlog_VLog_materialize(JNIEnv *env, jobject obj, jboolean skolem, jint jtimeout) {
     VLogInfo *f = getVLogInfo(env, obj);
     if (f == NULL || f->program == NULL) {
 	throwNotStartedException(env, "VLog is not started yet");
-	return;
+	return false;
     }
 
     if (f->sn != NULL) {
@@ -614,10 +637,19 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_materialize(JNIEnv *env, job
     f->sn = new SemiNaiver(f->program->getAllRules(), *(f->layer), f->program, true, true, false, ! (bool) skolem, -1, false);
     LOG(INFOL) << "Starting full materialization";
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    f->sn->run();
+    unsigned long *p = NULL;
+    unsigned long t = (unsigned long) jtimeout;
+    if (t > 0) {
+	p = &t;
+    }
+    f->sn->run(p);
+    if (p != NULL && *p == 0) {
+	return (jboolean) false;
+    }
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
     f->sn->printCountAllIDBs("");
+    return (jboolean) true;
 }
 
 /*

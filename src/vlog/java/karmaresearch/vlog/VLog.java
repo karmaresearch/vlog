@@ -256,6 +256,20 @@ public class VLog {
             throws NotStartedException;
 
     /**
+     * Returns the internal representation of the constant. Internally, VLog
+     * uses longs to represent constants. This method allows the user to look up
+     * this internal number. If no such number is available yet, one is created.
+     *
+     * @param constant
+     *            the constant to look up
+     * @return the constant id
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet.
+     */
+    public native long getOrAddConstantId(String constant)
+            throws NotStartedException;
+
+    /**
      * Returns the constant. Internally, VLog uses longs to represent constants.
      * This method allows the user to look up the constant string, when provided
      * with the constant id.
@@ -310,12 +324,7 @@ public class VLog {
                     longTerms[i] = -variables.size();
                 }
             } else {
-                longTerms[i] = getConstantId(terms[i].getName());
-                if (longTerms[i] == -1) {
-                    // Non-existing ..., but make sure that VLog won't interpret
-                    // it as a variable.
-                    longTerms[i] = Long.MAX_VALUE;
-                }
+                longTerms[i] = getOrAddConstantId(terms[i].getName());
             }
         }
         return longTerms;
@@ -444,16 +453,33 @@ public class VLog {
     /**
      * Materializes the database under the specified rules.
      *
-     * TODO: maybe limit number of iterations? (Currently not in vlog, but could
-     * be added)
+     * @param skolem
+     *            whether to use skolem chase <code>true</code> or restricted
+     *            chase <code>false</code>.
+     * @return <code>true</code> if success.
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet.
+     */
+    public boolean materialize(boolean skolem) throws NotStartedException {
+        return materialize(skolem, 0);
+    }
+
+    /**
+     * Materializes the database under the specified rules.
      *
      * @param skolem
      *            whether to use skolem chase <code>true</code> or restricted
      *            chase <code>false</code>.
+     * @param timeout
+     *            when larger than 0, indicates a timeout in seconds; otherwise
+     *            ignored.
+     * @return <code>false</code> if terminated by a timeout, <code>true</code>
+     *         if success.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      */
-    public native void materialize(boolean skolem) throws NotStartedException;
+    public native boolean materialize(boolean skolem, int timeout)
+            throws NotStartedException;
 
     /**
      * Creates a CSV file at the specified location, for the specified

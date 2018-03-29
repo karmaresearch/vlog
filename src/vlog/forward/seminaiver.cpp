@@ -202,7 +202,7 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
 bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
         std::vector<RuleExecutionDetails> &ruleset,
         std::vector<StatIteration> &costRules,
-        bool fixpoint) {
+        bool fixpoint, unsigned long *timeout) {
 #if DEBUG
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 #endif
@@ -217,12 +217,12 @@ bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
 #endif
 
     if (ruleset.size() > 0) {
-        newDer |= executeUntilSaturation(ruleset, costRules, fixpoint);
+        newDer |= executeUntilSaturation(ruleset, costRules, fixpoint, timeout);
     }
     return newDer;
 }
 
-void SemiNaiver::run(size_t lastExecution, size_t it) {
+void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout) {
     running = true;
     iteration = it;
     startTime = std::chrono::system_clock::now();
@@ -312,21 +312,21 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
         while (true) {
             bool resp1;
             if (loopNr == 0)
-                resp1 = executeRules(tmpEDBRules, tmpIDBRules, costRules, true);
+                resp1 = executeRules(tmpEDBRules, tmpIDBRules, costRules, true, timeout);
             else
-                resp1 = executeRules(emptyRuleset, tmpIDBRules, costRules, true);
+                resp1 = executeRules(emptyRuleset, tmpIDBRules, costRules, true, timeout);
             bool resp2;
             if (loopNr == 0)
-                resp2 = executeRules(tmpExtEDBRules, tmpExtIDBRules, costRules, false);
+                resp2 = executeRules(tmpExtEDBRules, tmpExtIDBRules, costRules, false, timeout);
             else
-                resp2 = executeRules(emptyRuleset, tmpExtIDBRules, costRules, false);
+                resp2 = executeRules(emptyRuleset, tmpExtIDBRules, costRules, false, timeout);
             if (!resp1 && !resp2) {
                 break; //Fix-point
             }
             loopNr++;
         }
     } else {
-        executeRules(allEDBRules, allIDBRules, costRules, true);
+        executeRules(allEDBRules, allIDBRules, costRules, true, timeout);
     }
 
     running = false;
@@ -358,7 +358,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
 bool SemiNaiver::executeUntilSaturation(
         std::vector<RuleExecutionDetails> &ruleset,
         std::vector<StatIteration> &costRules,
-        bool fixpoint) {
+        bool fixpoint, unsigned long *timeout) {
     size_t currentRule = 0;
     uint32_t rulesWithoutDerivation = 0;
 
@@ -373,6 +373,13 @@ bool SemiNaiver::executeUntilSaturation(
                 iteration,
                 NULL);
         newDer |= response;
+	if (timeout != NULL && *timeout != 0) {
+	    std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
+	    if (s.count() > *timeout) {
+		*timeout = 0;	// To indicate materialization was stopped because of timeout.
+		return newDer;
+	    }
+	}
         std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
         StatIteration stat;
         stat.iteration = iteration;
@@ -448,7 +455,7 @@ bool SemiNaiver::executeUntilSaturation(
                 break;
         }
     } while (rulesWithoutDerivation != ruleset.size());
-                    return newDer;
+    return newDer;
 }
 
 void SemiNaiver::storeOnFile(std::string path, const PredId_t pred, const bool decompress, const int minLevel, const bool csv) {

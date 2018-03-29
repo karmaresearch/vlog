@@ -100,7 +100,7 @@ class SemiNaiver {
         bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
                 std::vector<RuleExecutionDetails> &allIDBRules,
                 std::vector<StatIteration> &costRules,
-                bool fixpoint);
+                bool fixpoint, unsigned long *timeout = NULL);
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
                 std::vector<Literal> &heads,
@@ -134,7 +134,7 @@ class SemiNaiver {
         virtual bool executeUntilSaturation(
                 std::vector<RuleExecutionDetails> &ruleset,
                 std::vector<StatIteration> &costRules,
-                bool fixpoint);
+                bool fixpoint, unsigned long *timeout = NULL);
 
     public:
 		VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
@@ -151,8 +151,8 @@ class SemiNaiver {
                     multithreaded, false, nthreads, shuffleRules) {
             }
 
-        VLIBEXP void run() {
-            run(0, 1);
+        VLIBEXP void run(unsigned long *timeout = NULL) {
+            run(0, 1, timeout);
         }
 
         bool opt_filter() {
@@ -165,7 +165,7 @@ class SemiNaiver {
 
         virtual FCTable *getTable(const PredId_t pred, const uint8_t card);
 
-        VLIBEXP void run(size_t lastIteration, size_t iteration);
+        VLIBEXP void run(size_t lastIteration, size_t iteration, unsigned long *timeout = NULL);
 
         VLIBEXP void storeOnFile(std::string path, const PredId_t pred, const bool decompress,
                 const int minLevel, const bool csv);
