@@ -4,13 +4,15 @@
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
+static bool curl_initialized = false;
+
 SparqlTable::SparqlTable(string repository, EDBLayer *layer, string f, string whereBody) :
-    endpoint(HttpClient::parse(repository)),
-    client(endpoint.host, endpoint.port), layer(layer), whereBody(whereBody) {
-        isConnected = client.connect();
-        if (!isConnected) {
-            LOG(WARNL) << "Client failed in connecting to " << repository;
-        }
+    repository(repository), layer(layer), whereBody(whereBody) {
+	if (! curl_initialized) {
+	    curl_global_init(CURL_GLOBAL_ALL);
+	    curl_initialized = true;
+	}
+	curl = curl_easy_init();
 	//Extract fields
 	std::stringstream ss(f);
 	std::string item;
@@ -120,22 +122,64 @@ size_t SparqlTable::estimateCardinality(const Literal &query) {
     return getCardinality(query);
 }
 
+//Inspired by https://stackoverflow.com/questions/154536/encode-decode-urls-in-c#17708801
+std::string escape(const std::string &s) {
+    std::ostringstream escaped;
+    escaped.fill('0');
+    escaped << std::hex;
+
+    std::string::const_iterator n;
+    for (std::string::const_iterator i = s.cbegin(),
+            n = s.cend(); i != n; ++i) {
+        std::string::value_type c = (*i);
+        if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+            escaped << c;
+            continue;
+        }
+        // Any other characters are percent-encoded
+        escaped << std::uppercase;
+        escaped << '%' << std::setw(2) << int((unsigned char) c);
+        escaped << std::nouppercase;
+    }
+
+    return escaped.str();
+}
+
+size_t writeFunction(void *ptr, size_t size, size_t nmemb, std::string* data) {
+    data->append((char*) ptr, size * nmemb);
+    return size * nmemb;
+}
+
 json SparqlTable::launchQuery(std::string sparqlQuery) {
-    std::string request = endpoint.protocol + "://" + endpoint.host + endpoint.path;
-    request += "?query=" + HttpClient::escape(sparqlQuery);
+
+    char errorBuffer[CURL_ERROR_SIZE];
+    std::string request = repository;
+
+    request += "?query=" + escape(sparqlQuery);
     LOG(DEBUGL) << "Launching the remote query " << sparqlQuery;
-    LOG(DEBUGL) << "request = " << request;
-    std::string headers;
+    LOG(DEBUGL) << "Request = " << request;
+    curl_easy_setopt(curl, CURLOPT_URL, request.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeFunction);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 50L);
+    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errorBuffer);
+    std::string rheaders;
     std::string response;
-    std::string format = "application/sparql-results+json";
-    bool resp = client.get(request, headers, response, format);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(curl, CURLOPT_HEADERDATA, &rheaders);
+    struct curl_slist *headers = NULL;
+    headers = curl_slist_append(headers, "Accept: application/sparql-results+json");
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    
+    CURLcode resp = curl_easy_perform(curl);
     json output;
-    if (resp) {
+    if (resp == 0) {
 	output = json::parse(response);
 	output = output["results"];
 	output = output["bindings"];
     } else {
-	LOG(WARNL) << "Launching query failed";
+	std::string em(errorBuffer);
+	LOG(WARNL) << "Launching query failed: " << em;
     }
     return output;
 }
@@ -244,5 +288,5 @@ uint64_t SparqlTable::getSize() {
 }
 
 SparqlTable::~SparqlTable() {
-    client.disconnect();
+    curl_easy_cleanup(curl);
 }

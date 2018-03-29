@@ -25,7 +25,6 @@ bool SparqlIterator::hasNext() {
                 // Note that it points at the next value.
 		std::string val = (*it)[fieldVars[elNo]]["value"];
 		uint64_t v;
-		LOG(DEBUGL) << "String: " << val;
 		layer->getOrAddDictNumber(val.c_str(), val.size(), v);
                 if (v != oldval) {
                     stop = true;
@@ -44,7 +43,6 @@ bool SparqlIterator::hasNext() {
                 for (int i = 0; i < sortFields.size(); i++) {
 		    std::string val = (*it)[fieldVars[sortFields[i]]]["value"];
 		    uint64_t v;
-		    LOG(DEBUGL) << "String: " << val;
 		    layer->getOrAddDictNumber(val.c_str(), val.size(), v);
                     if (oldval[i] != v) {
                         stop = true;
@@ -76,7 +74,6 @@ void SparqlIterator::next() {
 	if (t.isVariable()) {
 	    std::string val = (*it)[fieldVars[i]]["value"];
 	    uint64_t v;
-	    LOG(DEBUGL) << "String: " << val;
 	    layer->getOrAddDictNumber(val.c_str(), val.size(), v);
 	    row[i] = v;
 

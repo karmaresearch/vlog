@@ -5,16 +5,15 @@
 #include <vlog/edbtable.h>
 #include <vlog/edbiterator.h>
 
-#include <trident/utils/httpclient.h>
+#include <curl/curl.h>
 
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
 class SparqlTable : public EDBTable {
     private:
-        HttpClient::URL endpoint;
-        HttpClient client;
-        bool isConnected;
+        CURL *curl;
+	std::string repository;
 	EDBLayer *layer;
 	std::vector<string> fieldVars;
 	std::string whereBody;

@@ -136,6 +136,8 @@ IF(MAPI)
 ENDIF()
 
 IF(SPARQL)
+    find_package(CURL REQUIRED)
+    include_directories(${CURL_INCLUDE_DIR})
     file(GLOB vlog_sparqlSRC "src/vlog/sparql/*.cpp")
     set(vlog_SRC ${vlog_sparqlSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DSPARQL=1")
@@ -162,6 +164,10 @@ ENDIF()
 #Create both a library and the executable program
 add_library(vlog-core SHARED ${vlog_SRC})
 add_executable(vlog src/launcher/main.cpp)
+
+IF(SPARQL)
+    target_link_libraries(vlog-core ${CURL_LIBRARIES})
+ENDIF()
 
 #PTHREADS
 find_package(Threads REQUIRED)
