@@ -220,6 +220,16 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setLogLevel(JNIEnv *env, job
 
 /*
  * Class:     karmaresearch_vlog_VLog
+ * Method:    setLogFile
+ * Signature: (Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setLogFile(JNIEnv *env, jobject obj, jstring file) {
+    std::string f = jstring2string(env, file);
+    Logger::logToFile(f);
+}
+
+/*
+ * Class:     karmaresearch_vlog_VLog
  * Method:    start
  * Signature: (Ljava/lang/String;Z)V
  */

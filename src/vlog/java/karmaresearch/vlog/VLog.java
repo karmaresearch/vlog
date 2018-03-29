@@ -149,6 +149,15 @@ public class VLog {
     public native void setLogLevel(String level);
 
     /**
+     * Redirects the logging of VLog to a file.
+     *
+     * @param filename
+     *            the file.
+     *
+     */
+    public native void setLogFile(String filename);
+
+    /**
      * Starts vlog with the specified edb configuration. The edb configuration
      * can either be specified directly as a string, in which case the
      * <code>isFile</code> parameter should be <code>false</code>, or as a file
