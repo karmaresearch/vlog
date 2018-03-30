@@ -55,7 +55,9 @@ std::pair<std::string, int> makeComplexQuery(Program& p, Literal& l, vector<Subs
         for (int j = 0; j < sub.size(); ++j) {
             if (sub[j].origin == +id && sub[j].destination.getId() == 0) {
                 char supportText[MAX_TERM_SIZE];
+                //LOG(INFOL) << "dest value = " << sub[j].destination.getValue();
                 db.getDictText(sub[j].destination.getValue(), supportText);
+                //LOG(INFOL) << " support text = {" << supportText << "}";
                 query += supportText;
                 found = true;
                 countConst++;
@@ -250,14 +252,14 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
             if (!p.isPredicateIDB(pb.getId())) {
                 // add sigmaB as a substitution to this edge too
                 // This will be useful when creating the edb query with constraints
-                for (int j = 0; j < pb.getCardinality(); ++j) {
-                    VTerm dest = itr->getTuple().get(j);
-                    uint8_t temp = dest.getId();
-                    if (temp == 0) {
-                        char supportText[MAX_TERM_SIZE];
-                        db.getDictText(dest.getValue(), supportText);
-                    }
-                }
+                //for (int j = 0; j < pb.getCardinality(); ++j) {
+                //    VTerm dest = itr->getTuple().get(j);
+                //    uint8_t temp = dest.getId();
+                //    if (temp == 0) {
+                //        char supportText[MAX_TERM_SIZE];
+                //        db.getDictText(dest.getValue(), supportText);
+                //    }
+                //}
                 edge.backEdge = sigmaB;
             }
 
@@ -286,6 +288,9 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
     //        }
     //    LOG(INFOL) << "=====";
     //}
+    //std::vector<std::pair<std::string,int>> queries2;
+    //return queries2;
+
     std::vector<PredId_t> ids = p.getAllIDBPredicateIds();
     std::ofstream allPredicatesLog("allPredicatesInQueries.log");
     Dictionary dictVariables;
@@ -363,6 +368,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
             // Construct the query to find EDB tuples
             Predicate edbPred = p.getPredicate(predId);
             vector<Substitution> subLiteral;
+            //LOG(INFOL) << "last node in path : " << p.getPredicateName(path.back().endpoint.first);
             subLiteral = path.back().backEdge;
             string workingQuery = makeGenericQuery(p, edbPred.getId(), edbPred.getCardinality());
             Literal workingLiteral = p.parseLiteral(workingQuery, dictVariables);
@@ -438,7 +444,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
     std::vector<std::pair<std::string,int>> queries;
     for (std::unordered_map<std::string,int>::iterator it = allQueries.begin(); it !=  allQueries.end(); ++it) {
         queries.push_back(std::make_pair(it->first, it->second));
-        LOG(INFOL) << "Query: " << it->first << " type : " << it->second ;
+        //LOG(INFOL) << "Query: " << it->first << " type : " << it->second ;
     }
     return queries;
 }
