@@ -199,7 +199,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             // 1. generate queries and run them and train model
             EDBConf conf(edbFile);
             int depth = 5;
-            uint64_t maxTuples = 5000;
+            uint64_t maxTuples = 500;
             uint8_t vt1 = 1;
             uint8_t vt2 = 2;
             uint8_t vt3 = 3;
@@ -211,7 +211,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             vt.push_back(vt4);
             LOG(INFOL) << "Generating training queries: ";
             std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-            std::vector<std::pair<std::string,int>> trainingQueries = Training::generateTrainingQueries(conf,
+            std::vector<std::pair<std::string,int>> trainingQueries = Training::generateNewTrainingQueries(conf,
                     *edb.get(),
                     *program.get(),
                     depth,
@@ -225,13 +225,15 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             if (nMaxTrainingQueries < 0) {
                 nMaxTrainingQueries = nQueries;
             }
+            LOG(INFOL) << "Max training queries : " << nMaxTrainingQueries;
             int i = 0;
-            for (auto tq: trainingQueries) {
-                trainingQueriesVector.push_back(tq.first);
-                if (++i > nMaxTrainingQueries) {
-                    break;
-                }
+            vector<int> queryIndexes(nMaxTrainingQueries);
+            getRandomTupleIndexes(nMaxTrainingQueries, nQueries, queryIndexes);
+            LOG(INFOL) << "query indexes received : " << queryIndexes.size();
+            for (auto qi: queryIndexes) {
+                trainingQueriesVector.push_back(trainingQueries[qi].first);
             }
+            LOG(INFOL) << "training queries ready";
             // 2. test the model against test queries
 
             uint64_t timeout = stoull(timeoutStr);
@@ -343,7 +345,6 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             page = buf.str();
             isjson = true;
         } else if (path == "/setup") {
-            LOG(INFOL) << "request : " << req;
             string form = req.substr(req.find("application/x-www-form-urlencoded"));
             string srules = _getValueParam(form, "rules");
             string spremat = _getValueParam(form, "queries");
@@ -363,8 +364,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                     srules.begin(), srules.end(), e2, "$1\n");
             srules = replacedString;
 
-            LOG(INFOL) << srules;
-            LOG(INFOL) << "size = "<< srules.size();
+            LOG(INFOL) << "# of rules = "<< srules.size();
             spremat = HttpClient::unescape(spremat);
             replacedString = "";
             std::regex_replace(std::back_inserter(replacedString),

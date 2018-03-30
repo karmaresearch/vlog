@@ -170,3 +170,13 @@ void VLogUtils::execSPARQLQuery(string sparqlquery,
     delete plangen;
 }
 
+void getRandomTupleIndexes(uint64_t m, uint64_t n, vector<int>& indexes) {
+    srand(time(0));
+    for (uint64_t i = 0; i < m; ++i) {
+        uint64_t r;
+        do {
+            r = rand() % n;
+        } while(std::find(indexes.begin(), indexes.end(), r) != indexes.end());
+        indexes[i] = r;
+    }
+}

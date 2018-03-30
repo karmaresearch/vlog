@@ -30,3 +30,5 @@ class VLogUtils {
 
 };
 #endif
+// This function generates m random numbers from the range (0, n) and stores them in indexes vector
+void getRandomTupleIndexes(uint64_t m, uint64_t n, std::vector<int>& indexes);

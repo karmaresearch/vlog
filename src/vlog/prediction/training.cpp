@@ -1,4 +1,5 @@
 #include <vlog/training.h>
+#include <vlog/utils.h>
 #include <csignal>
 #include <ctime>
 #include <set>
@@ -132,17 +133,6 @@ PredId_t getMatchingIDB(EDBLayer& db, Program &p, vector<uint64_t>& tuple) {
         }
     }
     return idbPredicateId;
-}
-
-void getRandomTupleIndexes(uint64_t m, uint64_t n, vector<int>& indexes) {
-    srand(time(0));
-    for (uint64_t i = 0; i < m; ++i) {
-        uint64_t r;
-        do {
-            r = rand() % n;
-        } while(std::find(indexes.begin(), indexes.end(), r) != indexes.end());
-        indexes[i] = r;
-    }
 }
 
 bool isSimilar(string& query1, string& query2, EDBLayer& layer) {
@@ -886,7 +876,7 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
 
     vector<pair<string, int>> trainingQueriesAndResult;
 
-    bool use5050 = false;
+    bool use5050 = true;
     vector<Metrics>* ptrFeatures = NULL;
     vector<int>* ptrDecisions = NULL;
     vector<string>* ptrQueries = NULL;
@@ -937,7 +927,7 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         instances[i].x[5] = std::log1p(instances[i].x[5]);
     }
     int totalTraining = instances.size();
-    double k = ((double)trainingQsqr / (double)totalTraining);//*100;
+    double qsqrPercent = ((double)trainingQsqr / (double)totalTraining);//*100;
     LogisticRegression lr(6);
     lr.train(instances);
 
@@ -971,12 +961,14 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         testInst[i].x[5] = std::log1p(testInst[i].x[5]);
     }
 
-    vector<double> probabilities = {0.5, 0.6, 0.7, 0.8, 0.9};
+    vector<double> probabilities = {0.1, 0.2, 0.3, 0.4, 0.45, 0.5, 0.55, 0.6, 0.7, 0.8, 0.9, qsqrPercent};
     accuracy = 0;
+    double effectiveProb = 0.0;
     for (auto prob : probabilities) {
         double acc = computeAccuracy(testInst, lr, prob);
         if (acc > accuracy) {
             accuracy = acc;
+            effectiveProb = prob;
         }
     }
 
