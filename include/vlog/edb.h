@@ -72,11 +72,13 @@ class EDBLayer {
             std::shared_ptr<EDBTable> manager;
         };
 
-        Dictionary predDictionary;
+        std::unique_ptr<Dictionary> predDictionary;
         std::map<PredId_t, EDBInfoTable> dbPredicates;
 
         Factory<EDBMemIterator> memItrFactory;
         IndexedTupleTable *tmpRelations[MAX_NPREDS];
+
+        std::unique_ptr<Dictionary> termsDictionary;
 
         VLIBEXP void addTridentTable(const EDBConf::Table &tableConf, bool multithreaded);
 
@@ -93,10 +95,14 @@ class EDBLayer {
         void addMDLiteTable(const EDBConf::Table &tableConf);
 #endif
         VLIBEXP void addInmemoryTable(const EDBConf::Table &tableConf);
+        VLIBEXP void addSparqlTable(const EDBConf::Table &tableConf);
 
     public:
         EDBLayer(EDBConf &conf, bool multithreaded) {
             const std::vector<EDBConf::Table> tables = conf.getTables();
+
+            predDictionary = std::unique_ptr<Dictionary>(new Dictionary());
+
             for (const auto &table : tables) {
                 if (table.type == "Trident") {
                     addTridentTable(table, multithreaded);
@@ -118,6 +124,10 @@ class EDBLayer {
 #endif
                 } else if (table.type == "INMEMORY") {
                     addInmemoryTable(table);
+#ifdef SPARQL
+                } else if (table.type == "SPARQL") {
+                    addSparqlTable(table);
+#endif
                 } else {
                     LOG(ERRORL) << "Type of table is not supported";
                     throw 10;
@@ -147,7 +157,8 @@ class EDBLayer {
         }
 
         const Dictionary &getPredDictionary() {
-            return predDictionary;
+            assert(predDictionary.get() != NULL);
+            return *(predDictionary.get());
         }
 
         VLIBEXP bool doesPredExists(PredId_t id) const;
@@ -208,9 +219,15 @@ class EDBLayer {
         size_t getCardinalityColumn(const Literal &query,
                 uint8_t posColumn);
 
-        VLIBEXP bool getDictNumber(const char *text, const size_t sizeText, uint64_t &id);
+        VLIBEXP bool getDictNumber(const char *text,
+                const size_t sizeText, uint64_t &id);
+
+        VLIBEXP bool getOrAddDictNumber(const char *text,
+                const size_t sizeText, uint64_t &id);
 
         VLIBEXP bool getDictText(const uint64_t id, char *text);
+
+        VLIBEXP std::string getDictText(const uint64_t id);
 
         Predicate getDBPredicate(int idx);
 
@@ -234,7 +251,7 @@ class EDBLayer {
 
         void releaseIterator(EDBIterator *itr);
 
-	// For JNI interface ...
+        // For JNI interface ...
         VLIBEXP void addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows);
 
         ~EDBLayer() {

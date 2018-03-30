@@ -17,18 +17,25 @@ public class Atom {
      * @param terms
      *            the terms
      */
-    public Atom(String predicate, Term[] terms) {
+    public Atom(String predicate, Term... terms) {
         if (predicate == null || terms == null) {
             throw new IllegalArgumentException(
                     "null argument to Atom constructor");
         }
+        for (Term t : terms) {
+            if (t == null) {
+                throw new IllegalArgumentException(
+                        "null term in Atom constructor");
+            }
+        }
+
         this.predicate = predicate;
         this.terms = terms.clone();
     }
 
     /**
      * Returns the predicate of this atom.
-     * 
+     *
      * @return the predicate
      */
     public String getPredicate() {
@@ -37,7 +44,7 @@ public class Atom {
 
     /**
      * Returns the terms of this atom.
-     * 
+     *
      * @return the terms.
      */
     public Term[] getTerms() {
@@ -60,5 +67,17 @@ public class Atom {
         Atom atom = (Atom) o;
         return predicate.equals(atom.predicate)
                 && Arrays.equals(terms, atom.terms);
+    }
+
+    /**
+     * Checks that the Atom does not contain a blank, and throws an
+     * IllegalArgumentException if it does.
+     */
+    public void checkNoBlank() {
+        for (Term t : terms) {
+            if (t.getTermType() == Term.TermType.BLANK) {
+                throw new IllegalArgumentException("Blank not allowed here");
+            }
+        }
     }
 }

@@ -58,12 +58,6 @@ class WebInterface {
 
         void processMaterialization();
 
-        static void parseQuery(bool &success,
-                SPARQLParser &parser,
-                std::shared_ptr<QueryGraph> &queryGraph,
-                QueryDict &queryDict,
-                DBLayer &db);
-
         void processRequest(std::string req, std::string &resp);
 
     public:

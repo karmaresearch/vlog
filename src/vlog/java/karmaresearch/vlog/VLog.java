@@ -149,6 +149,15 @@ public class VLog {
     public native void setLogLevel(String level);
 
     /**
+     * Redirects the logging of VLog to a file.
+     *
+     * @param filename
+     *            the file.
+     *
+     */
+    public native void setLogFile(String filename);
+
+    /**
      * Starts vlog with the specified edb configuration. The edb configuration
      * can either be specified directly as a string, in which case the
      * <code>isFile</code> parameter should be <code>false</code>, or as a file
@@ -221,6 +230,18 @@ public class VLog {
             throws NotStartedException;
 
     /**
+     * Returns the arity of the predicate.
+     *
+     * @param predicate
+     *            the predicate to look up
+     * @return the predicate arity, or -1 if not found.
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet.
+     */
+    public native int getPredicateArity(String predicate)
+            throws NotStartedException;
+
+    /**
      * Returns the internal representation of the constant. Internally, VLog
      * uses longs to represent constants. This method allows the user to look up
      * this internal number.
@@ -232,6 +253,20 @@ public class VLog {
      *                is thrown when vlog is not started yet.
      */
     public native long getConstantId(String constant)
+            throws NotStartedException;
+
+    /**
+     * Returns the internal representation of the constant. Internally, VLog
+     * uses longs to represent constants. This method allows the user to look up
+     * this internal number. If no such number is available yet, one is created.
+     *
+     * @param constant
+     *            the constant to look up
+     * @return the constant id
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet.
+     */
+    public native long getOrAddConstantId(String constant)
             throws NotStartedException;
 
     /**
@@ -259,11 +294,16 @@ public class VLog {
      * @param terms
      *            the constant values or variables. If the term is negative, it
      *            is assumed to be a variable.
+     * @param includeConstants
+     *            whether to include the constants in the results.
+     * @param filterBlanks
+     *            whether results with blanks in them should be filtered out
      * @return the result iterator.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      */
-    private native QueryResultEnumeration query(int predicate, long[] terms)
+    public native QueryResultIterator query(int predicate, long[] terms,
+            boolean includeConstants, boolean filterBlanks)
             throws NotStartedException;
 
     private long[] extractTerms(Term[] terms) throws NotStartedException {
@@ -272,7 +312,7 @@ public class VLog {
         for (int i = 0; i < terms.length; i++) {
             if (terms[i].getTermType() == TermType.VARIABLE) {
                 boolean found = false;
-                for (int j = 0; i < variables.size(); j++) {
+                for (int j = 0; j < variables.size(); j++) {
                     if (variables.get(j).equals(terms[i].getName())) {
                         found = true;
                         longTerms[i] = -j - 1;
@@ -284,12 +324,7 @@ public class VLog {
                     longTerms[i] = -variables.size();
                 }
             } else {
-                longTerms[i] = getConstantId(terms[i].getName());
-                if (longTerms[i] == -1) {
-                    // Non-existing ..., but make sure that VLog won't interpret
-                    // it as a variable.
-                    longTerms[i] = Long.MAX_VALUE;
-                }
+                longTerms[i] = getOrAddConstantId(terms[i].getName());
             }
         }
         return longTerms;
@@ -307,16 +342,39 @@ public class VLog {
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      */
-    public StringQueryResultEnumeration query(Atom query)
+    public TermQueryResultIterator query(Atom query)
             throws NotStartedException {
-        int intPred = getPredicateId(query.getPredicate());
-        long[] longTerms = extractTerms(query.getTerms());
-        return new StringQueryResultEnumeration(this,
-                query(intPred, longTerms));
+        return query(query, true, false);
     }
 
-    private native void queryToCsv(int predicate, long[] term, String fileName)
-            throws IOException;
+    /**
+     * Queries the current, so possibly materialized, database, and returns an
+     * iterator that delivers the answers, one by one.
+     *
+     * TODO: deal with not-found predicates, terms.
+     *
+     * @param query
+     *            the query, as an atom.
+     * @param includeConstants
+     *            whether to include the constants of the query in the results.
+     * @param filterBlanks
+     *            whether results with blanks in them should be filtered out
+     * @return the result iterator.
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet.
+     */
+
+    public TermQueryResultIterator query(Atom query, boolean includeConstants,
+            boolean filterBlanks) throws NotStartedException {
+        query.checkNoBlank();
+        int intPred = getPredicateId(query.getPredicate());
+        long[] longTerms = extractTerms(query.getTerms());
+        return new TermQueryResultIterator(this,
+                query(intPred, longTerms, includeConstants, filterBlanks));
+    }
+
+    private native void queryToCsv(int predicate, long[] term, String fileName,
+            boolean filterBlanks) throws IOException;
 
     /**
      * Writes the result of a query to a CSV file.
@@ -334,9 +392,31 @@ public class VLog {
      */
     public void writeQueryResultsToCsv(Atom query, String fileName)
             throws NotStartedException, IOException {
+        writeQueryResultsToCsv(query, fileName, false);
+    }
+
+    /**
+     * Writes the result of a query to a CSV file.
+     *
+     * @param query
+     *            the query
+     * @param fileName
+     *            the file to write to.
+     * @param filterBlanks
+     *            whether results with blanks in them should be filtered out
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet, or materialization
+     *                has not run yet
+     * @exception IOException
+     *                is thrown when the file could not be written for some
+     *                reason
+     */
+    public void writeQueryResultsToCsv(Atom query, String fileName,
+            boolean filterBlanks) throws NotStartedException, IOException {
+        query.checkNoBlank();
         int intPred = getPredicateId(query.getPredicate());
         long[] longTerms = extractTerms(query.getTerms());
-        queryToCsv(intPred, longTerms, fileName);
+        queryToCsv(intPred, longTerms, fileName, filterBlanks);
     }
 
     /**
@@ -373,16 +453,33 @@ public class VLog {
     /**
      * Materializes the database under the specified rules.
      *
-     * TODO: maybe limit number of iterations? (Currently not in vlog, but could
-     * be added)
+     * @param skolem
+     *            whether to use skolem chase <code>true</code> or restricted
+     *            chase <code>false</code>.
+     * @return <code>true</code> if success.
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet.
+     */
+    public boolean materialize(boolean skolem) throws NotStartedException {
+        return materialize(skolem, 0);
+    }
+
+    /**
+     * Materializes the database under the specified rules.
      *
      * @param skolem
      *            whether to use skolem chase <code>true</code> or restricted
      *            chase <code>false</code>.
+     * @param timeout
+     *            when larger than 0, indicates a timeout in seconds; otherwise
+     *            ignored.
+     * @return <code>false</code> if terminated by a timeout, <code>true</code>
+     *         if success.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      */
-    public native void materialize(boolean skolem) throws NotStartedException;
+    public native boolean materialize(boolean skolem, int timeout)
+            throws NotStartedException;
 
     /**
      * Creates a CSV file at the specified location, for the specified
@@ -405,10 +502,5 @@ public class VLog {
     @Override
     protected void finalize() {
         stop();
-    }
-
-    // For testing purposes ...
-    public static void main(String[] args) throws Exception {
-        Test.runTest(args[0]);
     }
 }

@@ -6,7 +6,7 @@ package karmaresearch.vlog;
 public class Term {
 
     public enum TermType {
-        CONSTANT, VARIABLE
+        CONSTANT, VARIABLE, BLANK
     };
 
     private final TermType termType;
@@ -64,6 +64,11 @@ public class Term {
             return false;
         }
         Term v = (Term) o;
-        return v.name.equals(name) && v.termType == termType;
+        return v.termType == termType && v.name.equals(name);
+    }
+
+    @Override
+    public String toString() {
+        return termType.toString() + ": " + name;
     }
 }

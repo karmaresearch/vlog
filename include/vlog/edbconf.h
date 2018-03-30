@@ -15,6 +15,9 @@ public:
         string predname;
         string type;
         std::vector<string> params;
+        bool encoded;
+        Table() : encoded(true) {}
+        Table(bool encoded) : encoded(encoded) {}
     };
 
 private:

@@ -4,6 +4,7 @@
 #include <vlog/materialization.h>
 #include <vlog/seminaiver.h>
 #include <vlog/training.h>
+#include <vlog/utils.h>
 
 #include <launcher/vloglayer.h>
 #include <cts/parser/SPARQLLexer.hpp>
@@ -111,42 +112,6 @@ static string _getValueParam(string req, string param) {
     }
 }
 
-void WebInterface::parseQuery(bool &success,
-        SPARQLParser &parser,
-        std::shared_ptr<QueryGraph> &queryGraph,
-        QueryDict &queryDict,
-        DBLayer &db) {
-
-    //Sometimes the query introduces new constants which need an ID
-    try {
-        parser.parse();
-    } catch (const SPARQLParser::ParserException& e) {
-        cerr << "parse error: " << e.message << endl;
-        success = false;
-        return;
-    }
-
-    queryGraph = std::shared_ptr<QueryGraph>(new QueryGraph(parser.getVarCount()));
-
-    // And perform the semantic anaylsis
-    try {
-        SemanticAnalysis semana(db, queryDict);
-        semana.transform(parser, *queryGraph.get());
-    } catch (const SemanticAnalysis::SemanticException& e) {
-        cerr << "semantic error: " << e.message << endl;
-        success = false;
-        return;
-    }
-    if (queryGraph->knownEmpty()) {
-        cout << "<empty result -- known empty>" << endl;
-        success = false;
-        return;
-    }
-
-    success = true;
-    return;
-}
-
 string WebInterface::lookup(string sId, DBLayer &db) {
     const char *start;
     const char *end;
@@ -157,101 +122,6 @@ string WebInterface::lookup(string sId, DBLayer &db) {
     return string(start, end - start);
 }
 
-void WebInterface::execSPARQLQuery(string sparqlquery,
-        bool explain,
-        long nterms,
-        DBLayer &db,
-        bool printstdout,
-        bool jsonoutput,
-        JSON *jsonvars,
-        JSON *jsonresults,
-        JSON *jsonstats) {
-    std::unique_ptr<QueryDict> queryDict = std::unique_ptr<QueryDict>(new QueryDict(nterms));
-    bool parsingOk;
-
-    std::unique_ptr<SPARQLLexer> lexer =
-        std::unique_ptr<SPARQLLexer>(new SPARQLLexer(sparqlquery));
-    std::unique_ptr<SPARQLParser> parser = std::unique_ptr<SPARQLParser>(
-            new SPARQLParser(*lexer.get()));
-    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    std::shared_ptr<QueryGraph> queryGraph;
-    parseQuery(parsingOk, *parser.get(), queryGraph, *queryDict.get(), db);
-    if (!parsingOk) {
-        std::chrono::duration<double> duration = std::chrono::system_clock::now() - start;
-        LOG(INFOL) << "Runtime query: 0ms.";
-        LOG(INFOL) << "Runtime total: " << duration.count() * 1000 << "ms.";
-        LOG(INFOL) << "# rows = 0";
-        return;
-    }
-
-    if (jsonvars) {
-        //Copy the output of the query in the json vars
-        for (QueryGraph::projection_iterator itr = queryGraph->projectionBegin();
-                itr != queryGraph->projectionEnd(); ++itr) {
-            string namevar = parser->getVariableName(*itr);
-            JSON var;
-            var.put("", namevar);
-            jsonvars->push_back(var);
-        }
-    }
-
-    // Run the optimizer
-    PlanGen *plangen = new PlanGen();
-    Plan* plan = plangen->translate(db, *queryGraph.get(), false);
-    // delete plangen;  Commented out, because this also deletes all plans!
-    // In particular, it corrupts the current plan.
-    // --Ceriel
-    if (!plan) {
-        cerr << "internal error plan generation failed" << endl;
-        delete plangen;
-        return;
-    }
-    if (explain)
-        plan->print(0);
-
-    // Build a physical plan
-    Runtime runtime(db, NULL, queryDict.get());
-    Operator* operatorTree = CodeGen().translate(runtime, *queryGraph.get(), plan, false);
-
-    // Execute it
-    if (explain) {
-        DebugPlanPrinter out(runtime, false);
-        operatorTree->print(out);
-        delete operatorTree;
-    } else {
-#if DEBUG
-        DebugPlanPrinter out(runtime, false);
-        operatorTree->print(out);
-#endif
-        //set up output options for the last operators
-        ResultsPrinter *p = (ResultsPrinter*) operatorTree;
-        p->setSilent(!printstdout);
-        if (jsonoutput) {
-            std::vector<std::string> jsonvars;
-            p->setJSONOutput(jsonresults, jsonvars);
-        }
-
-        std::chrono::system_clock::time_point startQ = std::chrono::system_clock::now();
-        if (operatorTree->first()) {
-            while (operatorTree->next());
-        }
-        std::chrono::duration<double> durationQ = std::chrono::system_clock::now() - startQ;
-        std::chrono::duration<double> duration = std::chrono::system_clock::now() - start;
-        LOG(INFOL) << "Runtime query: " << durationQ.count() * 1000 << "ms.";
-        LOG(INFOL) << "Runtime total: " << duration.count() * 1000 << "ms.";
-        if (jsonstats) {
-            jsonstats->put("runtime", to_string(durationQ.count()));
-            jsonstats->put("nresults", to_string(p->getPrintedRows()));
-
-        }
-        if (printstdout) {
-            long nElements = p->getPrintedRows();
-            LOG(INFOL) << "# rows = " << nElements;
-        }
-        delete operatorTree;
-    }
-    delete plangen;
-}
 
 void WebInterface::processRequest(std::string req, std::string &resp) {
     setActive();
@@ -289,7 +159,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             bool jsonoutput = printresults == string("true");
             if (program) {
                 LOG(INFOL) << "Answering the SPARQL query with VLog ...";
-                WebInterface::execSPARQLQuery(sparqlquery,
+                VLogUtils::execSPARQLQuery(sparqlquery,
                         false,
                         edb->getNTerms(),
                         *(vloglayer.get()),
@@ -300,7 +170,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                         &stats);
             } else {
                 LOG(INFOL) << "Answering the SPARQL query with Trident ...";
-                WebInterface::execSPARQLQuery(sparqlquery,
+                VLogUtils::execSPARQLQuery(sparqlquery,
                         false,
                         edb->getNTerms(),
                         *(tridentlayer.get()),
@@ -514,8 +384,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             setupTridentLayer();
 
             //Setup the program
-            program = std::unique_ptr<Program>(new Program(
-                        edb->getNTerms(), edb.get()));
+            program = std::unique_ptr<Program>(new Program(edb.get()));
             program->readFromString(srules, vm["rewriteMultihead"].as<bool>());
             program->sortRulesByIDBPredicates();
             //Set up the ruleset and perform the pre-materialization if necessary

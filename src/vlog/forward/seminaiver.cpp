@@ -110,7 +110,7 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
         }
 
 #if 0
-	// Commented out rule-reordering for now. It is only needed for interrule-parallelism.
+        // Commented out rule-reordering for now. It is only needed for interrule-parallelism.
         if (multithreaded) {
             // newDetails will ultimately contain the new rule order.
             std::vector<int> newDetails;
@@ -202,7 +202,7 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
 bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
         std::vector<RuleExecutionDetails> &ruleset,
         std::vector<StatIteration> &costRules,
-        bool fixpoint) {
+        bool fixpoint, unsigned long *timeout) {
 #if DEBUG
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 #endif
@@ -217,12 +217,12 @@ bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
 #endif
 
     if (ruleset.size() > 0) {
-        newDer |= executeUntilSaturation(ruleset, costRules, fixpoint);
+        newDer |= executeUntilSaturation(ruleset, costRules, fixpoint, timeout);
     }
     return newDer;
 }
 
-void SemiNaiver::run(size_t lastExecution, size_t it) {
+void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout) {
     running = true;
     iteration = it;
     startTime = std::chrono::system_clock::now();
@@ -312,21 +312,21 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
         while (true) {
             bool resp1;
             if (loopNr == 0)
-                resp1 = executeRules(tmpEDBRules, tmpIDBRules, costRules, true);
+                resp1 = executeRules(tmpEDBRules, tmpIDBRules, costRules, true, timeout);
             else
-                resp1 = executeRules(emptyRuleset, tmpIDBRules, costRules, true);
+                resp1 = executeRules(emptyRuleset, tmpIDBRules, costRules, true, timeout);
             bool resp2;
             if (loopNr == 0)
-                resp2 = executeRules(tmpExtEDBRules, tmpExtIDBRules, costRules, false);
+                resp2 = executeRules(tmpExtEDBRules, tmpExtIDBRules, costRules, false, timeout);
             else
-                resp2 = executeRules(emptyRuleset, tmpExtIDBRules, costRules, false);
+                resp2 = executeRules(emptyRuleset, tmpExtIDBRules, costRules, false, timeout);
             if (!resp1 && !resp2) {
                 break; //Fix-point
             }
             loopNr++;
         }
     } else {
-        executeRules(allEDBRules, allIDBRules, costRules, true);
+        executeRules(allEDBRules, allIDBRules, costRules, true, timeout);
     }
 
     running = false;
@@ -358,7 +358,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it) {
 bool SemiNaiver::executeUntilSaturation(
         std::vector<RuleExecutionDetails> &ruleset,
         std::vector<StatIteration> &costRules,
-        bool fixpoint) {
+        bool fixpoint, unsigned long *timeout) {
     size_t currentRule = 0;
     uint32_t rulesWithoutDerivation = 0;
 
@@ -373,6 +373,13 @@ bool SemiNaiver::executeUntilSaturation(
                 iteration,
                 NULL);
         newDer |= response;
+	if (timeout != NULL && *timeout != 0) {
+	    std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
+	    if (s.count() > *timeout) {
+		*timeout = 0;	// To indicate materialization was stopped because of timeout.
+		return newDer;
+	    }
+	}
         std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
         StatIteration stat;
         stat.iteration = iteration;
@@ -381,6 +388,14 @@ bool SemiNaiver::executeUntilSaturation(
         stat.derived = response;
         costRules.push_back(stat);
         ruleset[currentRule].lastExecution = iteration++;
+
+	if (timeout != NULL && *timeout != 0) {
+	    std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
+	    if (s.count() > *timeout) {
+		*timeout = 0;	// To indicate materialization was stopped because of timeout.
+		return newDer;
+	    }
+	}
 
         if (response) {
             if (ruleset[currentRule].rule.isRecursive()) {
@@ -402,6 +417,13 @@ bool SemiNaiver::executeUntilSaturation(
                     stat.time = sec.count() * 1000;
                     stat.derived = response;
                     costRules.push_back(stat);
+		    if (timeout != NULL && *timeout != 0) {
+			std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
+			if (s.count() > *timeout) {
+			    *timeout = 0;	// To indicate materialization was stopped because of timeout.
+			    return newDer;
+			}
+		    }
                 } while (response);
                     LOG(DEBUGL) << "Rules " <<
                         ruleset[currentRule].rule.tostring(program, &layer) <<
@@ -448,7 +470,7 @@ bool SemiNaiver::executeUntilSaturation(
                 break;
         }
     } while (rulesWithoutDerivation != ruleset.size());
-                    return newDer;
+    return newDer;
 }
 
 void SemiNaiver::storeOnFile(std::string path, const PredId_t pred, const bool decompress, const int minLevel, const bool csv) {
@@ -461,64 +483,60 @@ void SemiNaiver::storeOnFile(std::string path, const PredId_t pred, const bool d
     }
 
     if (table != NULL && !table->isEmpty()) {
-	FCIterator itr = table->read(0);
-	if (! itr.isEmpty()) {
-	    const uint8_t sizeRow = table->getSizeRow();
-	    while (!itr.isEmpty()) {
-		std::shared_ptr<const FCInternalTable> t = itr.getCurrentTable();
-		FCInternalTableItr *iitr = t->getIterator();
-		while (iitr->hasNext()) {
-		    iitr->next();
-		    std::string row = "";
-		    if (! csv) {
-			row = to_string(iitr->getCurrentIteration());
-		    }
-		    bool first = true;
-		    for (uint8_t m = 0; m < sizeRow; ++m) {
-			if (decompress || csv) {
-			    if (layer.getDictText(iitr->getCurrentValue(m), buffer)) {
-				if (csv) {
-				    if (first) {
-					first = false;
-				    } else {
-					row += ",";
-				    }
-				    row += VLogUtils::csvString(string(buffer));
-				} else {
-				    row += "\t";
-				    row += string(buffer);
-				}
-			    } else {
-				std::string t = program->getFromAdditional(iitr->getCurrentValue(m));
-				if (t == std::string("")) {
-				    uint64_t v = iitr->getCurrentValue(m);
-				    t = "" + std::to_string(v >> 40) + "_"
-					+ std::to_string((v >> 32) & 0377) + "_"
-					+ std::to_string(v & 0xffffffff);
-				    // t = std::to_string(iitr->getCurrentValue(m));
-				}
-				if (csv) {
-				    if (first) {
-					first = false;
-				    } else {
-					row += ",";
-				    }
-				    row += VLogUtils::csvString(t);
-				} else {
-				    row += "\t";
-				    row += t;
-				}
-			    }
-			} else {
-			    row += "\t" + to_string(iitr->getCurrentValue(m));
-			}
-		    }
-		    streamout << row << std::endl;
-		}
-		t->releaseIterator(iitr);
-		itr.moveNextCount();
-	    }
-	}
+        FCIterator itr = table->read(0);
+        if (! itr.isEmpty()) {
+            const uint8_t sizeRow = table->getSizeRow();
+            while (!itr.isEmpty()) {
+                std::shared_ptr<const FCInternalTable> t = itr.getCurrentTable();
+                FCInternalTableItr *iitr = t->getIterator();
+                while (iitr->hasNext()) {
+                    iitr->next();
+                    std::string row = "";
+                    if (! csv) {
+                        row = to_string(iitr->getCurrentIteration());
+                    }
+                    bool first = true;
+                    for (uint8_t m = 0; m < sizeRow; ++m) {
+                        if (decompress || csv) {
+                            if (layer.getDictText(iitr->getCurrentValue(m), buffer)) {
+                                if (csv) {
+                                    if (first) {
+                                        first = false;
+                                    } else {
+                                        row += ",";
+                                    }
+                                    row += VLogUtils::csvString(string(buffer));
+                                } else {
+                                    row += "\t";
+                                    row += string(buffer);
+                                }
+                            } else {
+                                uint64_t v = iitr->getCurrentValue(m);
+                                std::string t = "" + std::to_string(v >> 40) + "_"
+                                    + std::to_string((v >> 32) & 0377) + "_"
+                                    + std::to_string(v & 0xffffffff);
+                                if (csv) {
+                                    if (first) {
+                                        first = false;
+                                    } else {
+                                        row += ",";
+                                    }
+                                    row += VLogUtils::csvString(t);
+                                } else {
+                                    row += "\t";
+                                    row += t;
+                                }
+                            }
+                        } else {
+                            row += "\t" + to_string(iitr->getCurrentValue(m));
+                        }
+                    }
+                    streamout << row << std::endl;
+                }
+                t->releaseIterator(iitr);
+                itr.moveNextCount();
+            }
+        }
     }
     streamout.close();
 }
@@ -1315,6 +1333,9 @@ FCIterator SemiNaiver::getTable(const Literal & literal,
 }
 
 FCIterator SemiNaiver::getTable(const PredId_t predid) {
+    if (predicatesTables[predid] == NULL) {
+	return FCIterator();
+    }
     return predicatesTables[predid]->read(0);
 }
 

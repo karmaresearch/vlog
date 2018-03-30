@@ -166,7 +166,10 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
 #else
     //Create a pipe between the two processes
     int pipeID[2];
-    pipe(pipeID);
+    if (pipe(pipeID) < 0) {
+	LOG(ERRORL) << "Pipe has failed";
+	exit(1);
+    }
     //Fork the process.
     pid_t pid = fork();
 
@@ -191,8 +194,10 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
         //First write the row size and n of rows
         Utils::encode_int(buffer, 0, tmpTable->getSizeRow());
         Utils::encode_int(buffer, 4, tmpTable->getNRows());
-        write(pipeID[1], buffer, 8);
-
+        if (write(pipeID[1], buffer, 8) != 8) {
+	    LOG(ERRORL) << "write failed";
+	    exit(EXIT_FAILURE);
+	}
         //Write the bindings, one after the other
         const size_t rowSize = tmpTable->getSizeRow();
         for (size_t i = 0; i < tmpTable->getNRows(); ++i) {
@@ -200,7 +205,10 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
             for (size_t j = 0; j < rowSize; ++j) {
                 Utils::encode_long(buffer, 8 * j, row[j]);
             }
-            write(pipeID[1], buffer, 8 * rowSize);
+            if (write(pipeID[1], buffer, 8 * rowSize) != 8 * rowSize) {
+		LOG(ERRORL) << "write failed";
+		exit(EXIT_FAILURE);
+	    }
         }
         close(pipeID[1]);
         delete qsqr;
@@ -220,13 +228,19 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
                 //Read tuple table
                 char buffer[24];
                 //Read rowsize and n. of rows
-                read(pipeID[0], buffer, 8);
+                if (read(pipeID[0], buffer, 8) != 8) {
+		    LOG(ERRORL) << "Read failed";
+		    exit(EXIT_FAILURE);
+		}
                 const size_t rowSize = Utils::decode_int(buffer, 0);
                 const size_t nRows = Utils::decode_int(buffer, 4);
                 *output = new TupleTable(rowSize);
                 uint64_t row[3];
                 for (size_t i = 0; i < nRows; ++i) {
-                    read(pipeID[0], buffer, 8 * rowSize);
+                    if (read(pipeID[0], buffer, 8 * rowSize) != 8 * rowSize) {
+			LOG(ERRORL) << "Read failed";
+			exit(EXIT_FAILURE);
+		    }
                     for (size_t j = 0; j < rowSize; ++j) {
                         row[j] = Utils::decode_long(buffer, j * 8);
                     }

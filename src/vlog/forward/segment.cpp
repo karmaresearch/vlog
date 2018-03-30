@@ -1026,7 +1026,7 @@ std::shared_ptr<const Segment> SegmentInserter::retainMemMem(Column *c1,
         } else {
             while(true) {
                 if (v1 <= v2) {
-		    if (v1 < v2 && v1 != prevv1) {
+                    if (v1 < v2 && v1 != prevv1) {
                         co.add(v1);
                         prevv1 = v1;
                     }
@@ -1088,7 +1088,7 @@ std::shared_ptr<const Segment> SegmentInserter::retainMemMem(Column *c1,
                     break;
                 }
             }
-	    else {
+            else {
                 if (c2R->hasNext()) {
                     v2 = c2R->next();
                 } else {
@@ -1182,8 +1182,8 @@ std::shared_ptr<const Segment> SegmentInserter::retainEDB(
         //different positions. ??? What if the head is, say pred(?A,?A)? --Ceriel
         Substitution subs[SIZETUPLE];
         if (!l1.sameVarSequenceAs(l12) || l1.subsumes(subs, l1, l12) == -1
-                // || pos1 == pos12	// Commented out --Ceriel
-		) {
+                // || pos1 == pos12 // Commented out --Ceriel
+           ) {
             //The columns come from different literals. This is not yet
             //supported
             throw 10;
@@ -1196,8 +1196,8 @@ std::shared_ptr<const Segment> SegmentInserter::retainEDB(
         uint8_t pos22 = ((EDBColumn*)column22.get())
             ->posColumnInLiteral();
         if (!l2.sameVarSequenceAs(l22) || l1.subsumes(subs, l2, l22) == -1
-                // || pos2 == pos22	// Commented out --Ceriel
-		) {
+                // || pos2 == pos22 // Commented out --Ceriel
+           ) {
             //The columns come from different literals. This is not yet
             //supported
             throw 10;

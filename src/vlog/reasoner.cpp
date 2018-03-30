@@ -637,12 +637,16 @@ TupleIterator *Reasoner::getMagicIterator(Literal &query,
 
         // itrTable contains only variables.
         if (returnOnlyVars) {
-            //const uint8_t rowSize = table->getRowSize();
             while (itrTable->hasNext()) {
                 itrTable->next();
-                for (uint8_t j = 0; j < posVars.size(); ++j) {
-                    finalTable->addValue(itrTable->getCurrentValue(j));
-                }
+		if (finalTable->getSizeRow() == 0) {
+		    Term_t row = 0;
+		    finalTable->addRow(&row);
+		} else {
+		    for (uint8_t j = 0; j < posVars.size(); ++j) {
+			finalTable->addValue(itrTable->getCurrentValue(j));
+		    }
+		}
                 // Not sure about this. Was:
                 // for (uint8_t j = 0; j < rowsize; ++j) {
                 //     finalTable->addValue(itrTable->getCurrentValue(j));
@@ -720,6 +724,9 @@ TupleIterator *Reasoner::getIteratorWithMaterialization(SemiNaiver *sn, Literal 
     } else {
         finalTable = new TupleTable(query.getTupleSize());
     }
+
+    std::vector<std::pair<uint8_t, uint8_t>> repeated = query.getRepeatedVars();
+
     while (! tableIt.isEmpty()) {
         std::shared_ptr<const FCInternalTable> table = tableIt.getCurrentTable();
         FCInternalTableItr *itrTable = table->getIterator();
@@ -734,15 +741,27 @@ TupleIterator *Reasoner::getIteratorWithMaterialization(SemiNaiver *sn, Literal 
                     }
                 }
             }
+	    if (copy) {
+		for (uint8_t i = 0; i < repeated.size(); ++i) {
+		    if (itrTable->getCurrentValue(repeated[i].first) != itrTable->getCurrentValue(repeated[i].second)) {
+			copy = false;
+			break;
+		    }
+		}
+	    }
             if (! copy) {
                 continue;
             }
-            for (int i = 0; i < tuple.getSize(); i++) {
-                if (! returnOnlyVars || tuple.get(i).isVariable()) {
-                    finalTable->addValue(itrTable->getCurrentValue(i));
-                }
-            }
-
+	    if (finalTable->getSizeRow() == 0) {
+		Term_t row = 0;
+		finalTable->addRow(&row);
+	    } else {
+		for (int i = 0; i < tuple.getSize(); i++) {
+		    if (! returnOnlyVars || tuple.get(i).isVariable()) {
+			finalTable->addValue(itrTable->getCurrentValue(i));
+		    }
+		}
+	    }
         }
         table->releaseIterator(itrTable);
         tableIt.moveNextCount();

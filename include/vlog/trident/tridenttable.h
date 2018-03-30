@@ -121,6 +121,8 @@ public:
 
     bool getDictText(const uint64_t id, char *text);
 
+    bool getDictText(const uint64_t id, std::string &text);
+
     uint64_t getNTerms();
 
     uint64_t getSize();

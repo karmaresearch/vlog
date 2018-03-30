@@ -11,6 +11,9 @@
 #include <iostream>
 #include <fstream>
 #include <cstring>
+#include <cstdint>
+
+#define IS_BLANK(c) (c >= (INT64_C(1) << 40))
 
 class VLogInfo {
 public:
@@ -54,18 +57,16 @@ std::string jstring2string(JNIEnv *env, jstring jstr) {
 
 // Utility method to convert a literal id to a string.
 std::string literalToString(VLogInfo *f, uint64_t literalid) {
-    char supportText[MAX_TERM_SIZE];
-    if (!f->layer->getDictText(literalid, supportText)) {
-	std::string s = f->program->getFromAdditional((Term_t) literalid);
-	if (s == std::string("")) {
-	    s = "" + std::to_string(literalid >> 40) + "_"
-		    + std::to_string((literalid >> 32) & 0377) + "_"
-		    + std::to_string(literalid & 0xffffffff);
-	}
 
-	return s;
+    std::string s = f->layer->getDictText(literalid);
+
+    if (s == std::string("")) {
+	s = "" + std::to_string(literalid >> 40) + "_"
+		+ std::to_string((literalid >> 32) & 0377) + "_"
+		+ std::to_string(literalid & 0xffffffff);
     }
-    return std::string(supportText);
+
+    return s;
 }
 
 jint getVLogId(JNIEnv *env, jobject jobj) {
@@ -112,6 +113,10 @@ void throwAlreadyStartedException(JNIEnv *env, const char *message) {
 
 void throwEDBConfigurationException(JNIEnv *env, const char *message) {
     throwException(env, "karmaresearch/vlog/EDBConfigurationException", message);
+}
+
+void throwIllegalArgumentException(JNIEnv *env, const char *message) {
+    throwException(env, "java/lang/IllegalArgumentException", message);
 }
 
 // Converts a vector of Atoms into VLog representation.
@@ -164,10 +169,7 @@ std::vector<Literal> getVectorLiteral(JNIEnv *env, VLogInfo *f, jobjectArray h, 
 		// Constant
 		// name = program->rewriteRDFOWLConstants(name);
 		uint64_t dictTerm;
-		if (!f->layer->getDictNumber(name.c_str(), name.size(), dictTerm)) {
-		    //Get an ID from the temporary dictionary
-		    dictTerm = f->program->getOrAddToAdditional(name);
-		}
+		f->layer->getOrAddDictNumber(name.c_str(), name.size(), dictTerm);
 		t.push_back(VTerm(0, dictTerm));
 	    }
 	}
@@ -180,7 +182,7 @@ std::vector<Literal> getVectorLiteral(JNIEnv *env, VLogInfo *f, jobjectArray h, 
 
 	int64_t predid = f->program->getOrAddPredicate(predicate, (uint8_t) vtuplesz);
 	if (predid < 0) {
-	    // TODO: throw something
+	    throwIllegalArgumentException(env, ("wrong cardinality in predicate " + predicate).c_str());
 	}
 
 	Predicate pred((PredId_t) predid, adornment, f->layer->doesPredExists((PredId_t) predid) ? EDB : IDB, (uint8_t) vtuplesz);
@@ -218,6 +220,16 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setLogLevel(JNIEnv *env, job
 
 /*
  * Class:     karmaresearch_vlog_VLog
+ * Method:    setLogFile
+ * Signature: (Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setLogFile(JNIEnv *env, jobject obj, jstring file) {
+    std::string f = jstring2string(env, file);
+    Logger::logToFile(f);
+}
+
+/*
+ * Class:     karmaresearch_vlog_VLog
  * Method:    start
  * Signature: (Ljava/lang/String;Z)V
  */
@@ -251,7 +263,7 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_start(JNIEnv *env, jobject o
 	    throwIOException(env, s.c_str());
 	    return;
 	}
-	f->program = new Program(f->layer->getNTerms(), f->layer);
+	f->program = new Program(f->layer);
     } catch(std::string s) {
 	throwEDBConfigurationException(env, s.c_str());
     }
@@ -336,7 +348,7 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_addData(JNIEnv *env, jobject
 	return;
     }
 
-    f->program = new Program(f->layer->getNTerms(), f->layer);
+    f->program = new Program(f->layer);
 }
 
 
@@ -361,6 +373,31 @@ JNIEXPORT jint JNICALL Java_karmaresearch_vlog_VLog_getPredicateId(JNIEnv *env, 
     Predicate pred = f->program->getPredicate(predName);
 
     return (jint) pred.getId();
+}
+
+/*
+ * Class:     karmaresearch_vlog_VLog
+ * Method:    getPredicateArity
+ * Signature: (Ljava/lang/String;)I
+ */
+JNIEXPORT jint JNICALL Java_karmaresearch_vlog_VLog_getPredicateArity(JNIEnv *env, jobject obj, jstring p) {
+
+    VLogInfo *f = getVLogInfo(env, obj);
+    if (f == NULL || f->program == NULL) {
+	throwNotStartedException(env, "VLog is not started yet");
+	return (jint) -1;
+    }
+
+    //Transform the string into a C++ string
+    std::string predName = jstring2string(env, p);
+
+    // TODO: fix this: this might create a new predicate if it does not exist.
+    // There should be a way to just do a lookup???
+    Predicate pred = f->program->getPredicate(predName);
+    if (pred.getCardinality() == 0) {
+	return (jint) -1;
+    }
+    return (jint) pred.getCardinality();
 }
 
 /*
@@ -401,7 +438,29 @@ JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_getConstantId(JNIEnv *env, 
     if (f->layer->getDictNumber(cliteral, strlen(cliteral), value)) {
 	retval = value;
     }
-    // TODO: lookup in additional, and deal with results of chases.
+    env->ReleaseStringUTFChars(literal, cliteral);
+    return retval;
+}
+
+/*
+ * Class:     karmaresearch_vlog_VLog
+ * Method:    getOrAddConstantId
+ * Signature: (Ljava/lang/String;)J
+ */
+JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_getOrAddConstantId(JNIEnv *env, jobject obj, jstring literal) {
+
+    VLogInfo *f = getVLogInfo(env, obj);
+    if (f == NULL || f->layer == NULL) {
+	throwNotStartedException(env, "VLog is not started yet");
+	return (jint) -1;
+    }
+
+    const char *cliteral = env->GetStringUTFChars(literal, 0);
+    uint64_t value;
+    jlong retval = -1;
+    if (f->layer->getOrAddDictNumber(cliteral, strlen(cliteral), value)) {
+	retval = value;
+    }
     env->ReleaseStringUTFChars(literal, cliteral);
     return retval;
 }
@@ -417,10 +476,14 @@ JNIEXPORT jstring JNICALL Java_karmaresearch_vlog_VLog_getConstant(JNIEnv *env, 
 	throwNotStartedException(env, "VLog is not started yet");
 	return NULL;
     }
-    return env->NewStringUTF(literalToString(f, literalid).c_str());
+    std::string s = f->layer->getDictText(literalid);
+    if (s == std::string("")) {
+	return NULL;
+    }
+    return env->NewStringUTF(s.c_str());
 }
 
-static TupleIterator *getQueryIter(JNIEnv *env, jobject obj, PredId_t p, jlongArray els) {
+static TupleIterator *getQueryIter(JNIEnv *env, jobject obj, PredId_t p, jlongArray els, jboolean includeConstants) {
     VLogInfo *f = getVLogInfo(env, obj);
     if (f == NULL || f->program == NULL) {
 	throwNotStartedException(env, "VLog is not started yet");
@@ -451,9 +514,9 @@ static TupleIterator *getQueryIter(JNIEnv *env, jobject obj, PredId_t p, jlongAr
     TupleIterator *iter = NULL;
     Reasoner r((uint64_t) 0);
     if (pred.getType() == EDB) {
-	iter = r.getEDBIterator(query, NULL, NULL, *(f->layer), false, NULL);
+	iter = r.getEDBIterator(query, NULL, NULL, *(f->layer), ! (bool) includeConstants, NULL);
     } else if (f->sn != NULL) {
-	iter = r.getIteratorWithMaterialization(f->sn, query, false, NULL);
+	iter = r.getIteratorWithMaterialization(f->sn, query, ! (bool) includeConstants, NULL);
     } else {
 	// No materialization yet, but non-EDB predicate ... so, empty.
 	TupleTable *table = new TupleTable(sz);
@@ -466,13 +529,13 @@ static TupleIterator *getQueryIter(JNIEnv *env, jobject obj, PredId_t p, jlongAr
 /*
  * Class:     karmaresearch_vlog_VLog
  * Method:    query
- * Signature: (I[J)Lkarmaresearch/vlog/QueryResultEnumeration;
+ * Signature: (I[JZZ)Lkarmaresearch/vlog/QueryResultIterator;
  */
-JNIEXPORT jobject JNICALL Java_karmaresearch_vlog_VLog_query(JNIEnv * env, jobject obj, jint p, jlongArray els ) {
-    TupleIterator *iter = getQueryIter(env, obj, (PredId_t) p, els);
-    jclass jcls=env->FindClass("karmaresearch/vlog/QueryResultEnumeration");
-    jmethodID mID = env->GetMethodID(jcls, "<init>", "(J)V");
-    jobject jobj = env->NewObject(jcls, mID, (jlong) iter);
+JNIEXPORT jobject JNICALL Java_karmaresearch_vlog_VLog_query(JNIEnv * env, jobject obj, jint p, jlongArray els, jboolean includeConstants, jboolean filterBlanks) {
+    TupleIterator *iter = getQueryIter(env, obj, (PredId_t) p, els, includeConstants);
+    jclass jcls=env->FindClass("karmaresearch/vlog/QueryResultIterator");
+    jmethodID mID = env->GetMethodID(jcls, "<init>", "(JZ)V");
+    jobject jobj = env->NewObject(jcls, mID, (jlong) iter, filterBlanks);
 
     return jobj;
 }
@@ -492,7 +555,7 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setRules(JNIEnv *env, jobjec
     if (rules != NULL) {
 	// Create a new program, to remove any left-overs from old rule stuff
 	delete f->program;
-	f->program = new Program(f->layer->getNTerms(), f->layer);
+	f->program = new Program(f->layer);
 
 	// Get rewrite flag
 	jclass enumClass = env->GetObjectClass(rewriteHeads);
@@ -538,7 +601,7 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setRulesFile(JNIEnv *env, jo
     }
 
     delete f->program;
-    f->program = new Program(f->layer->getNTerms(), f->layer);
+    f->program = new Program(f->layer);
 
     // Get rewrite flag
     jclass enumClass = env->GetObjectClass(rewriteHeads);
@@ -558,13 +621,13 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setRulesFile(JNIEnv *env, jo
 /*
  * Class:     karmaresearch_vlog_VLog
  * Method:    materialize
- * Signature: (Z)V
+ * Signature: (ZI)Z
  */
-JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_materialize(JNIEnv *env, jobject obj, jboolean skolem) {
+JNIEXPORT jboolean JNICALL Java_karmaresearch_vlog_VLog_materialize(JNIEnv *env, jobject obj, jboolean skolem, jint jtimeout) {
     VLogInfo *f = getVLogInfo(env, obj);
     if (f == NULL || f->program == NULL) {
 	throwNotStartedException(env, "VLog is not started yet");
-	return;
+	return false;
     }
 
     if (f->sn != NULL) {
@@ -574,10 +637,19 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_materialize(JNIEnv *env, job
     f->sn = new SemiNaiver(f->program->getAllRules(), *(f->layer), f->program, true, true, false, ! (bool) skolem, -1, false);
     LOG(INFOL) << "Starting full materialization";
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    f->sn->run();
+    unsigned long *p = NULL;
+    unsigned long t = (unsigned long) jtimeout;
+    if (t > 0) {
+	p = &t;
+    }
+    f->sn->run(p);
+    if (p != NULL && *p == 0) {
+	return (jboolean) false;
+    }
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
     f->sn->printCountAllIDBs("");
+    return (jboolean) true;
 }
 
 /*
@@ -607,9 +679,9 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_writePredicateToCsv(JNIEnv *
 /*
  * Class:     karmaresearch_vlog_VLog
  * Method:    queryToCsv
- * Signature: (I[JLjava/lang/String;)V
+ * Signature: (I[JLjava/lang/String;Z)V
  */
-JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_queryToCsv(JNIEnv *env, jobject obj, jint pred, jlongArray q, jstring jfile) {
+JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_queryToCsv(JNIEnv *env, jobject obj, jint pred, jlongArray q, jstring jfile, jboolean filterBlanks) {
     char buffer[65536];
     VLogInfo *f = getVLogInfo(env, obj);
     if (f == NULL || f->program == NULL) {
@@ -622,13 +694,26 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_queryToCsv(JNIEnv *env, jobj
         throwIOException(env, ("Could not open " + fn + " for writing").c_str());
 	return;
     }
-    TupleIterator *iter = getQueryIter(env, obj, (PredId_t) pred, q);
+    TupleIterator *iter = getQueryIter(env, obj, (PredId_t) pred, q, (jboolean) true);
     if (iter == NULL) {
 	return;
     }
     size_t sz = iter->getTupleSize();
     while (iter->hasNext()) {
 	iter->next();
+	if (filterBlanks) {
+	    bool filter = false;
+	    for (int i = 0; i < sz; i++) {
+		if (IS_BLANK(iter->getElementAt(i))) {
+		    // It is a blank.
+		    filter = true;
+		    break;
+		}
+	    }
+	    if (filter) {
+		continue;
+	    }
+	}
 	for (int i = 0; i < sz; i++) {
 	    if (i != 0) {
 		streamout << ",";
@@ -643,21 +728,21 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_queryToCsv(JNIEnv *env, jobj
 }
 
 /*
- * Class:     karmaresearch_vlog_QueryResultEnumeration
+ * Class:     karmaresearch_vlog_QueryResultIterator
  * Method:    hasMoreElements
  * Signature: (J)Z
  */
-JNIEXPORT jboolean JNICALL Java_karmaresearch_vlog_QueryResultEnumeration_hasMoreElements(JNIEnv *env, jobject obj, jlong ref) {
+JNIEXPORT jboolean JNICALL Java_karmaresearch_vlog_QueryResultIterator_hasNext(JNIEnv *env, jobject obj, jlong ref) {
     TupleIterator *iter = (TupleIterator *) ref;
     return (jboolean) iter->hasNext();
 }
 
 /*
- * Class:     karmaresearch_vlog_QueryResultEnumeration
+ * Class:     karmaresearch_vlog_QueryResultIterator
  * Method:    nextElement
  * Signature: (J)[J
  */
-JNIEXPORT jlongArray JNICALL Java_karmaresearch_vlog_QueryResultEnumeration_nextElement(JNIEnv *env, jobject obj, jlong ref) {
+JNIEXPORT jlongArray JNICALL Java_karmaresearch_vlog_QueryResultIterator_next(JNIEnv *env, jobject obj, jlong ref) {
     TupleIterator *iter = (TupleIterator *) ref;
     size_t sz = iter->getTupleSize();
     iter->next();
@@ -672,13 +757,31 @@ JNIEXPORT jlongArray JNICALL Java_karmaresearch_vlog_QueryResultEnumeration_next
 }
 
 /*
- * Class:     karmaresearch_vlog_QueryResultEnumeration
+ * Class:     karmaresearch_vlog_QueryResultIterator
  * Method:    cleanup
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_karmaresearch_vlog_QueryResultEnumeration_cleanup(JNIEnv *env, jobject obj, jlong ref) {
+JNIEXPORT void JNICALL Java_karmaresearch_vlog_QueryResultIterator_cleanup(JNIEnv *env, jobject obj, jlong ref) {
     TupleIterator *iter = (TupleIterator *) ref;
     delete iter;
+}
+
+/*
+ * Class:     karmaresearch_vlog_QueryResultIterator
+ * Method:    hasBlanks
+ * Signature: ([J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_karmaresearch_vlog_QueryResultIterator_hasBlanks(JNIEnv * env, jobject obj, jlongArray jv) {
+    jsize sz = env->GetArrayLength(jv);
+    jlong *e = env->GetLongArrayElements(jv, NULL);
+    for (int i = 0; i < sz; i++) {
+	if (IS_BLANK(e[i])) {
+	    env->ReleaseLongArrayElements(jv, e, JNI_ABORT);
+	    return (jboolean) true;
+	}
+    }
+    env->ReleaseLongArrayElements(jv, e, JNI_ABORT);
+    return (jboolean) false;
 }
 
 

@@ -41,6 +41,14 @@ public:
         return map;
     }
 
+    int64_t get(const std::string &rawValue) {
+        SimpleHashmap::iterator itr = map.find(rawValue);
+        if (itr == map.end()) {
+	    return -1;
+	}
+	return itr->second;
+    }
+
     Term_t getOrAdd(const std::string &rawValue) {
         SimpleHashmap::iterator itr = map.find(rawValue);
         if (itr == map.end()) {
@@ -50,6 +58,16 @@ public:
             return (Term_t) counter++;
         } else {
             return itr->second;
+        }
+    }
+
+    bool get(const std::string &rawValue, Term_t &id) {
+        SimpleHashmap::iterator itr = map.find(rawValue);
+        if (itr == map.end()) {
+            return false;
+        } else {
+            id = itr->second;
+            return true;
         }
     }
 
@@ -72,7 +90,7 @@ public:
     std::string tostring() {
         std::string output = "";
         for (SimpleHashmap::iterator itr = map.begin(); itr != map.end(); ++itr) {
-            output += itr->first + std::string(" ") + std::to_string(itr->second) + std::string(" ");
+            output += itr->first + std::string(" ") + std::to_string(itr->second) + std::string("\n");
         }
         return output;
     }

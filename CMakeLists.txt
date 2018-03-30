@@ -165,6 +165,10 @@ ENDIF()
 add_library(vlog-core SHARED ${vlog_SRC})
 add_executable(vlog src/launcher/main.cpp)
 
+IF(SPARQL)
+    target_link_libraries(vlog-core ${CURL_LIBRARIES})
+ENDIF()
+
 #PTHREADS
 find_package(Threads REQUIRED)
 if (THREADS_HAVE_PTHREAD_ARG)
