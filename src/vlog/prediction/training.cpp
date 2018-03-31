@@ -240,16 +240,6 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
 
             Edge edge;
             if (!p.isPredicateIDB(pb.getId())) {
-                // add sigmaB as a substitution to this edge too
-                // This will be useful when creating the edb query with constraints
-                //for (int j = 0; j < pb.getCardinality(); ++j) {
-                //    VTerm dest = itr->getTuple().get(j);
-                //    uint8_t temp = dest.getId();
-                //    if (temp == 0) {
-                //        char supportText[MAX_TERM_SIZE];
-                //        db.getDictText(dest.getValue(), supportText);
-                //    }
-                //}
                 edge.backEdge = sigmaB;
             }
 
@@ -282,6 +272,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
     //return queries2;
 
     std::vector<PredId_t> ids = p.getAllIDBPredicateIds();
+    vector<string> genericQueriesVector;
     std::ofstream allPredicatesLog("allPredicatesInQueries.log");
     Dictionary dictVariables;
     for (int i = 0; i < ids.size(); ++i) {
@@ -295,6 +286,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
 
         // This generic query could be added to list/set of all queries we generate
         std::string query = makeGenericQuery(p, idbPred.getId(), idbPred.getCardinality());
+        genericQueriesVector.push_back(query);
         Literal literal = p.parseLiteral(query, dictVariables);
         int nVars = literal.getNVars();
 
@@ -402,8 +394,8 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
 
             for (auto ts: tuplesSubstitution) {
                 vector<Substitution> workingSigma = ts;
-                PredId_t workingIDB;// = nextNode;
-                int workingIDBCard;// = nextNodeCard;
+                PredId_t workingIDB;
+                int workingIDBCard;
                 for(int k = path.size()-1; k >= 0; --k) {
                     vector<Substitution> sigmaH = path[k].endpoint.second;
                     vector<Substitution> result = concat(sigmaH, workingSigma);
@@ -435,6 +427,9 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
     for (std::unordered_map<std::string,int>::iterator it = allQueries.begin(); it !=  allQueries.end(); ++it) {
         queries.push_back(std::make_pair(it->first, it->second));
         //LOG(INFOL) << "Query: " << it->first << " type : " << it->second ;
+    }
+    for (auto gq: genericQueriesVector) {
+        queries.push_back(make_pair(gq, QUERY_TYPE_GENERIC + 1));
     }
     return queries;
 }
@@ -738,7 +733,6 @@ void parseQueriesLog(vector<string>& testQueriesLog,
         vector<int>& expectedDecisions) {
 
     for (auto line: testQueriesLog) {
-        LOG(INFOL) << "Parsing line : " << line;
         // A line looks like this (An underscore (_) represents a space)
         // query_fe,a,t,u,r,es_QSQTime_MagicTime_Decision
         //RP29(<http://www.Department4.University60.edu/FullProfessor5>,B) 4.000000,4,1,1,2,0 1.290000 2.069000 1
@@ -761,7 +755,7 @@ void parseQueriesLog(vector<string>& testQueriesLog,
     }
 }
 
-double computeAccuracy(vector<Instance>& testInst, LogisticRegression& lr, double threshold) {
+double computeAccuracy(vector<Instance>& testInst, LogisticRegression& lr, double threshold, vector<int>& heuristics, bool useHeuristics) {
 
     int hit = 0;
     int totalQsqr = 0;
@@ -783,21 +777,29 @@ double computeAccuracy(vector<Instance>& testInst, LogisticRegression& lr, doubl
         if (myDecision == testInst[i].label) {
             if (myDecision == 0) {
                 hitQsqr++;
-                //LOG(INFOL)<< " ###### Qsqr picked at probability : " << probability;
             } else {
                 hitMagic++;
-                //LOG(INFOL)<< " @@@@@@ magic picked at probability : " << probability;
-                //logCorrectlyGuessedMagic << testQueries[i] << endl;
             }
             hit++;
         } else {
             // miss
             if(testInst[i].label == 1) {
-                LOG(INFOL) << "Probability= "<< probability;
+                if (useHeuristics) {
+                    if (heuristics[i] != -1) {
+                        myDecision = heuristics[i];
+                    }
+                }
+                if (myDecision == testInst[i].label) {
+                    hitMagic++;
+                } /*else {
+                    LOG(INFOL) << "Probability= "<< probability;
+                }*/
             }
         }
     }
     double accuracy = (double)hit/(double)testInst.size();
+    double qsqrAccuracy = (double)hitQsqr / (double) totalQsqr;
+    double magicAccuracy = (double)hitMagic / (double) totalMagic;
     LOG(INFOL) << "Overall Accuracy : " << accuracy;
     LOG(INFOL) << "Probability Threshold : " << threshold;
     LOG(INFOL) << "QSQR Accuracy : " << hitQsqr << " / " << totalQsqr << " = " <<  (double)hitQsqr/(double)totalQsqr;
@@ -821,6 +823,7 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
     vector<string> strQsqrTime;
     vector<string> strMagicTime;
     ofstream logTraining("training-queries.log");
+    ofstream logTrainCsv("train.csv");
     int nMagicQueries = 0;
     int i = 1;
     for (auto q : trainingQueriesVector) {
@@ -845,11 +848,26 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         strFeatures.push_back(features);
         strQsqrTime.push_back(qsqrTime);
         logTraining << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back() << endl;
+        string row = "";
+        vector<string> tokens = split(features, ',');
+        for (int i = 0; i < tokens.size(); ++i) {
+            row += tokens[i];
+            row += " ";
+        }
+        row += to_string(decisionVector.back());
+        row += "\n";
+        logTrainCsv << row;
         strMagicTime.push_back(magicTime);
         if (decisionVector.back() == 1) {
             nMagicQueries++;
         }
     }
+
+    if (logTraining.fail() || logTrainCsv.fail()) {
+        LOG(ERRORL) << "Error writing to file";
+    }
+    logTraining.close();
+    logTrainCsv.close();
 
     vector<Metrics> balancedFeaturesVector;
     vector<int> balancedDecisionVector;
@@ -876,7 +894,7 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
 
     vector<pair<string, int>> trainingQueriesAndResult;
 
-    bool use5050 = true;
+    bool use5050 = false;
     vector<Metrics>* ptrFeatures = NULL;
     vector<int>* ptrDecisions = NULL;
     vector<string>* ptrQueries = NULL;
@@ -912,10 +930,6 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         instances.push_back(instance);
     }
 
-    if (logTraining.fail()) {
-        LOG(ERRORL) << "Error writing to file";
-    }
-    logTraining.close();
 
     // Normalization
     for (int i =0; i < instances.size(); ++i) {
@@ -935,6 +949,7 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
     vector<Metrics> testMetrics;
     vector<string> testQueries;
     vector<int> testDecisions;
+    vector<int> heuristicDecisions;
     parseQueriesLog(testQueriesLog, testQueries, testMetrics, testDecisions);
     LOG(INFOL) << "# Test queries = " << testMetrics.size();
     vector<Instance> testInst;
@@ -947,6 +962,8 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         features.push_back(testMetrics[i].countIntermediateQueries);
         features.push_back(testMetrics[i].countIDBPredicates);
 
+        int heurLabel = foundSubsumingQuery(testQueries[i], trainingQueriesAndResult, p, edb);
+        heuristicDecisions.push_back(heurLabel);
         int label = testDecisions[i];
         Instance instance(label, features);
         testInst.push_back(instance);
@@ -965,7 +982,7 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
     accuracy = 0;
     double effectiveProb = 0.0;
     for (auto prob : probabilities) {
-        double acc = computeAccuracy(testInst, lr, prob);
+        double acc = computeAccuracy(testInst, lr, prob, heuristicDecisions, false);
         if (acc > accuracy) {
             accuracy = acc;
             effectiveProb = prob;

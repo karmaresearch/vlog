@@ -233,6 +233,27 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             for (auto qi: queryIndexes) {
                 trainingQueriesVector.push_back(trainingQueries[qi].first);
             }
+            // Add a few generic queries in training
+            int nIDBpredicates = program->getAllIDBPredicateIds().size();
+            LOG(INFOL) << "# of IDB predicates = " << nIDBpredicates;
+            int nGenericQueries = nIDBpredicates/4;
+            if (nGenericQueries > 100) {
+                nGenericQueries = 100;
+            }
+            LOG(INFOL) << "# of generic queries that will be added = "<< nGenericQueries;
+            // We know that generic queries are all at the end of trainingQueries vector
+            // because generateNewTrainingQueries() adds them to the end
+            int cntAdded = 0;
+            for (int i = trainingQueries.size()-1; i >= 0; --i) {
+                // add the generic query only if it is not already present
+                if (std::find(trainingQueriesVector.begin(), trainingQueriesVector.end(), trainingQueries[i].first) ==
+                    trainingQueriesVector.end()) {
+                    trainingQueriesVector.push_back(trainingQueries[i].first);
+                }
+                if(++cntAdded > nGenericQueries) {
+                    break;
+                }
+            }
             LOG(INFOL) << "training queries ready";
             // 2. test the model against test queries
 
@@ -306,7 +327,6 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                 queryVector.push_back(query);
             }
 
-            LOG(INFOL) << "vectors:";
             JSON node;
             JSON queryResults;
             JSON queryFeatures;
