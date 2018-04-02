@@ -820,7 +820,6 @@ bool EDBLayer::getOrAddDictNumber(const char *text, const size_t sizeText,
         resp = dbPredicates.begin()->second.manager->
             getDictNumber(text, sizeText, id);
     }
-    LOG(INFOL) << "resp " << resp << ", id " << id;
     if (!resp) {
         if (!termsDictionary.get()) {
             LOG(DEBUGL) << "The additional terms will start from " << getNTerms();
@@ -829,7 +828,6 @@ bool EDBLayer::getOrAddDictNumber(const char *text, const size_t sizeText,
         }
         std::string t(text, sizeText);
         id = termsDictionary->getOrAdd(t);
-	LOG(INFOL) << "String: " << t << ", value: " << id;
         resp = true;
     }
     return resp;
