@@ -171,6 +171,12 @@ void VLogUtils::execSPARQLQuery(string sparqlquery,
 }
 
 void getRandomTupleIndexes(uint64_t m, uint64_t n, vector<int>& indexes) {
+    if (m == n) {
+        for (uint64_t i = 0; i < n; ++i) {
+            indexes[i] =i;
+        }
+        return;
+    }
     srand(time(0));
     for (uint64_t i = 0; i < m; ++i) {
         uint64_t r;
