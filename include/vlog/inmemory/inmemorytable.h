@@ -72,9 +72,9 @@ class InmemoryTable : public EDBTable {
                 const std::vector<uint8_t> &filterBy);
 
     public:
-        InmemoryTable(string repository, string tablename, PredId_t predid);
+        InmemoryTable(string repository, string tablename, PredId_t predid, EDBLayer *layer);
 
-        InmemoryTable(PredId_t predid, std::vector<std::vector<std::string>> &entries);
+        InmemoryTable(PredId_t predid, std::vector<std::vector<std::string>> &entries, EDBLayer *layer);
 
         uint8_t getArity() const;
 

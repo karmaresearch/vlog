@@ -4,8 +4,6 @@
 
 #include <kognac/utils.h>
 
-Dictionary singletonDict;
-
 void dump() {
 }
 
@@ -69,7 +67,7 @@ std::vector<std::string> readRow(istream &ifs) {
 }
 
 InmemoryTable::InmemoryTable(string repository, string tablename,
-        PredId_t predid) {
+        PredId_t predid, EDBLayer *layer) {
     arity = 0;
     //Load the table in the database
     string tablefile = repository + "/" + tablename + ".csv";
@@ -95,7 +93,9 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
                 std::vector<Term_t> v;
                 vectors.push_back(v);
             }
-            vectors[i].push_back(singletonDict.getOrAdd(row[i]));
+	    uint64_t val;
+	    layer->getOrAddDictNumber(row[i].c_str(), row[i].size(), val);
+            vectors[i].push_back(val);
         }
     }
     std::vector<std::shared_ptr<Column>> columns;
@@ -108,7 +108,8 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
     // dump();
 }
 
-InmemoryTable::InmemoryTable(PredId_t predid, std::vector<std::vector<std::string>> &entries) {
+InmemoryTable::InmemoryTable(PredId_t predid, std::vector<std::vector<std::string>> &entries,
+	EDBLayer *layer) {
     arity = 0;
     //Load the table in the database
     std::vector<std::vector<Term_t>> vectors;
@@ -126,7 +127,9 @@ InmemoryTable::InmemoryTable(PredId_t predid, std::vector<std::vector<std::strin
                 std::vector<Term_t> v;
                 vectors.push_back(v);
             }
-            vectors[i].push_back(singletonDict.getOrAdd(row[i]));
+	    uint64_t val;
+	    layer->getOrAddDictNumber(row[i].c_str(), row[i].size(), val);
+            vectors[i].push_back(val);
         }
     }
     std::vector<std::shared_ptr<Column>> columns;
@@ -509,35 +512,19 @@ size_t InmemoryTable::estimateCardinality(const Literal &query) {
 
 bool InmemoryTable::getDictNumber(const char *text, const size_t sizeText,
         uint64_t &id) {
-    std::string s(text, sizeText);
-    int64_t v = singletonDict.get(s);
-    if (v < 0) {
-        return false;
-    }
-    id = v;
-    return true;
+    return false;
 }
 
 bool InmemoryTable::getDictText(const uint64_t id, char *text) {
-    std::string s = singletonDict.getRawValue(id);
-    if (s == "") {
-        return false;
-    }
-    strcpy(text, s.c_str());
-    return true;
+    return false;
 }
 
 bool InmemoryTable::getDictText(const uint64_t id, std::string &text) {
-    std::string s = singletonDict.getRawValue(id);
-    if (s == "") {
-	return false;
-    }
-    text = s;
-    return true;
+    return false;
 }
 
 uint64_t InmemoryTable::getNTerms() {
-    return singletonDict.size();
+    return 0;
 }
 
 uint8_t InmemoryTable::getArity() const {

@@ -101,7 +101,7 @@ void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.type = tableConf.type;
     InmemoryTable *table = new InmemoryTable(tableConf.params[0],
-            tableConf.params[1], infot.id);
+            tableConf.params[1], infot.id, this);
     infot.manager = std::shared_ptr<EDBTable>(table);
     infot.arity = table->getArity();
     dbPredicates.insert(make_pair(infot.id, infot));
@@ -115,7 +115,7 @@ void EDBLayer::addInmemoryTable(std::string predicate, std::vector<std::vector<s
         dbPredicates.erase(infot.id);
     }
     infot.type = "INMEMORY";
-    InmemoryTable *table = new InmemoryTable(infot.id, rows);
+    InmemoryTable *table = new InmemoryTable(infot.id, rows, this);
     infot.arity = table->getArity();
     infot.manager = std::shared_ptr<EDBTable>(table);
     dbPredicates.insert(make_pair(infot.id, infot));
@@ -820,6 +820,7 @@ bool EDBLayer::getOrAddDictNumber(const char *text, const size_t sizeText,
         resp = dbPredicates.begin()->second.manager->
             getDictNumber(text, sizeText, id);
     }
+    LOG(INFOL) << "resp " << resp << ", id " << id;
     if (!resp) {
         if (!termsDictionary.get()) {
             LOG(DEBUGL) << "The additional terms will start from " << getNTerms();
@@ -828,6 +829,7 @@ bool EDBLayer::getOrAddDictNumber(const char *text, const size_t sizeText,
         }
         std::string t(text, sizeText);
         id = termsDictionary->getOrAdd(t);
+	LOG(INFOL) << "String: " << t << ", value: " << id;
         resp = true;
     }
     return resp;
