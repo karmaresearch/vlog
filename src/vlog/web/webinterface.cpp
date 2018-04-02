@@ -199,7 +199,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             // 1. generate queries and run them and train model
             EDBConf conf(edbFile);
             int depth = 5;
-            uint64_t maxTuples = 500;
+            uint64_t maxTuples = 50;
             uint8_t vt1 = 1;
             uint8_t vt2 = 2;
             uint8_t vt3 = 3;

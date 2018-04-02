@@ -20,7 +20,6 @@ double LogisticRegression::sigmoid(double z) {
 
 void LogisticRegression::train(vector<Instance>& instances) {
     for (int n = 0; n < ITERATIONS; ++n) {
-        //double lik = 0.0;
         for (int i = 0; i < instances.size(); ++i) {
             vector<double> x (instances.at(i).x);
             double predicted = classify(x);
@@ -28,14 +27,7 @@ void LogisticRegression::train(vector<Instance>& instances) {
             for (int j = 0; j < weights.size(); ++j) {
                 weights[j] = weights[j] + rate * (label - predicted) * x[j];
             }
-
-            // Not necessary for learning
-            //lik += label * log(classify(x)) + (1-label) * log(1 - classify(x));
         }
-
-        //std::ostringstream strs;
-        //strs << lik;
-        //std::string strDouble = strs.str();
     }
 }
 

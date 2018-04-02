@@ -217,6 +217,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
         ) {
     std::unordered_map<string, int> allQueries;
     std::set<string> setOfUniquePredicates;
+    std::unordered_map<string, vector<pair<string, int>>> queryMap;
 
     Graph graph;
 
@@ -344,8 +345,8 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
                 pathlog += "=>";
             pathLength++;
         }
-        LOG(INFOL) << pathlog;
-         vector<vector<Substitution>> tuplesSubstitution;
+        //LOG(INFOL) << pathlog;
+        vector<vector<Substitution>> tuplesSubstitution;
         if (reachedEDB == true) {
             // Construct the query to find EDB tuples
             Predicate edbPred = p.getPredicate(predId);
@@ -412,6 +413,8 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
                     pair<string,int> finalQueryResult = makeComplexQuery(p, qLiteral, result, db, dictVariables);
                     int type = finalQueryResult.second + ((n > 4) ? 4 : n);
                     if (allQueries.find(finalQueryResult.first) == allQueries.end()) {
+                        string key = p.getPredicateName(workingIDB);
+                        queryMap[key].push_back(make_pair(finalQueryResult.first, type));
                         allQueries.insert(make_pair(finalQueryResult.first,type));
                     }
                     workingSigma = result;
@@ -424,13 +427,28 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
     allPredicatesLog.close();
     LOG(INFOL) << " # of unique predicate = "<< setOfUniquePredicates.size();
     std::vector<std::pair<std::string,int>> queries;
-    for (std::unordered_map<std::string,int>::iterator it = allQueries.begin(); it !=  allQueries.end(); ++it) {
-        queries.push_back(std::make_pair(it->first, it->second));
+    //for (auto it = allQueries.begin(); it !=  allQueries.end(); ++it) {
+    //    queries.push_back(std::make_pair(it->first, it->second));
         //LOG(INFOL) << "Query: " << it->first << " type : " << it->second ;
+    //}
+    int nQueriesPerPredicate = 20;
+
+    for (auto it = queryMap.begin(); it !=  queryMap.end(); ++it) {
+        //LOG(INFOL)<< it->first << " : ";
+        int countPerPredicate = 0;
+        for (auto q : it->second) {
+            //LOG(INFOL) << q.first << ", " << q.second;
+            queries.push_back(make_pair(q.first, q.second));
+            if (++countPerPredicate > nQueriesPerPredicate) {
+                break;
+            }
+        }
     }
-    for (auto gq: genericQueriesVector) {
-        queries.push_back(make_pair(gq, QUERY_TYPE_GENERIC + 1));
-    }
+
+    // Uncomment this code to add generic queries explicitly
+    //for (auto gq: genericQueriesVector) {
+    //    queries.push_back(make_pair(gq, QUERY_TYPE_GENERIC + 1));
+    //}
     return queries;
 }
 
@@ -823,7 +841,6 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
     vector<string> strQsqrTime;
     vector<string> strMagicTime;
     ofstream logTraining("training-queries.log");
-    ofstream logTrainCsv("train.csv");
     int nMagicQueries = 0;
     int i = 1;
     for (auto q : trainingQueriesVector) {
@@ -848,26 +865,16 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         strFeatures.push_back(features);
         strQsqrTime.push_back(qsqrTime);
         logTraining << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back() << endl;
-        string row = "";
-        vector<string> tokens = split(features, ',');
-        for (int i = 0; i < tokens.size(); ++i) {
-            row += tokens[i];
-            row += " ";
-        }
-        row += to_string(decisionVector.back());
-        row += "\n";
-        logTrainCsv << row;
         strMagicTime.push_back(magicTime);
         if (decisionVector.back() == 1) {
             nMagicQueries++;
         }
     }
 
-    if (logTraining.fail() || logTrainCsv.fail()) {
+    if (logTraining.fail()) {
         LOG(ERRORL) << "Error writing to file";
     }
     logTraining.close();
-    logTrainCsv.close();
 
     vector<Metrics> balancedFeaturesVector;
     vector<int> balancedDecisionVector;
