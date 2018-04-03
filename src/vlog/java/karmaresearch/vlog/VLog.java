@@ -136,20 +136,24 @@ public class VLog {
         NONE, AGGRESSIVE
     };
 
+    public enum LogLevel {
+        ERROR, WARNING, INFO, DEBUG
+    };
+
     /**
-     * Sets the log level of the VLog logger. Possible values of the parameter
-     * are: "debug", "info", "warning", "error". The default log level is
-     * "info". If the specified level string is not recognized, the default is
-     * used.
+     * Sets the log level of the VLog logger. The default log level is INFO.
      *
      * @param level
      *            the log level.
      *
      */
-    public native void setLogLevel(String level);
+    public native void setLogLevel(LogLevel level);
 
     /**
-     * Redirects the logging of VLog to a file.
+     * Redirects the logging of VLog to a file. If file is an empty string or
+     * <code>null</code>, the logging is directed to the default stream. If the
+     * file cannot be opened for some reason, again, the logging is directed to
+     * the default stream.
      *
      * @param filename
      *            the file.
