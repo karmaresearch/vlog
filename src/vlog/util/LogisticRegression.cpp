@@ -50,8 +50,6 @@ vector<Instance> LogisticRegression::readDataset(std::string fileName) {
     vector<Instance> dataset;
     ifstream file(fileName);
     string line;
-    // skip the first line
-    getline(file, line);
     while (file && getline(file, line)) {
         if (line.size() == 0) {
             continue;

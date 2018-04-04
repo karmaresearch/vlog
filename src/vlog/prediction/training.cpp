@@ -20,28 +20,6 @@ std::string makeGenericQuery(Program& p, PredId_t predId, uint8_t predCard) {
     query += ")";
     return query;
 }
-// http://www.cplusplus.com/forum/general/125094/
-std::vector<std::string> split( std::string str, char sep = ' ' )
-{
-    std::vector<std::string> ret ;
-
-    std::istringstream stm(str) ;
-    std::string token ;
-    while( std::getline( stm, token, sep ) ) ret.push_back(token) ;
-
-    return ret ;
-}
-
-std::string stringJoin(vector<string>& vec, char delimiter=','){
-    string result;
-    for (int i = 0; i < vec.size(); ++i) {
-        result += vec[i];
-        if (i != vec.size()-1) {
-            result += delimiter;
-        }
-    }
-    return result;
-}
 
 std::pair<std::string, int> makeComplexQuery(Program& p, Literal& l, vector<Substitution>& sub, EDBLayer& db, Dictionary& dictVariables) {
     std::string query = p.getPredicateName(l.getPredicate().getId());
@@ -723,27 +701,6 @@ double Training::runAlgo(string& algo,
     }
 }
 
-void separateQuery(string logLine, vector<string>& tokens) {
-    stack<int> spaceIndexes;
-    size_t index = string::npos;
-    int cntIndexes = 0;
-    while (cntIndexes < 4) {
-        index = logLine.find_last_of(" ", index);
-        assert(index != string::npos);
-        index--;
-        spaceIndexes.push(index);
-        cntIndexes++;
-    }
-
-    int startIndex = 0;
-    while(!spaceIndexes.empty()) {
-        int index = spaceIndexes.top();
-        spaceIndexes.pop();
-        tokens.push_back(logLine.substr(startIndex, (index - startIndex)+1));
-        startIndex = index+2;
-    }
-    tokens.push_back(logLine.substr(startIndex, (index - startIndex)+1));
-}
 
 void parseQueriesLog(vector<string>& testQueriesLog,
         vector<string>& testQueries,
@@ -757,7 +714,7 @@ void parseQueriesLog(vector<string>& testQueriesLog,
         // some queries can contain spaces, commas. To address these, we split tokens by scanning the string from the end
         //RP1052(A,"(A)National Security (B) Public Accounts(C)Rules,Business & Privliges (D) Foreign Affairs (E) Kashmir"@en)
         vector<string> tokens;
-        separateQuery(line, tokens);
+        tokens = rsplit(line); // by default rsplit gives 5 tokens from the back
         assert (tokens.size() == 5);
         vector<string> features = split(tokens[1], ',');
         testQueries.push_back(tokens[0]);
