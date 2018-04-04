@@ -18,6 +18,17 @@ SparqlTable::SparqlTable(PredId_t predid, string repository, EDBLayer *layer, st
 	std::stringstream ss(f);
 	std::string item;
 	while (std::getline(ss, item, ',')) {
+	    bool alreadyPresent = false;
+	    for (int i = 0; i < fieldVars.size(); i++) {
+		if (item == fieldVars[i]) {
+		    LOG(WARNL) << "Repeated variable name " << item << " ignored.";
+		    alreadyPresent = true;
+		    break;
+		}
+	    }
+	    if (alreadyPresent) {
+		continue;
+	    }
 	    this->fieldVars.push_back(item);
 	}
     }
@@ -177,9 +188,13 @@ json SparqlTable::launchQuery(std::string sparqlQuery) {
     LOG(DEBUGL) << "output = " << response.substr(0, 1000) << ((response.size() > 1000) ? " ..." : "");
     json output;
     if (resp == 0) {
-	output = json::parse(response);
-	output = output["results"];
-	output = output["bindings"];
+	try {
+	    output = json::parse(response);
+	    output = output["results"];
+	    output = output["bindings"];
+	} catch(nlohmann::detail::parse_error x) {
+	    LOG(WARNL) << "Returning empty result; parse error in response: " << response.substr(0, 1000) << ((response.size() > 1000) ? " ..." : "");
+	}
     } else {
 	std::string em(errorBuffer);
 	LOG(WARNL) << "Launching query failed: " << em;
