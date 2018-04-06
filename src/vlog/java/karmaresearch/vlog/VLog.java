@@ -16,12 +16,12 @@ import karmaresearch.vlog.Term.TermType;
  */
 public class VLog {
 
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     private static final AtomicInteger VlogCounter = new AtomicInteger(0);
 
     static {
-        loadLibrary("kognac-log");
+        // loadLibrary("kognac-log");
         loadLibrary("kognac");
         loadLibrary("trident-core");
         loadLibrary("trident-sparql");
@@ -80,9 +80,10 @@ public class VLog {
                         System.out.println("Loaded " + s + " from the jar");
                     }
                 } catch (Throwable e1) {
-                    System.err.println("Could not load library " + s
-                            + ", exceptions are temporarily disabled to accomodate windows version");
-                    // throw new UnsatisfiedLinkError(e1.getMessage());
+                    // System.err.println("Could not load library " + s
+                    // + ", exceptions are temporarily disabled to accomodate
+                    // windows version");
+                    throw new UnsatisfiedLinkError(e1.getMessage());
                 }
             }
         }
