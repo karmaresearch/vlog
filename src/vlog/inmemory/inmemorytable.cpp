@@ -58,6 +58,7 @@ std::vector<std::string> readRow(istream &ifs) {
             insideEscaped = false;
         } else {
             if (p - buffer >= 65535) {
+		LOG(ERRORL) << "Max field size";
                 throw "Maximum field size exceeded in CSV file: 65535";
             }
             *p++ = c;
@@ -74,6 +75,7 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
     ifstream ifs;
     ifs.open(tablefile);
     if (ifs.fail()) {
+	LOG(ERRORL) << "Could not open " << tablefile;
         throw ("Could not open file " + tablefile + " for reading");
     }
     LOG(DEBUGL) << "Reading " << tablefile;
@@ -86,6 +88,7 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
         if (row.size() == 0) {
             break;
         } else if (row.size() != arity) {
+	    LOG(ERRORL) << "Multiple arities";
             throw ("Multiple arities in file " + tablefile);
         }
         for (int i = 0; i < arity; i++) {
