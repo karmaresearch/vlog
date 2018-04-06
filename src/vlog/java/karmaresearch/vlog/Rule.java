@@ -70,4 +70,10 @@ public class Rule {
         Rule rule = (Rule) o;
         return Arrays.equals(head, rule.head) && Arrays.equals(body, rule.body);
     }
+
+    @Override
+    public String toString() {
+        return "HEAD: " + Arrays.toString(head) + ", BODY: "
+                + Arrays.toString(body);
+    }
 }
