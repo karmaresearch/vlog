@@ -83,7 +83,7 @@ std::string SparqlTable::generateQuery(const Literal &query) {
 	    // Also, the bracketing may depend on the type of the value (which we don't keep track of in VLog).
 	    // Or should we add bracketing when we put stuff in the dictionary???
 	    // TODO!!!
-	    if (val.find('<') == 0) {
+	    if (val.find('<') == 0 || val.find('"') == 0) {
 		binds += " BIND (" + val + " AS ?" + fieldVars[i] + ") ";
 	    } else {
 		binds += " BIND \"" + val + "\" AS ?" + fieldVars[i] + ") ";
@@ -114,7 +114,8 @@ void SparqlTable::query(QSQQuery *query, TupleTable *outputTable,
     uint8_t *pos = query->getPosToCopy();
     const uint8_t npos = query->getNPosToCopy();
     if (posToFilter == NULL || posToFilter->size() == 0) {
-	EDBIterator *iter = getIterator(*lit);
+	std::vector<uint8_t> sortFields;
+	EDBIterator *iter = getSortedIterator(*lit, sortFields);
         while (iter->hasNext()) {
             iter->next();
             for (uint8_t i = 0; i < npos; ++i) {
@@ -193,7 +194,8 @@ json SparqlTable::launchQuery(std::string sparqlQuery) {
 	    output = output["results"];
 	    output = output["bindings"];
 	} catch(nlohmann::detail::parse_error x) {
-	    LOG(WARNL) << "Returning empty result; parse error in response: " << response.substr(0, 1000) << ((response.size() > 1000) ? " ..." : "");
+	    LOG(WARNL) << "Returning empty result; parse error in response";
+	    LOG(DEBUGL) << "Response = " << response;
 	}
     } else {
 	std::string em(errorBuffer);
@@ -210,15 +212,29 @@ size_t SparqlTable::getCardinality(const Literal &query) {
 	return 0;
     }
 
-    std::string sparqlQuery = "SELECT (COUNT(*) AS ?cnt) WHERE { " + generateQuery(query) + " }";
-    json output = launchQuery(sparqlQuery);
-    json::iterator it = output.begin();
-    if (it != output.end()) {
-	std::string s = (*it)["cnt"]["value"];
-	LOG(DEBUGL) << "Cardinality = " << s;
-	return std::stoll(s);
+    std::string key = query.tostring();
+    LOG(DEBUGL) << "Get cardinality for " << key;
+    
+//    std::string sparqlQuery = "SELECT (COUNT(*) AS ?cnt) WHERE { " + generateQuery(query) + " }";
+//    json output = launchQuery(sparqlQuery);
+//    json::iterator it = output.begin();
+//    if (it != output.end()) {
+//	std::string s = (*it)["cnt"]["value"];
+//	LOG(DEBUGL) << "Cardinality = " << s;
+//	size_t card = std::stoll(s);
+//	cachedCardinalities[key] = card;
+//	return card;
+//    }
+//  This apparently does not work, sometimes causes exceptions in endpoint.
+
+    EDBIterator *it = getIterator(query);
+    size_t count = 0;
+    while (it->hasNext()) {
+	it->next();
+	count++;
     }
-    return 0;
+    delete it;
+    return count;
 }
 
 size_t SparqlTable::getCardinalityColumn(const Literal &query,
@@ -254,14 +270,21 @@ bool SparqlTable::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilte
 }
 
 EDBIterator *SparqlTable::getIterator(const Literal &query) {
-    std::vector<uint8_t> sorting;
+
+    LOG(DEBUGL) << "GetIterator, query = " << query.tostring();
 
     size_t sz = query.getTupleSize();
 
     json output;
     if (sz == fieldVars.size()) {
-	std::string sparqlQuery = generateQuery(query);
-	output = launchQuery(sparqlQuery);
+	std::string key = query.tostring();
+	if (cachedTables.count(key) > 0) {
+	    output = cachedTables[key];
+	} else {
+	    std::string sparqlQuery = generateQuery(query);
+	    output = launchQuery(sparqlQuery);
+	    cachedTables[key] = output;
+	}
     }
     return new SparqlIterator(output, layer, query, fieldVars);
 }
@@ -284,6 +307,8 @@ EDBIterator *SparqlTable::getSortedIterator(const Literal &query,
 	json output;
 	return new SparqlIterator(output, layer, query, fieldVars);
     }
+
+    LOG(DEBUGL) << "GetSortedIterator, query = " << query.tostring();
 
     uint64_t key = 0;
     if (sz <= 8 && query.getNUniqueVars() == sz) {
