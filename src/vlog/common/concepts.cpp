@@ -998,6 +998,26 @@ int Program::getNIDBPredicates() {
     return n;
 }
 
+size_t findEndLiteral(std::string s) {
+    size_t pos = s.find("),");
+    size_t oldpos = 0;
+    while (pos != std::string::npos) {
+	LOG(DEBUGL) << "string: " << s << ",found pos " << pos;
+	int count = 0;
+	for (int i = oldpos; i < pos; i++) {
+	    if (s[i] == '"') {
+		count++;
+	    }
+	}
+	LOG(DEBUGL) << "quote count = " << count;
+	if (count % 2 == 0) {
+	    return pos;
+	}
+	oldpos = pos;
+	pos = s.find("),", oldpos+2);
+    }
+    return pos;
+}
 
 void Program::parseRule(std::string rule, bool rewriteMultihead) {
     //split the rule between head and body
@@ -1012,7 +1032,7 @@ void Program::parseRule(std::string rule, bool rewriteMultihead) {
         std::vector<Literal> lHeads;
         while (head.size() > 0) {
             std::string headLiteral;
-            size_t posEndLiteral = head.find("),");
+            size_t posEndLiteral = findEndLiteral(head);
             if (posEndLiteral != std::string::npos) {
                 headLiteral = head.substr(0, posEndLiteral + 1);
                 head = head.substr(posEndLiteral + 2, std::string::npos);
@@ -1029,7 +1049,7 @@ void Program::parseRule(std::string rule, bool rewriteMultihead) {
         std::vector<Literal> lBody;
         while (body.size() > 0) {
             std::string bodyLiteral;
-            size_t posEndLiteral = body.find("),");
+            size_t posEndLiteral = findEndLiteral(body);
             if (posEndLiteral != std::string::npos) {
                 bodyLiteral = body.substr(0, posEndLiteral + 1);
                 body = body.substr(posEndLiteral + 2, std::string::npos);
