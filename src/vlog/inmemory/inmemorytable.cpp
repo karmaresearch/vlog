@@ -70,6 +70,7 @@ std::vector<std::string> readRow(istream &ifs) {
 InmemoryTable::InmemoryTable(string repository, string tablename,
         PredId_t predid, EDBLayer *layer) {
     arity = 0;
+    this->predid = predid;
     //Load the table in the database
     string tablefile = repository + "/" + tablename + ".csv";
     ifstream ifs;
@@ -114,6 +115,7 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
 InmemoryTable::InmemoryTable(PredId_t predid, std::vector<std::vector<std::string>> &entries,
 	EDBLayer *layer) {
     arity = 0;
+    this->predid = predid;
     //Load the table in the database
     std::vector<std::vector<Term_t>> vectors;
     for (auto &row : entries) {
@@ -389,6 +391,9 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
     if (query.getTupleSize() != arity) {
         return new InmemoryIterator(NULL, predid, fields);
     }
+
+    LOG(DEBUGL) << "InmemoryTable::getSortedIterator, query = " << query.tostring();
+
     /*** Look at the query to see if we need filtering***/
     std::vector<uint8_t> posConstants;
     std::vector<uint8_t> vars;
@@ -477,9 +482,11 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
                 }
                 std::shared_ptr<const Segment> subsegment = std::shared_ptr<
                     const Segment>(new Segment(arity, subcolumns));
+		LOG(DEBUGL) << "Returning " << subsegment->getNRows() << " rows";
                 return new InmemoryIterator(subsegment, predid, fields);
             } else {
                 //Return an empty segment (i.e., where hasNext() returns false)
+		LOG(DEBUGL) << "Returning empty segment";
                 return new InmemoryIterator(NULL, predid, fields);
             }
 
@@ -500,6 +507,7 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
             }
             auto filteredSegment = ((InmemoryFCInternalTable*)(fTable.get()))->
                 getUnderlyingSegment();
+	    LOG(DEBUGL) << "Returning " << filteredSegment->getNRows() << " rows";
             return new InmemoryIterator(filteredSegment, predid, fields);
         }
     }
