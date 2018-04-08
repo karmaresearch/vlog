@@ -75,7 +75,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>..\..\..\deps_kognac\include;..\..\..\kognac\include;..\..\..\trident\include;..\..\include;C:\Program Files\Java\jdk1.8.0_161\include\win32;C:\Program Files\Java\jdk1.8.0_161\include;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\deps_kognac\include;..\..\..\kognac\include;..\..\..\trident\rdf3x\include;..\..\..\trident\include;..\..\include;C:\Program Files\Java\jdk1.8.0_161\include\win32;C:\Program Files\Java\jdk1.8.0_161\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
@@ -85,7 +85,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>..\..\..\deps_kognac\include;..\..\..\kognac\include;..\..\..\trident\include;..\..\include;C:\Program Files\Java\jdk1.8.0_161\include\win32;C:\Program Files\Java\jdk1.8.0_161\include;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\deps_kognac\include;..\..\..\kognac\include;..\..\..\trident\rdf3x\include;..\..\..\trident\include;..\..\include;C:\Program Files\Java\jdk1.8.0_161\include\win32;C:\Program Files\Java\jdk1.8.0_161\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
