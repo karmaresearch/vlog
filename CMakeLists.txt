@@ -36,8 +36,8 @@ IF(TRIDENT_LIB)
     message("Using KOGNAC provided installation: ${KOGNAC_LIB} ${KOGNAC_INC}")
     include_directories(${KOGNAC_INC})
     LINK_DIRECTORIES("${KOGNAC_LIB}")
-    add_library(kognac SHARED IMPORTED)
-    set_property(TARGET kognac PROPERTY IMPORTED_LOCATION ${KOGNAC_LIB}/${CMAKE_SHARED_LIBRARY_PREFIX}kognac${CMAKE_SHARED_LIBRARY_SUFFIX})
+    add_library(kognac-core SHARED IMPORTED)
+    set_property(TARGET kognac-core PROPERTY IMPORTED_LOCATION ${KOGNAC_LIB}/${CMAKE_SHARED_LIBRARY_PREFIX}kognac-core${CMAKE_SHARED_LIBRARY_SUFFIX})
 
     message("Using Trident provided installation: ${TRIDENT_LIB} ${TRIDENT_INC}")
     include_directories(${TRIDENT_INC})
@@ -72,11 +72,11 @@ ELSE()
     set_property(TARGET trident-sparql PROPERTY IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/trident/libtrident-sparql${CMAKE_SHARED_LIBRARY_SUFFIX}")
     # KOGNAC
     set(KOGNAC_LIB ${CMAKE_BINARY_DIR}/trident/kognac)
-    add_library(kognac SHARED IMPORTED)
-    add_dependencies(kognac git-trident)
+    add_library(kognac-core SHARED IMPORTED)
+    add_dependencies(kognac-core git-trident)
     include_directories(${SOURCE_DIR}/kognac/include)
     LINK_DIRECTORIES("${KOGNAC_LIB}")
-    set_property(TARGET kognac PROPERTY IMPORTED_LOCATION ${KOGNAC_LIB}/${CMAKE_SHARED_LIBRARY_PREFIX}kognac${CMAKE_SHARED_LIBRARY_SUFFIX})
+    set_property(TARGET kognac-core PROPERTY IMPORTED_LOCATION ${KOGNAC_LIB}/${CMAKE_SHARED_LIBRARY_PREFIX}kognac-core${CMAKE_SHARED_LIBRARY_SUFFIX})
 ENDIF()
 
 #SPARSEHASH
@@ -196,13 +196,13 @@ set_target_properties(vlog PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}" OUTPUT_NA
 
 #standard include
 include_directories(include/)
-TARGET_LINK_LIBRARIES(vlog-core trident trident-sparql ${ZLIB_LIBRARIES} kognac lz4)
+TARGET_LINK_LIBRARIES(vlog-core trident trident-sparql ${ZLIB_LIBRARIES} kognac-core lz4)
 
 if(JAVA)
     file(GLOB javaSRC "src/vlog/java/karmaresearch/vlog/*.java")
     Create_javadoc(vlog PACKAGES karmaresearch.vlog SOURCEPATH ${CMAKE_CURRENT_SOURCE_DIR}/src/vlog/java WINDOWTITLE "VLog JNI Interface")
     # add_dependencies(vlog-java headers)
-    TARGET_LINK_LIBRARIES(vlog-java vlog-core trident trident-sparql kognac)
+    TARGET_LINK_LIBRARIES(vlog-java vlog-core trident trident-sparql kognac-core)
     #Terrible hack to make cmake actually find the shared library when adding it to the jar.
     #It won't find it in the binary directory ... so we copy it to the source directory, add it to the jar, and then remove it from the source directory
     add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/resources)
@@ -210,8 +210,8 @@ if(JAVA)
     add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:vlog-core> ${CMAKE_SOURCE_DIR}/resources)
     add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:trident> ${CMAKE_SOURCE_DIR}/resources)
     add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:trident-sparql> ${CMAKE_SOURCE_DIR}/resources)
-    add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:kognac> ${CMAKE_SOURCE_DIR}/resources)
-    add_jar(jvlog ${javaSRC} resources/${CMAKE_SHARED_LIBRARY_PREFIX}vlog-java${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}vlog-core${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}trident-core${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}trident-sparql${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}kognac${CMAKE_SHARED_LIBRARY_SUFFIX})
+    add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:kognac-core> ${CMAKE_SOURCE_DIR}/resources)
+    add_jar(jvlog ${javaSRC} resources/${CMAKE_SHARED_LIBRARY_PREFIX}vlog-java${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}vlog-core${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}trident-core${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}trident-sparql${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}kognac-core${CMAKE_SHARED_LIBRARY_SUFFIX})
     add_custom_command(TARGET jvlog POST_BUILD COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_SOURCE_DIR}/resources)
     add_custom_command(TARGET jvlog POST_BUILD COMMAND ${CMAKE_COMMAND} -E remove $<TARGET_FILE:vlog-java>)
     add_dependencies(jvlog vlog-java)
