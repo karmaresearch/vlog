@@ -22,7 +22,7 @@ public class VLog {
 
     static {
         // loadLibrary("kognac-log");
-        loadLibrary("kognac");
+        loadLibrary("kognac-core");
         loadLibrary("trident-core");
         loadLibrary("trident-sparql");
         loadLibrary("vlog-core");
