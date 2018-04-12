@@ -69,6 +69,7 @@ std::vector<std::string> readRow(istream &ifs) {
 
 InmemoryTable::InmemoryTable(string repository, string tablename,
         PredId_t predid, EDBLayer *layer) {
+    this->layer = layer;
     arity = 0;
     this->predid = predid;
     //Load the table in the database
@@ -117,6 +118,7 @@ InmemoryTable::InmemoryTable(PredId_t predid, std::vector<std::vector<std::strin
 	EDBLayer *layer) {
     arity = 0;
     this->predid = predid;
+    this->layer = layer;
     //Load the table in the database
     SegmentInserter *inserter = NULL;
     for (auto &row : entries) {
@@ -181,50 +183,6 @@ bool InmemoryTable::isEmpty(const Literal &q, std::vector<uint8_t> *posToFilter,
     }
 }
 
-size_t InmemoryTable::getCardinality(const Literal &q) {
-    if (q.getNUniqueVars() == q.getTupleSize()) {
-        if (segment == NULL) {
-            return 0;
-        } else {
-            if (arity == 0) {
-                return 1;
-            } else {
-                return segment->getNRows();
-            }
-        }
-    } else {
-        // Not efficient, just to get it to run ... TODO!
-        size_t cnt = 0;
-        EDBIterator *iter = getIterator(q);
-        while (iter->hasNext()) {
-            iter->next();
-            cnt++;
-        }
-        iter->clear();
-        delete iter;
-        return cnt;
-    }
-}
-
-size_t InmemoryTable::getCardinalityColumn(const Literal &q, uint8_t posColumn) {
-    if (q.getNUniqueVars() == q.getTupleSize()) {
-        std::shared_ptr<Column> col = segment->getColumn(posColumn);
-        return col->sort_and_unique()->size();
-    }
-    std::vector<uint8_t> fields;
-    fields.push_back(posColumn);
-    // probably not efficient... TODO
-    EDBIterator *iter = getSortedIterator(q, fields);
-    size_t cnt = 0;
-    while (iter->hasNext()) {
-        iter->next();
-        cnt++;
-    }
-    iter->clear();
-    delete iter;
-    return cnt;
-}
-
 void _literal2filter(const Literal &query, std::vector<uint8_t> &posVarsToCopy,
         std::vector<uint8_t> &posConstantsToFilter,
         std::vector<Term_t> &valuesConstantsToFilter,
@@ -234,7 +192,7 @@ void _literal2filter(const Literal &query, std::vector<uint8_t> &posVarsToCopy,
         if (term.isVariable()) {
             bool unique = true;
             for(uint8_t j = 0; j < posVarsToCopy.size(); ++j) {
-                auto var = query.getTermAtPos(j);
+                auto var = query.getTermAtPos(posVarsToCopy[j]);
                 if (var.getId() == term.getId()) {
                     repeatedVars.push_back(std::make_pair(i, j));
                     unique = false;
@@ -248,6 +206,81 @@ void _literal2filter(const Literal &query, std::vector<uint8_t> &posVarsToCopy,
             valuesConstantsToFilter.push_back(term.getValue());
         }
     }
+}
+
+size_t InmemoryTable::getCardinality(const Literal &q) {
+    if (q.getTupleSize() != arity) {
+        return 0;
+    }
+    if (q.getNUniqueVars() == q.getTupleSize()) {
+        if (segment == NULL) {
+            return 0;
+        } else {
+            if (arity == 0) {
+                return 1;
+            } else {
+                return segment->getNRows();
+            }
+        }
+    } else {
+	std::vector<uint8_t> posVarsToCopy;
+	std::vector<uint8_t> posConstantsToFilter;
+	std::vector<Term_t> valuesConstantsToFilter;
+	std::vector<std::pair<uint8_t, uint8_t>> repeatedVars;
+	std::unique_ptr<SegmentIterator> segIter = segment->iterator();
+
+	_literal2filter(q, posVarsToCopy, posConstantsToFilter,
+		valuesConstantsToFilter, repeatedVars);
+
+	size_t count = 0;
+	while (segIter->hasNext()) {
+	    segIter->next();
+	    bool match = true;
+	    // First filter out non-matching constants
+	    for (uint8_t i = 0; i < posConstantsToFilter.size(); i++) {
+		if (segIter->get(posConstantsToFilter[i]) != valuesConstantsToFilter[i]) {
+		    match = false;
+		    break;
+		}
+	    }
+
+	    if (match && repeatedVars.size() > 0) {
+		for (int i = 0; i < repeatedVars.size(); i++) {
+		    if (segIter->get(repeatedVars[i].first) != segIter->get(posVarsToCopy[repeatedVars[i].second])) {
+			match = false;
+			break;
+		    }
+		}
+	    }
+	    if (match) {
+		count++;
+	    }
+	}
+	return count;
+    }
+}
+
+size_t InmemoryTable::getCardinalityColumn(const Literal &q, uint8_t posColumn) {
+    if (q.getNUniqueVars() == q.getTupleSize()) {
+        std::shared_ptr<Column> col = segment->getColumn(posColumn);
+        return col->sort_and_unique()->size();
+    }
+    int64_t oldval = -1;
+    std::vector<uint8_t> fields;
+    fields.push_back(posColumn);
+    // probably not efficient... TODO
+    EDBIterator *iter = getSortedIterator2(q, fields);
+    size_t cnt = 0;
+    while (iter->hasNext()) {
+        iter->next();
+	if (iter->getElementAt(posColumn) != oldval) {
+	    cnt++;
+	    oldval = iter->getElementAt(posColumn);
+	}
+    }
+    iter->clear();
+    delete iter;
+    return cnt;
 }
 
 EDBIterator *InmemoryTable::getIterator(const Literal &q) {
@@ -386,14 +419,34 @@ std::shared_ptr<const Segment> InmemoryTable::getSortedCachedSegment(
     return sortedSegment;
 }
 
+
 EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
         const std::vector<uint8_t> &fields) {
+    std::vector<uint8_t> offsets;
+    int nConstantsSeen = 0;
+    int varNo = 0;
+    for (int i = 0; i < query.getTupleSize(); i++) {
+	if (! query.getTermAtPos(i).isVariable()) {
+	    nConstantsSeen++;
+	} else {
+	    offsets.push_back(nConstantsSeen);
+	}
 
+    }
+    std::vector<uint8_t> newFields;
+    for (auto f : fields) {
+	newFields.push_back(offsets[f] + f);
+    }
+    return getSortedIterator2(query, newFields);
+}
+
+EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
+        const std::vector<uint8_t> &fields) {
     if (query.getTupleSize() != arity) {
         return new InmemoryIterator(NULL, predid, fields);
     }
 
-    LOG(DEBUGL) << "InmemoryTable::getSortedIterator, query = " << query.tostring();
+    LOG(DEBUGL) << "InmemoryTable::getSortedIterator, query = " << query.tostring(NULL, layer) << ", fields.size() = " << fields.size();
 
     /*** Look at the query to see if we need filtering***/
     std::vector<uint8_t> posConstants;
@@ -426,7 +479,15 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
 	    ((posConstants.size() + fields.size()) <= 8)) {
 	std::vector<uint8_t> filterBy = __mergeSortingFields(posConstants,
 		fields);
+#if 0
+	std::string s = "";
+	for (auto f : filterBy) {
+	    s += to_string((int) f) + " ";
+	}
+	LOG(DEBUGL) << "Sorting fields: " << s;
+#endif
 	uint64_t keySortFields = __getKeyFromFields(filterBy);
+	LOG(DEBUGL) << "keySortFields = " << to_string(keySortFields);
 	if (!cacheHashes.count(keySortFields)) { //Fill the cache
 	    std::shared_ptr<const Segment> sortedSegment =
 		getSortedCachedSegment(segment, filterBy);
@@ -471,9 +532,9 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
 				    column, coord.offset, coord.len)));
 		} else {
 		    std::vector<Term_t> values;
-		    for(uint64_t i = coord.offset; i < coord.offset +
-			    coord.len; ++i) {
-			values.push_back(column->getValue(i));
+		    for(uint64_t j = coord.offset; j < coord.offset +
+			    coord.len; ++j) {
+			values.push_back(column->getValue(j));
 		    }
 		    subcolumns.push_back(std::shared_ptr<Column>(new
 				InmemoryColumn(values)));
@@ -498,21 +559,28 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
 		posConstantsToFilter.size(), posConstantsToFilter.data(),
 		valuesConstantsToFilter.data(), repeatedVars.size(),
 		repeatedVars.data(), 1); //no multithread
-	if (fTable == NULL) {
-	    return new InmemoryIterator(NULL, predid, fields);
-	}
-	// Note, the fTable now only has the variables in posVarsToCopy.
-	auto filteredSegment = ((InmemoryFCInternalTable*)(fTable.get()))->
-	    getUnderlyingSegment();
+	uint64_t sz = 0;
 	std::vector<std::shared_ptr<Column>> subcolumns(arity);
-	uint64_t sz = filteredSegment->getNRows();
-	for (int j = 0; j < posVarsToCopy.size(); j++) {
-	    subcolumns[posVarsToCopy[j]] = filteredSegment->getColumn(j);
-	    for (int i = 0; i < repeatedVars.size(); i++) {
-		if (repeatedVars[i].second == j) {
-		    subcolumns[repeatedVars[i].first] = subcolumns[posVarsToCopy[j]];
+	if (fTable == NULL || fTable->isEmpty()) {
+	    return new InmemoryIterator(NULL, predid, fields);
+	} else if (posVarsToCopy.size() != 0) {
+	    // Note, the fTable now only has the variables in posVarsToCopy.
+	    auto filteredSegment = ((InmemoryFCInternalTable*)(fTable.get()))->
+		getUnderlyingSegment();
+	    sz = filteredSegment->getNRows();
+	    for (int j = 0; j < posVarsToCopy.size(); j++) {
+		subcolumns[posVarsToCopy[j]] = filteredSegment->getColumn(j);
+		for (int i = 0; i < repeatedVars.size(); i++) {
+		    if (repeatedVars[i].second == j) {
+			subcolumns[repeatedVars[i].first] = subcolumns[posVarsToCopy[j]];
+		    }
 		}
 	    }
+	} else {
+	    sz = fTable->getNRows();
+	}
+	if (sz == 0) {
+	    return new InmemoryIterator(NULL, predid, fields);
 	}
 	for (int j = 0; j < posConstantsToFilter.size(); j++) {
 	    ColumnWriter *w = new ColumnWriter();
@@ -524,6 +592,7 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
 	}
 	std::shared_ptr<const Segment> subsegment = std::shared_ptr<
 	    const Segment>(new Segment(arity, subcolumns));
+	subsegment = subsegment->sortBy(&fields);
 	return new InmemoryIterator(subsegment, predid, fields);
     }
 }
@@ -622,7 +691,33 @@ void InmemoryIterator::next() {
     }
     if (isFirst || ! skipDuplicatedFirst) {
         // otherwise we already did next() on the iterator. See hasNext().
+#if 0
+	std::vector<Term_t> oldval;
+	if (! isFirst) {
+	    for (int i = 0; i < sortFields.size(); i++) {
+		oldval.push_back(getElementAt(sortFields[i]));
+	    }
+	}
+#endif
         iterator->next();
+#if 0
+	std::string s = "";
+	for (int i = 0; i < segment->getNColumns(); i++) {
+	    s += to_string(getElementAt(i)) + " ";
+	}
+	LOG(DEBUGL) << "Iterator delivers: " + s;
+	if (! isFirst) {
+	    for (int i = 0; i < sortFields.size(); i++) {
+		if (oldval[i] < getElementAt(sortFields[i])) {
+		    break;
+		}
+		if (oldval[i] > getElementAt(sortFields[i])) {
+		    LOG(ERRORL) << "Not sorted!";
+		    break;
+		}
+	    }
+	}
+#endif
     }
     isFirst = false;
     hasNextChecked = false;
@@ -637,6 +732,7 @@ PredId_t InmemoryIterator::getPredicateID() {
 }
 
 void InmemoryIterator::skipDuplicatedFirstColumn() {
+    LOG(DEBUGL) << "skipDuplicatedFirst, sortFields.size() = " << sortFields.size();
     skipDuplicatedFirst = true;
 }
 

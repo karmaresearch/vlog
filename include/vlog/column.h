@@ -125,7 +125,9 @@ class CompressedColumn: public Column {
     public:
         CompressedColumn(const Term_t v, const uint32_t size) : Column() {
             _size = size;
-            blocks.push_back(CompressedColumnBlock(v, 0, size - 1));
+	    if (size > 0) {
+		blocks.push_back(CompressedColumnBlock(v, 0, size - 1));
+	    }
         }
 
         CompressedColumn(std::vector<CompressedColumnBlock> &blocks,
@@ -666,7 +668,7 @@ class EDBColumn : public Column {
         size_t estimateSize() const;
 
         bool isEmpty() const {
-            return false;
+            return size() == 0;
         }
 
         bool isEDB() const {

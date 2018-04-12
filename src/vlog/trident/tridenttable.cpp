@@ -909,7 +909,7 @@ TridentIterator *TridentTable::getTridentIter() {
 
 EDBIterator *TridentTable::getIterator(const Literal &query) {
     const Literal *literal = &query;
-    // LOG(DEBUGL) << "Get iterator for query " << literal->tostring(NULL, NULL);
+    LOG(DEBUGL) << "Get iterator for query " << literal->tostring(NULL, layer);
     TridentIterator *itr = getTridentIter();
     itr->init(query.getPredicate().getId(), q, *literal, multithreaded ? &mutex : NULL);
     return itr;
@@ -918,7 +918,7 @@ EDBIterator *TridentTable::getIterator(const Literal &query) {
 EDBIterator *TridentTable::getSortedIterator(const Literal &query,
         const std::vector<uint8_t> &fields) {
     const Literal *literal = &query;
-    // LOG(DEBUGL) << "Get sorted iterator for query " << literal->tostring(NULL, NULL);
+    LOG(DEBUGL) << "Get sorted iterator for query " << literal->tostring(NULL, layer);
     TridentIterator *itr = getTridentIter();
     itr->init(query.getPredicate().getId(), q, *literal, fields, multithreaded ? &mutex : NULL);
     return itr;
