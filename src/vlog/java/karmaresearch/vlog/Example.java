@@ -7,10 +7,14 @@ import karmaresearch.vlog.VLog.LogLevel;
 import karmaresearch.vlog.VLog.RuleRewriteStrategy;
 
 class Example {
-    // TODO: replace Trident database with csv file.
+    // // TODO: replace Trident database with csv file.
+    // private static String edbConf0 = "EDB0_predname=TE\n"
+    // + "EDB0_type=Trident\n"
+    // + "EDB0_param0=/Users/ceriel/Downloads/iswc-2017.trident\n";
+
     private static String edbConf0 = "EDB0_predname=TE\n"
-            + "EDB0_type=Trident\n"
-            + "EDB0_param0=/Users/ceriel/Downloads/iswc-2017.trident\n";
+            + "EDB0_type=INMEMORY\n" + "EDB0_param0=/Users/ceriel/Downloads\n"
+            + "EDB0_param1=iswc-2017-complete\n";
 
     // Gets a country from an affiliation. Note that the parameter "a" should be
     // bound.
@@ -23,7 +27,7 @@ class Example {
             + "  bd:serviceParam mwapi:search ?a ."
             + "  bd:serviceParam mwapi:language \"en\" ."
             + "  ?c wikibase:apiOutputItem mwapi:item ." + " }"
-            + " ?c wdt:P17 ?b ."
+            + " ?c wdt:P31/wdt:P279* wd:Q43229 ." + " ?c wdt:P17 ?b ."
             + " SERVICE wikibase:label { bd:serviceParam wikibase:language \"[AUTO_LANGUAGE],en\". }\n";
 
     public Term varA = new Term(TermType.VARIABLE, "A");
