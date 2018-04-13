@@ -347,13 +347,31 @@ EDBIterator *SparqlTable::getSortedIterator(const Literal &query,
         delete writers[i];
     }
 
-    segment = segment->sortBy(&fields);
+    // Map fields. Note that "fields" only counts variables. We need all columns here.
+    std::vector<uint8_t> offsets;
+    int nConstantsSeen = 0;
+    int varNo = 0;
+    for (int i = 0; i < query.getTupleSize(); i++) {
+        if (! query.getTermAtPos(i).isVariable()) {
+            nConstantsSeen++;
+        } else {
+            offsets.push_back(nConstantsSeen);
+        }
+
+    }
+    std::vector<uint8_t> newFields;
+    for (auto f : fields) {
+        newFields.push_back(offsets[f] + f);
+    }
+
+
+    segment = segment->sortBy(&newFields);
     if (sz <= 8 && query.getNUniqueVars() == sz) {
 	// put it in the cache.
 	cachedSegments[key] = segment;
     }
 
-    return new InmemoryIterator(segment, predid, fields);
+    return new InmemoryIterator(segment, predid, newFields);
 }
 
 bool SparqlTable::getDictNumber(const char *text, const size_t sizeText,
