@@ -176,7 +176,7 @@ void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
 bool InmemoryTable::isEmpty(const Literal &q, std::vector<uint8_t> *posToFilter,
         std::vector<Term_t> *valuesToFilter) {
     if (posToFilter == NULL) {
-        return segment == NULL;
+        return segment == NULL || getCardinality(q) == 0;
     } else {
         LOG(ERRORL) << "Not implemented yet";
         throw 10;
@@ -256,6 +256,7 @@ size_t InmemoryTable::getCardinality(const Literal &q) {
 		count++;
 	    }
 	}
+	LOG(DEBUGL) << "Cardinality of " << q.tostring(NULL, layer) << " is " << count;
 	return count;
     }
 }
@@ -474,7 +475,7 @@ EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
         std::shared_ptr<const Segment> sortedSegment = getSortedCachedSegment(
                 segment, fields);
         return new InmemoryIterator(sortedSegment, predid, fields);
-    } else if (posConstants.size() == 1 &&
+    } else if ((posConstants.size() == arity || posConstants.size() == 1) &&
 	    !repeatedVars &&
 	    ((posConstants.size() + fields.size()) <= 8)) {
 	std::vector<uint8_t> filterBy = __mergeSortingFields(posConstants,
@@ -487,7 +488,6 @@ EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
 	LOG(DEBUGL) << "Sorting fields: " << s;
 #endif
 	uint64_t keySortFields = __getKeyFromFields(filterBy);
-	LOG(DEBUGL) << "keySortFields = " << to_string(keySortFields);
 	if (!cacheHashes.count(keySortFields)) { //Fill the cache
 	    std::shared_ptr<const Segment> sortedSegment =
 		getSortedCachedSegment(segment, filterBy);
@@ -542,7 +542,30 @@ EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
 	    }
 	    std::shared_ptr<const Segment> subsegment = std::shared_ptr<
 		const Segment>(new Segment(arity, subcolumns));
-	    return new InmemoryIterator(subsegment, predid, fields);
+	    if (posConstants.size() == arity) {
+		InmemoryFCInternalTable t(arity, 0, false, subsegment);
+		std::vector<uint8_t> posVarsToCopy;
+		std::vector<Term_t> valuesConstantsToFilter;
+		std::vector<std::pair<uint8_t, uint8_t>> repeatedVars;
+		for (int i = 0; i < arity; i++) {
+		    valuesConstantsToFilter.push_back(query.getTermAtPos(i).getValue());
+		}
+		auto fTable = t.filter(posVarsToCopy.size(), posVarsToCopy.data(),
+		    posConstants.size(), posConstants.data(),
+		    valuesConstantsToFilter.data(), repeatedVars.size(),
+		    repeatedVars.data(), 1); //no multithread
+		if (fTable == NULL || fTable->isEmpty()) {
+		    return new InmemoryIterator(NULL, predid, fields);
+		}
+		LOG(DEBUGL) << query.tostring(NULL, layer) << " present!";
+		for (int j = 0; j < arity; j++) {
+		    subcolumns[j] = std::shared_ptr<Column>(new CompressedColumn(valuesConstantsToFilter[j], 1));
+		}
+		subsegment = std::shared_ptr<const Segment>(new Segment(arity, subcolumns));
+		return new InmemoryIterator(subsegment, predid, fields);
+	    } else {
+		return new InmemoryIterator(subsegment, predid, fields);
+	    }
 	} else {
 	    //Return an empty segment (i.e., where hasNext() returns false)
 	    return new InmemoryIterator(NULL, predid, fields);
@@ -583,12 +606,7 @@ EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
 	    return new InmemoryIterator(NULL, predid, fields);
 	}
 	for (int j = 0; j < posConstantsToFilter.size(); j++) {
-	    ColumnWriter *w = new ColumnWriter();
-	    for (uint64_t c = 0; c < sz; c++) {
-		w->add(valuesConstantsToFilter[j]);
-	    }
-	    subcolumns[posConstantsToFilter[j]] = w->getColumn();
-	    delete w;
+	    subcolumns[posConstantsToFilter[j]] = std::shared_ptr<Column>(new CompressedColumn(valuesConstantsToFilter[j], sz));
 	}
 	std::shared_ptr<const Segment> subsegment = std::shared_ptr<
 	    const Segment>(new Segment(arity, subcolumns));
