@@ -1,5 +1,7 @@
 # VLog
 
+[![Build Status](https://travis-ci.org/karmaresearch/vlog.svg?branch=master)](https://travis-ci.org/karmaresearch/vlog)
+
 ## Installation 
 
 We used CMake to ease the installation process. To build VLog, the following
