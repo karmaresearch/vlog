@@ -223,39 +223,14 @@ size_t InmemoryTable::getCardinality(const Literal &q) {
             }
         }
     } else {
-	std::vector<uint8_t> posVarsToCopy;
-	std::vector<uint8_t> posConstantsToFilter;
-	std::vector<Term_t> valuesConstantsToFilter;
-	std::vector<std::pair<uint8_t, uint8_t>> repeatedVars;
-	std::unique_ptr<SegmentIterator> segIter = segment->iterator();
-
-	_literal2filter(q, posVarsToCopy, posConstantsToFilter,
-		valuesConstantsToFilter, repeatedVars);
-
+	EDBIterator *iter = getIterator(q);
 	size_t count = 0;
-	while (segIter->hasNext()) {
-	    segIter->next();
-	    bool match = true;
-	    // First filter out non-matching constants
-	    for (uint8_t i = 0; i < posConstantsToFilter.size(); i++) {
-		if (segIter->get(posConstantsToFilter[i]) != valuesConstantsToFilter[i]) {
-		    match = false;
-		    break;
-		}
-	    }
-
-	    if (match && repeatedVars.size() > 0) {
-		for (int i = 0; i < repeatedVars.size(); i++) {
-		    if (segIter->get(repeatedVars[i].first) != segIter->get(posVarsToCopy[repeatedVars[i].second])) {
-			match = false;
-			break;
-		    }
-		}
-	    }
-	    if (match) {
-		count++;
-	    }
+	while (iter->hasNext()) {
+	    iter->next();
+	    count++;
 	}
+	iter->clear();
+	delete iter;
 	LOG(DEBUGL) << "Cardinality of " << q.tostring(NULL, layer) << " is " << count;
 	return count;
     }
@@ -292,67 +267,13 @@ EDBIterator *InmemoryTable::getIterator(const Literal &q) {
     if (q.getNUniqueVars() == q.getTupleSize()) {
         return new InmemoryIterator(segment, predid, sortFields);
     }
-
-    std::vector<uint8_t> posVarsToCopy;
-    std::vector<uint8_t> posConstantsToFilter;
-    std::vector<Term_t> valuesConstantsToFilter;
-    std::vector<std::pair<uint8_t, uint8_t>> repeatedVars;
-    std::unique_ptr<SegmentIterator> segIter = segment->iterator();
-    uint8_t nfields = segment->getNColumns();
-    std::vector<ColumnWriter *> writers;
-
-    _literal2filter(q, posVarsToCopy, posConstantsToFilter,
-            valuesConstantsToFilter, repeatedVars);
-
-    writers.resize(nfields);
-    for (uint8_t i = 0; i < nfields; ++i) {
-        writers[i] = new ColumnWriter();
+    for (int i = 0; i < q.getTupleSize(); i++) {
+	if (q.getTermAtPos(i).isVariable()) {
+	    sortFields.push_back(i);
+	    break;
+	}
     }
-
-    while (segIter->hasNext()) {
-        segIter->next();
-        bool match = true;
-        // First filter out non-matching constants
-        for (uint8_t i = 0; i < posConstantsToFilter.size(); i++) {
-            if (segIter->get(posConstantsToFilter[i]) != valuesConstantsToFilter[i]) {
-                match = false;
-                break;
-            }
-        }
-
-        if (! match) {
-            continue;
-        }
-
-        if (repeatedVars.size() > 0) {
-            for (int i = 0; i < repeatedVars.size(); i++) {
-                if (segIter->get(repeatedVars[i].first) != segIter->get(posVarsToCopy[repeatedVars[i].second])) {
-                    match = false;
-                    break;
-                }
-            }
-            if (! match) {
-                continue;
-            }
-        }
-
-        for (uint8_t i = 0; i < nfields; ++i) {
-            writers[i]->add(segIter->get(i));
-        }
-    }
-
-    std::vector<std::shared_ptr<Column>> columns;
-    for (uint8_t i = 0; i < nfields; ++i) {
-        columns.push_back(writers[i]->getColumn());
-    }
-
-    std::shared_ptr<Segment> filteredSegment = std::shared_ptr<Segment>(new Segment(nfields, columns));
-
-    for (uint8_t i = 0; i < nfields; ++i) {
-        delete writers[i];
-    }
-
-    return new InmemoryIterator(filteredSegment, predid, sortFields);
+    return getSortedIterator2(q, sortFields);
 }
 
 static std::vector<uint8_t> __mergeSortingFields(std::vector<uint8_t> v1,
@@ -377,10 +298,10 @@ static std::vector<uint8_t> __mergeSortingFields(std::vector<uint8_t> v1,
     }
 }
 
-static uint64_t __getKeyFromFields(const std::vector<uint8_t> &fields) {
-    assert(fields.size() <= 8);
+static uint64_t __getKeyFromFields(const std::vector<uint8_t> &fields, uint8_t sz) {
+    assert(sz <= 8);
     uint64_t key = 0;
-    for(uint8_t i = 0; i < fields.size(); ++i) {
+    for(uint8_t i = 0; i < sz; ++i) {
         uint8_t field = fields[i];
         key = (key << 8) + (uint64_t)(field+1);
     }
@@ -390,16 +311,49 @@ static uint64_t __getKeyFromFields(const std::vector<uint8_t> &fields) {
 std::shared_ptr<const Segment> InmemoryTable::getSortedCachedSegment(
         std::shared_ptr<const Segment> segment,
         const std::vector<uint8_t> &sortBy) {
+    // The segment that we have is sorted in field order, so if that is what is requested,
+    // return that.
+    bool haveSorted = true;
+    for (int i = 0; i < sortBy.size(); i++) {
+	if (sortBy[i] != i) {
+	    haveSorted = false;
+	    break;
+	}
+    }
+    if (haveSorted) {
+	return segment;
+    }
     std::shared_ptr<const Segment> sortedSegment;
     if (sortBy.size() >=8) {
         sortedSegment = segment->sortBy(&sortBy);
     } else {
         //See if I have it in the cache
-        uint64_t filterByKey = __getKeyFromFields(sortBy);
+	//if we already have one in the cache that is say, sorted on fields 1, 2, 3
+	//and we now require sorted on fields 1, 2, then the one sorted on fields 1, 2, 3
+	//meets the requirement.
+        uint64_t filterByKey = __getKeyFromFields(sortBy, sortBy.size());
         if (cachedSortedSegments.count(filterByKey)) {
+	    LOG(DEBUGL) << "Found sorted segment in cache";
             sortedSegment = cachedSortedSegments[filterByKey];
         } else {
-            sortedSegment = segment->sortBy(&sortBy);
+	    LOG(DEBUGL) << "Did not find sorted segment in cache";
+	    std::vector<uint8_t> sb(sortBy);
+	    if (sortBy.size() < arity) {
+		for (int i = 0; i < arity; i++) {
+		    bool present = false;
+		    for (int j = 0; j < sortBy.size(); j++) {
+			if (i == sortBy[j]) {
+			    present = true;
+			    break;
+			}
+		    }
+		    if (! present) {
+			sb.push_back(i);
+		    }
+		}
+	    }
+	    
+            sortedSegment = segment->sortBy(&sb);
             //Rewrite columns not backed by vectors
             std::vector<std::shared_ptr<Column>> columns;
             for(uint8_t i = 0; i < arity; ++i) {
@@ -414,7 +368,13 @@ std::shared_ptr<const Segment> InmemoryTable::getSortedCachedSegment(
             }
             sortedSegment = std::shared_ptr<Segment>(new Segment(arity,
                         columns));
-            cachedSortedSegments[filterByKey] = sortedSegment;
+	    //If we are adding one in the cache that is say, sorted on fields 1, 2, 3,
+	    //this one is also sorted on fields 1, 2, and also sorted on field 1.
+	    //So, we add those to the hashtable as well.
+	    for (uint8_t i = 0; i < sb.size(); i++) {
+		filterByKey = __getKeyFromFields(sb, i);
+		cachedSortedSegments[filterByKey] = sortedSegment;
+	    }
         }
     }
     return sortedSegment;
@@ -432,7 +392,6 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
 	} else {
 	    offsets.push_back(nConstantsSeen);
 	}
-
     }
     std::vector<uint8_t> newFields;
     for (auto f : fields) {
@@ -487,7 +446,7 @@ EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
 	}
 	LOG(DEBUGL) << "Sorting fields: " << s;
 #endif
-	uint64_t keySortFields = __getKeyFromFields(filterBy);
+	uint64_t keySortFields = __getKeyFromFields(filterBy, filterBy.size());
 	if (!cacheHashes.count(keySortFields)) { //Fill the cache
 	    std::shared_ptr<const Segment> sortedSegment =
 		getSortedCachedSegment(segment, filterBy);
