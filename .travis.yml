@@ -13,7 +13,8 @@ compiler:
 before_script:
     - mkdir build
     - cd build
-    - eval “CC=gcc-5 && CXX=g++-5”
+    - export CC=gcc-5
+    - export CXX=g++-5
     - cmake -DSPARQL=1 -DJAVA=1 ..
 
 script:
