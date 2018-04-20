@@ -323,6 +323,13 @@ std::shared_ptr<const Segment> InmemoryTable::getSortedCachedSegment(
     if (haveSorted) {
 	return segment;
     }
+#if DEBUG
+    std::string s = "";
+    for (int i = 0; i < sortBy.size(); i++) {
+	s += to_string(sortBy[i]) + " ";
+    }
+    LOG(DEBUGL) << "Sorting fields: " << s;
+#endif
     std::shared_ptr<const Segment> sortedSegment;
     if (sortBy.size() >=8) {
         sortedSegment = segment->sortBy(&sortBy);
@@ -372,7 +379,7 @@ std::shared_ptr<const Segment> InmemoryTable::getSortedCachedSegment(
 	    //this one is also sorted on fields 1, 2, and also sorted on field 1.
 	    //So, we add those to the hashtable as well.
 	    for (uint8_t i = 0; i < sb.size(); i++) {
-		filterByKey = __getKeyFromFields(sb, i);
+		filterByKey = __getKeyFromFields(sb, i+1);
 		cachedSortedSegments[filterByKey] = sortedSegment;
 	    }
         }
@@ -409,83 +416,96 @@ EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
     LOG(DEBUGL) << "InmemoryTable::getSortedIterator, query = " << query.tostring(NULL, layer) << ", fields.size() = " << fields.size();
 
     /*** Look at the query to see if we need filtering***/
-    std::vector<uint8_t> posConstants;
-    std::vector<uint8_t> vars;
-    bool repeatedVars = false;
-    for(uint8_t i = 0; i < query.getTupleSize(); ++i) {
-        if (!query.getTermAtPos(i).isVariable()) {
-            posConstants.push_back(i);
-        } else {
-            bool found = false;
-            for(auto v : vars) {
-                if (v == query.getTermAtPos(i).getId()) {
-                    found = true;
-                    repeatedVars = true;
-                }
-            }
-            if (!found)
-                vars.push_back(query.getTermAtPos(i).getId());
-        }
-    }
+    std::vector<uint8_t> posVarsToCopy;
+    std::vector<uint8_t> posConstantsToFilter;
+    std::vector<Term_t> valuesConstantsToFilter;
+    std::vector<std::pair<uint8_t, uint8_t>> repeatedVars;
+    _literal2filter(query, posVarsToCopy, posConstantsToFilter,
+	    valuesConstantsToFilter, repeatedVars);
 
     /*** If there are no constants, then just returned a sorted version of the
      * table ***/
-    if (posConstants.empty() && !repeatedVars) {
+    if (posConstantsToFilter.empty() && repeatedVars.empty()) {
         std::shared_ptr<const Segment> sortedSegment = getSortedCachedSegment(
                 segment, fields);
         return new InmemoryIterator(sortedSegment, predid, fields);
-    } else if ((posConstants.size() == arity || posConstants.size() == 1) &&
-	    !repeatedVars &&
-	    ((posConstants.size() + fields.size()) <= 8)) {
-	std::vector<uint8_t> filterBy = __mergeSortingFields(posConstants,
-		fields);
-#if 0
-	std::string s = "";
-	for (auto f : filterBy) {
-	    s += to_string((int) f) + " ";
-	}
-	LOG(DEBUGL) << "Sorting fields: " << s;
-#endif
-	uint64_t keySortFields = __getKeyFromFields(filterBy, filterBy.size());
-	if (!cacheHashes.count(keySortFields)) { //Fill the cache
-	    std::shared_ptr<const Segment> sortedSegment =
-		getSortedCachedSegment(segment, filterBy);
-	    cacheHashes.insert(std::make_pair(keySortFields,
-			HashMapEntry(sortedSegment)));
-	    auto &map = cacheHashes.find(keySortFields)->second.map;
-	    //Add offset and length for each key
-	    auto column = sortedSegment->getColumn(posConstants[0]);
-	    auto reader = column->getReader();
-	    Term_t prevkey = ~0lu;
-	    uint64_t start = 0;
-	    uint64_t currentidx = 0;
-	    while (reader->hasNext()) {
-		Term_t t = reader->next();
-		if (t != prevkey) {
-		    if (prevkey != ~0lu) {
-			map.insert(make_pair(prevkey,
-				    Coordinates(start, currentidx - start)));
+    }
+
+    // Now, first get a segment to filter. Several cases.
+    std::shared_ptr<const Segment> segmentToFilter;
+    if (posConstantsToFilter.size() == 0) {
+	// No constants in the query, so we need the whole segment, sorted.
+	segmentToFilter = getSortedCachedSegment(segment, fields);
+    } else {
+	// Constants in the query, so prepend their positions to the sorting fields.
+	std::vector<uint8_t> filterBy;
+	filterBy.push_back(posConstantsToFilter[0]);
+	filterBy = __mergeSortingFields(filterBy, fields);
+	// Now get the key of the entry we need.
+	uint64_t keySortFields = __getKeyFromFields(filterBy, filterBy.size() >= 8 ? 7 : filterBy.size());
+	// Fill the sort fields up with the other fields.
+	if (filterBy.size() < arity) {
+	    for (int i = 0; i < arity; i++) {
+		bool present = false;
+		for (int j = 0; j < filterBy.size(); j++) {
+		    if (i == filterBy[j]) {
+			present = true;
+			break;
 		    }
-		    start = currentidx;
-		    prevkey = t;
 		}
-		currentidx++;
-	    }
-	    if (currentidx != start) {
-		map.insert(std::make_pair(prevkey, Coordinates(start,
-				currentidx - start)));
+		if (! present) {
+		    filterBy.push_back(i);
+		}
 	    }
 	}
-	//Now I have a hashmap... use it to return a projection of the segment
+	if (! cacheHashes.count(keySortFields)) {
+	    // Not available yet. Get the corresponding sorted segment.
+	    std::shared_ptr<const Segment> sortedSegment =
+                getSortedCachedSegment(segment, filterBy);
+	    // Create a map from constant values to begin and end coordinates in this segment.
+	    std::shared_ptr<HashMapEntry> map = std::shared_ptr<HashMapEntry>(new HashMapEntry(sortedSegment));
+	    auto column = sortedSegment->getColumn(posConstantsToFilter[0]);
+            auto reader = column->getReader();
+            Term_t prevkey = ~0lu;
+            uint64_t start = 0;
+            uint64_t currentidx = 0;
+            while (reader->hasNext()) {
+                Term_t t = reader->next();
+                if (t != prevkey) {
+                    if (prevkey != ~0lu) {
+                        map->map.insert(make_pair(prevkey,
+                                    Coordinates(start, currentidx - start)));
+                    }
+                    start = currentidx;
+                    prevkey = t;
+                }
+                currentidx++;
+            }
+            if (currentidx != start) {
+                map->map.insert(std::make_pair(prevkey, Coordinates(start,
+                                currentidx - start)));
+            }
+	    // Now put this map in the cacheHashes map, for each size.
+	    for (int i = 1; i <= filterBy.size(); i++) {
+		if (i >= 8) {
+		    break;
+		}
+		keySortFields = __getKeyFromFields(filterBy, i);
+		if (! cacheHashes.count(keySortFields)) {
+		    cacheHashes.insert(std::make_pair(keySortFields, map));
+		}
+	    }
+	}
+	// Now we hav the map available.
 	auto entry = cacheHashes.find(keySortFields)->second;
-	Term_t constantValue = query.getTermAtPos(posConstants[0]).getValue();
-	if (entry.map.count(constantValue)) {
+	Term_t constantValue = valuesConstantsToFilter[0];
+	if (entry->map.count(constantValue)) {
 	    //Get the start and offset
-	    Coordinates &coord = entry.map.find(constantValue)->second;
+	    Coordinates &coord = entry->map.find(constantValue)->second;
 	    //Create a segment with some subcolumns
 	    std::vector<std::shared_ptr<Column>> subcolumns;
 	    for(uint8_t i = 0; i < arity; ++i) {
-		auto column = entry.segment->getColumn(i);
+		auto column = entry->segment->getColumn(i);
 		if (column->isBackedByVector()) {
 		    subcolumns.push_back(std::shared_ptr<Column>(new SubColumn(
 				    column, coord.offset, coord.len)));
@@ -499,79 +519,57 @@ EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
 				InmemoryColumn(values)));
 		}
 	    }
-	    std::shared_ptr<const Segment> subsegment = std::shared_ptr<
-		const Segment>(new Segment(arity, subcolumns));
-	    if (posConstants.size() == arity) {
-		InmemoryFCInternalTable t(arity, 0, false, subsegment);
-		std::vector<uint8_t> posVarsToCopy;
-		std::vector<Term_t> valuesConstantsToFilter;
-		std::vector<std::pair<uint8_t, uint8_t>> repeatedVars;
-		for (int i = 0; i < arity; i++) {
-		    valuesConstantsToFilter.push_back(query.getTermAtPos(i).getValue());
-		}
-		auto fTable = t.filter(posVarsToCopy.size(), posVarsToCopy.data(),
-		    posConstants.size(), posConstants.data(),
-		    valuesConstantsToFilter.data(), repeatedVars.size(),
-		    repeatedVars.data(), 1); //no multithread
-		if (fTable == NULL || fTable->isEmpty()) {
-		    return new InmemoryIterator(NULL, predid, fields);
-		}
-		LOG(DEBUGL) << query.tostring(NULL, layer) << " present!";
-		for (int j = 0; j < arity; j++) {
-		    subcolumns[j] = std::shared_ptr<Column>(new CompressedColumn(valuesConstantsToFilter[j], 1));
-		}
-		subsegment = std::shared_ptr<const Segment>(new Segment(arity, subcolumns));
-		return new InmemoryIterator(subsegment, predid, fields);
-	    } else {
-		return new InmemoryIterator(subsegment, predid, fields);
+	    segmentToFilter = std::shared_ptr<const Segment>(new Segment(arity, subcolumns));
+	    if (filterBy.size() > 7) {
+		// In this case, we don't know the exact ordering, so it needs to be sorted
+		// further. Hopefully, it helps that it is already partly ordered.
+		segmentToFilter = segmentToFilter->sortBy(&filterBy);
 	    }
 	} else {
 	    //Return an empty segment (i.e., where hasNext() returns false)
 	    return new InmemoryIterator(NULL, predid, fields);
 	}
-    } else { //More sophisticated sorting procedure ...
-	InmemoryFCInternalTable t(arity, 0, false, segment);
-	std::vector<uint8_t> posVarsToCopy;
-	std::vector<uint8_t> posConstantsToFilter;
-	std::vector<Term_t> valuesConstantsToFilter;
-	std::vector<std::pair<uint8_t, uint8_t>> repeatedVars;
-	_literal2filter(query, posVarsToCopy, posConstantsToFilter,
-		valuesConstantsToFilter, repeatedVars);
-	auto fTable = t.filter(posVarsToCopy.size(), posVarsToCopy.data(),
-		posConstantsToFilter.size(), posConstantsToFilter.data(),
-		valuesConstantsToFilter.data(), repeatedVars.size(),
-		repeatedVars.data(), 1); //no multithread
-	uint64_t sz = 0;
-	std::vector<std::shared_ptr<Column>> subcolumns(arity);
-	if (fTable == NULL || fTable->isEmpty()) {
-	    return new InmemoryIterator(NULL, predid, fields);
-	} else if (posVarsToCopy.size() != 0) {
-	    // Note, the fTable now only has the variables in posVarsToCopy.
-	    auto filteredSegment = ((InmemoryFCInternalTable*)(fTable.get()))->
-		getUnderlyingSegment();
-	    sz = filteredSegment->getNRows();
-	    for (int j = 0; j < posVarsToCopy.size(); j++) {
-		subcolumns[posVarsToCopy[j]] = filteredSegment->getColumn(j);
-		for (int i = 0; i < repeatedVars.size(); i++) {
-		    if (repeatedVars[i].second == j) {
-			subcolumns[repeatedVars[i].first] = subcolumns[posVarsToCopy[j]];
-		    }
+    }
+
+    if (posConstantsToFilter.size() == 1 && ! repeatedVars.empty()) {
+	// No further filtering needed.
+	return new InmemoryIterator(segmentToFilter, predid, fields);
+    }
+
+    // General filtering procedure.
+    InmemoryFCInternalTable t(arity, 0, false, segmentToFilter);
+    auto fTable = t.filter(posVarsToCopy.size(), posVarsToCopy.data(),
+	    posConstantsToFilter.size(), posConstantsToFilter.data(),
+	    valuesConstantsToFilter.data(), repeatedVars.size(),
+	    repeatedVars.data(), 1); //no multithread
+    uint64_t sz = 0;
+    std::vector<std::shared_ptr<Column>> subcolumns(arity);
+    if (fTable == NULL || fTable->isEmpty()) {
+	return new InmemoryIterator(NULL, predid, fields);
+    } else if (posVarsToCopy.size() != 0) {
+	// Note, the fTable now only has the variables in posVarsToCopy.
+	auto filteredSegment = ((InmemoryFCInternalTable*)(fTable.get()))->
+	    getUnderlyingSegment();
+	sz = filteredSegment->getNRows();
+	for (int j = 0; j < posVarsToCopy.size(); j++) {
+	    subcolumns[posVarsToCopy[j]] = filteredSegment->getColumn(j);
+	    for (int i = 0; i < repeatedVars.size(); i++) {
+		if (repeatedVars[i].second == j) {
+		    subcolumns[repeatedVars[i].first] = subcolumns[posVarsToCopy[j]];
 		}
 	    }
-	} else {
-	    sz = fTable->getNRows();
 	}
-	if (sz == 0) {
-	    return new InmemoryIterator(NULL, predid, fields);
-	}
-	for (int j = 0; j < posConstantsToFilter.size(); j++) {
-	    subcolumns[posConstantsToFilter[j]] = std::shared_ptr<Column>(new CompressedColumn(valuesConstantsToFilter[j], sz));
-	}
-	std::shared_ptr<const Segment> subsegment = std::shared_ptr<
-	    const Segment>(new Segment(arity, subcolumns));
-	subsegment = subsegment->sortBy(&fields);
-	return new InmemoryIterator(subsegment, predid, fields);
+    } else {
+	sz = fTable->getNRows();
     }
+    if (sz == 0) {
+	return new InmemoryIterator(NULL, predid, fields);
+    }
+    for (int j = 0; j < posConstantsToFilter.size(); j++) {
+	subcolumns[posConstantsToFilter[j]] = std::shared_ptr<Column>(new CompressedColumn(valuesConstantsToFilter[j], sz));
+    }
+    std::shared_ptr<const Segment> subsegment = std::shared_ptr<const Segment>(new Segment(arity, subcolumns));
+    return new InmemoryIterator(subsegment, predid, fields);
 }
 
 void InmemoryTable::releaseIterator(EDBIterator *itr) {

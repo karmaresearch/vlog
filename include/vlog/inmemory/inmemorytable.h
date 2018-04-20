@@ -66,7 +66,7 @@ class InmemoryTable : public EDBTable {
 
         std::shared_ptr<const Segment> segment;
         std::map<uint64_t, std::shared_ptr<const Segment>> cachedSortedSegments;
-        std::map<uint64_t, HashMapEntry> cacheHashes;
+        std::map<uint64_t, std::shared_ptr<HashMapEntry>> cacheHashes;
 
         std::shared_ptr<const Segment> getSortedCachedSegment(
                 std::shared_ptr<const Segment> segment,
