@@ -1,7 +1,13 @@
 cmake_minimum_required (VERSION 2.8)
 
-set(CMAKE_CXX_COMPILER "g++")
 set(CMAKE_C_COMPILER "gcc")
+set(CMAKE_CXX_COMPILER "g++")
+if (NOT "$ENV{CC}" STREQUAL "")
+    set(CMAKE_C_COMPILER "$ENV{CC}")
+endif()
+if (NOT "$ENV{CXX}" STREQUAL "")
+    set(CMAKE_CXX_COMPILER "$ENV{CXX}")
+endif()
 
 project (vlog)
 include(ExternalProject)
