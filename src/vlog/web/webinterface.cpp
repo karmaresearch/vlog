@@ -5,6 +5,7 @@
 #include <vlog/seminaiver.h>
 #include <vlog/training.h>
 #include <vlog/utils.h>
+#include <vlog/helper.h>
 
 #include <launcher/vloglayer.h>
 #include <cts/parser/SPARQLLexer.hpp>

@@ -7,6 +7,7 @@
 #include <numeric>
 #include <climits>
 #include <sys/wait.h>
+#include <vlog/helper.h>
 
 std::string makeGenericQuery(Program& p, PredId_t predId, uint8_t predCard) {
     std::string query = p.getPredicateName(predId);
@@ -323,7 +324,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
                 pathlog += "=>";
             pathLength++;
         }
-        //LOG(INFOL) << pathlog;
+        LOG(INFOL) << pathlog;
         vector<vector<Substitution>> tuplesSubstitution;
         if (reachedEDB == true) {
             // Construct the query to find EDB tuples
@@ -334,6 +335,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
             string workingQuery = makeGenericQuery(p, edbPred.getId(), edbPred.getCardinality());
             Literal workingLiteral = p.parseLiteral(workingQuery, dictVariables);
             pair<string, int> queryAndType = makeComplexQuery(p, workingLiteral, subLiteral, db, dictVariables);
+            LOG(INFOL) << ":: complex Query : " << queryAndType.first;
             Literal literal = p.parseLiteral(queryAndType.first, dictVariables);
             int nVars = literal.getNVars();
 
@@ -393,6 +395,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
                     if (allQueries.find(finalQueryResult.first) == allQueries.end()) {
                         string key = p.getPredicateName(workingIDB);
                         queryMap[key].push_back(make_pair(finalQueryResult.first, type));
+                        LOG(INFOL) << ":: " << finalQueryResult.first << " added";
                         allQueries.insert(make_pair(finalQueryResult.first,type));
                     }
                     workingSigma = result;
@@ -424,9 +427,9 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
     }
 
     // Uncomment this code to add generic queries explicitly
-    //for (auto gq: genericQueriesVector) {
-    //    queries.push_back(make_pair(gq, QUERY_TYPE_GENERIC + 1));
-    //}
+    for (auto gq: genericQueriesVector) {
+        queries.push_back(make_pair(gq, QUERY_TYPE_GENERIC + 1));
+    }
     return queries;
 }
 
@@ -725,6 +728,7 @@ void parseQueriesLog(vector<string>& testQueriesLog,
         metrics.countUniqueRules = stoi(features[3]);
         metrics.countIntermediateQueries = stoi(features[4]);
         metrics.countIDBPredicates = stoi(features[5]);
+        PredId_t featurePredicate = stoi(features[6]);
         testFeaturesVector.push_back(metrics);
         expectedDecisions.push_back(stoi(tokens[4]));
     }
@@ -800,32 +804,43 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
     ofstream logTraining("training-queries.log");
     int nMagicQueries = 0;
     int i = 1;
-    for (auto q : trainingQueriesVector) {
-        LOG(INFOL) << i++ << ") " << q;
-        // Execute the literal query
-        string results="";
-        string features="";
-        string qsqrTime="";
-        string magicTime="";
-        Training::execLiteralQuery(q,
-                edb,
-                p,
-                results,
-                features,
-                qsqrTime,
-                magicTime,
-                timeout,
-                repeatQuery,
-                featuresVector,
-                decisionVector);
-        strResults.push_back(results);
-        strFeatures.push_back(features);
-        strQsqrTime.push_back(qsqrTime);
-        logTraining << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back() << endl;
-        strMagicTime.push_back(magicTime);
-        if (decisionVector.back() == 1) {
-            nMagicQueries++;
+    vector<string> workingQueries = trainingQueriesVector;
+    vector<uint64_t> timeouts = {10000,60000,300000};
+    for (auto time : timeouts) {
+        LOG(INFOL) << "For timeout = " << time << " dealing with " << workingQueries.size() << " queries";
+        vector<string> timedOutQueries;
+        for (auto q : workingQueries) {
+            LOG(INFOL) << i++ << ") " << q;
+            // Execute the literal query
+            string results="";
+            string features="";
+            string qsqrTime="";
+            string magicTime="";
+            Training::execLiteralQuery(q,
+                    edb,
+                    p,
+                    results,
+                    features,
+                    qsqrTime,
+                    magicTime,
+                    timeout,
+                    repeatQuery,
+                    featuresVector,
+                    decisionVector);
+            strResults.push_back(results);
+            strFeatures.push_back(features);
+            strQsqrTime.push_back(qsqrTime);
+            logTraining << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back() << endl;
+            if (stoull(qsqrTime) == timeout && stoull(magicTime) == timeout) {
+                LOG(INFOL) << "Query timed out : " << q;
+                timedOutQueries.push_back(q);
+            }
+            strMagicTime.push_back(magicTime);
+            if (decisionVector.back() == 1) {
+                nMagicQueries++;
+            }
         }
+        workingQueries = timedOutQueries;
     }
 
     if (logTraining.fail()) {
@@ -986,30 +1001,41 @@ void Training::execLiteralQueries(vector<string>& queryVector,
     vector<string> strFeatures;
     vector<string> strQsqrTime;
     vector<string> strMagicTime;
+    vector<string> workingQueries = queryVector;
     ofstream logFile("queries-execution.log");
-    for (auto q : queryVector) {
-        LOG(INFOL) << i++ << ") " << q;
-        // Execute the literal query
-        string results="";
-        string features="";
-        string qsqrTime="";
-        string magicTime="";
-        Training::execLiteralQuery(q,
-                edb,
-                p,
-                results,
-                features,
-                qsqrTime,
-                magicTime,
-                timeout,
-                repeatQuery,
-                featuresVector,
-                decisionVector);
-        strResults.push_back(results);
-        strFeatures.push_back(features);
-        strQsqrTime.push_back(qsqrTime);
-        strMagicTime.push_back(magicTime);
-        logFile << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back() << endl;
+    vector<uint64_t> timeouts = {10000,60000,300000};
+    for (auto time : timeouts) {
+        LOG(INFOL) << "For timeout = " << time << " dealing with " << workingQueries.size() << " queries";
+        vector<string> timedOutQueries;
+        for (auto q : workingQueries) {
+            LOG(INFOL) << i++ << ") " << q;
+            // Execute the literal query
+            string results="";
+            string features="";
+            string qsqrTime="";
+            string magicTime="";
+            Training::execLiteralQuery(q,
+                    edb,
+                    p,
+                    results,
+                    features,
+                    qsqrTime,
+                    magicTime,
+                    time,
+                    repeatQuery,
+                    featuresVector,
+                    decisionVector);
+            strResults.push_back(results);
+            strFeatures.push_back(features);
+            strQsqrTime.push_back(qsqrTime);
+            strMagicTime.push_back(magicTime);
+            logFile << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back() << endl;
+            if (stoull(qsqrTime) == timeout && stoull(magicTime) == timeout) {
+                LOG(INFOL) << "Query timed out : " << q;
+                timedOutQueries.push_back(q);
+            }
+        }
+        workingQueries = timedOutQueries;
     }
     if (logFile.fail()) {
         LOG(ERRORL) << "Error writing to the log file";
@@ -1045,6 +1071,7 @@ void Training::execLiteralQuery(string& literalquery,
     reasoner.getMetrics(literal, NULL, NULL, edb, p, metrics, 5);
     featuresVector.push_back(metrics);
     stringstream strMetrics;
+    PredId_t featurePredicate = literal.getPredicate().getId();
     strMetrics  << std::to_string(metrics.cost) << ","
         << std::to_string(metrics.estimate) << ","
         << std::to_string(metrics.countRules) << ","
