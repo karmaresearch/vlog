@@ -20,6 +20,7 @@ class SparqlTable : public EDBTable {
 	std::vector<string> fieldVars;
 	std::string whereBody;
 	std::unordered_map<uint64_t, std::shared_ptr<const Segment>> cachedSegments;
+	std::unordered_map<std::string, json> cachedTables;
 
         std::string generateQuery(const Literal &query);
 

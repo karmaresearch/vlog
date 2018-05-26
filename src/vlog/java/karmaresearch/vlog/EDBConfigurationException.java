@@ -5,6 +5,8 @@ package karmaresearch.vlog;
  */
 public class EDBConfigurationException extends Exception {
 
+    private static final long serialVersionUID = 7033858489078840759L;
+
     /**
      * Constructs an <code>EDBConfigurationException</code> with
      * <code>null</code> as its error detail message.

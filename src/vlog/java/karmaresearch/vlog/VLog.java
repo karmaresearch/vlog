@@ -16,13 +16,11 @@ import karmaresearch.vlog.Term.TermType;
  */
 public class VLog {
 
-    private static final boolean DEBUG = true;
-
     private static final AtomicInteger VlogCounter = new AtomicInteger(0);
 
     static {
-        loadLibrary("kognac-log");
-        loadLibrary("kognac");
+        // loadLibrary("kognac-log");
+        loadLibrary("kognac-core");
         loadLibrary("trident-core");
         loadLibrary("trident-sparql");
         loadLibrary("vlog-core");
@@ -33,10 +31,6 @@ public class VLog {
         // First try to just load the shared library.
         try {
             System.loadLibrary(s);
-            if (DEBUG) {
-                System.out
-                        .println("Loaded " + s + " with System.loadLibrary()");
-            }
         } catch (Throwable ex) {
             // Did not work, now try to load it from the same directory as the
             // jar file. First determine prefix and suffix, depending on OS.
@@ -47,7 +41,9 @@ public class VLog {
                 jarFile = new File(VLog.class.getProtectionDomain()
                         .getCodeSource().getLocation().toURI());
             } catch (Throwable e) {
-                throw new UnsatisfiedLinkError(e.getMessage());
+                throw (UnsatisfiedLinkError) new UnsatisfiedLinkError(
+                        "while loading " + s + ": " + e.getMessage())
+                                .initCause(e.getCause());
             }
 
             // Next, determine OS.
@@ -69,20 +65,16 @@ public class VLog {
 
             try {
                 loadFromDir(jarFile, libName);
-                if (DEBUG) {
-                    System.out.println("Loaded " + s
-                            + " from the directory in which the jar resides");
-                }
             } catch (Throwable e) {
                 try {
                     loadFromJar(jarFile, libName, os);
-                    if (DEBUG) {
-                        System.out.println("Loaded " + s + " from the jar");
-                    }
                 } catch (Throwable e1) {
-                    System.err.println("Could not load library " + s
-                            + ", exceptions are temporarily disabled to accomodate windows version");
-                    // throw new UnsatisfiedLinkError(e1.getMessage());
+                    // System.err.println("Could not load library " + s
+                    // + ", exceptions are temporarily disabled to accomodate
+                    // windows version");
+                    throw (UnsatisfiedLinkError) new UnsatisfiedLinkError(
+                            "while loading " + s + ": " + e1.getMessage())
+                                    .initCause(e1.getCause());
                 }
             }
         }
@@ -136,20 +128,24 @@ public class VLog {
         NONE, AGGRESSIVE
     };
 
+    public enum LogLevel {
+        ERROR, WARNING, INFO, DEBUG
+    };
+
     /**
-     * Sets the log level of the VLog logger. Possible values of the parameter
-     * are: "debug", "info", "warning", "error". The default log level is
-     * "info". If the specified level string is not recognized, the default is
-     * used.
+     * Sets the log level of the VLog logger. The default log level is INFO.
      *
      * @param level
      *            the log level.
      *
      */
-    public native void setLogLevel(String level);
+    public native void setLogLevel(LogLevel level);
 
     /**
-     * Redirects the logging of VLog to a file.
+     * Redirects the logging of VLog to a file. If file is an empty string or
+     * <code>null</code>, the logging is directed to the default stream. If the
+     * file cannot be opened for some reason, again, the logging is directed to
+     * the default stream.
      *
      * @param filename
      *            the file.

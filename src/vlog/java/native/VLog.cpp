@@ -200,20 +200,25 @@ extern "C" {
 /*
  * Class:     karmaresearch_vlog_VLog
  * Method:    setLogLevel
- * Signature: (Ljava/lang/String;)V
+ * Signature: (Lkarmaresearch/vlog/VLog/LogLevel;)V
  */
-JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setLogLevel(JNIEnv *env, jobject obj, jstring level) {
-    std::string ll = jstring2string(env, level);
-    if (ll == "debug") {
-        Logger::setMinLevel(DEBUGL);
-    } else if (ll == "info") {
-        Logger::setMinLevel(INFOL);
-    } else if (ll == "warning") {
-        Logger::setMinLevel(WARNL);
-    } else if (ll == "error") {
-        Logger::setMinLevel(ERRORL);
-    } else {
-        Logger::setMinLevel(INFOL);
+JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setLogLevel(JNIEnv *env, jobject obj, jobject level) {
+    jclass enumClass = env->GetObjectClass(level);
+    jmethodID getOrdinalMethod = env->GetMethodID(enumClass, "ordinal", "()I");
+    jint lvl = (jint) env->CallIntMethod(level, getOrdinalMethod);
+    switch(lvl) {
+	case 0:
+	    Logger::setMinLevel(ERRORL);
+	    break;
+	case 1:
+	    Logger::setMinLevel(WARNL);
+	    break;
+	case 2:
+	    Logger::setMinLevel(INFOL);
+	    break;
+	default:
+	    Logger::setMinLevel(DEBUGL);
+	    break;
     }
     logLevelSet = true;
 }
@@ -224,6 +229,10 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setLogLevel(JNIEnv *env, job
  * Signature: (Ljava/lang/String;)V
  */
 JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setLogFile(JNIEnv *env, jobject obj, jstring file) {
+    if (file == NULL) {
+	Logger::logToFile("");
+	return;
+    }
     std::string f = jstring2string(env, file);
     Logger::logToFile(f);
 }

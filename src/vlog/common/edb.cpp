@@ -35,7 +35,7 @@ void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithread
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.arity = 3;
     infot.type = tableConf.type;
-    infot.manager = std::shared_ptr<EDBTable>(new TridentTable(kbpath, multithreaded));
+    infot.manager = std::shared_ptr<EDBTable>(new TridentTable(kbpath, multithreaded, this));
     dbPredicates.insert(make_pair(infot.id, infot));
     LOG(DEBUGL) << "Inserted " << pn << " with number " << infot.id;
 }
@@ -44,12 +44,12 @@ void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithread
 void EDBLayer::addMySQLTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
     const string pn = tableConf.predname;
-    infot.id = (PredId_t) predDictionary.getOrAdd(pn);
+    infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.arity = 3;
     infot.type = tableConf.type;
-    infot.manager = std::shared_ptr<EDBTable>(new MySQLTable(tableConf.params[0],
+    infot.manager = std::shared_ptr<EDBTable>(new MySQLTable(infot.id, tableConf.params[0],
                 tableConf.params[1], tableConf.params[2], tableConf.params[3],
-                tableConf.params[4], tableConf.params[5]));
+                tableConf.params[4], tableConf.params[5], this));
     dbPredicates.insert(make_pair(infot.id, infot));
 }
 #endif
@@ -58,12 +58,12 @@ void EDBLayer::addMySQLTable(const EDBConf::Table &tableConf) {
 void EDBLayer::addODBCTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
     const string pn = tableConf.predname;
-    infot.id = (PredId_t) predDictionary.getOrAdd(pn);
+    infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.arity = 3;
     infot.type = tableConf.type;
-    infot.manager = std::shared_ptr<EDBTable>(new ODBCTable(tableConf.params[0],
+    infot.manager = std::shared_ptr<EDBTable>(new ODBCTable(infot.id, tableConf.params[0],
                 tableConf.params[1], tableConf.params[2], tableConf.params[3],
-                tableConf.params[4]));
+                tableConf.params[4], this));
     dbPredicates.insert(make_pair(infot.id, infot));
 }
 #endif
@@ -72,12 +72,12 @@ void EDBLayer::addODBCTable(const EDBConf::Table &tableConf) {
 void EDBLayer::addMAPITable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
     const string pn = tableConf.predname;
-    infot.id = (PredId_t) predDictionary.getOrAdd(pn);
+    infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.arity = 3;
     infot.type = tableConf.type;
-    infot.manager = std::shared_ptr<EDBTable>(new MAPITable(tableConf.params[0],
+    infot.manager = std::shared_ptr<EDBTable>(new MAPITable(infot.id, tableConf.params[0],
                 (int) strtol(tableConf.params[1].c_str(), NULL, 10), tableConf.params[2], tableConf.params[3],
-                tableConf.params[4], tableConf.params[5], tableConf.params[6]));
+                tableConf.params[4], tableConf.params[5], tableConf.params[6], this));
     dbPredicates.insert(make_pair(infot.id, infot));
 }
 #endif
@@ -86,9 +86,9 @@ void EDBLayer::addMAPITable(const EDBConf::Table &tableConf) {
 void EDBLayer::addMDLiteTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
     const string pn = tableConf.predname;
-    infot.id = (PredId_t) predDictionary.getOrAdd(pn);
+    infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.type = tableConf.type;
-    MDLiteTable *table = new MDLiteTable(tableConf.params[0], tableConf.params[1]);
+    MDLiteTable *table = new MDLiteTable(infot.id, tableConf.params[0], tableConf.params[1], this);
     infot.manager = std::shared_ptr<EDBTable>(table);
     infot.arity = table->getArity();
     dbPredicates.insert(make_pair(infot.id, infot));
@@ -101,7 +101,7 @@ void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.type = tableConf.type;
     InmemoryTable *table = new InmemoryTable(tableConf.params[0],
-            tableConf.params[1], infot.id);
+            tableConf.params[1], infot.id, this);
     infot.manager = std::shared_ptr<EDBTable>(table);
     infot.arity = table->getArity();
     dbPredicates.insert(make_pair(infot.id, infot));
@@ -115,7 +115,7 @@ void EDBLayer::addInmemoryTable(std::string predicate, std::vector<std::vector<s
         dbPredicates.erase(infot.id);
     }
     infot.type = "INMEMORY";
-    InmemoryTable *table = new InmemoryTable(infot.id, rows);
+    InmemoryTable *table = new InmemoryTable(infot.id, rows, this);
     infot.arity = table->getArity();
     infot.manager = std::shared_ptr<EDBTable>(table);
     dbPredicates.insert(make_pair(infot.id, infot));

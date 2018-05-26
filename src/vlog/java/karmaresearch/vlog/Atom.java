@@ -80,4 +80,8 @@ public class Atom {
             }
         }
     }
+
+    public String toString() {
+        return predicate + Arrays.toString(terms);
+    }
 }

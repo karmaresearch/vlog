@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import karmaresearch.vlog.Term.TermType;
+import karmaresearch.vlog.VLog.LogLevel;
 import karmaresearch.vlog.VLog.RuleRewriteStrategy;
 
 class Test {
@@ -45,7 +46,7 @@ class Test {
 
     public static void testEmpty() throws Exception {
         VLog vlog = new VLog();
-        vlog.setLogLevel("info");
+        vlog.setLogLevel(LogLevel.INFO);
         vlog.start("", false);
         try (TermQueryResultIterator e = vlog
                 .query(new Atom("A", new Term(Term.TermType.VARIABLE, "C")))) {
@@ -58,7 +59,7 @@ class Test {
     static void runTest() throws Exception {
         testEmpty();
         VLog vlog = new VLog();
-        vlog.setLogLevel("debug");
+        vlog.setLogLevel(LogLevel.DEBUG);
         try {
             vlog.start("blabla", false);
             System.err.println("vlog.start() should have thrown an exception.");

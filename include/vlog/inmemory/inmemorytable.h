@@ -62,19 +62,24 @@ class InmemoryTable : public EDBTable {
         std::vector<string> varnames;
         PredId_t predid;
         uint8_t arity;
+	EDBLayer *layer;
 
         std::shared_ptr<const Segment> segment;
         std::map<uint64_t, std::shared_ptr<const Segment>> cachedSortedSegments;
-        std::map<uint64_t, HashMapEntry> cacheHashes;
+        std::map<uint64_t, std::shared_ptr<HashMapEntry>> cacheHashes;
 
         std::shared_ptr<const Segment> getSortedCachedSegment(
                 std::shared_ptr<const Segment> segment,
                 const std::vector<uint8_t> &filterBy);
 
-    public:
-        InmemoryTable(string repository, string tablename, PredId_t predid);
+	// This version has fields corresponding to the query.
+        EDBIterator *getSortedIterator2(const Literal &query,
+                const std::vector<uint8_t> &fields);
 
-        InmemoryTable(PredId_t predid, std::vector<std::vector<std::string>> &entries);
+    public:
+        InmemoryTable(string repository, string tablename, PredId_t predid, EDBLayer *layer);
+
+        InmemoryTable(PredId_t predid, std::vector<std::vector<std::string>> &entries, EDBLayer *layer);
 
         uint8_t getArity() const;
 
@@ -93,6 +98,7 @@ class InmemoryTable : public EDBTable {
 
         EDBIterator *getIterator(const Literal &query);
 
+	// This version has fields corresponding to the VARIABLES IN THE QUERY!!!!!
         EDBIterator *getSortedIterator(const Literal &query,
                 const std::vector<uint8_t> &fields);
 

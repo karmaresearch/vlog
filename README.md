@@ -1,5 +1,7 @@
 # VLog
 
+[![Build Status](https://travis-ci.org/karmaresearch/vlog.svg?branch=master)](https://travis-ci.org/karmaresearch/vlog)
+
 ## Installation 
 
 We used CMake to ease the installation process. To build VLog, the following
@@ -42,4 +44,5 @@ Please check the [Wiki](https://github.com/karmaresearch/vlog/wiki) for some ins
 
 ## License
 
-Vlog is released under the Apache 2 license.
+Vlog is released under the Apache license, Version 2.0.  A copy of the license may be obtained
+from [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0).

@@ -1,0 +1,25 @@
+language: cpp
+
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - gcc-5
+    - g++-5
+
+compiler:
+    - gcc
+
+before_script:
+    - mkdir build
+    - cd build
+    - export CC=gcc-5
+    - export CXX=g++-5
+    - cmake -DSPARQL=1 -DJAVA=1 ..
+
+script:
+    - make
+
+dist: trusty
+sudo: false

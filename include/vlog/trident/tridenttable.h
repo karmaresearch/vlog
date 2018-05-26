@@ -32,6 +32,7 @@ private:
     Factory<TridentIterator> kbItrFactory;
     std::mutex mutex;
     bool multithreaded;
+    EDBLayer *layer;
 
     TridentIterator *getTridentIter();
 
@@ -64,7 +65,7 @@ private:
 
 
 public:
-    TridentTable(string kbDir, bool multithreaded) {
+    TridentTable(string kbDir, bool multithreaded, EDBLayer *layer) : layer(layer) {
         KBConfig config;
         kb = new KB(kbDir.c_str(), true, false, true, config);
         q = kb->query();
