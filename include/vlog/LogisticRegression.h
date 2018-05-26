@@ -15,6 +15,14 @@ class Instance {
             this->label = label;
             this->x = x;
         }
+
+        friend ostream& operator << (ostream& out, Instance& instance) {
+            for (int i = 0; i < instance.x.size(); ++i) {
+                out << instance.x[i] << " , ";
+            }
+            out << instance.label;
+            return out;
+        }
 };
 
 class LogisticRegression {
@@ -34,6 +42,7 @@ class LogisticRegression {
         double classify(vector<double>&); // predict() function
         void getWeights(vector<double>& wt);
         static vector<Instance> readDataset(std::string file);
+        static vector<Instance> readLogfile(std::string file, vector<string>& allQueries);
 };
 
 #endif // ML_LOGISTICREGRESSION_H

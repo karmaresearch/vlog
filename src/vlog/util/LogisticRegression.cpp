@@ -2,7 +2,12 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#include <vlog/LogisticRegression.h>
+//#include <vlog/LogisticRegression.h>
+#include "../../../include/vlog/LogisticRegression.h"
+#include <cstdlib>
+#include <cassert>
+//#include "helper.h"
+#include "../../../include/vlog/helper.h"
 
 using namespace std;
 
@@ -23,6 +28,8 @@ void LogisticRegression::train(vector<Instance>& instances) {
         for (int i = 0; i < instances.size(); ++i) {
             vector<double> x (instances.at(i).x);
             double predicted = classify(x);
+            // TODO: This predicted value will be a probability value
+            // We are subtracting it from 0 or 1 (label)
             int label = instances.at(i).label;
             for (int j = 0; j < weights.size(); ++j) {
                 weights[j] = weights[j] + rate * (label - predicted) * x[j];
@@ -38,6 +45,7 @@ double LogisticRegression::classify(vector<double>& x) {
     }
 
     return sigmoid(logit);// > 0.5) ? 0.0 : 1.0;
+    //return (sigmoid(logit) > 0.5) ? 1.0 : 0.0;
 }
 
 void LogisticRegression::getWeights(vector<double>& wt) {
@@ -72,6 +80,38 @@ vector<Instance> LogisticRegression::readDataset(std::string fileName) {
         int label = atoi(columns[i].c_str());
         Instance instance(label, data);
         dataset.push_back(instance);
+    }
+
+    return dataset;
+}
+
+vector<Instance> LogisticRegression::readLogfile(std::string fileName, vector<string>& allQueries) {
+    vector<Instance> dataset;
+    ifstream file(fileName);
+    string line;
+    while (file && getline(file, line)) {
+        if (line.size() == 0) {
+            continue;
+        }
+        // A line looks like this (An underscore (_) represents a space)
+        // query_fe,a,t,u,r,es_QSQTime_MagicTime_Decision
+
+        // Ex(1). RP29(<http://www.Department4.University60.edu/FullProfessor5>,B) 4.000000,4,1,1,2,0 1.290000 2.069000 1
+        // some queries can contain spaces, commas. To address these, we split tokens by scanning the string from the end
+        // Ex(2). RP1052(A,"(A)National Security (B) Public Accounts(C)Rules,Business & Privliges (D) Foreign Affairs (E) Kashmir"@en)
+
+        vector<string> tokens;
+        tokens = rsplit(line); // by default gives 5 tokens from the back of string
+        vector<string> features = split(tokens[1], ',');
+        vector<double> data;
+        for (auto feat : features) {
+            data.push_back(std::stof(feat));
+        }
+        assert(data.size() == 6);
+        int label = std::stoi(tokens[4]);
+        Instance instance(label, data);
+        dataset.push_back(instance);
+        allQueries.push_back(line);
     }
 
     return dataset;
