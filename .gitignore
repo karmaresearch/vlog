@@ -23,3 +23,6 @@ testOutput
 .classpath
 .project
 .settings
+**/*.csv
+**/*.datalog
+**/*.ipynb
