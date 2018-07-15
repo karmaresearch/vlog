@@ -1,4 +1,4 @@
-//VLog
+ //VLog
 #include <vlog/reasoner.h>
 #include <vlog/materialization.h>
 #include <vlog/seminaiver.h>
@@ -8,6 +8,8 @@
 #include <vlog/fcinttable.h>
 #include <vlog/exporter.h>
 #include <vlog/utils.h>
+
+#include <vlog/cycles/checker.h>
 
 //Used to load a Trident KB
 #include <vlog/trident/tridenttable.h>
@@ -73,7 +75,8 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
     }
 
     if (cmd != "help" && cmd != "query" && cmd != "lookup" && cmd != "load" && cmd != "queryLiteral"
-            && cmd != "mat" && cmd != "rulesgraph" && cmd != "server" && cmd != "gentq") {
+            && cmd != "mat" && cmd != "rulesgraph" && cmd != "server" && cmd != "gentq" &&
+            cmd != "detectCycles") {
         printErrorMsg(
                 (string("The command \"") + cmd + string("\" is unknown.")).c_str());
         return false;
@@ -1013,6 +1016,19 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     runLiteralQuery(edb, p, literal, reasoner, vm);
 }
 
+void checkAcyclicity(std::string ruleFile, EDBLayer &db) {
+    int response = Checker::check(ruleFile, db);
+    std::cout << "The response is: ";
+    if (response == 0) {
+        std::cout << "Unknown";
+    } else if (response == 1) {
+        std::cout << "Terminates.";
+    } else {
+        std::cout << "Does not always terminate.";
+    }
+    std::cout << std::endl;
+}
+
 int main(int argc, const char** argv) {
     //Init params
     ProgramArgs vm;
@@ -1231,6 +1247,11 @@ int main(int argc, const char** argv) {
         cerr << "The program is not compiled with the web interface activated." << endl;
         return 1;
 #endif
+    } else if (cmd == "detectCycles") {
+        EDBConf conf(edbFile);
+        EDBLayer *layer = new EDBLayer(conf, false);
+        string rulesFile = vm["rules"].as<string>();
+        checkAcyclicity(rulesFile, *layer);
     }
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Runtime = " << sec.count() * 1000 << " milliseconds";

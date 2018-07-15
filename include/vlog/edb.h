@@ -72,7 +72,7 @@ class EDBLayer {
             std::shared_ptr<EDBTable> manager;
         };
 
-        std::unique_ptr<Dictionary> predDictionary;
+        std::shared_ptr<Dictionary> predDictionary;
         std::map<PredId_t, EDBInfoTable> dbPredicates;
 
         Factory<EDBMemIterator> memItrFactory;
@@ -98,10 +98,12 @@ class EDBLayer {
         VLIBEXP void addSparqlTable(const EDBConf::Table &tableConf);
 
     public:
+        EDBLayer(EDBLayer &db);
+
         EDBLayer(EDBConf &conf, bool multithreaded) {
             const std::vector<EDBConf::Table> tables = conf.getTables();
 
-            predDictionary = std::unique_ptr<Dictionary>(new Dictionary());
+            predDictionary = std::shared_ptr<Dictionary>(new Dictionary());
 
             for (const auto &table : tables) {
                 if (table.type == "Trident") {
