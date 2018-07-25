@@ -275,7 +275,8 @@ size_t EDBColumn::size() const {
         LOG(TRACEL) << "query = " << l.tostring();
         LOG(TRACEL) << "sz = " << sz << ", should be " << retval;
         LOG(TRACEL) << "unq = " << unq << ", l.getNVars = " << (int) l.getNVars();
-        throw 10;
+        std::cerr << "Mismatch between calculated and cached Column size: " << sz << " vs. " << retval << " l.getNVars " << static_cast<int>(l.getNVars()) << std::endl;
+        // throw 10;
     }
 #endif
     return retval;

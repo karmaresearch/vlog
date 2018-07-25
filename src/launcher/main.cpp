@@ -184,6 +184,15 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
                             path + string("' does not exists")).c_str());
                 return false;
             }
+            if (! vm["rm"].empty()) {
+                std::string filename = vm["rm"].as<string>();
+                if (!Utils::exists(filename)) {
+                    printErrorMsg((string("The remove-literals file ") +
+                                   filename +
+                                   string(" does not exist")).c_str());
+                    return false;
+                }
+            }
         }
     }
 
@@ -223,6 +232,8 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             string("Set maximum number of threads to use when run in multithreaded mode. Default is " + to_string(std::max((unsigned int)1, std::thread::hardware_concurrency() / 2))).c_str(), false);
     query_options.add<int>("", "interRuleThreads", 0,
             "Set maximum number of threads to use for inter-rule parallelism. Default is 0", false);
+    query_options.add<string>("", "rm", "",
+            "File with facts to suppress (remove) from the EDB", false);
 
     query_options.add<bool>("", "shufflerules", false,
             "shuffle rules randomly instead of using heuristics (only for <mat>, and only when running multithreaded).", false);
@@ -1085,10 +1096,20 @@ int main(int argc, const char** argv) {
     } else if (cmd == "mat") {
         EDBConf conf(edbFile);
         EDBLayer *layer = new EDBLayer(conf, ! vm["multithreaded"].empty());
+        EDBRemoveLiterals *rm;
+        if (! vm["rm"].empty()) {
+            rm = new EDBRemoveLiterals(vm["rm"].as<string>(), layer);
+            rm->dump(std::cerr, layer);
+            // Would like to move the thing i.s.o. copy RFHH
+            layer->setRemoveLiterals(*rm);
+        }
         // EDBLayer layer(conf, false);
         launchFullMat(argc, argv, full_path, *layer, vm,
                 vm["rules"].as<string>());
         delete layer;
+        if (! vm["rm"].empty()) {
+            // delete rm;
+        }
     } else if (cmd == "rulesgraph") {
         EDBConf conf(edbFile);
         EDBLayer *layer = new EDBLayer(conf, false);

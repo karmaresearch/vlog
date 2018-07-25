@@ -373,8 +373,18 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
 
     if (dbPredicates.count(predid)) {
         auto p = dbPredicates.find(predid);
-        return p->second.manager->getIterator(query);
+        auto itr = p->second.manager->getIterator(query);
+        if (removals.size() > 0) {
+            std::cerr << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator" << std::endl;
+            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals, itr);
+            return ritr;
+        } else {
+            return itr;
+        }
+
     } else {
+        // HERE inject the remove-literals filterIterator RFHH -- how????
+        std::cerr << "HERE " << __func__ << ":" << __LINE__ << " need to inject RemoveIterator" << std::endl;
         bool equalFields = query.hasRepeatedVars();
         IndexedTupleTable *rel = tmpRelations[predid];
         uint8_t size = rel->getSizeTuple();
@@ -402,6 +412,7 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
     throw 10;
 }
 
+
 EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
         const std::vector<uint8_t> &fields) {
     const Literal *literal = &query;
@@ -409,8 +420,18 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
 
     if (dbPredicates.count(predid)) {
         auto p = dbPredicates.find(predid);
-        return p->second.manager->getSortedIterator(query, fields);
+        auto itr = p->second.manager->getSortedIterator(query, fields);
+        if (removals.size() > 0) {
+            std::cerr << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator" << std::endl;
+            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals, itr);
+            return ritr;
+        } else {
+            return itr;
+        }
+
     } else {
+        std::cerr << "HERE " << __func__ << ":" << __LINE__ << " need to inject RemoveIterator" << std::endl;
+        // HERE inject the remove-literals filterIterator RFHH -- how????
         assert(literal->getTupleSize() <= 2);
         bool equalFields = false;
         if (query.hasRepeatedVars()) {
@@ -429,10 +450,12 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
         EDBMemIterator *itr;
         switch (size) {
             case 1:
+                // Should I just wrap a removalIterator here? RFHH
                 itr = memItrFactory.get();
                 itr->init1(predid, rel->getSingleColumn(), c1, vc1);
                 return itr;
             case 2:
+                // Should I just wrap a removalIterator here? RFHH
                 itr = memItrFactory.get();
                 if (c1) {
                     itr->init2(predid, true, rel->getTwoColumn1(), c1, vc1, c2, vc2, equalFields);
@@ -623,7 +646,13 @@ bool EDBLayer::checkValueInTmpRelation(const uint8_t relId, const uint8_t posInR
 void EDBLayer::releaseIterator(EDBIterator * itr) {
     if (dbPredicates.count(itr->getPredicateID())) {
         auto p = dbPredicates.find(itr->getPredicateID());
-        return p->second.manager->releaseIterator(itr);
+        if (removals.size() > 0) {
+            auto ritr = dynamic_cast<EDBRemovalIterator *>(itr);
+            p->second.manager->releaseIterator(ritr->getUnderlyingIterator());
+            delete itr;
+        } else {
+            p->second.manager->releaseIterator(itr);
+        }
     } else {
         memItrFactory.release((EDBMemIterator*)itr);
     }
@@ -1301,4 +1330,110 @@ std::shared_ptr<Column> EDBTable::checkIn(
     iter->clear();
     delete iter;
     return col->getColumn();
+}
+
+
+EDBRemoveLiterals::EDBRemoveLiterals(const std::string &file, EDBLayer *layer) : layer(layer), num_rows(0) {
+    std::ifstream infile(file);
+    std::string token;
+    std::vector<Term_t> terms;
+    PredId_t pred;
+    while (infile >> token) {
+        std::cerr << "Read token '" << token << "'" << std::endl;
+        uint64_t val;
+        if (token == ".") {
+            insert(terms);
+            terms.clear();
+        } else {
+            layer->getOrAddDictNumber(token.c_str(), token.size(), val);
+            terms.push_back(val);
+        }
+    }
+}
+
+
+EDBRemoveItem *EDBRemoveLiterals::insert_recursive(const std::vector<Term_t> &terms, size_t offset) {
+    EDBRemoveItem *item;
+    if (offset == terms.size()) {
+        item = NULL;
+    } else {
+        item = new EDBRemoveItem();
+        item->has[terms[offset]] = insert_recursive(terms, offset + 1);
+    }
+
+    return item;
+}
+
+
+void EDBRemoveLiterals::insert(const std::vector<Term_t> &terms) {
+    removals.has[terms[0]] = insert_recursive(terms, 1);
+    ++num_rows;
+}
+
+
+static void dump_map(std::ostream &os, const std::unordered_map<Term_t, EDBRemoveItem *> &m) {
+    for (auto &r : m) {
+        os << "    " << r.first << " -> " << r.second << std::endl;
+    }
+}
+
+bool EDBRemoveLiterals::present(const std::vector<Term_t> &terms) const {
+    const EDBRemoveItem *m = &removals;
+    for (auto i = 0; i < terms.size(); ++i) {
+        // dump_map(std::cerr, m->has);
+        // dump_recursive(std::cerr, layer, &(*m));
+        const auto f = m->has.find(terms[i]);
+        if (f == m->has.end()) {
+            return false;
+        }
+        m = f->second;
+    }
+    if (true) {
+        std::cerr << "Hit row in removals: ";
+        std::cerr << "[";
+        for (auto t : terms) {
+            std::cerr << t << " ";
+        }
+        std::cerr << "]" << std::endl;
+    }
+    return true;
+}
+
+
+std::ostream &EDBRemoveLiterals::dump_recursive_name(std::ostream &of, EDBLayer *layer, const EDBRemoveItem *item) const {
+    if (item == NULL) {
+        return of;
+    }
+
+    for (auto rm = item->has.begin(); rm != item->has.end(); ++rm) {
+        char name[1024];
+        layer->getDictText(rm->first, name);
+        of << name << ",";
+        dump_recursive_name(of, layer, rm->second);
+        of << std::endl;
+    }
+
+    return of;
+}
+
+
+std::ostream &EDBRemoveLiterals::dump_recursive(std::ostream &of, EDBLayer *layer, const EDBRemoveItem *item) const {
+    if (item == NULL) {
+        return of;
+    }
+
+    for (auto rm = item->has.begin(); rm != item->has.end(); ++rm) {
+        of << rm->first << ",";
+        dump_recursive(of, layer, rm->second);
+        of << std::endl;
+    }
+
+    return of;
+}
+
+std::ostream &EDBRemoveLiterals::dump(std::ostream &of, /* const */ EDBLayer *layer) const {
+    dump_recursive(of, layer, &removals);
+    dump_recursive_name(of, layer, &removals);
+
+    return of;
 }

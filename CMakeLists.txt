@@ -60,7 +60,9 @@ ELSE()
         DOWNLOAD_DIR .
         SOURCE_DIR trident
         BUILD_IN_SOURCE 1
-        CMAKE_ARGS "-DSPARQL=1"
+        CMAKE_ARGS 
+		-DSPARQL=1
+		-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
         INSTALL_COMMAND ""
         )
     ExternalProject_Get_Property(git-trident SOURCE_DIR)
