@@ -45,7 +45,7 @@ void MAPITable::executeQuery(const std::string &query, SegmentInserter *inserter
 
     MapiHdl handle = doquery(con, query);
     // Cache results at client side, fetching them in one go.
-    mapi_int64 nrows = mapi_fetch_all_rows(handle);
+    int64_t nrows = mapi_fetch_all_rows(handle);
     int nfields;
     while ((nfields = mapi_fetch_row(handle)) > 0) {
 	if (nfields != arity) {
