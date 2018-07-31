@@ -262,7 +262,7 @@ size_t EDBColumn::size() const {
         }
     } else {
         if (l.getNVars() == 2) {
-            retval = layer.getCardinalityColumn(*query.getLiteral(), posColumn);
+            retval = layer.getCardinalityColumn(*query.getLiteral(), l.getPosVars()[posColumn]);
         } else {
             LOG(WARNL) << "Must go through all the column"
                 " to count the size";
