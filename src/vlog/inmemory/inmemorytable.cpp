@@ -5,6 +5,8 @@
 #include <kognac/utils.h>
 #include <kognac/filereader.h>
 
+#include <zstr/zstr.hpp>
+
 void dump() {
 }
 
@@ -76,16 +78,21 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
     SegmentInserter *inserter = NULL;
     //Load the table in the database
     string tablefile = repository + "/" + tablename + ".csv";
-    if (Utils::exists(tablefile)) {
-	ifstream ifs;
-	ifs.open(tablefile);
-	if (ifs.fail()) {
+    string gz = tablefile + ".gz";
+    istream *ifs = NULL;
+    if (Utils::exists(gz)) {
+	ifs = new zstr::ifstream(gz);
+    } else if (Utils::exists(tablefile)) {
+	ifs = new std::ifstream(tablefile, ios_base::in | ios_base::binary);
+    }
+    if (ifs != NULL) {
+	if (ifs->fail()) {
 	    LOG(ERRORL) << "Could not open " << tablefile;
 	    throw ("Could not open file " + tablefile + " for reading");
 	}
 	LOG(DEBUGL) << "Reading " << tablefile;
-	while (! ifs.eof()) {
-	    std::vector<std::string> row = readRow(ifs);
+	while (! ifs->eof()) {
+	    std::vector<std::string> row = readRow(*ifs);
 	    Term_t rowc[128];
 	    if (arity == 0) {
 		arity = row.size();
@@ -106,7 +113,7 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
 	    }
 	    inserter->addRow(rowc);
 	}
-	ifs.close();
+	delete ifs;
     } else {
 	tablefile = repository + "/" + tablename + ".nt";
 	string gz = tablefile + ".gz";
