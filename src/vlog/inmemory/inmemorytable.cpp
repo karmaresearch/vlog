@@ -573,7 +573,7 @@ EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
 	}
     }
 
-    if (posConstantsToFilter.size() == 1 && ! repeatedVars.empty()) {
+    if (posConstantsToFilter.size() == 1 && repeatedVars.empty()) {
 	// No further filtering needed.
 	return new InmemoryIterator(segmentToFilter, predid, fields);
     }
