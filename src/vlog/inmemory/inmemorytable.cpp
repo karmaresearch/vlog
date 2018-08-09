@@ -488,7 +488,9 @@ EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
     } else {
 	// Constants in the query, so prepend their positions to the sorting fields.
 	std::vector<uint8_t> filterBy;
-	filterBy.push_back(posConstantsToFilter[0]);
+	for (int i = 0; i < posConstantsToFilter.size(); i++) {
+	    filterBy.push_back(posConstantsToFilter[i]);
+	}
 	filterBy = __mergeSortingFields(filterBy, fields);
 	// Now get the key of the entry we need.
 	uint64_t keySortFields = __getKeyFromFields(filterBy, filterBy.size() >= 8 ? 7 : filterBy.size());
