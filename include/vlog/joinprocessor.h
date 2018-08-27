@@ -324,7 +324,7 @@ class DuplicateContainers {
     private:
         const uint8_t nfields;
         const size_t ntables;
-        uint8_t fields[SIZETUPLE];
+        uint8_t fields[256];
         bool empty;
 
         const FCInternalTable *firstTable;

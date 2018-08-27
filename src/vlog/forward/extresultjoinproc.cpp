@@ -252,7 +252,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     }
 
     uint8_t nKnownColumns = 0;
-    std::pair<uint8_t,uint8_t> posKnownColumns[SIZETUPLE * 3];
+    std::pair<uint8_t,uint8_t> posKnownColumns[256];
     for(uint8_t j = 0; j < c.size(); ++j) {
         bool found = false;
         for(uint8_t i = 0; i < nCopyFromFirst; ++i) {

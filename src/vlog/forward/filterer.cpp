@@ -15,7 +15,7 @@ bool TableFilterer::intersection(const Literal &currentQuery,
         LOG(DEBUGL) << "intersection disabled";
         return true;
     }
-    Substitution subs[SIZETUPLE];
+    std::vector<Substitution> subs;
     if (Literal::getSubstitutionsA2B(subs, block.query, currentQuery) != -1) {
         return true;
     } else {
@@ -34,14 +34,14 @@ bool TableFilterer::producedDerivationInPreviousSteps(
     }
 
     //Easy case: the body of the current rule is equal to our rule
-    Substitution subs[10];
+    std::vector<Substitution> subs;
     int nsubs = Literal::getSubstitutionsA2B(subs,
             rule->rule.getHead(block->posQueryInRule), currentQuery);
     assert(nsubs != -1);
 
     for (const auto &lit : rule->rule.getBody()) {
         if (lit.getPredicate().getType() == IDB) {
-            const Literal subsChild = lit.substitutes(subs, nsubs);
+            const Literal subsChild = lit.substitutes(subs);
             if (subsChild == outputQuery) {
                 //LOG(INFOL) << "SIMPLEPRUNING ok";
                 return true;
@@ -307,7 +307,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
             throw 10;
         }
         /*** This code calculates the new current query and pos of the subs ***/
-        Substitution subs[10];
+	std::vector<Substitution> subs;
         const int nsubs = Literal::getSubstitutionsA2B(subs,
                 blockRule.getFirstHead(), currentQuery);
         if (nsubs == -1) {
@@ -321,7 +321,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
             }
         }
         const Literal childCurrentQuery = blockRule.getBody()[0].substitutes(
-                subs, nsubs);
+                subs);
         uint8_t childPosLit_second;
         for (int i = 0; i < childCurrentQuery.getTupleSize(); ++i) {
             if (childCurrentQuery.getTermAtPos(i).getId() == idVarCurQuery)
@@ -330,7 +330,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
         /*** End ***/
 
         /*** This code calculates the new output query and pos of the subs ***/
-        Substitution subs2[10];
+	std::vector<Substitution> subs2;
         const int nsubs2 = Literal::getSubstitutionsA2B(subs2,
                 blockRule.getFirstHead(), outputQuery);
         VTerm tAtOutQuery = outputQuery.getTermAtPos(posHead_first);
@@ -341,7 +341,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
             }
         }
         const Literal childOutputQuery = blockRule.getBody()[0].substitutes(
-                subs2, nsubs2);
+                subs2);
         uint8_t childPosHead_first;
         for (int i = 0; i < childOutputQuery.getTupleSize(); ++i) {
             if (childOutputQuery.getTermAtPos(i).getId() == idVarOutQuery)
@@ -440,7 +440,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
 
     bool response = true;
 
-    Substitution subs[SIZETUPLE];
+    std::vector<Substitution> subs;
     long counterProcessedSubs = 0;
     int countEmpty = 0;
     for (const auto &el : mapSubstitutions) {
@@ -478,7 +478,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
 
         //Copy the substitutions in the body literal of block rule that
         //should match with our head
-        const Literal srLit = rLit->substitutes(subs, nsubs);
+        const Literal srLit = rLit->substitutes(subs);
         assert(srLit.getPredicate().getId() ==
                 outputQuery.getPredicate().getId());
 
