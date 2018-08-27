@@ -948,11 +948,14 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
             if (filterRowsInhashMap) {
                 filterRowsPosJoin = joinsCoordinates[0].first;
                 FinalRuleProcessor* o = (FinalRuleProcessor*)output;
-                assert(o->getNCopyFromFirst() == 1);
-                filterRowsPosOther = o->getPosFromFirst()[0].second;
-                if (filterRowsPosJoin == filterRowsPosOther) {
-                    filterRowsInhashMap = false;
-                }
+		if (o->getNCopyFromFirst() != 1) {
+		    filterRowsInhashMap = false;
+		} else {
+		    filterRowsPosOther = o->getPosFromFirst()[0].second;
+		    if (filterRowsPosJoin == filterRowsPosOther) {
+			filterRowsInhashMap = false;
+		    }
+		}
             }
 
             while (t2->hasNext()) {
