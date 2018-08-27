@@ -755,7 +755,7 @@ JNIEXPORT jlongArray JNICALL Java_karmaresearch_vlog_QueryResultIterator_next(JN
     TupleIterator *iter = (TupleIterator *) ref;
     size_t sz = iter->getTupleSize();
     iter->next();
-    jlong res[16];
+    jlong res[256];
     for (int i = 0; i < sz; i++) {
 	res[i] = iter->getElementAt(i);
     }
