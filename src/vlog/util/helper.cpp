@@ -10,14 +10,14 @@ using namespace std;
 
 void getRandomTupleIndexes(uint64_t m, uint64_t n, vector<int>& indexes) {
     if (m >= n) {
-        for (uint64_t i = 0; i < n; ++i) {
+        for (int i = 0; i < n; ++i) {
             indexes[i] =i;
         }
         return;
     }
     srand(time(0));
-    for (uint64_t i = 0; i < m; ++i) {
-        uint64_t r;
+    for (int i = 0; i < m; ++i) {
+        int r;
         do {
             r = rand() % n;
         } while(std::find(indexes.begin(), indexes.end(), r) != indexes.end());
