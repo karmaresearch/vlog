@@ -8,6 +8,15 @@
 
 using namespace std;
 
+inline bool foundInVector(vector<int> &v, int e) {
+    for (auto t : v) {
+        if (t == e) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void getRandomTupleIndexes(uint64_t m, uint64_t n, vector<int>& indexes) {
     if (m >= n) {
         for (int i = 0; i < n; ++i) {
@@ -20,7 +29,7 @@ void getRandomTupleIndexes(uint64_t m, uint64_t n, vector<int>& indexes) {
         int r;
         do {
             r = rand() % n;
-        } while(std::find(indexes.begin(), indexes.end(), r) != indexes.end());
+        } while(foundInVector(indexes, r));
         indexes[i] = r;
     }
 }
