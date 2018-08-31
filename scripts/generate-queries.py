@@ -288,9 +288,13 @@ def parseResultFile(predicate, resultFile, arity):
         # If we split() it, then we would have more than two columns
         if (nColumns > arity+1):
             columns[2] = ' '.join(columns[2:nColumns])
-        # delete the columns that contain parts of constant
-        while (len(columns) != arity+1):
-            del(columns[-1])
+            # delete the columns that contain parts of constant
+            while (len(columns) != arity+1):
+                print(predicate)
+                print("arity        = ", arity)
+                print("len(columns) = ", len(columns))
+                print(line)
+                del(columns[-1])
         operands = []
         for i, column in enumerate(columns):
             if i == 0:
@@ -352,7 +356,7 @@ outFile = args.out
 #foutTypes.flush()
 #foutFeatures = open(outFile + '.features', 'w')
 #foutGenFeatures = open(outFile + '.gen.features', 'w')
-#foutQueryStats = open(outFile + '.query.stats', 'w')
+foutQueryStats = open(outFile + '.query.stats', 'w')
 
 predicateWithResult = dict()
 matDir = args.mat
@@ -372,6 +376,7 @@ parseRulesFile(rulesFile, predicateWithResult)
 
 foutQueries = open(outFile + '.datalog', 'w')
 data = ""
+records = ""
 for queryType in queries.keys():
     #print ("Running queries of type : ", queryType)
     uniqueQueries = list(set(queries[queryType]))
@@ -379,9 +384,16 @@ for queryType in queries.keys():
     for q in uniqueQueries:
         numQueries += 1
         data += q + "\n"
+        record = str(q) + " " + str(queryType) + "\n"
+        records += record
+
 foutQueries.write(data)
 foutQueries.flush()
 foutQueries.close()
+
+foutQueryStats.write(records)
+foutQueryStats.flush()
+foutQueryStats.close()
 #runQueries(queries)
 end = time.time()
 

@@ -784,9 +784,12 @@ int Reasoner::getNumberOfIDBPredicates(Literal &query, Program &program) {
     std::vector<Rule> rules;
     int idxRules = 0;
 
+    std::unordered_set<Term_t> setQueries;
     std::vector<Literal> queries;
     int idxQueries = 0;
     queries.push_back(query);
+    Term_t key = (query.getPredicate().getId() << 16) + query.getPredicate().getAdornment();
+    setQueries.insert(key);
 
     while (idxQueries < queries.size()) {
         Literal lit = queries[idxQueries];
@@ -806,6 +809,11 @@ int Reasoner::getNumberOfIDBPredicates(Literal &query, Program &program) {
                 Predicate pred = itr->getPredicate();
                 if (pred.getType() == IDB) {
                     count++;
+                    Term_t key = (pred.getId() << 16) + pred.getAdornment();
+                    if (setQueries.find(key) == setQueries.end()) {
+                        setQueries.insert(key);
+                        queries.push_back(*itr);
+                    }
                 }
             }
             idxRules++;

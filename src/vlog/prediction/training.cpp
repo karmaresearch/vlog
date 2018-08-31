@@ -261,7 +261,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
         and try to traverse randomly so that we generate queries that induce reasoning.
         */
         int neighbours = graph[ids[i]].size();
-        LOG(INFOL) << i+1 << ") " <<p.getPredicateName(ids[i]) << " is IDB  with " << neighbours << " neighbours";
+        LOG(DEBUGL) << i+1 << ") " <<p.getPredicateName(ids[i]) << " is IDB  with " << neighbours << " neighbours";
         Predicate idbPred = p.getPredicate(ids[i]);
 
         // This generic query could be added to list/set of all queries we generate
@@ -324,7 +324,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
                 pathlog += "=>";
             pathLength++;
         }
-        LOG(INFOL) << pathlog;
+        LOG(DEBUGL) << pathlog;
         vector<vector<Substitution>> tuplesSubstitution;
         if (reachedEDB == true) {
             // Construct the query to find EDB tuples
@@ -335,7 +335,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
             string workingQuery = makeGenericQuery(p, edbPred.getId(), edbPred.getCardinality());
             Literal workingLiteral = p.parseLiteral(workingQuery, dictVariables);
             pair<string, int> queryAndType = makeComplexQuery(p, workingLiteral, subLiteral, db, dictVariables);
-            LOG(INFOL) << ":: complex Query : " << queryAndType.first;
+            LOG(DEBUGL) << ":: complex Query : " << queryAndType.first;
             Literal literal = p.parseLiteral(queryAndType.first, dictVariables);
             int nVars = literal.getNVars();
 
@@ -395,7 +395,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
                     if (allQueries.find(finalQueryResult.first) == allQueries.end()) {
                         string key = p.getPredicateName(workingIDB);
                         queryMap[key].push_back(make_pair(finalQueryResult.first, type));
-                        LOG(INFOL) << ":: " << finalQueryResult.first << " added";
+                        LOG(DEBUGL) << ":: " << finalQueryResult.first << " added";
                         allQueries.insert(make_pair(finalQueryResult.first,type));
                     }
                     workingSigma = result;
@@ -406,7 +406,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
 
     }//For all IDB predicates
     allPredicatesLog.close();
-    LOG(INFOL) << " # of unique predicate = "<< setOfUniquePredicates.size();
+    LOG(DEBUGL) << " # of unique predicate = "<< setOfUniquePredicates.size();
     std::vector<std::pair<std::string,int>> queries;
     //for (auto it = allQueries.begin(); it !=  allQueries.end(); ++it) {
     //    queries.push_back(std::make_pair(it->first, it->second));
@@ -493,7 +493,7 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBCo
     Dictionary dictVariables;
     for (int i = 0; i < ids.size(); ++i) {
         int neighbours = graph[ids[i]].size();
-        LOG(INFOL) << p.getPredicateName(ids[i]) << " is EDB : " << neighbours << "neighbours";
+        LOG(DEBUGL) << p.getPredicateName(ids[i]) << " is EDB : " << neighbours << "neighbours";
         Predicate edbPred = p.getPredicate(ids[i]);
         int card = edbPred.getCardinality();
         std::string query = makeGenericQuery(p, edbPred.getId(), edbPred.getCardinality());
@@ -602,7 +602,7 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBCo
         delete table;
     } // all EDB predicate ids
     allPredicatesLog.close();
-    LOG(INFOL) << " # of unique predicate = "<< setOfUniquePredicates.size();
+    LOG(DEBUGL) << " # of unique predicate = "<< setOfUniquePredicates.size();
     std::vector<std::pair<std::string,int>> queries;
     for (std::unordered_map<std::string,int>::iterator it = allQueries.begin(); it !=  allQueries.end(); ++it) {
         queries.push_back(std::make_pair(it->first, it->second));
@@ -694,7 +694,7 @@ double Training::runAlgo(string& algo,
         ret = waitpid(pid, &status, 0);
         alarm(0);
         if (timedOut) {
-            LOG(INFOL) << "TIMED OUT";
+            LOG(DEBUGL) << "TIMED OUT";
             munmap(queryTime, sizeof(double));
             return timeoutMillis;
         }
