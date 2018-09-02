@@ -24,6 +24,7 @@ int Checker::check(std::string ruleFile, EDBLayer &db) {
     //Launch the  skolem chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(cdb,
             &p, true, true, false, false, 1, 1, false);
+    sn->checkAcyclicity();
     sn->run();
 
     //if check succeds then return 0 (we don't know)

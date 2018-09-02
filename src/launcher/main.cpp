@@ -1022,7 +1022,7 @@ void checkAcyclicity(std::string ruleFile, EDBLayer &db) {
     if (response == 0) {
         std::cout << "Unknown";
     } else if (response == 1) {
-        std::cout << "Terminates.";
+        std::cout << "It will always terminate.";
     } else {
         std::cout << "Does not always terminate.";
     }

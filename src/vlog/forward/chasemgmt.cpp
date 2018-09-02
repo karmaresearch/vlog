@@ -12,11 +12,11 @@ uint64_t ChaseMgmt::Rows::addRow(uint64_t* row) {
             blocks.push_back(std::move(n));
             blockCounter = 0;
         }
-        const uint64_t cc_ruleid = currentcounter & (long)1 << 40;
+        const uint64_t cc_ruleid = currentcounter & (long)1 << 32;
         for(uint8_t i = 0; i < sizerow; ++i) {
             currentblock[i] = row[i];
 
-            uint64_t vruleid = row[i] & (long)1 << 40;
+            uint64_t vruleid = row[i] & (long)1 << 32;
             if (vruleid == cc_ruleid) {
                 cyclicTerms = true;
             }
