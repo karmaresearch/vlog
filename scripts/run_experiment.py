@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#)!/usr/bin/python
 
 # Input file contains rules and data, and possibly prefixes.
 # Format is same as RDFOX input, but Vlog-rules also work.
@@ -43,6 +43,11 @@ def rewritePred(pred, arity):
 def getURI(uri):
     global prefixes
     if not uri.startswith('<'):
+        # check for '^^'
+        index = uri.find('^^')
+        if index >= 0:
+            uri = uri[:index+2] + getURI(uri[index+2:])
+            return uri
         # Extract prefix
         index = uri.find(':')
         if index < 0:
