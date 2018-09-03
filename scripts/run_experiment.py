@@ -173,6 +173,23 @@ def parseRule(rules, rule):
 
     body = rule[rule.find(':-')+2:]
     body = body.strip()
+    if body.startswith('['):
+        body = body[1:body.find(']')]
+        terms = body.split(',')
+        newbody = ''
+        for term in terms:
+            term = term.strip()
+            if term.startswith('?'):
+                newbody +=  term[1:].upper() + ','
+            else:
+                if not term.startswith('<'):
+                    newbody += getURI(term) + ','
+                else:
+                    newbody += getURI(term) + ','
+        newbody = newbody[0:-1]
+        newRule += 'TE(' + newbody + ')'
+        rules.append(newRule)
+        return
     while True:
         # Read predicate name
         predName = body[0:body.find('(')]
