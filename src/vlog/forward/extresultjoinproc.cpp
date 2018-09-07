@@ -296,8 +296,8 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     }
 
     std::vector<std::shared_ptr<Column>> knownColumns;
-    for (int i = 0; i < nKnownColumns; i++) {
-	knownColumns.push_back(c[posKnownColumns[i].first]);
+    for(int i = 0; i < colsForExt.size(); ++i) {
+	knownColumns.push_back(c[colsForExt[i]]);
     }
 
     //Create existential columns
@@ -324,6 +324,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
 		    //The body might contain more variables than what
 		    //is needed to create existential columns
 		    //First I copy the columns from the body of the rule
+
 		    auto extcolumn = chaseMgmt->getNewOrExistingIDs(
 			    ruleDetails->rule.getId(),
 			    t.getId(),
