@@ -546,7 +546,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
 }
 
 void ExistentialRuleProcessor::consolidate(const bool isFinished) {
-    if (replaceExtColumns) {
+    if (replaceExtColumns && tmpRelation != NULL) {
         //Populate the allColumns vector with known columns and constants
         std::vector<std::shared_ptr<Column>> allColumns;
         allColumns.resize(rowsize);
@@ -595,6 +595,7 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                 count += h.getTupleSize();
             }
             if (filterRows.size() == nrows * atomTables.size()) {
+		tmpRelation = std::unique_ptr<SegmentInserter>();
                 return; //every substitution already exists in the database.
                 // Nothing new can be derived.
             }

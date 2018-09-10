@@ -258,9 +258,9 @@ void FilterHashJoin::run(const std::vector<FilterHashJoinBlock> &inputTables, co
         std::vector<const FCInternalTable*> tables;
 
         std::vector<uint8_t> sortingCriteria;
-        if (posToSort.size() == 0 && tables.size() > 0) {
+        if (posToSort.size() == 0 && inputTables.size() > 0) {
             //Sort by all columns
-            for (uint8_t i = 0; i < tables.back()->getRowSize(); ++i) {
+            for (uint8_t i = 0; i < inputTables.back().table->getRowSize(); ++i) {
                 sortingCriteria.push_back(i);
             }
         } else {
