@@ -712,7 +712,7 @@ if (filteredSegment != NULL && !filteredSegment->isEmpty()) {
     }
 
     if (nVarsToCopy > 0) {
-        return std::shared_ptr<const FCInternalTable>(new InmemoryFCInternalTable(nVarsToCopy, iteration, true, filteredSegment));
+        return std::shared_ptr<const FCInternalTable>(new InmemoryFCInternalTable(nVarsToCopy, iteration, sorted, filteredSegment));
     } else {
         return std::shared_ptr<const FCInternalTable>(new SingletonTable(iteration));
     }
