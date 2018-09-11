@@ -42,6 +42,8 @@ void RuleExecutionPlan::checkIfFilteringHashMapIsPossible(const Literal &head) {
 RuleExecutionPlan RuleExecutionPlan::reorder(std::vector<uint8_t> &order,
         const std::vector<Literal> &heads) const {
     RuleExecutionPlan newPlan;
+    newPlan.lastLiteralSharesWithHead = false;
+    newPlan.filterLastHashMap = false;
     for (int i = 0; i < order.size(); ++i) {
         newPlan.plan.push_back(plan[order[i]]);
         newPlan.ranges.push_back(ranges[order[i]]);
