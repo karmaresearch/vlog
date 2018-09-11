@@ -365,6 +365,7 @@ void RuleExecutionDetails::createExecutionPlans() {
                 itr != posIdbLiterals.end();
                 ++itr) {
             RuleExecutionPlan p;
+	    p.filterLastHashMap = false;
             p.dependenciesExtVars = dependenciesExtVars;
             size_t idx = 0;
 
@@ -428,7 +429,8 @@ void RuleExecutionDetails::createExecutionPlans() {
         //Create a single plan. Here they are all EDBs. So the ranges are all the same
         std::vector<const Literal*> v;
         RuleExecutionPlan p;
-        p.dependenciesExtVars = dependenciesExtVars;
+	p.filterLastHashMap = false;
+	p.dependenciesExtVars = dependenciesExtVars;
         for (std::vector<Literal>::const_iterator itr = bodyLiterals.begin();
                 itr != bodyLiterals.end();
                 ++itr) {

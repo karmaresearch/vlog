@@ -71,29 +71,18 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 const bool sorted);
 
         void processResults(const int blockid, const Term_t *first,
-                FCInternalTableItr* second, const bool unique) {
-            //TODO: Chase...
-            LOG(ERRORL) << "Not implemented yet";
-            throw 10;
-        }
+                FCInternalTableItr* second, const bool unique);
 
         void processResults(const int blockid,
                 const std::vector<const std::vector<Term_t> *> &vectors1, size_t i1,
                 const std::vector<const std::vector<Term_t> *> &vectors2, size_t i2,
                 const bool unique);
 
-        void processResults(std::vector<int> &blockid, Term_t *p, std::vector<bool> &unique, std::mutex *m) {
-            //TODO: Chase...
-            LOG(ERRORL) << "Not implemented yet";
-            throw 10;
-        }
+        void processResults(std::vector<int> &blockid, Term_t *p,
+		std::vector<bool> &unique, std::mutex *m);
 
         void processResults(const int blockid, FCInternalTableItr *first,
-                FCInternalTableItr* second, const bool unique) {
-            //TODO: Chase...
-            LOG(ERRORL) << "Not implemented yet";
-            throw 10;
-        }
+                FCInternalTableItr* second, const bool unique);
 
         void consolidate(const bool isFinished);
 };
