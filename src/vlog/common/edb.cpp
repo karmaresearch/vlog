@@ -24,6 +24,14 @@
 #include <unordered_map>
 #include <climits>
 
+
+EDBLayer::EDBLayer(EDBLayer &db) {
+    this->predDictionary = db.predDictionary;
+    for (int i = 0; i < MAX_NPREDS; ++i) {
+        tmpRelations[i] = NULL;
+    }
+}
+
 void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithreaded) {
     EDBInfoTable infot;
     const string pn = tableConf.predname;
@@ -842,7 +850,7 @@ bool EDBLayer::getDictText(const uint64_t id, char *text) {
         std::string t = termsDictionary->getRawValue(id);
         if (t != "") {
             memcpy(text, t.c_str(), t.size());
-	    text[t.size()] = '\0';
+            text[t.size()] = '\0';
             return true;
         }
     }

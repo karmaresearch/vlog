@@ -2,23 +2,29 @@
 
 //************** ROWS ***************
 uint64_t ChaseMgmt::Rows::addRow(uint64_t* row) {
-    if (! restricted) {
-	if (!currentblock || blockCounter >= SIZE_BLOCK) {
-	    //Create a new block
-	    std::unique_ptr<uint64_t> n =
-		std::unique_ptr<uint64_t>(
-			new uint64_t[sizerow * SIZE_BLOCK]);
-	    currentblock = n.get();
-	    blocks.push_back(std::move(n));
-	    blockCounter = 0;
-	}
-	for(uint8_t i = 0; i < sizerow; ++i) {
-	    currentblock[i] = row[i];
-	}
-	ChaseRow r(sizerow, currentblock);
-	rows[r] = currentcounter;
-	currentblock += sizerow;
-	blockCounter++;
+    if (!restricted) {
+        if (!currentblock || blockCounter >= SIZE_BLOCK) {
+            //Create a new block
+            std::unique_ptr<uint64_t> n =
+                std::unique_ptr<uint64_t>(
+                        new uint64_t[sizerow * SIZE_BLOCK]);
+            currentblock = n.get();
+            blocks.push_back(std::move(n));
+            blockCounter = 0;
+        }
+        const uint64_t cc_ruleid = currentcounter & (long)1 << 32;
+        for(uint8_t i = 0; i < sizerow; ++i) {
+            currentblock[i] = row[i];
+
+            uint64_t vruleid = row[i] & (long)1 << 32;
+            if (vruleid == cc_ruleid) {
+                cyclicTerms = true;
+            }
+        }
+        ChaseRow r(sizerow, currentblock);
+        rows[r] = currentcounter;
+        currentblock += sizerow;
+        blockCounter++;
     }
     if (startCounter == UINT32_MAX) {
         LOG(ERRORL) << "I can assign at most 2^32 new IDs to an ext. variable... Stop!";
@@ -28,30 +34,6 @@ uint64_t ChaseMgmt::Rows::addRow(uint64_t* row) {
 }
 
 bool ChaseMgmt::Rows::existingRow(uint64_t *row, uint64_t &value) {
-    //Linear search among the blocks. If I find one equivalent to row, then I add
-    //its ID and return true
-    //    uint64_t i = startCounter;
-    //    for(auto &b : blocks) {
-    //        uint64_t *start = b.get();
-    //        uint64_t *end = start + sizerow * SIZE_BLOCK;
-    //        while (i < currentcounter && start < end) {
-    //            //Compare a row
-    //            bool found = true;
-    //            for(uint32_t j = 0; j < sizerow; ++j) {
-    //                if (start[j] != row[j]) {
-    //                    found = false;
-    //                    break;
-    //                }
-    //            }
-    //            if (found) {
-    //                value = i;
-    //                return true;
-    //            }
-    //            start += sizerow;
-    //            i++;
-    //        }
-    //    }
-    //    return false;
     ChaseRow r(sizerow, row);
     auto search = rows.find(r);
     if (search != rows.end()) {
@@ -73,6 +55,14 @@ ChaseMgmt::Rows *ChaseMgmt::RuleContainer::getRows(uint8_t var, bool restricted)
         vars2rows.insert(std::make_pair(var, Rows(startCounter, sizerow, restricted)));
     }
     return &vars2rows.find(var)->second;
+}
+
+bool ChaseMgmt::RuleContainer::containsCyclicTerms() {
+    for (auto &p : vars2rows) {
+        if (p.second.containsCyclicTerms())
+            return true;
+    }
+    return false;
 }
 //************** END RULE CONTAINER *************
 
@@ -124,5 +114,10 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
         functerms.push_back(value);
     }
     return ColumnWriter::getColumn(functerms, false);
+}
+
+bool ChaseMgmt::checkCyclicTerms(uint32_t ruleid) {
+    auto &container = rules[ruleid];
+    return container->containsCyclicTerms();
 }
 //************** END CHASE MGMT ************

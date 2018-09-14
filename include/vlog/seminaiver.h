@@ -49,6 +49,8 @@ class SemiNaiver {
         bool opt_filtering;
         bool multithreaded;
         bool restrictedChase;
+        bool checkCyclicTerms;
+        bool foundCyclicTerms;
         std::shared_ptr<ChaseMgmt> chaseMgmt;
 
         std::chrono::system_clock::time_point startTime;
@@ -137,13 +139,13 @@ class SemiNaiver {
                 bool fixpoint, unsigned long *timeout = NULL);
 
     public:
-		VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
+        VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 bool restrictedChase, int nthreads, bool shuffleRules);
 
         //disable restricted chase
-		VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
+        VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 int nthreads, bool shuffleRules) :
@@ -151,8 +153,8 @@ class SemiNaiver {
                     multithreaded, false, nthreads, shuffleRules) {
             }
 
-        VLIBEXP void run(unsigned long *timeout = NULL) {
-            run(0, 1, timeout);
+        VLIBEXP void run(unsigned long *timeout = NULL, bool checkCyclicTerms = false) {
+            run(0, 1, timeout, checkCyclicTerms);
         }
 
         bool opt_filter() {
@@ -165,12 +167,13 @@ class SemiNaiver {
 
         virtual FCTable *getTable(const PredId_t pred, const uint8_t card);
 
-        VLIBEXP void run(size_t lastIteration, size_t iteration, unsigned long *timeout = NULL);
+        VLIBEXP void run(size_t lastIteration, size_t iteration, unsigned long *timeout = NULL,
+                bool checkCyclicTerms = false);
 
         VLIBEXP void storeOnFile(std::string path, const PredId_t pred, const bool decompress,
                 const int minLevel, const bool csv);
 
-		VLIBEXP void storeOnFiles(std::string path, const bool decompress,
+        VLIBEXP void storeOnFiles(std::string path, const bool decompress,
                 const int minLevel, const bool csv);
 
         FCIterator getTable(const Literal &literal, const size_t minIteration,
@@ -191,6 +194,10 @@ class SemiNaiver {
 
         Program *getProgram() {
             return program;
+        }
+
+        bool isFoundCyclicTerms() {
+            return foundCyclicTerms;
         }
 
         void addDataToIDBRelation(const Predicate pred, FCBlock block);
