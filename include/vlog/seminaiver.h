@@ -218,6 +218,8 @@ class SemiNaiver {
         virtual FCIterator getTable(const Literal &literal, const size_t minIteration,
                 const size_t maxIteration, TableFilterer *filter);
 
+        void checkAcyclicity();
+
         //Statistics methods
 
         VLIBEXP void printCountAllIDBs(string prefix);
