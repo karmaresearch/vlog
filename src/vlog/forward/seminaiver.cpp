@@ -67,6 +67,10 @@ void SemiNaiver::createGraphRuleDependency(std::vector<int> &nodes,
     delete[] definedBy;
 }
 
+void SemiNaiver::checkAcyclicity() {
+    //TODO
+}
+
 string set_to_string(std::unordered_set<int> s) {
     ostringstream oss("");
     for (std::unordered_set<int>::const_iterator k = s.begin(); k != s.end(); ++k) {
