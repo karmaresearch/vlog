@@ -1,6 +1,8 @@
 #ifndef _ML_H
 #define _ML_H
 
+#include <cmath>
+
 #include <vlog/concepts.h>
 #include <kognac/progargs.h>
 
