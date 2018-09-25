@@ -187,6 +187,229 @@ string printSubstitutions(vector<Substitution>& subs, EDBLayer& db) {
     return result;
 }
 
+void getAllPaths(uint16_t source, vector<Edge>& path, vector<vector<Edge>>& paths, int& maxDepth, Graph& graph) {
+    if (path.size() >= maxDepth) {
+        paths.push_back(path);
+    } else {
+        for (auto e : graph[source]) {
+            vector<Edge> newPath (path);
+            newPath.push_back(e);
+            getAllPaths(source, newPath, paths, maxDepth, graph);
+        }
+    }
+}
+
+std::vector<std::pair<std::string, int>> Training::generateTrainingQueriesAllPaths(EDBConf &conf,
+        EDBLayer &db,
+        Program &p,
+        int depth,
+        uint64_t maxTuples,
+        std::vector<uint8_t>& vt
+        ) {
+    std::unordered_map<string, int> allQueries;
+    std::set<string> setOfUniquePredicates;
+    std::unordered_map<string, vector<pair<string, int>>> queryMap;
+
+    Graph graph;
+
+    std::vector<Rule> rules = p.getAllRules();
+    for (int i = 0; i < rules.size(); ++i) {
+        Rule ri = rules[i];
+        Predicate ph = ri.getFirstHead().getPredicate();
+        std::vector<Substitution> sigmaH;
+        for (int j = 0; j < ph.getCardinality(); ++j) {
+            VTerm dest = ri.getFirstHead().getTuple().get(j);
+            sigmaH.push_back(Substitution(vt[j], dest));
+        }
+        std::vector<Literal> body = ri.getBody();
+        for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end(); ++itr) {
+            Predicate pb = itr->getPredicate();
+            std::vector<Substitution> sigmaB;
+            for (int j = 0; j < pb.getCardinality(); ++j) {
+                VTerm dest = itr->getTuple().get(j);
+                sigmaB.push_back(Substitution(vt[j], dest));
+            }
+
+            Edge edge;
+            if (!p.isPredicateIDB(pb.getId())) {
+                edge.backEdge = sigmaB;
+            }
+
+            // Calculate sigmaH * sigmaB
+            std::vector<Substitution> edge_label = inverse_concat(sigmaB, sigmaH);
+            edge.endpoint = std::make_pair(pb.getId(), edge_label);
+            graph[ph.getId()].push_back(edge);
+        }
+    }
+
+    std::vector<PredId_t> ids = p.getAllIDBPredicateIds();
+    vector<string> genericQueriesVector;
+    std::ofstream allPredicatesLog("allPredicatesInQueries.log");
+    Dictionary dictVariables;
+    for (int i = 0; i < ids.size(); ++i) {
+        vector<Edge> pathTemp;
+        vector<vector<Edge>> paths;
+        getAllPaths(ids[i], pathTemp, paths, depth, graph);
+
+        int neighbours = graph[ids[i]].size();
+        LOG(DEBUGL) << i+1 << ") " <<p.getPredicateName(ids[i]) << " is IDB  with " << neighbours << " neighbours";
+        LOG(INFOL) << i+1 << ") " <<p.getPredicateName(ids[i]) << " is IDB  with " << paths.size() << " paths";
+
+        for (auto ap : paths) {
+            stringstream pathString;
+            pathString.str("");
+            for (auto node: ap) {
+                pathString << node.endpoint.first << "=> ";
+            }
+            LOG(DEBUGL) << pathString.str();
+        }
+
+        Predicate idbPred = p.getPredicate(ids[i]);
+
+        // This generic query could be added to list/set of all queries we generate
+        std::string query = makeGenericQuery(p, idbPred.getId(), idbPred.getCardinality());
+        genericQueriesVector.push_back(query);
+        Literal literal = p.parseLiteral(query, dictVariables);
+        int nVars = literal.getNVars();
+
+        PredId_t predId = idbPred.getId();
+        int n = 1;
+        for(auto path: paths) {
+            bool reachedEDB = false;
+            for (auto edge: path){
+                PredId_t qId = edge.endpoint.first;
+                vector<Substitution> sigmaN = edge.endpoint.second;
+                vector<Substitution> backEdge = edge.backEdge;
+
+                predId = qId;
+                n++;
+                if (!p.isPredicateIDB(predId)) {
+                    reachedEDB = true;
+                    break;
+                }
+            } // for each edge of the path
+
+            string pathlog = p.getPredicateName(idbPred.getId());
+            pathlog += "=>";
+            int pathLength = 0;
+            for(auto node : path) {
+                string substi = printSubstitutions(node.endpoint.second, db);
+                string nodestr = p.getPredicateName(node.endpoint.first);
+                pathlog += nodestr + "," + substi;
+                if (pathLength != path.size()-1)
+                    pathlog += "=>";
+                pathLength++;
+            }
+            LOG(DEBUGL) << pathlog;
+            vector<vector<Substitution>> tuplesSubstitution;
+            if (reachedEDB == true) {
+                // Construct the query to find EDB tuples
+                Predicate edbPred = p.getPredicate(predId);
+                vector<Substitution> subLiteral;
+                //LOG(INFOL) << "last node in path : " << p.getPredicateName(path.back().endpoint.first);
+                subLiteral = path.back().backEdge;
+                string workingQuery = makeGenericQuery(p, edbPred.getId(), edbPred.getCardinality());
+                Literal workingLiteral = p.parseLiteral(workingQuery, dictVariables);
+                pair<string, int> queryAndType = makeComplexQuery(p, workingLiteral, subLiteral, db, dictVariables);
+                LOG(DEBUGL) << ":: complex Query : " << queryAndType.first << " working query =  " << workingQuery ;
+                Literal literal = p.parseLiteral(queryAndType.first, dictVariables);
+                int nVars = literal.getNVars();
+
+                EDBIterator* table = db.getIterator(literal);
+
+                // Pop the EDB predicate id and substitution from the top
+                vector<Substitution> sigmaH = path.back().endpoint.second;
+                PredId_t nextNode;
+                if (path.size() == 1) {
+                    nextNode = idbPred.getId();
+                } else {
+                    nextNode = path[path.size()-2].endpoint.first;
+                }
+                int nextNodeCard = p.getPredicate(nextNode).getCardinality();
+                // This nextNode must be an IDB predicate
+                // We will check whether this predicate appeared as the head of any rule
+                // such that the body contained only one atom (with EDB predicate)
+                uint64_t rowNumber = 0;
+                int count = 0;
+                while (table->hasNext()) {
+                    table->next();
+                    count++;
+                    if (count > maxTuples) {
+                        break;
+                    }
+                    string strTuple = "";
+                    vector<Substitution> subs;
+                    for (int j = 0; j < edbPred.getCardinality(); ++j) {
+                        Term_t term = table->getElementAt(j);
+                        subs.push_back(Substitution(vt[j], VTerm(0, term)));
+                        char supportText[MAX_TERM_SIZE];
+                        db.getDictText(term, supportText);
+                        strTuple += supportText;
+                    }
+                    tuplesSubstitution.push_back(subs);
+                }
+
+                for (auto ts: tuplesSubstitution) {
+                    vector<Substitution> workingSigma = ts;
+                    PredId_t workingIDB;
+                    int workingIDBCard;
+                    for(int k = path.size()-1; k >= 0; --k) {
+                        vector<Substitution> sigmaH = path[k].endpoint.second;
+                        vector<Substitution> result = concat(sigmaH, workingSigma);
+                        if (k != 0) {
+                            workingIDB = path[k-1].endpoint.first;
+                            workingIDBCard = p.getPredicate(workingIDB).getCardinality();
+                        } else {
+                            workingIDB = idbPred.getId();
+                            workingIDBCard = idbPred.getCardinality();
+                        }
+                        string qQuery = makeGenericQuery(p, workingIDB, workingIDBCard);
+                        setOfUniquePredicates.insert(p.getPredicateName(workingIDB));
+                        Literal qLiteral = p.parseLiteral(qQuery, dictVariables);
+                        pair<string,int> finalQueryResult = makeComplexQuery(p, qLiteral, result, db, dictVariables);
+                        int type = finalQueryResult.second + ((n > 4) ? 4 : n);
+                        if (allQueries.find(finalQueryResult.first) == allQueries.end()) {
+                            string key = p.getPredicateName(workingIDB);
+                            queryMap[key].push_back(make_pair(finalQueryResult.first, type));
+                            LOG(DEBUGL) << ":: " << finalQueryResult.first << " added";
+                            allQueries.insert(make_pair(finalQueryResult.first,type));
+                        }
+                        workingSigma = result;
+                    }
+                }
+                delete table;
+            }
+        } // for all paths are traversed
+
+    }//For all IDB predicates
+    allPredicatesLog.close();
+    LOG(DEBUGL) << " # of unique predicate = "<< setOfUniquePredicates.size();
+    std::vector<std::pair<std::string,int>> queries;
+    for (auto it = allQueries.begin(); it !=  allQueries.end(); ++it) {
+        queries.push_back(std::make_pair(it->first, it->second));
+        LOG(INFOL) << "Query: " << it->first << " type : " << it->second ;
+    }
+    int nQueriesPerPredicate = 20;
+
+    for (auto it = queryMap.begin(); it !=  queryMap.end(); ++it) {
+        //LOG(INFOL)<< it->first << " : ";
+        int countPerPredicate = 0;
+        for (auto q : it->second) {
+            //LOG(INFOL) << q.first << ", " << q.second;
+            queries.push_back(make_pair(q.first, q.second));
+            if (++countPerPredicate > nQueriesPerPredicate) {
+                break;
+            }
+        }
+    }
+
+    // Uncomment this code to add generic queries explicitly
+    for (auto gq: genericQueriesVector) {
+        queries.push_back(make_pair(gq, QUERY_TYPE_GENERIC + 1));
+    }
+    return queries;
+}
+
 std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(EDBConf &conf,
         EDBLayer &db,
         Program &p,
@@ -260,8 +483,10 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
         For every IDB predicate, we will start from its node in the dependency graph
         and try to traverse randomly so that we generate queries that induce reasoning.
         */
+
         int neighbours = graph[ids[i]].size();
         LOG(DEBUGL) << i+1 << ") " <<p.getPredicateName(ids[i]) << " is IDB  with " << neighbours << " neighbours";
+
         Predicate idbPred = p.getPredicate(ids[i]);
 
         // This generic query could be added to list/set of all queries we generate

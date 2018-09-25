@@ -601,6 +601,18 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
         LOG(INFOL) << "Selection strategy determined that we go for " << algo;
     }
 
+    if (algo == "onlyMetrics") {
+        Metrics m;
+        std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
+        reasoner.getMetrics(literal, NULL, NULL, edb, p, m, 5);
+        std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
+        LOG(INFOL) << "Query = " << literal.tostring(&p, &edb) << "Vector: " << \
+        m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
+        <<m.countIntermediateQueries;
+        LOG(INFOL) << "Time taken : " << durationMetrics.count() * 1000 << "ms";
+        return;
+    }
+
     TupleIterator *iter;
 
     if (algo == "edb") {
@@ -943,7 +955,8 @@ int main(int argc, const char** argv) {
         vt.push_back(vt4);
         p.readFromFile(rulesFile);
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-        std::vector<std::pair<std::string,int>> trainingQueries = Training::generateNewTrainingQueries(conf,
+        //std::vector<std::pair<std::string,int>> trainingQueries = Training::generateNewTrainingQueries(conf,
+        std::vector<std::pair<std::string,int>> trainingQueries = Training::generateTrainingQueriesAllPaths(conf,
                 *layer,
                 p,
                 depth,
