@@ -207,7 +207,7 @@ bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 #endif
     bool newDer = false;
-    for (int i = 0; i < edbRuleset.size(); ++i) {
+    for (size_t i = 0; i < edbRuleset.size(); ++i) {
         newDer |= executeRule(edbRuleset[i], iteration, NULL);
         iteration++;
     }

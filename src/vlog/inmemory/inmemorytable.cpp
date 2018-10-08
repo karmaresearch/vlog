@@ -3,6 +3,9 @@
 #include <vlog/support.h>
 
 #include <kognac/utils.h>
+#include <kognac/filereader.h>
+
+#include <zstr/zstr.hpp>
 
 void dump() {
 }
@@ -72,37 +75,84 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
     this->layer = layer;
     arity = 0;
     this->predid = predid;
+    SegmentInserter *inserter = NULL;
     //Load the table in the database
     string tablefile = repository + "/" + tablename + ".csv";
-    ifstream ifs;
-    ifs.open(tablefile);
-    if (ifs.fail()) {
-	LOG(ERRORL) << "Could not open " << tablefile;
-        throw ("Could not open file " + tablefile + " for reading");
+    string gz = tablefile + ".gz";
+    istream *ifs = NULL;
+    if (Utils::exists(gz)) {
+	ifs = new zstr::ifstream(gz);
+    } else if (Utils::exists(tablefile)) {
+	ifs = new std::ifstream(tablefile, ios_base::in | ios_base::binary);
     }
-    LOG(DEBUGL) << "Reading " << tablefile;
-    SegmentInserter *inserter = NULL;
-    while (! ifs.eof()) {
-        std::vector<std::string> row = readRow(ifs);
-	Term_t rowc[128];
-        if (arity == 0) {
-            arity = row.size();
-        }
-        if (row.size() == 0) {
-            break;
-        } else if (row.size() != arity) {
-	    LOG(ERRORL) << "Multiple arities";
-            throw ("Multiple arities in file " + tablefile);
-        }
-	if (inserter == NULL) {
-	    inserter = new SegmentInserter(arity);
+    if (ifs != NULL) {
+	if (ifs->fail()) {
+	    LOG(ERRORL) << "Could not open " << tablefile;
+	    throw ("Could not open file " + tablefile + " for reading");
 	}
-        for (int i = 0; i < arity; i++) {
-	    uint64_t val;
-	    layer->getOrAddDictNumber(row[i].c_str(), row[i].size(), val);
-	    rowc[i] = val;
-        }
-	inserter->addRow(rowc);
+	LOG(DEBUGL) << "Reading " << tablefile;
+	while (! ifs->eof()) {
+	    std::vector<std::string> row = readRow(*ifs);
+	    Term_t rowc[128];
+	    if (arity == 0) {
+		arity = row.size();
+	    }
+	    if (row.size() == 0) {
+		break;
+	    } else if (row.size() != arity) {
+		LOG(ERRORL) << "Multiple arities";
+		throw ("Multiple arities in file " + tablefile);
+	    }
+	    if (inserter == NULL) {
+		inserter = new SegmentInserter(arity);
+	    }
+	    for (int i = 0; i < arity; i++) {
+		uint64_t val;
+		layer->getOrAddDictNumber(row[i].c_str(), row[i].size(), val);
+		rowc[i] = val;
+	    }
+	    inserter->addRow(rowc);
+	}
+	delete ifs;
+    } else {
+	tablefile = repository + "/" + tablename + ".nt";
+	string gz = tablefile + ".gz";
+	FileInfo f;
+	f.start = 0;
+	if (Utils::exists(gz)) {
+	    f.size = Utils::fileSize(gz);
+	    f.path = gz;
+	    f.splittable = false;
+	} else if (Utils::exists(tablefile)) {
+	    f.size = Utils::fileSize(tablefile);
+	    f.path = tablefile;
+	    f.splittable = true;
+	} else {
+	    LOG(ERRORL) << "Could not find " << tablename;
+	    throw("Could not find " + tablename);
+	}
+	FileReader reader(f);
+	while (reader.parseTriple()) {
+	    if (reader.isTripleValid()) {
+		Term_t rowc[3];
+		int ls, lp, lo;
+		const char *s = reader.getCurrentS(ls);
+		const char *p = reader.getCurrentP(lp);
+		const char *o = reader.getCurrentO(lo);
+		if (inserter == NULL) {
+		    inserter = new SegmentInserter(3);
+		}
+		uint64_t val;
+		layer->getOrAddDictNumber(s, ls, val);
+		rowc[0] = val;
+		layer->getOrAddDictNumber(p, lp, val);
+		rowc[1] = val;
+		layer->getOrAddDictNumber(o, lo, val);
+		rowc[2] = val;
+		inserter->addRow(rowc);
+	    }
+	}
+	arity = 3;
     }
     if (inserter == NULL) {
 	segment = NULL;
@@ -110,7 +160,6 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
 	segment = inserter->getSortedAndUniqueSegment();
 	delete inserter;
     }
-    ifs.close();
     // dump();
 }
 
@@ -439,7 +488,9 @@ EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
     } else {
 	// Constants in the query, so prepend their positions to the sorting fields.
 	std::vector<uint8_t> filterBy;
-	filterBy.push_back(posConstantsToFilter[0]);
+	for (int i = 0; i < posConstantsToFilter.size(); i++) {
+	    filterBy.push_back(posConstantsToFilter[i]);
+	}
 	filterBy = __mergeSortingFields(filterBy, fields);
 	// Now get the key of the entry we need.
 	uint64_t keySortFields = __getKeyFromFields(filterBy, filterBy.size() >= 8 ? 7 : filterBy.size());
@@ -531,7 +582,7 @@ EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
 	}
     }
 
-    if (posConstantsToFilter.size() == 1 && ! repeatedVars.empty()) {
+    if (posConstantsToFilter.size() == 1 && repeatedVars.empty()) {
 	// No further filtering needed.
 	return new InmemoryIterator(segmentToFilter, predid, fields);
     }

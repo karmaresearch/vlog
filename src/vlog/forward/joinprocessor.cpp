@@ -561,7 +561,7 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
         //This code is to execute more generic joins. We do hash join if
         //keys are few and there is no ordering. Otherwise, merge join.
         if (t1->estimateNRows() <= THRESHOLD_HASHJOIN
-                && joinsCoordinates.size() < 3
+                && joinsCoordinates.size() < 3 && joinsCoordinates.size() > 0
                 && (joinsCoordinates.size() > 1 ||
                     joinsCoordinates[0].first != joinsCoordinates[0].second ||
                     joinsCoordinates[0].first != 0)) {
@@ -948,11 +948,14 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
             if (filterRowsInhashMap) {
                 filterRowsPosJoin = joinsCoordinates[0].first;
                 FinalRuleProcessor* o = (FinalRuleProcessor*)output;
-                assert(o->getNCopyFromFirst() == 1);
-                filterRowsPosOther = o->getPosFromFirst()[0].second;
-                if (filterRowsPosJoin == filterRowsPosOther) {
-                    filterRowsInhashMap = false;
-                }
+		if (o->getNCopyFromFirst() != 1) {
+		    filterRowsInhashMap = false;
+		} else {
+		    filterRowsPosOther = o->getPosFromFirst()[0].second;
+		    if (filterRowsPosJoin == filterRowsPosOther) {
+			filterRowsInhashMap = false;
+		    }
+		}
             }
 
             while (t2->hasNext()) {
@@ -2089,7 +2092,7 @@ bool DuplicateContainers::exists(const Term_t *v) {
         }
     } else {
         if (nfields == 1) {
-            uint8_t idxTable = 0;
+            size_t idxTable = 0;
             size_t emptyTables = 0;
             while (idxTable < ntables) {
                 if (tables[idxTable] != NULL) {
@@ -2112,7 +2115,7 @@ bool DuplicateContainers::exists(const Term_t *v) {
             }
             empty = emptyTables == ntables;
         } else {
-            uint8_t idxTable = 0;
+            size_t idxTable = 0;
             size_t emptyTables = 0;
             while (idxTable < ntables) {
                 if (tables[idxTable] != NULL) {
