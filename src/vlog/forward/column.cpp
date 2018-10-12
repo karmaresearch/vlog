@@ -238,7 +238,15 @@ EDBColumn::EDBColumn(EDBLayer &edb, const Literal &lit, uint8_t posColumn,
     presortPos(presortPos),
     unq(unq) {
         assert(!unq || presortPos.empty());
+        std::cerr << "Create EDBColumn " << this << std::endl;
     }
+
+bool EDBColumn::isEmptyRemovals() const {
+    // std::unique_ptr<ColumnReader> r = getReader();
+    // return r.hasNext();
+    // FIXME think of some optimization RFHH
+    return size() == 0;
+}
 
 size_t EDBColumn::estimateSize() const {
     QSQQuery query(l);
@@ -270,14 +278,17 @@ size_t EDBColumn::size() const {
         }
     }
 #if DEBUG
+    std::cerr << "DEBUG column size calls size() via getReader()" << std::endl;
     size_t sz = getReader()->asVector().size();
     if (sz != retval) {
         LOG(TRACEL) << "query = " << l.tostring();
         LOG(TRACEL) << "sz = " << sz << ", should be " << retval;
         LOG(TRACEL) << "unq = " << unq << ", l.getNVars = " << (int) l.getNVars();
-        std::cerr << "Mismatch between calculated and cached Column size: " << sz << " vs. " << retval << " l.getNVars " << static_cast<int>(l.getNVars()) << std::endl;
+        std::cerr << "Mismatch between calculated and cached Column " << this << " size: " << sz << " vs. " << retval << " l.getNVars " << static_cast<int>(l.getNVars()) << std::endl;
         // throw 10;
     }
+#else
+    std::cerr << "column size cached " << retval << " calculated " << getReader()->asVector().size() << std::endl;
 #endif
     return retval;
 }

@@ -665,16 +665,29 @@ class EDBColumn : public Column {
 
         std::shared_ptr<Column> clone() const;
 
+        bool isEmptyRemovals() const;
+
     public:
         EDBColumn(EDBLayer &layer, const Literal &l, uint8_t posColumn,
                 const std::vector<uint8_t> presortPos, const bool unq);
+
+        // debug RFHH
+        ~EDBColumn() {
+            std::cerr << "Destroy EDBColumn " << this << std::endl;
+        }
 
         size_t size() const;
 
         size_t estimateSize() const;
 
         bool isEmpty() const {
-            return size() == 0;
+            // FIXME test just for presence of a first element i.s.o.
+            // traversing with the RemovalIterator
+            if (layer.hasRemoveLiterals()) {
+                return isEmptyRemovals();
+            } else {
+                return size() == 0;
+            }
         }
 
         bool isEDB() const {

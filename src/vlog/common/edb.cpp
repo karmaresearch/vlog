@@ -383,8 +383,7 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
         }
 
     } else {
-        // HERE inject the remove-literals filterIterator RFHH -- how????
-        std::cerr << "HERE " << __func__ << ":" << __LINE__ << " need to inject RemoveIterator" << std::endl;
+        std::cerr << "FIXME: untested -- HERE " << __func__ << ":" << __LINE__ << " inject RemoveIterator" << std::endl;
         bool equalFields = query.hasRepeatedVars();
         IndexedTupleTable *rel = tmpRelations[predid];
         uint8_t size = rel->getSizeTuple();
@@ -402,14 +401,23 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
             case 1:
                 itr = memItrFactory.get();
                 itr->init1(predid, rel->getSingleColumn(), c1, vc1);
-                return itr;
+                break;
             case 2:
                 itr = memItrFactory.get();
                 itr->init2(predid, c1, rel->getTwoColumn1(), c1, vc1, c2, vc2, equalFields);
-                return itr;
+                break;
+            default:
+                throw 10;
+        }
+
+        if (removals.size() > 0) {
+            std::cerr << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator" << std::endl;
+            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals, itr);
+            return ritr;
+        } else {
+            return itr;
         }
     }
-    throw 10;
 }
 
 
@@ -430,9 +438,7 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
         }
 
     } else {
-        std::cerr << "HERE " << __func__ << ":" << __LINE__ << " need to inject RemoveIterator" << std::endl;
-        // HERE inject the remove-literals filterIterator RFHH -- how????
-        assert(literal->getTupleSize() <= 2);
+        std::cerr << "FIXME -- untested: HERE " << __func__ << ":" << __LINE__ << " inject RemoveIterator" << std::endl;
         bool equalFields = false;
         if (query.hasRepeatedVars()) {
             equalFields = true;
@@ -450,12 +456,10 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
         EDBMemIterator *itr;
         switch (size) {
             case 1:
-                // Should I just wrap a removalIterator here? RFHH
                 itr = memItrFactory.get();
                 itr->init1(predid, rel->getSingleColumn(), c1, vc1);
-                return itr;
+                break;
             case 2:
-                // Should I just wrap a removalIterator here? RFHH
                 itr = memItrFactory.get();
                 if (c1) {
                     itr->init2(predid, true, rel->getTwoColumn1(), c1, vc1, c2, vc2, equalFields);
@@ -471,10 +475,18 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
                         }
                     }
                 }
-                return itr;
+                break;
+            default:
+                throw 10;
+        }
+        if (removals.size() > 0) {
+            std::cerr << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator" << std::endl;
+            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals, itr);
+            return ritr;
+        } else {
+            return itr;
         }
     }
-    throw 10;
 }
 
 size_t EDBLayer::getCardinalityColumn(const Literal &query,

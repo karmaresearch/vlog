@@ -399,6 +399,10 @@ class EDBLayer {
             removals = rm;
         }
 
+        bool hasRemoveLiterals() const {
+            return removals.size() > 0;
+        }
+
         // For JNI interface ...
         VLIBEXP void addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows);
 
