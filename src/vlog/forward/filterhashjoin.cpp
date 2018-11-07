@@ -28,6 +28,7 @@ FilterHashJoin::FilterHashJoin(ResultJoinProcessor *output,
     existingTuples(existingTuples), nLastLiteralPosConstsInHead(nLastLiteralPosConstsInHead),
     lastLiteralValueConstsInHead(lastLiteralValueConstsInHead), lastLiteralPosConstsInHead(lastLiteralPosConstsInHead),
     processedElements(0) {
+	LOG(DEBUGL) << "FilterHashJoin, literal = " << literal->tostring();
         for (int i = 0; i < nValuesHead; ++i) {
             posValuesHeadRowEdition.push_back(posValuesHead[i]);
         }
@@ -217,7 +218,7 @@ void FilterHashJoin::run(const std::vector<FilterHashJoinBlock> &inputTables, co
 
     LOG(TRACEL) << "FilterHashJoin::run: start = " << startCarprod << ", end = " << endCartprod;
     //Calculate the correct offset of the variables to retrieve the existing bindings
-    uint8_t posOtherVariables[SIZETUPLE];
+    uint8_t posOtherVariables[256];
     uint8_t nconstants = 0; //I need to remove constants when I calculate the positions on the last literal
     if (literalSubsumesHead) {
         int j = 0;
@@ -257,9 +258,9 @@ void FilterHashJoin::run(const std::vector<FilterHashJoinBlock> &inputTables, co
         std::vector<const FCInternalTable*> tables;
 
         std::vector<uint8_t> sortingCriteria;
-        if (posToSort.size() == 0 && tables.size() > 0) {
+        if (posToSort.size() == 0 && inputTables.size() > 0) {
             //Sort by all columns
-            for (uint8_t i = 0; i < tables.back()->getRowSize(); ++i) {
+            for (uint8_t i = 0; i < inputTables.back().table->getRowSize(); ++i) {
                 sortingCriteria.push_back(i);
             }
         } else {
@@ -313,24 +314,24 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
 
     std::vector<std::shared_ptr<Column>> columns(output->getRowSize());
     uint8_t pos = 0;
-    uint8_t otherPos[SIZETUPLE];
+    uint8_t otherPos[256];
 
     for (uint8_t i = 0; i < columns.size(); ++i) {
         bool found = false;
         for (uint8_t j = 0; j < nValuesHashHead && !found; ++j) {
             if (posValuesHashHead[j].first == i) {
-                // LOG(TRACEL) << "Found HashHead " << (int) j << " at position " << (int) i << ", second = " << (int) posValuesHashHead[j].second;
+                LOG(TRACEL) << "Found HashHead " << (int) j << " at position " << (int) i << ", second = " << (int) posValuesHashHead[j].second;
                 found = true;
             }
         }
         for (uint8_t j = 0; j < nValuesHead && !found; ++j) {
             if (posValuesHead[j].first == i) {
-                // LOG(TRACEL) << "Found Head " << (int) j << " at position " << (int) i << ", second = " << (int) posValuesHashHead[j].second;
+                LOG(TRACEL) << "Found Head " << (int) j << " at position " << (int) i << ", second = " << (int) posValuesHashHead[j].second;
                 found = true;
             }
         }
         if (!found) {
-            // LOG(TRACEL) << "OtherPos " << (int) pos << " at position " << (int) i;
+            LOG(TRACEL) << "OtherPos " << (int) pos << " at position " << (int) i;
             otherPos[pos++] = i;
         }
     }
@@ -354,7 +355,7 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
 
     //Are all variables not involved in the join appearing also in the head? (otherwise I need filtering)
     size_t size = 0; //This function is called when I am sure that the literal has some elements. Therefore, I set 1 as default value
-    uint8_t columnIdx[SIZETUPLE];
+    uint8_t columnIdx[256];
     for (uint8_t i = 0; i < nValuesHead; ++i) {
         columnIdx[i] = posValuesHead[i].second;
     }
@@ -375,7 +376,6 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
                 size = sz;
             }
         }
-
     } else {
         //There might be duplicates to single out or values to filter
         if (nValuesHead == 0) {
@@ -411,224 +411,237 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
                 }
                 prevEl = v;
                 //}
-        }
+	    }
 
-        columns[posValuesHead[0].first] = p.getColumn();
-        //size = columns[posValuesHead[0].first]->size();
-        } else if (nValuesHead == 2) {
+	    columns[posValuesHead[0].first] = p.getColumn();
+	    //size = columns[posValuesHead[0].first]->size();
+        } else {
+	    std::vector<std::unique_ptr<ColumnReader>> cR;
+	    std::vector<Term_t> prev(nValuesHead);
+	    std::vector<Term_t> value(nValuesHead);
+	    std::vector<ColumnWriter> p(nValuesHead);
+	    for (int i = 0; i < nValuesHead; i++) {
+		cR.push_back(c[i].get()->getReader());
+		prev[i] = cR[i]->first();
+	    }
             //Filter away the duplicates. I assume it is already sorted
-            Column *c1 = c[0].get();
-            Column *c2 = c[1].get();
-            std::unique_ptr<ColumnReader> c1R = c1->getReader();
-            std::unique_ptr<ColumnReader> c2R = c2->getReader();
 
-            Term_t prevEl1 = c1R->first();
-            Term_t prevEl2 = c2R->first();
-
-            ColumnWriter p1;
-            ColumnWriter p2;
-
-            if (columnsToFilterOut == NULL || (prevEl1 != prevEl2)) {
+            if (columnsToFilterOut == NULL || prev[columnsToFilterOut->at(0).first] != prev[columnsToFilterOut->at(0).second]) {
                 if (valueColumnsToFilter == NULL ||
-                        (posColumnToFilter == 0 && prevEl1 != valueToFilter) ||
-                        (posColumnToFilter == 1 && prevEl2 != valueToFilter)) {
-                    p1.add(prevEl1);
-                    p2.add(prevEl2);
+			prev[posColumnToFilter] != valueToFilter) {
+		    for (int i = 0; i < nValuesHead; i++) {
+			p[i].add(prev[i]);
+		    }
                     size++;
                 }
             }
 
-            //Add the element
-            //for (uint32_t i = 1; i < c1->size(); ++i) {
-            while (c1R->hasNext() && c2R->hasNext()) {
-                const Term_t valueC1R = c1R->next();
-                const Term_t valueC2R = c2R->next();
-                if (valueC1R != prevEl1 || valueC2R != prevEl2) {
-                    if (columnsToFilterOut == NULL || (valueC1R != valueC2R)) {
-                        if (valueColumnsToFilter == NULL ||
-                                (posColumnToFilter == 0 && prevEl1 != valueToFilter) ||
-                                (posColumnToFilter == 1 && prevEl2 != valueToFilter)) {
-                            p1.add(valueC1R);
-                            p2.add(valueC2R);
-                            size++;
-                        }
-                    }
-                }
-                prevEl1 = valueC1R;
-                prevEl2 = valueC2R;
-            }
-
-            columns[posValuesHead[0].first] = p1.getColumn();
-            columns[posValuesHead[1].first] = p2.getColumn();
-            //size = columns[posValuesHead[0].first]->size();
-        } else {
-            throw 10;
-        }
-        }
-
-        LOG(TRACEL) << "startCarprod = " << startCarprod << ", mapRowSize = " << (int) mapRowSize
-            << ", endCartprod = " << endCartprod << ", size = " << size << ", pos = " << (int) pos;
-        LOG(TRACEL) << "nValuesHead = " << (int) nValuesHead << ", nValuesHashHead = " << (int) nValuesHashHead;
-        if (size > 0) {
-            //Add other constants
-            const Term_t *row = output->getRawRow();
-            for (uint8_t i = 0; i < pos; ++i) {
-                columns[otherPos[i]] = std::shared_ptr<Column>(
-                        new CompressedColumn(row[otherPos[i]], size));
-            }
-
-            uint32_t s = startCarprod;
-            uint32_t i = 0;
-            while (s < endCartprod) {
-                //create constants with the values of the map
-                const Term_t *row = &(mapValues->at(s));
-                for (uint8_t i = 0; i < nValuesHashHead; ++i) {
-                    columns[posValuesHashHead[i].first] = std::shared_ptr<Column>(
-                            new CompressedColumn(row[posValuesHashHead[i].second], size));
+	    for (;;) {
+		bool hasNext = true;
+		for (int i = 0; i < nValuesHead; i++) {
+		    if (! cR[i]->hasNext()) {
+			hasNext = false;
+			break;
+		    }
+		}
+		if (! hasNext) {
+		    break;
+		}
+		for (int i = 0; i < nValuesHead; i++) {
+		    value[i] = cR[i]->next();
+		}
+		bool same = true;
+		for (int i = 0; i < nValuesHead; i++) {
+		    if (value[i] != prev[i]) {
+			same = false;
+			break;
+		    }
+		}
+		if (! same) {
+		    if (columnsToFilterOut == NULL || value[columnsToFilterOut->at(0).first] != value[columnsToFilterOut->at(0).second]) {
+			if (valueColumnsToFilter == NULL ||
+			    value[posColumnToFilter] != valueToFilter) {
+			    for (int i = 0; i < nValuesHead; i++) {
+				p[i].add(value[i]);
+			    }
+			    size++;
+			}
+		    }
                 }
 
-                /*
-                   if (s != startCarprod) {
-                   for (uint8_t i = 0; i < nValuesHead; ++i) {
-                   columns[posValuesHead[i].first] = columns[posValuesHead[i].first]; // NOOP??? --Ceriel
-                   }
-                   for (uint8_t i = 0; i < pos; ++i) {
-                   columns[otherPos[i]] = columns[otherPos[i]]; // NOOP??? --Ceriel
-                   }
-                   }
-                   */
-
-#if DEBUG
-                for (int i = 0; i < columns.size(); i++) {
-                    size_t sz = columns[i]->size();
-                    assert(size == sz);
-                }
-#endif
-
-                //Add the columns to the output container
-                output->addColumns(i, columns, isDerivationUnique,
-                        true);
-
-
-                s += mapRowSize;
-                i++;
+		for (int i = 0; i < nValuesHead; i++) {
+		    prev[i] = value[i];
+		}
             }
-        }
-#if DEBUG
-        output->checkSizes();
-#endif
+	    for (int i = 0; i < nValuesHead; i++) {
+		columns[posValuesHead[i].first] = p[i].getColumn();
+	    }
+	}
     }
 
-    void FilterHashJoin::run_processitr_rowversion(FCInternalTableItr *itr, const bool cartprod,
-            const size_t startCarprod, const size_t endCartprod,
-            const uint8_t *posOtherVariables,
-            const std::vector<std::pair<uint8_t, Term_t>> *valueColumnsToFilter,
-            const std::vector<std::pair<uint8_t, uint8_t>> *columnsToFilterOut) {
+    LOG(TRACEL) << "startCarprod = " << startCarprod << ", mapRowSize = " << (int) mapRowSize
+	<< ", endCartprod = " << endCartprod << ", size = " << size << ", pos = " << (int) pos;
+    LOG(TRACEL) << "nValuesHead = " << (int) nValuesHead << ", nValuesHashHead = " << (int) nValuesHashHead;
+    if (size > 0) {
+	//Add other constants
+	const Term_t *row = output->getRawRow();
+	for (uint8_t i = 0; i < pos; ++i) {
+	    columns[otherPos[i]] = std::shared_ptr<Column>(
+		    new CompressedColumn(row[otherPos[i]], size));
+	}
 
-        uint8_t posToFilter;
-        Term_t valueToFilter;
-        if (valueColumnsToFilter != NULL) {
-            assert(valueColumnsToFilter->size() == 1);
-            posToFilter = valueColumnsToFilter->at(0).first;
-            valueToFilter = valueColumnsToFilter->at(0).second;
-        }
-        uint8_t c1, c2;
-        if (columnsToFilterOut != NULL) {
-            assert(columnsToFilterOut->size() == 1);
-            c1 = columnsToFilterOut->at(0).first;
-            c2 = columnsToFilterOut->at(0).second;
-        }
+	uint32_t s = startCarprod;
+	uint32_t i = 0;
+	while (s < endCartprod) {
+	    //create constants with the values of the map
+	    const Term_t *row = &(mapValues->at(s));
+	    for (uint8_t i = 0; i < nValuesHashHead; ++i) {
+		columns[posValuesHashHead[i].first] = std::shared_ptr<Column>(
+			new CompressedColumn(row[posValuesHashHead[i].second], size));
+	    }
 
-        std::vector<Term_t> joinsContainer1;
-        std::vector<std::pair<Term_t, Term_t>> joinsContainer2;
-        Term_t valuesHead[SIZETUPLE];
-        bool firstGroup = true;
-        std::vector<Term_t> otherVariablesContainer;
-        while (itr->hasNext()) {
-            processedElements++;
-            itr->next();
+	    /*
+	       if (s != startCarprod) {
+	       for (uint8_t i = 0; i < nValuesHead; ++i) {
+	       columns[posValuesHead[i].first] = columns[posValuesHead[i].first]; // NOOP??? --Ceriel
+	       }
+	       for (uint8_t i = 0; i < pos; ++i) {
+	       columns[otherPos[i]] = columns[otherPos[i]]; // NOOP??? --Ceriel
+	       }
+	       }
+	       */
 
-            if (valueColumnsToFilter != NULL
-                    && itr->getCurrentValue(posToFilter) == valueToFilter) {
-                LOG(TRACEL) << "Avoid to consider the value "
-                    << valueToFilter << " of column " << (int) posToFilter;
-                continue;
-            }
-            if (columnsToFilterOut != NULL
-                    && itr->getCurrentValue(c1) == itr->getCurrentValue(c2)) {
-                LOG(TRACEL) << "The columns " << c1 << " and " << c2
-                    << " are equivalent " << itr->getCurrentValue(c1);
-                continue;
-            }
+#if DEBUG
+	    for (int i = 0; i < columns.size(); i++) {
+		size_t sz = columns[i]->size();
+		assert(size == sz);
+	    }
+#endif
 
-            if (firstGroup) {
-                for (uint8_t i = 0; i < nValuesHead; ++i) {
-                    valuesHead[i] = itr->getCurrentValue(posValuesHeadRowEdition[i].second);
-                }
-                firstGroup = false;
-            } else {
-                //Check if the current value is equivalent to the previous one
-                bool ok = true;
-                for (uint8_t i = 0; i < nValuesHead; ++i) {
-                    if (itr->getCurrentValue(posValuesHeadRowEdition[i].second) != valuesHead[i]) {
-                        ok = false;
-                    }
-                }
+	    //Add the columns to the output container
+	    output->addColumns(i, columns, isDerivationUnique,
+		    true);
 
-                if (!ok) {
-                    if (!cartprod) {
-                        doJoin_join(valuesHead, joinsContainer1, joinsContainer2, otherVariablesContainer);
-                        if (njoinfields == 1) {
-                            joinsContainer1.clear();
-                        } else {
-                            joinsContainer2.clear();
-                        }
-                    } else {
-                        doJoin_cartprod(valuesHead, startCarprod, endCartprod, otherVariablesContainer);
-                    }
-                    otherVariablesContainer.clear();
-                    for (uint8_t i = 0; i < nValuesHead; ++i) {
-                        valuesHead[i] = itr->getCurrentValue(posValuesHeadRowEdition[i].second);
-                    }
-                }
-            }
 
-            if (!cartprod) {
-                if (njoinfields == 1) {
-                    joinsContainer1.push_back(itr->getCurrentValue(joinField1));
-                } else {
-                    joinsContainer2.push_back(std::make_pair(itr->getCurrentValue(joinField1),
-                                itr->getCurrentValue(joinField2)));
-                }
-            }
-
-            if (literalSubsumesHead) {
-                //Filter first
-                bool ok = true;
-                for (uint8_t i = 0; i < nLastLiteralPosConstsInHead && ok; ++i) {
-                    if (itr->getCurrentValue(lastLiteralPosConstsInHead[i]) != lastLiteralValueConstsInHead[i]) {
-                        ok = false;
-                    }
-                }
-                if (ok) {
-                    for (uint8_t i = 0; i < nValuesHashHead; ++i) {
-                        otherVariablesContainer.push_back(itr->getCurrentValue(posOtherVariables[i]));
-                    }
-
-                }
-            }
-        }
-        if (!firstGroup) {
-            if (!cartprod) {
-                doJoin_join(valuesHead, joinsContainer1, joinsContainer2, otherVariablesContainer);
-                if (njoinfields == 1) {
-                    joinsContainer1.clear();
-                } else {
-                    joinsContainer2.clear();
-                }
-            } else {
-                doJoin_cartprod(valuesHead, startCarprod, endCartprod, otherVariablesContainer);
-            }
-            otherVariablesContainer.clear();
-        }
+	    s += mapRowSize;
+	    i++;
+	}
     }
+#if DEBUG
+    output->checkSizes();
+#endif
+}
+
+void FilterHashJoin::run_processitr_rowversion(FCInternalTableItr *itr, const bool cartprod,
+	const size_t startCarprod, const size_t endCartprod,
+	const uint8_t *posOtherVariables,
+	const std::vector<std::pair<uint8_t, Term_t>> *valueColumnsToFilter,
+	const std::vector<std::pair<uint8_t, uint8_t>> *columnsToFilterOut) {
+
+    uint8_t posToFilter;
+    Term_t valueToFilter;
+    if (valueColumnsToFilter != NULL) {
+	assert(valueColumnsToFilter->size() == 1);
+	posToFilter = valueColumnsToFilter->at(0).first;
+	valueToFilter = valueColumnsToFilter->at(0).second;
+    }
+    uint8_t c1, c2;
+    if (columnsToFilterOut != NULL) {
+	assert(columnsToFilterOut->size() == 1);
+	c1 = columnsToFilterOut->at(0).first;
+	c2 = columnsToFilterOut->at(0).second;
+    }
+
+    std::vector<Term_t> joinsContainer1;
+    std::vector<std::pair<Term_t, Term_t>> joinsContainer2;
+    Term_t valuesHead[256];
+    bool firstGroup = true;
+    std::vector<Term_t> otherVariablesContainer;
+    while (itr->hasNext()) {
+	processedElements++;
+	itr->next();
+
+	if (valueColumnsToFilter != NULL
+		&& itr->getCurrentValue(posToFilter) == valueToFilter) {
+	    LOG(TRACEL) << "Avoid to consider the value "
+		<< valueToFilter << " of column " << (int) posToFilter;
+	    continue;
+	}
+	if (columnsToFilterOut != NULL
+		&& itr->getCurrentValue(c1) == itr->getCurrentValue(c2)) {
+	    LOG(TRACEL) << "The columns " << c1 << " and " << c2
+		<< " are equivalent " << itr->getCurrentValue(c1);
+	    continue;
+	}
+
+	if (firstGroup) {
+	    for (uint8_t i = 0; i < nValuesHead; ++i) {
+		valuesHead[i] = itr->getCurrentValue(posValuesHeadRowEdition[i].second);
+	    }
+	    firstGroup = false;
+	} else {
+	    //Check if the current value is equivalent to the previous one
+	    bool ok = true;
+	    for (uint8_t i = 0; i < nValuesHead; ++i) {
+		if (itr->getCurrentValue(posValuesHeadRowEdition[i].second) != valuesHead[i]) {
+		    ok = false;
+		}
+	    }
+
+	    if (!ok) {
+		if (!cartprod) {
+		    doJoin_join(valuesHead, joinsContainer1, joinsContainer2, otherVariablesContainer);
+		    if (njoinfields == 1) {
+			joinsContainer1.clear();
+		    } else {
+			joinsContainer2.clear();
+		    }
+		} else {
+		    doJoin_cartprod(valuesHead, startCarprod, endCartprod, otherVariablesContainer);
+		}
+		otherVariablesContainer.clear();
+		for (uint8_t i = 0; i < nValuesHead; ++i) {
+		    valuesHead[i] = itr->getCurrentValue(posValuesHeadRowEdition[i].second);
+		}
+	    }
+	}
+
+	if (!cartprod) {
+	    if (njoinfields == 1) {
+		joinsContainer1.push_back(itr->getCurrentValue(joinField1));
+	    } else {
+		joinsContainer2.push_back(std::make_pair(itr->getCurrentValue(joinField1),
+			    itr->getCurrentValue(joinField2)));
+	    }
+	}
+
+	if (literalSubsumesHead) {
+	    //Filter first
+	    bool ok = true;
+	    for (uint8_t i = 0; i < nLastLiteralPosConstsInHead && ok; ++i) {
+		if (itr->getCurrentValue(lastLiteralPosConstsInHead[i]) != lastLiteralValueConstsInHead[i]) {
+		    ok = false;
+		}
+	    }
+	    if (ok) {
+		for (uint8_t i = 0; i < nValuesHashHead; ++i) {
+		    otherVariablesContainer.push_back(itr->getCurrentValue(posOtherVariables[i]));
+		}
+
+	    }
+	}
+    }
+    if (!firstGroup) {
+	if (!cartprod) {
+	    doJoin_join(valuesHead, joinsContainer1, joinsContainer2, otherVariablesContainer);
+	    if (njoinfields == 1) {
+		joinsContainer1.clear();
+	    } else {
+		joinsContainer2.clear();
+	    }
+	} else {
+	    doJoin_cartprod(valuesHead, startCarprod, endCartprod, otherVariablesContainer);
+	}
+	otherVariablesContainer.clear();
+    }
+}

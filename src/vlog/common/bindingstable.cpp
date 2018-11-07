@@ -195,11 +195,11 @@ TupleTable *BindingsTable::sortBy(std::vector<uint8_t> &fields) {
 
 TupleTable *BindingsTable::projectAndFilter(const Literal &l, const std::vector<uint8_t> *posToFilter,
         const std::vector<Term_t> *valuesToFilter) {
-    uint8_t vars[SIZETUPLE];
-    uint8_t consts[SIZETUPLE];
+    uint8_t vars[256];
+    uint8_t consts[256];
     uint8_t nconsts = 0;
     uint8_t nvars = 0;
-    uint64_t currentRow[SIZETUPLE];	// Not Term_t; used in trident api.
+    uint64_t currentRow[256];	// Not Term_t; used in trident api.
 
     for (uint8_t i = 0; i < l.getTupleSize(); ++i) {
         if (l.getTermAtPos(i).isVariable()) {
@@ -266,8 +266,8 @@ TupleTable *BindingsTable::projectAndFilter(const Literal &l, const std::vector<
 TupleTable *BindingsTable::filter(const Literal &l, const std::vector<uint8_t> *posToFilter,
                                   const std::vector<Term_t> *valuesToFilter) {
 
-    Term_t consts[SIZETUPLE];
-    uint8_t posConsts[SIZETUPLE];
+    Term_t consts[256];
+    uint8_t posConsts[256];
     uint8_t nconsts = 0;
     for (uint8_t i = 0; i < l.getTupleSize(); ++i) {
         if (!l.getTermAtPos(i).isVariable()) {

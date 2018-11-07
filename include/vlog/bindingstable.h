@@ -91,7 +91,7 @@ class BindingsTable {
 
         struct FieldsSorter {
 
-            uint8_t fields[SIZETUPLE];
+            uint8_t fields[256];
             const uint8_t nfields;
 
             FieldsSorter(std::vector<uint8_t> &f) : nfields((uint8_t) f.size()) {

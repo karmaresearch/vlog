@@ -1274,20 +1274,24 @@ std::shared_ptr<Column> EDBTable::checkIn(
     //  throw 10;
     //    }
 
-    LOG(DEBUGL) << "EDBTable::checkIn";
+    LOG(DEBUGL) << "EDBTable::checkIn, literal = " << l.tostring() << ", posInL = " << (int) posInL;
     std::vector<uint8_t> posVars = l.getPosVars();
     std::vector<uint8_t> fieldsToSort;
-    fieldsToSort.push_back(posVars[posInL]);
+    for (int i = 0; i < posVars.size(); i++) {
+	if (i == posInL) {
+	    fieldsToSort.push_back(i);
+	    break;
+	}
+    }
     EDBIterator *iter = getSortedIterator(l, fieldsToSort);
 
     //Output
     std::unique_ptr<ColumnWriter> col(new ColumnWriter());
     size_t idx1 = 0;
-    const uint8_t varIndex = posVars[posInL];
     sizeOutput = 0;
     while (iter->hasNext()) {
         iter->next();
-        const Term_t v2 = iter->getElementAt(varIndex);
+        const Term_t v2 = iter->getElementAt(posInL);
         while (values[idx1] < v2) {
             idx1++;
             if (idx1 == values.size()) {

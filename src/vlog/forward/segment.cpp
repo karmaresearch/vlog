@@ -147,7 +147,7 @@ bool Segment::areAllColumnsPartOftheSameQuery(EDBLayer **edb, const Literal **l,
             } else {
                 //Check the literal is the same
                 const Literal *newlit = &(edbC->getLiteral());
-                Substitution subs[SIZETUPLE];
+		std::vector<Substitution> subs;
                 if (Literal::subsumes(subs, *newlit, *lit) != -1
                         && Literal::subsumes(subs, *lit, *newlit) != -1) {
                     posInLiteral.push_back(edbC->posColumnInLiteral());
@@ -1178,7 +1178,7 @@ std::shared_ptr<const Segment> SegmentInserter::retainEDB(
             ->posColumnInLiteral();
         //Chech the two literals are equivalent and that the rel. are
         //different positions. ??? What if the head is, say pred(?A,?A)? --Ceriel
-        Substitution subs[SIZETUPLE];
+	std::vector<Substitution> subs;
         if (!l1.sameVarSequenceAs(l12) || l1.subsumes(subs, l1, l12) == -1
                 // || pos1 == pos12 // Commented out --Ceriel
            ) {
@@ -1621,9 +1621,9 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
             //                         << ", e1 = " << e1 << ", e2 = " << e2;
 
             bool lastValueEOF = false;
-            Term_t lastValues[SIZETUPLE];
+            Term_t lastValues[256];
             bool curValueEOF = false;
-            Term_t curValues[SIZETUPLE];
+            Term_t curValues[256];
 
             long count1 = 1;
             long count2 = 1;

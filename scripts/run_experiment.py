@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#)!/usr/bin/python
 
 # Input file contains rules and data, and possibly prefixes.
 # Format is same as RDFOX input, but Vlog-rules also work.
@@ -43,6 +43,11 @@ def rewritePred(pred, arity):
 def getURI(uri):
     global prefixes
     if not uri.startswith('<'):
+        # check for '^^'
+        index = uri.find('^^')
+        if index >= 0:
+            uri = uri[:index+2] + getURI(uri[index+2:])
+            return uri
         # Extract prefix
         index = uri.find(':')
         if index < 0:
@@ -168,6 +173,23 @@ def parseRule(rules, rule):
 
     body = rule[rule.find(':-')+2:]
     body = body.strip()
+    if body.startswith('['):
+        body = body[1:body.find(']')]
+        terms = body.split(',')
+        newbody = ''
+        for term in terms:
+            term = term.strip()
+            if term.startswith('?'):
+                newbody +=  term[1:].upper() + ','
+            else:
+                if not term.startswith('<'):
+                    newbody += getURI(term) + ','
+                else:
+                    newbody += getURI(term) + ','
+        newbody = newbody[0:-1]
+        newRule += 'TE(' + newbody + ')'
+        rules.append(newRule)
+        return
     while True:
         # Read predicate name
         predName = body[0:body.find('(')]
