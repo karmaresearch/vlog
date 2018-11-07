@@ -21,6 +21,30 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
 endif()
 
+#Add macPorts
+# Detect if the "port" command is valid on this system; if so, return full path
+EXECUTE_PROCESS(COMMAND which port RESULT_VARIABLE DETECT_MACPORTS OUTPUT_VARIABLE MACPORTS_PREFIX ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+IF (${DETECT_MACPORTS} EQUAL 0)
+    # "/opt/local/bin/port" doesn't have libs, so we get the parent directory
+    GET_FILENAME_COMPONENT(MACPORTS_PREFIX ${MACPORTS_PREFIX} DIRECTORY)
+
+    # "/opt/local/bin" doesn't have libs, so we get the parent directory
+    GET_FILENAME_COMPONENT(MACPORTS_PREFIX ${MACPORTS_PREFIX} DIRECTORY)
+
+    # "/opt/local" is where MacPorts lives, add `/lib` suffix and link
+    LINK_DIRECTORIES(${MACPORTS_PREFIX}/lib)
+    INCLUDE_DIRECTORIES(${MACPORTS_PREFIX}/include)
+ENDIF()
+
+#Add homebrew
+EXECUTE_PROCESS(COMMAND brew --prefix RESULT_VARIABLE exitstatus OUTPUT_VARIABLE BREW_PREFIX ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+IF (${exitstatus} EQUAL 0)
+    LINK_DIRECTORIES(${BREW_PREFIX}/lib)
+    INCLUDE_DIRECTORIES(${BREW_PREFIX}/include)
+ENDIF()
+
 #add files to compile
 file(GLOB vlog_SRC
     "src/vlog/*.cpp"
