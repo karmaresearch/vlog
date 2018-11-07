@@ -54,7 +54,7 @@ FCIterator FCTable::read(const size_t mincount, const size_t maxcount) const {
     while (itr != blocks.end() && itr->iteration < mincount) {
         itr++;
     }
-    if (itr != blocks.end()) {
+    if (itr != blocks.end() && itr->iteration <= maxcount) {
         std::vector<FCBlock>::const_iterator endrange = itr + 1;
         while (endrange != blocks.end() && endrange->iteration <= maxcount) {
             endrange++;
