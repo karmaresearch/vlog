@@ -354,8 +354,8 @@ class Rule {
         }
 
         Literal getFirstHead() const {
-            if (heads.size() > 1)
-                LOG(WARNL) << "This method should be called only if we handle multiple heads properly...";
+            // if (heads.size() > 1)
+            //     LOG(WARNL) << "This method should be called only if we handle multiple heads properly...";
             return heads[0];
         }
 

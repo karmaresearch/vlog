@@ -223,7 +223,9 @@ class SemiNaiver {
         virtual FCIterator getTable(const Literal &literal, const size_t minIteration,
                 const size_t maxIteration, TableFilterer *filter);
 
-        void checkAcyclicity();
+        void checkAcyclicity() {
+	    run(0, 1, NULL, true);
+	}
 
         //Statistics methods
 

@@ -71,6 +71,8 @@ class ChaseMgmt {
                 uint64_t addRow(uint64_t* row);
 
                 bool existingRow(uint64_t *row, uint64_t &value);
+
+		bool checkRecursive(uint64_t target, std::vector<uint64_t> &toCheck);
         };
 
         class RuleContainer {
@@ -92,11 +94,14 @@ class ChaseMgmt {
 
         std::vector<std::unique_ptr<ChaseMgmt::RuleContainer>> rules;
         const bool restricted;
+	const bool checkCyclic;
+	bool cyclic;
 
+	bool checkRecursive(uint64_t target, uint64_t rv, std::vector<uint64_t> &checked);
 
     public:
         ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
-                const bool restricted);
+                const bool restricted, const bool checkCyclic);
 
         std::shared_ptr<Column> getNewOrExistingIDs(
                 uint32_t ruleid,

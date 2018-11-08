@@ -67,10 +67,6 @@ void SemiNaiver::createGraphRuleDependency(std::vector<int> &nodes,
     delete[] definedBy;
 }
 
-void SemiNaiver::checkAcyclicity() {
-    //TODO
-}
-
 string set_to_string(std::unordered_set<int> s) {
     ostringstream oss("");
     for (std::unordered_set<int>::const_iterator k = s.begin(); k != s.end(); ++k) {
@@ -275,7 +271,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
     std::copy(allEDBRules.begin(), allEDBRules.end(), std::back_inserter(allrules));
     std::copy(allIDBRules.begin(), allIDBRules.end(), std::back_inserter(allrules));
     chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt(allrules,
-                restrictedChase));
+                restrictedChase, checkCyclicTerms));
 #if DEBUG
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(DEBUGL) << "Runtime ruleset optimization ms = " << sec.count() * 1000;
