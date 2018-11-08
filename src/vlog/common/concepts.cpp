@@ -617,8 +617,17 @@ std::vector<uint8_t> Rule::getVarsNotInBody() const {
                 if (ok)
                     break;
             }
-            if (!ok)
-                out.push_back(var);
+            if (!ok) {
+		for (auto v : out) {
+		    if (v == var) {
+			ok = true;
+			break;
+		    }
+		}
+		if (! ok) {
+		    out.push_back(var);
+		}
+	    }
         }
     }
     return out;
