@@ -11,43 +11,90 @@ int Checker::check(std::string ruleFile, std::string alg, EDBLayer &db) {
     p.readFromFile(ruleFile, false); //we do not rewrite the heads
 
     if (alg == "MFA") {
-	//Create  the critical instance (cdb)
-	EDBLayer cdb(db);
+	return MFA(p, false) ? 1 : 0;
+    } else if (alg == "RMFA") {
+	return MFA(p, true) ? 1 : 0;
+    } else if (alg == "JA") {
+	return JA(p, false) ? 1 : 0;
+    } else if (alg == "RJA") {
+	return JA(p, true) ? 1 : 0;
+    } else {
+	// TODO: RMFA, MSA, RMSA, RMFC
+	LOG(ERRORL) << "Unknown algorithm: " << alg;
+	return 0;
+    }
+}
+
+bool Checker::MFA(Program &p, bool restricted) {
+    //Create  the critical instance (cdb)
+    EDBLayer *db = p.getKB();
+    EDBLayer *cdb = db;
+    // p.setKB(cdb);
+    // TODO: delete db?
+    if (! restricted) {
 	//Populate the crit. instance with new facts
-	for(auto p : db.getAllPredicateIDs()) {
+	for(auto p : cdb->getAllPredicateIDs()) {
 	    std::vector<std::vector<string>> facts;
 	    std::vector<string> fact;
-	    for (int i = 0; i < db.getPredArity(p); ++i) {
+	    for (int i = 0; i < cdb->getPredArity(p); ++i) {
 		fact.push_back("*");
 	    }
 	    facts.push_back(fact);
-	    cdb.addInmemoryTable(db.getPredName(p), facts);
+	    cdb->addInmemoryTable(cdb->getPredName(p), facts);
 	}
-
-	//Launch the  skolem chase with the check for cyclic terms
-	std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(cdb,
-		&p, true, true, false, false, 1, 1, false);
-	sn->checkAcyclicity();
-	//if check succeeds then return 0 (we don't know)
-	if (sn->isFoundCyclicTerms()) {
-	    return 0; //we don't know
-	} else {
-	    return 1; //program will always terminate
+	// The critical instance should have initial values for ALL predicates, not just the EDB ones ... --Ceriel
+	bool hasNewEDB[256];
+	memset(hasNewEDB, 0, 256);
+	std::vector<PredId_t> allPredicates = p.getAllPredicateIDs();
+	for (PredId_t v : allPredicates) {
+	    Predicate pred = p.getPredicate(v);
+	    if (pred.getType() == IDB) {
+		// Add a rule with a dummy EDB predicate
+		uint8_t cardinality = pred.getCardinality();
+		std::string edbName = "__DUMMY__" + std::to_string(cardinality);
+		if (! hasNewEDB[cardinality]) {
+		    PredId_t predId = p.getOrAddPredicate(edbName, cardinality);
+		    std::vector<std::vector<string>> facts;
+		    std::vector<string> fact;
+		    for (int i = 0; i < cardinality; ++i) {
+			fact.push_back("*");
+		    }
+		    facts.push_back(fact);
+		    cdb->addInmemoryTable(edbName, predId, facts);
+		}
+		std::string rule = p.getPredicateName(v) + "(";
+		std::string paramList = "";
+		for (int i = 0; i < cardinality; i++) {
+		    paramList = paramList + "A" + std::to_string(i);
+		    if (i < cardinality - 1) {
+			paramList = paramList + ",";
+		    }
+		}
+		rule = rule + paramList + ") :- " + edbName + "(" + paramList + ")";
+		p.parseRule(rule, false);
+	    }
 	}
-    } else if (alg == "JA") {
-	// If we don't find cyles, the program is "JA", which means the chase will terminate.
-	return JA(p) ? 1 : 0;
     } else {
-	// TODO: RJA, RMFA, MSA, RMSA, RMFC
-	LOG(ERRORL) << "Unknown algorithm: " << alg;
-	return 0;
+	LOG(ERRORL) << "RMFA not implemented yet.";
+	return false;
+    }
+
+    //Launch the  skolem chase with the check for cyclic terms
+    std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(*cdb,
+	    &p, true, true, false, false, 1, 1, false);
+    sn->checkAcyclicity();
+    //if check succeeds then return 0 (we don't know)
+    if (sn->isFoundCyclicTerms()) {
+	return false;	// Not MFA
+    } else {
+	return true;
     }
 }
 
 typedef std::pair<PredId_t, uint8_t> vpos;
 typedef std::pair<uint32_t, uint8_t> rpos;
 
-bool Checker::JA(Program &p) {
+bool Checker::JA(Program &p, bool restricted) {
     auto rules = p.getAllRules();
     std::map<vpos, std::vector<vpos>> allExtVarsPos;
     for (auto rule : rules) {
@@ -88,38 +135,44 @@ bool Checker::JA(Program &p) {
     // Now, create a graph of dependencies
     Graph g(allExtVarsPos.size());
     int src = 0;
-    for (auto &it : allExtVarsPos) {
-	// For each existential variable, go back to the rule, this time to the body, and add all <pred, varpos> there to a list.
-	// These are the values used to compute a value for the existential variable.
-	const Rule &rule = p.getRule(it.first.first);
-	LOG(DEBUGL) << "Src = " << src << ", rule " << rule.tostring(&p, p.getKB());
-	auto body = rule.getBody();
-	std::vector<vpos> dependencies;
-	// Collect <PredId_t, tuplepos> values on which the existential variables of this rule depend.
-	for (auto lit: body) {
-	    for (int i = 0; i < lit.getTupleSize(); i++) {
-		VTerm t = lit.getTermAtPos(i);
-		if (t.getId() != 0) {
-		    vpos p(lit.getPredicate().getId(), i);
-		    dependencies.push_back(p);
+    if (! restricted) {
+	for (auto &it : allExtVarsPos) {
+	    // For each existential variable, go back to the rule, this time to the body, and add all <pred, varpos> there to a list.
+	    // These are the values used to compute a value for the existential variable.
+	    const Rule &rule = p.getRule(it.first.first);
+	    LOG(DEBUGL) << "Src = " << src << ", rule " << rule.tostring(&p, p.getKB());
+	    auto body = rule.getBody();
+	    std::vector<vpos> dependencies;
+	    // Collect <PredId_t, tuplepos> values on which the existential variables of this rule depend.
+	    for (auto lit: body) {
+		for (int i = 0; i < lit.getTupleSize(); i++) {
+		    VTerm t = lit.getTermAtPos(i);
+		    if (t.getId() != 0) {
+			vpos p(lit.getPredicate().getId(), i);
+			dependencies.push_back(p);
+		    }
 		}
 	    }
-	}
-	// We need the dependencies sorted to be able to call std::set_intersection later on.
-	std::sort(dependencies.begin(), dependencies.end());
-	int dest = 0;
-	for (auto &it2: allExtVarsPos) {
-	    // For each existential variable, check if a value of it could propagate to a value that is used to compute the
-	    // current variable.
-	    std::vector<vpos> intersect(dependencies.size() + it2.second.size());
-	    auto ipos = std::set_intersection(dependencies.begin(), dependencies.end(), it2.second.begin(), it2.second.end(), intersect.begin());
-	    if (ipos > intersect.begin()) {
-		g.addEdge(src, dest);
-		LOG(TRACEL) << "Adding edge from " << src << " to " << dest;
+	    // We need the dependencies sorted to be able to call std::set_intersection later on.
+	    std::sort(dependencies.begin(), dependencies.end());
+	    int dest = 0;
+	    for (auto &it2: allExtVarsPos) {
+		// For each existential variable, check if a value of it could propagate to a value that is used to compute the
+		// current variable.
+		std::vector<vpos> intersect(dependencies.size() + it2.second.size());
+		auto ipos = std::set_intersection(dependencies.begin(), dependencies.end(), it2.second.begin(), it2.second.end(), intersect.begin());
+		if (ipos > intersect.begin()) {
+		    g.addEdge(src, dest);
+		    LOG(TRACEL) << "Adding edge from " << src << " to " << dest;
+		}
+		dest++;
 	    }
-	    dest++;
+	    src++;
 	}
-	src++;
+    } else {
+	// RJA variant. TODO.
+	LOG(ERRORL) << "RJA not implemented yet.";
+	return false;
     }
 
     // Now check if the graph is cyclic. If it is, the ruleset is not JA (Joint Acyclic) (which means that the result is inconclusive).

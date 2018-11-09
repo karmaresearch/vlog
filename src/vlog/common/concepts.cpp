@@ -701,6 +701,14 @@ const Rule &Program::getRule(uint32_t ruleid) const {
     return allrules[ruleid];
 }
 
+std::vector<PredId_t> Program::getAllPredicateIDs() const {
+    std::vector<PredId_t> result;
+    for (auto iter: cardPredicates) {
+	result.push_back(iter.first);
+    }
+    return result;
+}
+
 size_t Program::getNRulesByPredicate(PredId_t predid) const {
     return rules[predid].size();
 }
@@ -929,6 +937,7 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
         }
     }
     Predicate pred(predid, Predicate::calculateAdornment(t1), kb->doesPredExists(predid) ? EDB : IDB, (uint8_t) t.size());
+    LOG(DEBUGL) << "Predicate : " << predicate << ", type = " << ((pred.getType() == EDB) ? "EDB" : "IDB");
 
     Literal literal(pred, t1);
     return literal;
