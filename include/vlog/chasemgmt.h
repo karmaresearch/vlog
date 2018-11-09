@@ -97,7 +97,7 @@ class ChaseMgmt {
 	const bool checkCyclic;
 	bool cyclic;
 
-	bool checkRecursive(uint64_t target, uint64_t rv, std::vector<uint64_t> &checked);
+	bool checkRecursive(uint64_t target, uint64_t rv, std::vector<uint64_t> &checked, int level);
 
     public:
         ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
