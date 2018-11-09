@@ -134,6 +134,7 @@ bool ChaseMgmt::Rows::checkRecursive(uint64_t target, std::vector<uint64_t> &toC
 
 bool ChaseMgmt::checkRecursive(uint64_t target, uint64_t rv, std::vector<uint64_t> &checked) {
     if (rv == target) {
+	LOG(DEBUGL) << "Found an immediate cycle!";
 	return true;
     }
     uint64_t mask = rv & RULEVARMASK;
