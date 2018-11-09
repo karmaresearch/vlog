@@ -714,7 +714,7 @@ Program::Program(EDBLayer *kb) : kb(kb),
     }
 
 std::string trim(const std::string& str,
-                 const std::string& whitespace = " \t")
+                 const std::string& whitespace = "\r \t")
 {
     const auto strBegin = str.find_first_not_of(whitespace);
     if (strBegin == std::string::npos)
@@ -737,7 +737,7 @@ void Program::readFromFile(std::string pathFile, bool rewriteMultihead) {
         while (std::getline(file, line)) {
 	    line = trim(line);
             if (line != "" && line.substr(0, 2) != "//") {
-                LOG(DEBUGL) << "Parsing rule " << line;
+                LOG(DEBUGL) << "Parsing rule \"" << line << "\"";
                 parseRule(line, rewriteMultihead);
             }
         }
@@ -1058,6 +1058,7 @@ void Program::parseRule(std::string rule, bool rewriteMultihead) {
         //process the head(s)
         std::string head = trim(rule.substr(0, posEndHead));
         std::vector<Literal> lHeads;
+	LOG(DEBUGL) << "head = \"" << head << "\"";
         while (head.size() > 0) {
             std::string headLiteral;
             size_t posEndLiteral = findEndLiteral(head);
@@ -1068,12 +1069,14 @@ void Program::parseRule(std::string rule, bool rewriteMultihead) {
                 headLiteral = head;
                 head = "";
             }
+	    LOG(DEBUGL) << "headliteral = \"" << headLiteral << "\"";
             Literal h = parseLiteral(headLiteral, dictVariables);
             lHeads.push_back(h);
         }
 
         //process the body
         std::string body = trim(rule.substr(posEndHead+2, std::string::npos));
+	LOG(DEBUGL) << "body = \"" << body << "\"";
         std::vector<Literal> lBody;
         while (body.size() > 0) {
             std::string bodyLiteral;
@@ -1085,6 +1088,7 @@ void Program::parseRule(std::string rule, bool rewriteMultihead) {
                 bodyLiteral = body;
                 body = "";
             }
+	    LOG(DEBUGL) << "bodyliteral = \"" << bodyLiteral << "\"";
             lBody.push_back(parseLiteral(bodyLiteral, dictVariables));
         }
 
