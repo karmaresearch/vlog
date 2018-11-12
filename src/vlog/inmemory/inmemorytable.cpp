@@ -115,7 +115,6 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
         }
         delete ifs;
     } else {
-<<<<<<< HEAD
         tablefile = repository + "/" + tablename + ".nt";
         string gz = tablefile + ".gz";
         FileInfo f;
@@ -154,46 +153,6 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
             }
         }
         arity = 3;
-=======
-	tablefile = repository + "/" + tablename + ".nt";
-	string gz = tablefile + ".gz";
-	FileInfo f;
-	f.start = 0;
-	if (Utils::exists(gz)) {
-	    f.size = Utils::fileSize(gz);
-	    f.path = gz;
-	    f.splittable = false;
-	} else if (Utils::exists(tablefile)) {
-	    f.size = Utils::fileSize(tablefile);
-	    f.path = tablefile;
-	    f.splittable = true;
-	} else {
-	    LOG(ERRORL) << "Could not find " << tablename;
-	    throw("Could not find " + tablename);
-	}
-	FileReader reader(f);
-	while (reader.parseTriple()) {
-	    if (reader.isTripleValid()) {
-		Term_t rowc[3];
-		int ls, lp, lo;
-		const char *s = reader.getCurrentS(ls);
-		const char *p = reader.getCurrentP(lp);
-		const char *o = reader.getCurrentO(lo);
-		if (inserter == NULL) {
-		    inserter = new SegmentInserter(3);
-		}
-		uint64_t val;
-		layer->getOrAddDictNumber(s, ls, val);
-		rowc[0] = val;
-		layer->getOrAddDictNumber(p, lp, val);
-		rowc[1] = val;
-		layer->getOrAddDictNumber(o, lo, val);
-		rowc[2] = val;
-		inserter->addRow(rowc);
-	    }
-	}
-	arity = 3;
->>>>>>> critical
     }
     if (inserter == NULL) {
         segment = NULL;
@@ -526,7 +485,6 @@ EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
         // No constants in the query, so we need the whole segment, sorted.
         segmentToFilter = getSortedCachedSegment(segment, fields);
     } else {
-<<<<<<< HEAD
         // Constants in the query, so prepend their positions to the sorting fields.
         std::vector<uint8_t> filterBy;
         for (int i = 0; i < posConstantsToFilter.size(); i++) {
@@ -553,34 +511,6 @@ EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
         if (! cacheHashes.count(keySortFields)) {
             // Not available yet. Get the corresponding sorted segment.
             std::shared_ptr<const Segment> sortedSegment =
-=======
-	// Constants in the query, so prepend their positions to the sorting fields.
-	std::vector<uint8_t> filterBy;
-	for (int i = 0; i < posConstantsToFilter.size(); i++) {
-	    filterBy.push_back(posConstantsToFilter[i]);
-	}
-	filterBy = __mergeSortingFields(filterBy, fields);
-	// Now get the key of the entry we need.
-	uint64_t keySortFields = __getKeyFromFields(filterBy, filterBy.size() >= 8 ? 7 : filterBy.size());
-	// Fill the sort fields up with the other fields.
-	if (filterBy.size() < arity) {
-	    for (int i = 0; i < arity; i++) {
-		bool present = false;
-		for (int j = 0; j < filterBy.size(); j++) {
-		    if (i == filterBy[j]) {
-			present = true;
-			break;
-		    }
-		}
-		if (! present) {
-		    filterBy.push_back(i);
-		}
-	    }
-	}
-	if (! cacheHashes.count(keySortFields)) {
-	    // Not available yet. Get the corresponding sorted segment.
-	    std::shared_ptr<const Segment> sortedSegment =
->>>>>>> critical
                 getSortedCachedSegment(segment, filterBy);
             // Create a map from constant values to begin and end coordinates in this segment.
             std::shared_ptr<HashMapEntry> map = std::shared_ptr<HashMapEntry>(new HashMapEntry(sortedSegment));
@@ -652,13 +582,8 @@ EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
     }
 
     if (posConstantsToFilter.size() == 1 && repeatedVars.empty()) {
-<<<<<<< HEAD
         // No further filtering needed.
         return new InmemoryIterator(segmentToFilter, predid, fields);
-=======
-	// No further filtering needed.
-	return new InmemoryIterator(segmentToFilter, predid, fields);
->>>>>>> critical
     }
 
     // General filtering procedure.

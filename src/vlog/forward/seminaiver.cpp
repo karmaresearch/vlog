@@ -412,15 +412,12 @@ bool SemiNaiver::executeUntilSaturation(
         }
 
         if (response) {
-<<<<<<< HEAD
-=======
             if (checkCyclicTerms) {
                 foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
                 if (foundCyclicTerms)
                     return newDer;
             }
 
->>>>>>> critical
             if (ruleset[currentRule].rule.isRecursive() && limitView == 0) {
                 //Is the rule recursive? Go until saturation...
                 int recursiveIterations = 0;
