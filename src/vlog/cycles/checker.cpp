@@ -55,6 +55,7 @@ static void addIDBCritical(Program &p, EDBLayer *db) {
 	    }
 	    rule = rule + paramList + ") :- " + edbName + "(" + paramList + ")";
 	    p.parseRule(rule, false);
+	    LOG(DEBUGL) << "Adding rule: " << rule;
 	}
     }
 }
@@ -81,6 +82,7 @@ bool Checker::MFA(Program &p) {
     std::vector<Rule> rules = p.getAllRules();
     for (auto rule : rules) {
 	std::string ruleString = rule.toprettystring(&p, p.getKB(), true);
+	LOG(DEBUGL) << "Adding rule: " << ruleString;
 	newRules.push_back(ruleString);
     }
 
