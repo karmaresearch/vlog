@@ -9,6 +9,7 @@
 #include <vlog/exporter.h>
 #include <vlog/utils.h>
 #include <vlog/ml/ml.h>
+#include <vlog/deps/detector.h>
 
 #include <vlog/cycles/checker.h>
 
@@ -55,7 +56,8 @@ void printHelp(const char *programName, ProgramArgs &desc) {
     cout << "load\t\t load a Trident KB." << endl;
     cout << "gentq\t\t generate training queries from rules file." << endl;
     cout << "lookup\t\t lookup for values in the dictionary." << endl << endl;
-    cout << "detectCycles\t\t try and detect cycles in the rules." << endl << endl;
+    cout << "cycles\t\t try and detect cycles in the rules." << endl << endl;
+    cout << "deps\t\t detect dependencies in the database." << endl << endl;
 
     cout << desc.tostring() << endl;
 }
@@ -78,7 +80,7 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
 
     if (cmd != "help" && cmd != "query" && cmd != "lookup" && cmd != "load" && cmd != "queryLiteral"
             && cmd != "mat" && cmd != "rulesgraph" && cmd != "server" && cmd != "gentq" &&
-            cmd != "detectCycles") {
+            cmd != "cycles" && cmd !="deps") {
         printErrorMsg(
                 (string("The command \"") + cmd + string("\" is unknown.")).c_str());
         return false;
@@ -189,10 +191,20 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
                             path + string("' does not exists")).c_str());
                 return false;
             }
-        } else if (cmd == "detectCycles") {
+        } else if (cmd == "cycles") {
             string path = vm["rules"].as<string>();
             if (path == "") {
                 printErrorMsg(string("You must set up the 'rules' parameter to detect cycles").c_str());
+            }
+            if (path != "" && !Utils::exists(path)) {
+                printErrorMsg((string("The rule file '") +
+                            path + string("' does not exists")).c_str());
+                return false;
+            }
+        } else if (cmd == "deps") {
+            string path = vm["rules"].as<string>();
+            if (path == "") {
+                printErrorMsg(string("You must set up the 'rules' parameter to detect dependencies").c_str());
             }
             if (path != "" && !Utils::exists(path)) {
                 printErrorMsg((string("The rule file '") +
@@ -766,6 +778,15 @@ void checkAcyclicity(std::string ruleFile, std::string alg, EDBLayer &db) {
     std::cout << std::endl;
 }
 
+void detectDeps(std::string ruleFile, EDBLayer &db) {
+    //Load the program
+    Program p(&db);
+    p.readFromFile(ruleFile, false);
+
+    Detector d;
+    d.printDatabaseDependencies(p, db);
+}
+
 int main(int argc, const char** argv) {
     //Init params
     ProgramArgs vm;
@@ -984,12 +1005,17 @@ int main(int argc, const char** argv) {
         cerr << "The program is not compiled with the web interface activated." << endl;
         return 1;
 #endif
-    } else if (cmd == "detectCycles") {
+    } else if (cmd == "cycles") {
         EDBConf conf(edbFile);
         EDBLayer *layer = new EDBLayer(conf, false);
         string rulesFile = vm["rules"].as<string>();
         string alg = vm["alg"].as<string>();
         checkAcyclicity(rulesFile, alg, *layer);
+    } else if (cmd == "deps") {
+        EDBConf conf(edbFile);
+        EDBLayer *layer = new EDBLayer(conf, false);
+        string rulesFile = vm["rules"].as<string>();
+        detectDeps(rulesFile, *layer);
     }
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Runtime = " << sec.count() * 1000 << " milliseconds";

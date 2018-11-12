@@ -62,15 +62,15 @@ class VTuple {
         VTerm *terms;
     public:
         VTuple(const uint8_t sizetuple) : sizetuple(sizetuple) {
-	    terms = new VTerm[sizetuple];
+            terms = new VTerm[sizetuple];
         }
 
-	VTuple(const VTuple &v) : sizetuple(v.sizetuple) {
-	    terms = new VTerm[sizetuple];
-	    for (int i = 0; i < sizetuple; i++) {
-		terms[i] = v.terms[i];
-	    }
-	}
+        VTuple(const VTuple &v) : sizetuple(v.sizetuple) {
+            terms = new VTerm[sizetuple];
+            for (int i = 0; i < sizetuple; i++) {
+                terms[i] = v.terms[i];
+            }
+        }
 
         size_t getSize() const {
             return sizetuple;
@@ -120,26 +120,26 @@ class VTuple {
             return false;
         }
 
-	/*
-	VTuple & operator=(const VTuple &v) {
-	    if (this == &v) {
-		return *this;
-	    }
-	    if (terms != NULL) {
-		delete[] terms;
-	    }
-	    sizetuple = v.sizetuple;
-	    terms = new VTerm[sizetuple];
-	    for (int i = 0; i < sizetuple; i++) {
-		terms[i] = v.terms[i];
-	    }
-	    return *this;
-	}
-	*/
+        /*
+           VTuple & operator=(const VTuple &v) {
+           if (this == &v) {
+           return *this;
+           }
+           if (terms != NULL) {
+           delete[] terms;
+           }
+           sizetuple = v.sizetuple;
+           terms = new VTerm[sizetuple];
+           for (int i = 0; i < sizetuple; i++) {
+           terms[i] = v.terms[i];
+           }
+           return *this;
+           }
+           */
 
-	~VTuple() {
-	    delete[] terms;
-	}
+        ~VTuple() {
+            delete[] terms;
+        }
 };
 
 struct hash_VTuple {
@@ -444,13 +444,13 @@ class Program {
             return kb;
         }
 
-	VLIBEXP void setKB(EDBLayer *e) {
-	    kb = e;
-	}
+        VLIBEXP void setKB(EDBLayer *e) {
+            kb = e;
+        }
 
         void parseRule(std::string rule, bool rewriteMultihead);
 
-	VLIBEXP std::vector<PredId_t> getAllPredicateIDs() const;
+        VLIBEXP std::vector<PredId_t> getAllPredicateIDs() const;
 
         VLIBEXP Literal parseLiteral(std::string literal, Dictionary &dictVariables);
 
