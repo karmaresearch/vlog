@@ -256,6 +256,8 @@ class EDBLayer {
         // For JNI interface ...
         VLIBEXP void addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows);
 
+        VLIBEXP void addInmemoryTable(std::string predicate, PredId_t id, std::vector<std::vector<std::string>> &rows);
+
         ~EDBLayer() {
             for (int i = 0; i < MAX_NPREDS; ++i) {
                 if (tmpRelations[i] != NULL) {

@@ -617,8 +617,17 @@ std::vector<uint8_t> Rule::getVarsNotInBody() const {
                 if (ok)
                     break;
             }
-            if (!ok)
-                out.push_back(var);
+            if (!ok) {
+		for (auto v : out) {
+		    if (v == var) {
+			ok = true;
+			break;
+		    }
+		}
+		if (! ok) {
+		    out.push_back(var);
+		}
+	    }
         }
     }
     return out;
@@ -692,6 +701,14 @@ const Rule &Program::getRule(uint32_t ruleid) const {
     return allrules[ruleid];
 }
 
+std::vector<PredId_t> Program::getAllPredicateIDs() const {
+    std::vector<PredId_t> result;
+    for (auto iter: cardPredicates) {
+	result.push_back(iter.first);
+    }
+    return result;
+}
+
 size_t Program::getNRulesByPredicate(PredId_t predid) const {
     return rules[predid].size();
 }
@@ -704,6 +721,19 @@ Program::Program(EDBLayer *kb) : kb(kb),
     dictPredicates(kb->getPredDictionary()) {
     }
 
+std::string trim(const std::string& str,
+                 const std::string& whitespace = "\r \t")
+{
+    const auto strBegin = str.find_first_not_of(whitespace);
+    if (strBegin == std::string::npos)
+        return ""; // no content
+
+    const auto strEnd = str.find_last_not_of(whitespace);
+    const auto strRange = strEnd - strBegin + 1;
+
+    return str.substr(strBegin, strRange);
+}
+
 void Program::readFromFile(std::string pathFile, bool rewriteMultihead) {
     LOG(INFOL) << "Read program from file " << pathFile;
     if (pathFile == "") {
@@ -713,8 +743,9 @@ void Program::readFromFile(std::string pathFile, bool rewriteMultihead) {
         std::ifstream file(pathFile);
         std::string line;
         while (std::getline(file, line)) {
+	    line = trim(line);
             if (line != "" && line.substr(0, 2) != "//") {
-                LOG(DEBUGL) << "Parsing rule " << line;
+                LOG(DEBUGL) << "Parsing rule \"" << line << "\"";
                 parseRule(line, rewriteMultihead);
             }
         }
@@ -726,6 +757,7 @@ void Program::readFromString(std::string rules, bool rewriteMultihead) {
     stringstream ss(rules);
     string rule;
     while (getline(ss, rule)) {
+	rule = trim(rule);
         if (rule != "" && rule .substr(0, 2) != "//") {
             LOG(DEBUGL) << "Parsing rule " << rule;
             parseRule(rule, rewriteMultihead);
@@ -783,9 +815,14 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     if (posBeginTuple == std::string::npos) {
         throw 10;
     }
-    std::string predicate = l.substr(0, posBeginTuple);
+    std::string predicate = trim(l.substr(0, posBeginTuple));
     std::string tuple = l.substr(posBeginTuple + 1, std::string::npos);
-    tuple = tuple.substr(0, tuple.size() - 1);
+    if (tuple[tuple.size() - 1] != ')') {
+	throw 10;
+    }
+    tuple = trim(tuple.substr(0, tuple.size() - 1));
+
+    LOG(DEBUGL) << "Found predicate \"" << predicate  << "\"";
 
     //Calculate the tuple
     std::vector<VTerm> t;
@@ -858,13 +895,15 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
         }
         if (posTerm != tuple.size()) {
             term = tuple.substr(0, posTerm);
-            tuple = tuple.substr(posTerm + 1, tuple.size());
+            tuple = trim(tuple.substr(posTerm + 1, tuple.size()));
         } else {
             term = tuple;
             tuple = "";
         }
 
-        //Parse the term
+	LOG(DEBUGL) << "Found term \"" << term << "\"";
+
+	    //Parse the term
         if (std::isupper(term.at(0))) {
             t.push_back(VTerm((uint8_t) dictVariables.getOrAdd(term), 0));
         } else {
@@ -898,6 +937,7 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
         }
     }
     Predicate pred(predid, Predicate::calculateAdornment(t1), kb->doesPredExists(predid) ? EDB : IDB, (uint8_t) t.size());
+    LOG(DEBUGL) << "Predicate : " << predicate << ", type = " << ((pred.getType() == EDB) ? "EDB" : "IDB");
 
     Literal literal(pred, t1);
     return literal;
@@ -1025,35 +1065,39 @@ void Program::parseRule(std::string rule, bool rewriteMultihead) {
             throw 10;
         }
         //process the head(s)
-        std::string head = rule.substr(0, posEndHead - 1);
+        std::string head = trim(rule.substr(0, posEndHead));
         std::vector<Literal> lHeads;
+	LOG(DEBUGL) << "head = \"" << head << "\"";
         while (head.size() > 0) {
             std::string headLiteral;
             size_t posEndLiteral = findEndLiteral(head);
             if (posEndLiteral != std::string::npos) {
-                headLiteral = head.substr(0, posEndLiteral + 1);
-                head = head.substr(posEndLiteral + 2, std::string::npos);
+                headLiteral = trim(head.substr(0, posEndLiteral + 1));
+                head = trim(head.substr(posEndLiteral + 2, std::string::npos));
             } else {
                 headLiteral = head;
                 head = "";
             }
+	    LOG(DEBUGL) << "headliteral = \"" << headLiteral << "\"";
             Literal h = parseLiteral(headLiteral, dictVariables);
             lHeads.push_back(h);
         }
 
         //process the body
-        std::string body = rule.substr(posEndHead + 3, std::string::npos);
+        std::string body = trim(rule.substr(posEndHead+2, std::string::npos));
+	LOG(DEBUGL) << "body = \"" << body << "\"";
         std::vector<Literal> lBody;
         while (body.size() > 0) {
             std::string bodyLiteral;
             size_t posEndLiteral = findEndLiteral(body);
             if (posEndLiteral != std::string::npos) {
-                bodyLiteral = body.substr(0, posEndLiteral + 1);
-                body = body.substr(posEndLiteral + 2, std::string::npos);
+                bodyLiteral = trim(body.substr(0, posEndLiteral + 1));
+                body = trim(body.substr(posEndLiteral + 2, std::string::npos));
             } else {
                 bodyLiteral = body;
                 body = "";
             }
+	    LOG(DEBUGL) << "bodyliteral = \"" << bodyLiteral << "\"";
             lBody.push_back(parseLiteral(bodyLiteral, dictVariables));
         }
 

@@ -44,12 +44,12 @@ class ChaseMgmt {
             private:
                 const uint64_t startCounter;
                 const uint8_t sizerow;
-
                 uint64_t currentcounter;
                 std::vector<std::unique_ptr<uint64_t>> blocks;
                 uint32_t blockCounter;
                 uint64_t *currentblock;
                 std::unordered_map<ChaseRow, uint64_t, hash_ChaseRow> rows;
+                bool cyclicTerms;
 
             public:
                 Rows(uint64_t startCounter, uint8_t sizerow) :
@@ -63,9 +63,15 @@ class ChaseMgmt {
                     return sizerow;
                 }
 
+                bool containsCyclicTerms() {
+                    return cyclicTerms;
+                }
+
                 uint64_t addRow(uint64_t* row);
 
                 bool existingRow(uint64_t *row, uint64_t &value);
+
+                bool checkRecursive(uint64_t target, std::vector<uint64_t> &toCheck);
         };
 
         class RuleContainer {
@@ -80,16 +86,21 @@ class ChaseMgmt {
                     dependencies = dep;
                 }
 
+                bool containsCyclicTerms();
+
                 ChaseMgmt::Rows *getRows(uint8_t var);
         };
 
         std::vector<std::unique_ptr<ChaseMgmt::RuleContainer>> rules;
         const bool restricted;
+        const bool checkCyclic;
+        bool cyclic;
 
+        bool checkRecursive(uint64_t target, uint64_t rv, std::vector<uint64_t> &checked, int level);
 
     public:
         ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
-                const bool restricted);
+                const bool restricted, const bool checkCyclic);
 
         std::shared_ptr<Column> getNewOrExistingIDs(
                 uint32_t ruleid,

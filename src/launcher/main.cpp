@@ -55,6 +55,7 @@ void printHelp(const char *programName, ProgramArgs &desc) {
     cout << "load\t\t load a Trident KB." << endl;
     cout << "gentq\t\t generate training queries from rules file." << endl;
     cout << "lookup\t\t lookup for values in the dictionary." << endl << endl;
+    cout << "detectCycles\t\t try and detect cycles in the rules." << endl << endl;
 
     cout << desc.tostring() << endl;
 }
@@ -188,6 +189,16 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
                             path + string("' does not exists")).c_str());
                 return false;
             }
+        } else if (cmd == "detectCycles") {
+            string path = vm["rules"].as<string>();
+            if (path == "") {
+                printErrorMsg(string("You must set up the 'rules' parameter to detect cycles").c_str());
+            }
+            if (path != "" && !Utils::exists(path)) {
+                printErrorMsg((string("The rule file '") +
+                            path + string("' does not exists")).c_str());
+                return false;
+            }
         }
     }
 
@@ -282,6 +293,9 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     ProgramArgs::GroupArgs& generateTraining_options = *vm.newGroup("Options for command <gentq>");
     generateTraining_options.add<int>("", "maxTuples", 500, "Number of EDB tuples to consider for training", false);
     generateTraining_options.add<int>("", "depth", 5, "Recursion level of training generation procedure", false);
+
+    ProgramArgs::GroupArgs& detectCycles_options = *vm.newGroup("Options for command <detectCycles>");
+    detectCycles_options.add<string>("", "alg", "MFA", "Algorithm to use for cycle detection", false);
 
     ProgramArgs::GroupArgs& cmdline_options = *vm.newGroup("Parameters");
     cmdline_options.add<string>("l","logLevel", "info",
@@ -739,8 +753,8 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     runLiteralQuery(edb, p, literal, reasoner, vm);
 }
 
-void checkAcyclicity(std::string ruleFile, EDBLayer &db) {
-    int response = Checker::check(ruleFile, db);
+void checkAcyclicity(std::string ruleFile, std::string alg, EDBLayer &db) {
+    int response = Checker::check(ruleFile, alg, db);
     std::cout << "The response is: ";
     if (response == 0) {
         std::cout << "Unknown";
@@ -974,7 +988,8 @@ int main(int argc, const char** argv) {
         EDBConf conf(edbFile);
         EDBLayer *layer = new EDBLayer(conf, false);
         string rulesFile = vm["rules"].as<string>();
-        checkAcyclicity(rulesFile, *layer);
+        string alg = vm["alg"].as<string>();
+        checkAcyclicity(rulesFile, alg, *layer);
     }
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Runtime = " << sec.count() * 1000 << " milliseconds";

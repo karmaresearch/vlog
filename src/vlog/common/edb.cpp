@@ -116,8 +116,13 @@ void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
 }
 
 void EDBLayer::addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows) {
+    PredId_t id = (PredId_t) predDictionary->getOrAdd(predicate);
+    addInmemoryTable(predicate, id, rows);
+}
+
+void EDBLayer::addInmemoryTable(std::string predicate, PredId_t id, std::vector<std::vector<std::string>> &rows) {
     EDBInfoTable infot;
-    infot.id = (PredId_t) predDictionary->getOrAdd(predicate);
+    infot.id = id;
     if (doesPredExists(infot.id)) {
         LOG(WARNL) << "Rewriting table for predicate " << predicate;
         dbPredicates.erase(infot.id);
@@ -127,6 +132,7 @@ void EDBLayer::addInmemoryTable(std::string predicate, std::vector<std::vector<s
     infot.arity = table->getArity();
     infot.manager = std::shared_ptr<EDBTable>(table);
     dbPredicates.insert(make_pair(infot.id, infot));
+    LOG(DEBUGL) << "Added table for " << predicate << ":" << infot.id;
 }
 
 #ifdef SPARQL
@@ -147,6 +153,7 @@ void EDBLayer::addSparqlTable(const EDBConf::Table &tableConf) {
 #endif
 
 bool EDBLayer::doesPredExists(PredId_t id) const {
+    LOG(DEBUGL) << "doesPredExists for: " << id;
     return dbPredicates.count(id);
 }
 

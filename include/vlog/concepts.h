@@ -354,8 +354,8 @@ class Rule {
         }
 
         Literal getFirstHead() const {
-            if (heads.size() > 1)
-                LOG(WARNL) << "This method should be called only if we handle multiple heads properly...";
+            // if (heads.size() > 1)
+            //     LOG(WARNL) << "This method should be called only if we handle multiple heads properly...";
             return heads[0];
         }
 
@@ -433,8 +433,6 @@ class Program {
         //Move them to the EDB layer ...
         //Dictionary additionalConstants;
 
-        void parseRule(std::string rule, bool rewriteMultihead);
-
         void rewriteRule(Rule &r);
 
         std::string rewriteRDFOWLConstants(std::string input);
@@ -445,6 +443,14 @@ class Program {
         EDBLayer *getKB() {
             return kb;
         }
+
+	VLIBEXP void setKB(EDBLayer *e) {
+	    kb = e;
+	}
+
+        void parseRule(std::string rule, bool rewriteMultihead);
+
+	VLIBEXP std::vector<PredId_t> getAllPredicateIDs() const;
 
         VLIBEXP Literal parseLiteral(std::string literal, Dictionary &dictVariables);
 
