@@ -13,9 +13,7 @@ int Checker::check(std::string ruleFile, std::string alg, EDBLayer &db) {
     p.readFromFile(ruleFile, false); //we do not rewrite the heads
 
     if (alg == "MFA") {
-	return MFA(p, false) ? 1 : 0;
-    } else if (alg == "RMFA") {
-	return MFA(p, true) ? 1 : 0;
+	return MFA(p) ? 1 : 0;
     } else if (alg == "JA") {
 	return JA(p, false) ? 1 : 0;
     } else if (alg == "RJA") {
@@ -61,33 +59,42 @@ static void addIDBCritical(Program &p, EDBLayer *db) {
     }
 }
 
-// TODO: make non-destructive. As it is now, it modifies the program and edb layer.
-bool Checker::MFA(Program &p, bool restricted) {
-    //Create  the critical instance (cdb)
+bool Checker::MFA(Program &p) {
+    // Create  the critical instance (cdb)
     EDBLayer *db = p.getKB();
-    EDBLayer *cdb = db;
-    // p.setKB(cdb);
-    if (! restricted) {
-	//Populate the critical instance with new facts
-	for(auto p : cdb->getAllPredicateIDs()) {
-	    std::vector<std::vector<string>> facts;
-	    std::vector<string> fact;
-	    for (int i = 0; i < cdb->getPredArity(p); ++i) {
-		fact.push_back("*");
-	    }
-	    facts.push_back(fact);
-	    cdb->addInmemoryTable(cdb->getPredName(p), facts);
+    EDBConf conf("", false);
+    EDBLayer layer(conf, false);
+
+    //Populate the critical instance with new facts
+    for(auto p : db->getAllPredicateIDs()) {
+	std::vector<std::vector<string>> facts;
+	std::vector<string> fact;
+	for (int i = 0; i < db->getPredArity(p); ++i) {
+	    fact.push_back("*");
 	}
-	// The critical instance should have initial values for ALL predicates, not just the EDB ones ... --Ceriel
-	addIDBCritical(p, cdb);
-    } else {
-	LOG(ERRORL) << "RMFA not implemented yet.";
-	return false;
+	facts.push_back(fact);
+	layer.addInmemoryTable(db->getPredName(p), facts);
     }
 
+    // Rewrite rules: all constants must be replaced with "*".
+    std::vector<std::string> newRules;
+    std::vector<Rule> rules = p.getAllRules();
+    for (auto rule : rules) {
+	std::string ruleString = rule.toprettystring(&p, p.getKB(), true);
+	newRules.push_back(ruleString);
+    }
+
+    Program newProgram(&layer);
+    for (auto rule : newRules) {
+	newProgram.parseRule(rule, false);
+    }
+
+    // The critical instance should have initial values for ALL predicates, not just the EDB ones ... --Ceriel
+    addIDBCritical(newProgram, &layer);
+
     //Launch the  skolem chase with the check for cyclic terms
-    std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(*cdb,
-	    &p, true, true, false, false, 1, 1, false);
+    std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
+	    &newProgram, true, true, false, false, 1, 1, false);
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)
     if (sn->isFoundCyclicTerms()) {

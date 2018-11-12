@@ -134,7 +134,7 @@ std::string Literal::tostring(Program *program, EDBLayer *db) const {
     return out;
 }
 
-std::string Literal::toprettystring(Program *program, EDBLayer *db) const {
+std::string Literal::toprettystring(Program *program, EDBLayer *db, bool replaceConstants) const {
 
     std::string predName;
     if (program != NULL)
@@ -148,7 +148,9 @@ std::string Literal::toprettystring(Program *program, EDBLayer *db) const {
         if (tuple.get(i).isVariable()) {
             out += std::string("A") + std::to_string(tuple.get(i).getId());
         } else {
-            if (db == NULL) {
+	    if (replaceConstants) {
+		out += "*";
+	    } else if (db == NULL) {
                 out += std::to_string(tuple.get(i).getValue());
             } else {
                 uint64_t id = tuple.get(i).getValue();
@@ -672,17 +674,25 @@ std::string Rule::tostring(Program * program, EDBLayer *db) const {
     return output;
 }
 
-std::string Rule::toprettystring(Program * program, EDBLayer *db) const {
+std::string Rule::toprettystring(Program * program, EDBLayer *db, bool replaceConstants) const {
     std::string output = "";
+    bool first = true;
     for(const auto& head : heads) {
-        output += head.toprettystring(program, db) + " AND ";
+	if (! first) {
+	    output += ",";
+	}
+        output += head.toprettystring(program, db, replaceConstants);
+	first = false;
     }
-    output = output.substr(0, output.length() - 5);
-    output += ":-";
+    output += " :- ";
+    first = true;
     for (int i = 0; i < body.size(); ++i) {
-        output += body[i].toprettystring(program, db) + std::string(",");
+	if (! first) {
+	    output += ",";
+	}
+	first = false;
+        output += body[i].toprettystring(program, db, replaceConstants);
     }
-    output = output.substr(0, output.size() - 1);
     return output;
 }
 
