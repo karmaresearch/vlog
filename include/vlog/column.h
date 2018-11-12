@@ -28,6 +28,8 @@ class ColumnReader {
         virtual void clear() = 0;
 
         virtual std::vector<Term_t> asVector() = 0;
+
+	virtual ~ColumnReader() { }
 };
 
 class ColumnWriter;

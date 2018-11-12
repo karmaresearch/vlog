@@ -44,29 +44,23 @@ class ChaseMgmt {
             private:
                 const uint64_t startCounter;
                 const uint8_t sizerow;
-                const bool restricted;
+
                 uint64_t currentcounter;
                 std::vector<std::unique_ptr<uint64_t>> blocks;
                 uint32_t blockCounter;
                 uint64_t *currentblock;
                 std::unordered_map<ChaseRow, uint64_t, hash_ChaseRow> rows;
-                bool cyclicTerms;
 
             public:
-                Rows(uint64_t startCounter, uint8_t sizerow, bool restricted) :
-                    startCounter(startCounter), sizerow(sizerow), restricted(restricted) {
+                Rows(uint64_t startCounter, uint8_t sizerow) :
+                    startCounter(startCounter), sizerow(sizerow) {
                         blockCounter = 0;
                         currentblock = NULL;
                         currentcounter = startCounter;
-                        cyclicTerms = false;
                     }
 
                 uint8_t getSizeRow() {
                     return sizerow;
-                }
-
-                bool containsCyclicTerms() {
-                    return cyclicTerms;
                 }
 
                 uint64_t addRow(uint64_t* row);
@@ -86,9 +80,7 @@ class ChaseMgmt {
                     dependencies = dep;
                 }
 
-                bool containsCyclicTerms();
-
-                ChaseMgmt::Rows *getRows(uint8_t var, bool restricted);
+                ChaseMgmt::Rows *getRows(uint8_t var);
         };
 
         std::vector<std::unique_ptr<ChaseMgmt::RuleContainer>> rules;

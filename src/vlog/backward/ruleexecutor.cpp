@@ -293,7 +293,7 @@ size_t RuleExecutor::estimateRule(const int depth, const uint8_t bodyAtom,
             if (posFromLiteral[bodyAtom].size() == 0) {
                 table->addRawTuple(NULL);
             } else {
-                Term_t tmpRow[SIZETUPLE];
+                Term_t tmpRow[256];
                 vector<std::pair<uint8_t, uint8_t>> pairs = posFromLiteral[bodyAtom];
 
                 for (size_t i = 0; i < pairs.size(); ++i) {
@@ -302,7 +302,7 @@ size_t RuleExecutor::estimateRule(const int depth, const uint8_t bodyAtom,
                 table->addRawTuple(tmpRow);
             }
         } else {
-            Term_t tmpRow[SIZETUPLE];
+            Term_t tmpRow[256];
             if (posFromLiteral[bodyAtom].size() > 0) {
                 vector<std::pair<uint8_t, uint8_t>> pairs = posFromLiteral[bodyAtom];
                 for (size_t i = 0; i < pairs.size(); ++i) {
@@ -421,7 +421,7 @@ void RuleExecutor::evaluateRule(const uint8_t bodyAtom,
             if (posFromLiteral[bodyAtom].size() == 0) {
                 table->addRawTuple(NULL);
             } else {
-                Term_t tmpRow[SIZETUPLE];
+                Term_t tmpRow[256];
                 vector<std::pair<uint8_t, uint8_t>> pairs = posFromLiteral[bodyAtom];
 
                 for (size_t i = 0; i < pairs.size(); ++i) {
@@ -430,7 +430,7 @@ void RuleExecutor::evaluateRule(const uint8_t bodyAtom,
                 table->addRawTuple(tmpRow);
             }
         } else {
-            Term_t tmpRow[SIZETUPLE];
+            Term_t tmpRow[256];
             if (posFromLiteral[bodyAtom].size() > 0) {
                 vector<std::pair<uint8_t, uint8_t>> pairs = posFromLiteral[bodyAtom];
                 for (size_t i = 0; i < pairs.size(); ++i) {
@@ -586,9 +586,9 @@ void RuleExecutor::copyLastRelInAnswers(QSQR *qsqr,
         BindingsTable *answer = qsqr->getAnswerTable(&l);
 
         //Copy the head in the tuple
-        Term_t tuple[SIZETUPLE];
+        Term_t tuple[256];
         uint8_t nvars = 0;
-        uint8_t posVars[SIZETUPLE];
+        uint8_t posVars[256];
         for (uint8_t i = 0; i < adornedRule.getFirstHead().getTupleSize(); ++i) {
             VTerm t = adornedRule.getFirstHead().getTermAtPos(i);
             if (t.isVariable()) {

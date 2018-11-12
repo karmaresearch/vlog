@@ -310,7 +310,7 @@ class EDBFCInternalTableItr : public FCInternalTableItr {
         std::vector<uint8_t> fields;
         EDBIterator *edbItr;
         uint8_t nfields;
-        uint8_t posFields[SIZETUPLE];
+        uint8_t posFields[256];
         bool compiled;
         size_t iteration;
 
@@ -577,14 +577,14 @@ class EDBFCInternalTable : public FCInternalTable {
     private:
         const size_t iteration;
         const uint8_t nfields;
-        uint8_t posFields[SIZETUPLE];
+        uint8_t posFields[256];
         const QSQQuery query;
         EDBLayer *layer;
         Factory<EDBFCInternalTableItr> factory;
         std::vector<uint8_t> defaultSorting;
 
         EDBFCInternalTable(const size_t iteration,
-                const uint8_t nfields, uint8_t const posFields[SIZETUPLE],
+                const uint8_t nfields, uint8_t const posFields[256],
                 const QSQQuery &query,
                 EDBLayer *layer,
                 const std::vector<uint8_t> &defaultSorting) :

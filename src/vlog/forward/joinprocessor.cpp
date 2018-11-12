@@ -349,7 +349,7 @@ void JoinExecutor::verificativeJoinOneColumn(
                 }
                 size_t idx1 = 0;
                 size_t idx2 = 0;
-                Term_t outputRow[SIZETUPLE];
+                Term_t outputRow[256];
                 std::unique_ptr<ColumnReader> matchedKeysR = matchedKeys->getReader();
 
                 if (matchedKeysR->hasNext()) {
@@ -422,7 +422,7 @@ void JoinExecutor::verificativeJoinOneColumn(
                 throw 10;
 
             itr->next();
-            Term_t outputRow[SIZETUPLE];
+            Term_t outputRow[256];
             size_t idx1 = 0;
             size_t idx2 = 0;
             //FCInternalTableItr *titr = table->getSortedIterator();
@@ -2092,7 +2092,7 @@ bool DuplicateContainers::exists(const Term_t *v) {
         }
     } else {
         if (nfields == 1) {
-            uint8_t idxTable = 0;
+            size_t idxTable = 0;
             size_t emptyTables = 0;
             while (idxTable < ntables) {
                 if (tables[idxTable] != NULL) {
@@ -2115,7 +2115,7 @@ bool DuplicateContainers::exists(const Term_t *v) {
             }
             empty = emptyTables == ntables;
         } else {
-            uint8_t idxTable = 0;
+            size_t idxTable = 0;
             size_t emptyTables = 0;
             while (idxTable < ntables) {
                 if (tables[idxTable] != NULL) {
