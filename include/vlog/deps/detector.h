@@ -15,7 +15,8 @@ class Detector {
                 std::vector<Literal> &out,
                 const Literal &l,
                 Program &p,
-                EDBLayer &layer);
+                EDBLayer &layer,
+                std::vector<Literal> &cache);
 
     public:
         std::vector<Equivalence> getDatabaseDependencies(Program &prog, EDBLayer &layer);
