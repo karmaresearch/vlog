@@ -7,14 +7,14 @@
 #include <list>
 
 class Checker {
-    public:
-        static int check(std::string ruleFile, std::string alg, EDBLayer &db);
-
+    private:
 	static bool JA(Program &p, bool restricted);
 
 	static bool MFA(Program &p, bool restricted);
 
-	static void closure(Program &p, std::vector<std::pair<PredId_t, uint8_t>> &input);
+    public:
+        static int check(std::string ruleFile, std::string alg, EDBLayer &db);
+
 };
 
 

@@ -146,7 +146,7 @@ std::string Literal::toprettystring(Program *program, EDBLayer *db) const {
 
     for (int i = 0; i < tuple.getSize(); ++i) {
         if (tuple.get(i).isVariable()) {
-            out += std::string("?") + std::to_string(tuple.get(i).getId());
+            out += std::string("A") + std::to_string(tuple.get(i).getId());
         } else {
             if (db == NULL) {
                 out += std::to_string(tuple.get(i).getValue());
@@ -155,8 +155,6 @@ std::string Literal::toprettystring(Program *program, EDBLayer *db) const {
                 char text[MAX_TERM_SIZE];
                 if (db->getDictText(id, text)) {
                     string v = Program::compressRDFOWLConstants(std::string(text));
-                    if (v[0] == '<')
-                        v = v.substr(1, v.size() - 2);
                     out += v;
                 } else {
                     if (program == NULL) {
