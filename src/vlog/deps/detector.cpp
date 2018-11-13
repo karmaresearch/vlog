@@ -20,14 +20,15 @@ std::vector<Equivalence> Detector::getDatabaseDependencies(Program &prog, EDBLay
         }
         Literal lit(pred, tuple);
         std::vector<Literal> cache;
+        std::vector<Rule> rules;
 
         //Start with an empty subs
-        getAllTerminals(dependentAtoms, lit, prog, layer, cache);
+        getAllTerminals(dependentAtoms, lit, prog, layer, cache, rules);
 
         //TODO: Go through all dependencies to identify equal atoms
 
-        //std::cout << "l=" << lit.tostring(&prog, &layer) << " # atoms " << dependentAtoms.size() << std::endl;
         if (dependentAtoms.size() > 1) {
+            std::cout << "l=" << lit.tostring(&prog, &layer) << " # atoms " << dependentAtoms.size() << std::endl;
             for(const auto &a : dependentAtoms) {
                 std::cout << a.tostring(&prog,&layer) << std::endl;
             }
@@ -43,12 +44,13 @@ void Detector::getAllTerminals(std::vector<Literal> &out,
         const Literal &l,
         Program &p,
         EDBLayer &layer,
-        std::vector<Literal> &cache) {
+        std::vector<Literal> &cache,
+        std::vector<Rule> &cachedRules) {
     std::vector<Rule> rules = p.getAllRulesByPredicate(l.getPredicate().getId());
     for (auto r : rules) {
-        //std::cout << "Rule=" << r.tostring(&p, &layer) << std::endl;
         //Rewrite the head using current substitutions
         Mapping m;
+        std::vector<Literal> localCache = cache;
         if (m.unify(l, r.getFirstHead())) {
             //Recursively invoke the function to the body
             for (auto const &ba : r.getBody()) {
@@ -57,7 +59,7 @@ void Detector::getAllTerminals(std::vector<Literal> &out,
                 for (const auto &a : rwa) {
                     //Check the cache -> If I've already considered, then skip it
                     bool found = false;
-                    for(const auto &cachedLiteral : cache) {
+                    for(const auto &cachedLiteral : localCache) {
                         std::vector<Substitution> subs;
                         int resp = Literal::subsumes(subs, cachedLiteral, a);
                         if (resp >= 0) {
@@ -66,9 +68,18 @@ void Detector::getAllTerminals(std::vector<Literal> &out,
                         }
                     }
 
-                    if (!found) {
-                        cache.push_back(a);
-                        getAllTerminals(out, a, p, layer, cache);
+                    //Check whether there are some variables in the input pattern
+                    bool interesting = false;
+                    for(int i = 0; i < a.getTupleSize(); ++i) {
+                        if (a.getTermAtPos(i).isVariable() && a.getTermAtPos(i).getId() >= 128) {
+                            interesting = true;
+                            break;
+                        }
+                    }
+
+                    if (!found && interesting) {
+                        localCache.push_back(a);
+                        getAllTerminals(out, a, p, layer, localCache, cachedRules);
                         if (out.size() == oldsize) {
                             out.push_back(a);
                         }
@@ -82,6 +93,7 @@ void Detector::getAllTerminals(std::vector<Literal> &out,
 void Detector::printDatabaseDependencies(Program &prog, EDBLayer &layer) {
     auto eq = getDatabaseDependencies(prog, layer);
     for(const auto &e : eq) {
-        std::cout << "Literal " << e.getLiteral1().tostring() << " equals to " << e.getLiteral2().tostring() << std::endl;
+        std::cout << "Literal " << e.getLiteral1().tostring() <<
+            " equals to " << e.getLiteral2().tostring() << std::endl;
     }
 }
