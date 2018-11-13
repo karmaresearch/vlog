@@ -393,13 +393,13 @@ bool Checker::JA(Program &p, bool restricted) {
 			if (t.getId() != 0) {
 			    vpos p(lit.getPredicate().getId(), i);
 			    positions[t.getId()].push_back(p);
-			    LOG(TRACEL) << "    pred: " << t.getId() << ", i = " << i;
+			    LOG(TRACEL) << "    pred: " << lit.getPredicate().getId() << ", i = " << i;
 			}
 		    }
 		}
 		for (auto pair : positions) {
-		    std::vector<vpos> intersect(pair.second.size() + it2.second.size());
-		    auto ipos = std::set_intersection(it2.second.begin(), it2.second.end(), pair.second.begin(), pair.second.end(), intersect.begin());
+		    std::vector<vpos> intersect(pair.second.size() + it.second.size());
+		    auto ipos = std::set_intersection(it.second.begin(), it.second.end(), pair.second.begin(), pair.second.end(), intersect.begin());
 		    if (ipos - intersect.begin() == pair.second.size()) {
 			// For this variable, all positions in the right-hand-side occur in the propagations of the existential variable.
 			uint8_t x = pair.first;
