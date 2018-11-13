@@ -712,7 +712,7 @@ if (filteredSegment != NULL && !filteredSegment->isEmpty()) {
     }
 
     if (nVarsToCopy > 0) {
-        return std::shared_ptr<const FCInternalTable>(new InmemoryFCInternalTable(nVarsToCopy, iteration, true, filteredSegment));
+        return std::shared_ptr<const FCInternalTable>(new InmemoryFCInternalTable(nVarsToCopy, iteration, sorted, filteredSegment));
     } else {
         return std::shared_ptr<const FCInternalTable>(new SingletonTable(iteration));
     }
@@ -926,13 +926,17 @@ void MergerInternalTableItr::next() {
 }
 
 bool MITISorter::operator ()(const uint8_t i1, const uint8_t i2) const {
+    if (i1 == i2) {
+	return false;
+    }
     for (uint8_t i = 0; i < tuplesize; ++i) {
         Term_t v1 = iterators[i1].first->getCurrentValue(sortPos[i]);
         Term_t v2 = iterators[i2].first->getCurrentValue(sortPos[i]);
+	// LOG(TRACEL) << "i = " << i << ", i1 = " << i1 << ", v1 = " << v1 << ", i2 = " << i2 << ", v2 = " << v2;
         if (v1 > v2)
             return true;
         else if (v1 < v2)
             return false;
     }
-    return true;
+    return false;
 }

@@ -7,6 +7,8 @@ package karmaresearch.vlog;
 
 public class AlreadyStartedException extends Exception {
 
+    private static final long serialVersionUID = 1660661300435414890L;
+
     /**
      * Constructs an <code>AlreadyStartedException</code> with <code>null</code>
      * as its error detail message.

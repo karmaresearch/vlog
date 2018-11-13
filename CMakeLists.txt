@@ -1,7 +1,13 @@
 cmake_minimum_required (VERSION 2.8)
 
-# set(CMAKE_CXX_COMPILER "g++")
-# set(CMAKE_C_COMPILER "gcc")
+set(CMAKE_C_COMPILER "gcc")
+set(CMAKE_CXX_COMPILER "g++")
+if (NOT "$ENV{CC}" STREQUAL "")
+    set(CMAKE_C_COMPILER "$ENV{CC}")
+endif()
+if (NOT "$ENV{CXX}" STREQUAL "")
+    set(CMAKE_CXX_COMPILER "$ENV{CXX}")
+endif()
 
 project (vlog)
 include(ExternalProject)
@@ -15,6 +21,30 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
 endif()
 
+#Add macPorts
+# Detect if the "port" command is valid on this system; if so, return full path
+EXECUTE_PROCESS(COMMAND which port RESULT_VARIABLE DETECT_MACPORTS OUTPUT_VARIABLE MACPORTS_PREFIX ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+IF (${DETECT_MACPORTS} EQUAL 0)
+    # "/opt/local/bin/port" doesn't have libs, so we get the parent directory
+    GET_FILENAME_COMPONENT(MACPORTS_PREFIX ${MACPORTS_PREFIX} DIRECTORY)
+
+    # "/opt/local/bin" doesn't have libs, so we get the parent directory
+    GET_FILENAME_COMPONENT(MACPORTS_PREFIX ${MACPORTS_PREFIX} DIRECTORY)
+
+    # "/opt/local" is where MacPorts lives, add `/lib` suffix and link
+    LINK_DIRECTORIES(${MACPORTS_PREFIX}/lib)
+    INCLUDE_DIRECTORIES(${MACPORTS_PREFIX}/include)
+ENDIF()
+
+#Add homebrew
+EXECUTE_PROCESS(COMMAND brew --prefix RESULT_VARIABLE exitstatus OUTPUT_VARIABLE BREW_PREFIX ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+IF (${exitstatus} EQUAL 0)
+    LINK_DIRECTORIES(${BREW_PREFIX}/lib)
+    INCLUDE_DIRECTORIES(${BREW_PREFIX}/include)
+ENDIF()
+
 #add files to compile
 file(GLOB vlog_SRC
     "src/vlog/*.cpp"
@@ -24,6 +54,7 @@ file(GLOB vlog_SRC
     "src/vlog/magic/*.cpp"
     "src/vlog/inmemory/*.cpp"
     "src/vlog/trident/*.cpp"
+    "src/vlog/ml/*.cpp"
     "src/launcher/vloglayer.cpp"
     "src/launcher/vlogscan.cpp"
     )
@@ -36,8 +67,8 @@ IF(TRIDENT_LIB)
     message("Using KOGNAC provided installation: ${KOGNAC_LIB} ${KOGNAC_INC}")
     include_directories(${KOGNAC_INC})
     LINK_DIRECTORIES("${KOGNAC_LIB}")
-    add_library(kognac SHARED IMPORTED)
-    set_property(TARGET kognac PROPERTY IMPORTED_LOCATION ${KOGNAC_LIB}/${CMAKE_SHARED_LIBRARY_PREFIX}kognac${CMAKE_SHARED_LIBRARY_SUFFIX})
+    add_library(kognac-core SHARED IMPORTED)
+    set_property(TARGET kognac-core PROPERTY IMPORTED_LOCATION ${KOGNAC_LIB}/${CMAKE_SHARED_LIBRARY_PREFIX}kognac-core${CMAKE_SHARED_LIBRARY_SUFFIX})
 
     message("Using Trident provided installation: ${TRIDENT_LIB} ${TRIDENT_INC}")
     include_directories(${TRIDENT_INC})
@@ -72,11 +103,11 @@ ELSE()
     set_property(TARGET trident-sparql PROPERTY IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/trident/libtrident-sparql${CMAKE_SHARED_LIBRARY_SUFFIX}")
     # KOGNAC
     set(KOGNAC_LIB ${CMAKE_BINARY_DIR}/trident/kognac)
-    add_library(kognac SHARED IMPORTED)
-    add_dependencies(kognac git-trident)
+    add_library(kognac-core SHARED IMPORTED)
+    add_dependencies(kognac-core git-trident)
     include_directories(${SOURCE_DIR}/kognac/include)
     LINK_DIRECTORIES("${KOGNAC_LIB}")
-    set_property(TARGET kognac PROPERTY IMPORTED_LOCATION ${KOGNAC_LIB}/${CMAKE_SHARED_LIBRARY_PREFIX}kognac${CMAKE_SHARED_LIBRARY_SUFFIX})
+    set_property(TARGET kognac-core PROPERTY IMPORTED_LOCATION ${KOGNAC_LIB}/${CMAKE_SHARED_LIBRARY_PREFIX}kognac-core${CMAKE_SHARED_LIBRARY_SUFFIX})
 ENDIF()
 
 #SPARSEHASH
@@ -87,18 +118,19 @@ IF (${sparsehash} STREQUAL "sparsehash-NOTFOUND")
 ENDIF()
 
 #LZ4
-find_library(lz4 lz4)
-find_path(lz4h lz4.h)
-IF (${lz4h} STREQUAL "lz4h-NOTFOUND")
-    message("Could not find LZ4. I'm going to use the version from kognac")
+# find_library(lz4 lz4)
+# find_path(lz4h lz4.h)
+# IF (${lz4h} STREQUAL "lz4h-NOTFOUND")
+#    message("Could not find LZ4. I'm going to use the version from kognac")
+    message("I'm going to use LZ4 the version from kognac")
     include_directories(${KOGNAC_LIB}/external/lz4/lib/)
     LINK_DIRECTORIES(${KOGNAC_LIB}/external/lz4/lib)
     add_library(lz4 STATIC IMPORTED)
     set_property(TARGET lz4 PROPERTY IMPORTED_LOCATION ${KOGNAC_LIB}/external/lz4/lib/${CMAKE_STATIC_LIBRARY_PREFIX}lz4${CMAKE_STATIC_LIBRARY_SUFFIX})
-ELSE()
-    include_directories(lz4h)
-    message("-- Found LZ4")
-ENDIF()
+# ELSE()
+#    include_directories(lz4h)
+#    message("-- Found LZ4")
+# ENDIF()
 
 IF (JAVA)
     find_package(Java REQUIRED)
@@ -196,13 +228,13 @@ set_target_properties(vlog PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}" OUTPUT_NA
 
 #standard include
 include_directories(include/)
-TARGET_LINK_LIBRARIES(vlog-core trident trident-sparql ${ZLIB_LIBRARIES} kognac lz4)
+TARGET_LINK_LIBRARIES(vlog-core trident trident-sparql ${ZLIB_LIBRARIES} kognac-core lz4)
 
 if(JAVA)
     file(GLOB javaSRC "src/vlog/java/karmaresearch/vlog/*.java")
     Create_javadoc(vlog PACKAGES karmaresearch.vlog SOURCEPATH ${CMAKE_CURRENT_SOURCE_DIR}/src/vlog/java WINDOWTITLE "VLog JNI Interface")
     # add_dependencies(vlog-java headers)
-    TARGET_LINK_LIBRARIES(vlog-java vlog-core trident trident-sparql kognac)
+    TARGET_LINK_LIBRARIES(vlog-java vlog-core trident trident-sparql kognac-core)
     #Terrible hack to make cmake actually find the shared library when adding it to the jar.
     #It won't find it in the binary directory ... so we copy it to the source directory, add it to the jar, and then remove it from the source directory
     add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/resources)
@@ -210,11 +242,10 @@ if(JAVA)
     add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:vlog-core> ${CMAKE_SOURCE_DIR}/resources)
     add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:trident> ${CMAKE_SOURCE_DIR}/resources)
     add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:trident-sparql> ${CMAKE_SOURCE_DIR}/resources)
-    add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:kognac> ${CMAKE_SOURCE_DIR}/resources)
-    add_jar(jvlog ${javaSRC} resources/${CMAKE_SHARED_LIBRARY_PREFIX}vlog-java${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}vlog-core${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}trident-core${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}trident-sparql${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}kognac${CMAKE_SHARED_LIBRARY_SUFFIX})
+    add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:kognac-core> ${CMAKE_SOURCE_DIR}/resources)
+    add_jar(jvlog ${javaSRC} resources/${CMAKE_SHARED_LIBRARY_PREFIX}vlog-java${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}vlog-core${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}trident-core${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}trident-sparql${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}kognac-core${CMAKE_SHARED_LIBRARY_SUFFIX} GENERATE_NATIVE_HEADERS headers DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/src/vlog/java/native/)
     add_custom_command(TARGET jvlog POST_BUILD COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_SOURCE_DIR}/resources)
     add_custom_command(TARGET jvlog POST_BUILD COMMAND ${CMAKE_COMMAND} -E remove $<TARGET_FILE:vlog-java>)
     add_dependencies(jvlog vlog-java)
-    Create_javah(TARGET headers CLASSES karmaresearch.vlog.VLog karmaresearch.vlog.QueryResultIterator CLASSPATH jvlog DEPENDS ${javaSRC}  OUTPUT_NAME ${CMAKE_CURRENT_SOURCE_DIR}/src/vlog/java/native/vlog_native.h)
 ENDIF()
 TARGET_LINK_LIBRARIES(vlog vlog-core)

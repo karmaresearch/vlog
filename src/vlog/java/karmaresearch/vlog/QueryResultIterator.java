@@ -36,20 +36,23 @@ public class QueryResultIterator implements Iterator<long[]>, AutoCloseable {
      * @return whether there are more results.
      */
     public boolean hasNext() {
-        if (!filterBlanks) {
-            return hasNext(handle);
+        if (cleaned) {
+            throw new IllegalStateException("Iterator already closed");
         }
         if (hasNextCalled) {
             return hasNextValue;
         }
         hasNextCalled = true;
-        hasNextValue = false;
-        while (hasNext(handle)) {
+        hasNextValue = hasNext(handle);
+        if (!filterBlanks) {
+            return hasNextValue;
+        }
+        while (hasNextValue) {
             saved = next(handle);
             if (!hasBlanks(saved)) {
-                hasNextValue = true;
-                break;
+                return true;
             }
+            hasNextValue = hasNext(handle);
         }
         return hasNextValue;
     }
@@ -62,20 +65,19 @@ public class QueryResultIterator implements Iterator<long[]>, AutoCloseable {
      *                is thrown when no more elements exist.
      */
     public long[] next() {
+        if (cleaned) {
+            throw new IllegalStateException("Iterator already closed");
+        }
+        if (!hasNext()) {
+            throw new NoSuchElementException("No more query results");
+        }
         if (!filterBlanks) {
             long[] v = next(handle);
             if (v == null) {
                 throw new NoSuchElementException("No more query results");
             }
+            hasNextCalled = false;
             return v;
-        }
-        if (!hasNextCalled) {
-            if (!hasNext()) {
-                throw new NoSuchElementException("No more query results");
-            }
-        }
-        if (!hasNextValue) {
-            throw new NoSuchElementException("No more query results");
         }
         long[] retval = saved;
         hasNextCalled = false;

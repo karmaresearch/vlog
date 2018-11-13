@@ -7,6 +7,8 @@ package karmaresearch.vlog;
 
 public class NotStartedException extends Exception {
 
+    private static final long serialVersionUID = 877780226511090797L;
+
     /**
      * Constructs an <code>NotStartedException</code> with <code>null</code> as
      * its error detail message.

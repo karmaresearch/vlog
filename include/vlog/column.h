@@ -28,6 +28,8 @@ class ColumnReader {
         virtual void clear() = 0;
 
         virtual std::vector<Term_t> asVector() = 0;
+
+	virtual ~ColumnReader() { }
 };
 
 class ColumnWriter;
@@ -125,7 +127,9 @@ class CompressedColumn: public Column {
     public:
         CompressedColumn(const Term_t v, const uint32_t size) : Column() {
             _size = size;
-            blocks.push_back(CompressedColumnBlock(v, 0, size - 1));
+	    if (size > 0) {
+		blocks.push_back(CompressedColumnBlock(v, 0, size - 1));
+	    }
         }
 
         CompressedColumn(std::vector<CompressedColumnBlock> &blocks,
@@ -289,29 +293,34 @@ class ColumnReaderImpl : public ColumnReader {
 class InmemColumnReader : public ColumnReader {
     private:
         const std::vector<Term_t> &col;
+	size_t start;
         size_t currentPos;
         size_t end;
 
     public:
         InmemColumnReader(const std::vector<Term_t> &vals) : col(vals),
-        currentPos(0), end(vals.size()) {
+        start(0), currentPos(0), end(vals.size()) {
         }
 
         InmemColumnReader(const std::vector<Term_t> &vals,
                 uint64_t start, uint64_t len) : col(vals),
-        currentPos(start), end(start + len) {
+        start(start), currentPos(start), end(start + len) {
         }
 
         Term_t first() {
-            return col.front();
+            return col[start];
         }
 
         Term_t last() {
-            return col.back();
+            return col[end-1];
         }
 
         std::vector<Term_t> asVector() {
-            return col;
+	    if (start == 0 && end == col.size()) {
+		return col;
+	    }
+	    std::vector<Term_t> sub(&col[start],&col[end]);
+	    return sub;
         }
 
         bool hasNext() {
@@ -467,6 +476,7 @@ class SubColumn : public Column {
                 uint64_t start, uint64_t len) : parentColumn(parentColumn),
         values(parentColumn->getVectorRef()),
         start(start), len(len) {
+	    assert(start + len <= values.size());
         }
 
         size_t size() const {
@@ -666,7 +676,7 @@ class EDBColumn : public Column {
         size_t estimateSize() const;
 
         bool isEmpty() const {
-            return false;
+            return size() == 0;
         }
 
         bool isEDB() const {

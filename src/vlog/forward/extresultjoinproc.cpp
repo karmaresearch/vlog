@@ -252,7 +252,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     }
 
     uint8_t nKnownColumns = 0;
-    std::pair<uint8_t,uint8_t> posKnownColumns[SIZETUPLE * 3];
+    std::pair<uint8_t,uint8_t> posKnownColumns[256];
     for(uint8_t j = 0; j < c.size(); ++j) {
         bool found = false;
         for(uint8_t i = 0; i < nCopyFromFirst; ++i) {
@@ -296,8 +296,8 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     }
 
     std::vector<std::shared_ptr<Column>> knownColumns;
-    for (int i = 0; i < nKnownColumns; i++) {
-	knownColumns.push_back(c[posKnownColumns[i].first]);
+    for(int i = 0; i < colsForExt.size(); ++i) {
+	knownColumns.push_back(c[colsForExt[i]]);
     }
 
     //Create existential columns
@@ -324,6 +324,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
 		    //The body might contain more variables than what
 		    //is needed to create existential columns
 		    //First I copy the columns from the body of the rule
+
 		    auto extcolumn = chaseMgmt->getNewOrExistingIDs(
 			    ruleDetails->rule.getId(),
 			    t.getId(),
@@ -339,6 +340,17 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     }
 }
 
+void ExistentialRuleProcessor::processResults(const int blockid, const Term_t *first,
+	FCInternalTableItr* second, const bool unique) {
+    copyRawRow(first, second);
+    replaceExtColumns = true;
+    if (!tmpRelation) {
+        tmpRelation = std::unique_ptr<SegmentInserter>(
+                new SegmentInserter(rowsize));
+    }
+    tmpRelation->addRow(row);
+}
+
 void ExistentialRuleProcessor::processResults(const int blockid,
         const std::vector<const std::vector<Term_t> *> &vectors1, size_t i1,
         const std::vector<const std::vector<Term_t> *> &vectors2, size_t i2,
@@ -350,6 +362,29 @@ void ExistentialRuleProcessor::processResults(const int blockid,
         row[posFromSecond[i].first] = (*vectors2[posFromSecond[i].second])[i2];
     }
 
+    replaceExtColumns = true;
+    if (!tmpRelation) {
+        tmpRelation = std::unique_ptr<SegmentInserter>(
+                new SegmentInserter(rowsize));
+    }
+    tmpRelation->addRow(row);
+}
+
+void ExistentialRuleProcessor::processResults(std::vector<int> &blockid, Term_t *p, 
+	std::vector<bool> &unique, std::mutex *m) {
+    //TODO: Chase...
+    LOG(ERRORL) << "Not implemented yet";
+    throw 10;
+}
+
+void ExistentialRuleProcessor::processResults(const int blockid, FCInternalTableItr *first,
+	FCInternalTableItr* second, const bool unique) {
+    for (uint32_t i = 0; i < nCopyFromFirst; ++i) {
+        row[posFromFirst[i].first] = first->getCurrentValue(posFromFirst[i].second);
+    }
+    for (uint32_t i = 0; i < nCopyFromSecond; ++i) {
+        row[posFromSecond[i].first] = second->getCurrentValue(posFromSecond[i].second);
+    }
     replaceExtColumns = true;
     if (!tmpRelation) {
         tmpRelation = std::unique_ptr<SegmentInserter>(
@@ -511,7 +546,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
 }
 
 void ExistentialRuleProcessor::consolidate(const bool isFinished) {
-    if (replaceExtColumns) {
+    if (replaceExtColumns && tmpRelation != NULL) {
         //Populate the allColumns vector with known columns and constants
         std::vector<std::shared_ptr<Column>> allColumns;
         allColumns.resize(rowsize);
@@ -560,6 +595,7 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                 count += h.getTupleSize();
             }
             if (filterRows.size() == nrows * atomTables.size()) {
+		tmpRelation = std::unique_ptr<SegmentInserter>();
                 return; //every substitution already exists in the database.
                 // Nothing new can be derived.
             }

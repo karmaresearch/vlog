@@ -35,7 +35,7 @@ void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithread
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.arity = 3;
     infot.type = tableConf.type;
-    infot.manager = std::shared_ptr<EDBTable>(new TridentTable(kbpath, multithreaded));
+    infot.manager = std::shared_ptr<EDBTable>(new TridentTable(kbpath, multithreaded, this));
     dbPredicates.insert(make_pair(infot.id, infot));
     LOG(DEBUGL) << "Inserted " << pn << " with number " << infot.id;
 }
@@ -44,12 +44,12 @@ void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithread
 void EDBLayer::addMySQLTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
     const string pn = tableConf.predname;
-    infot.id = (PredId_t) predDictionary.getOrAdd(pn);
+    infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.arity = 3;
     infot.type = tableConf.type;
-    infot.manager = std::shared_ptr<EDBTable>(new MySQLTable(tableConf.params[0],
+    infot.manager = std::shared_ptr<EDBTable>(new MySQLTable(infot.id, tableConf.params[0],
                 tableConf.params[1], tableConf.params[2], tableConf.params[3],
-                tableConf.params[4], tableConf.params[5]));
+                tableConf.params[4], tableConf.params[5], this));
     dbPredicates.insert(make_pair(infot.id, infot));
 }
 #endif
@@ -58,12 +58,12 @@ void EDBLayer::addMySQLTable(const EDBConf::Table &tableConf) {
 void EDBLayer::addODBCTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
     const string pn = tableConf.predname;
-    infot.id = (PredId_t) predDictionary.getOrAdd(pn);
+    infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.arity = 3;
     infot.type = tableConf.type;
-    infot.manager = std::shared_ptr<EDBTable>(new ODBCTable(tableConf.params[0],
+    infot.manager = std::shared_ptr<EDBTable>(new ODBCTable(infot.id, tableConf.params[0],
                 tableConf.params[1], tableConf.params[2], tableConf.params[3],
-                tableConf.params[4]));
+                tableConf.params[4], this));
     dbPredicates.insert(make_pair(infot.id, infot));
 }
 #endif
@@ -72,12 +72,12 @@ void EDBLayer::addODBCTable(const EDBConf::Table &tableConf) {
 void EDBLayer::addMAPITable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
     const string pn = tableConf.predname;
-    infot.id = (PredId_t) predDictionary.getOrAdd(pn);
+    infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.arity = 3;
     infot.type = tableConf.type;
-    infot.manager = std::shared_ptr<EDBTable>(new MAPITable(tableConf.params[0],
+    infot.manager = std::shared_ptr<EDBTable>(new MAPITable(infot.id, tableConf.params[0],
                 (int) strtol(tableConf.params[1].c_str(), NULL, 10), tableConf.params[2], tableConf.params[3],
-                tableConf.params[4], tableConf.params[5], tableConf.params[6]));
+                tableConf.params[4], tableConf.params[5], tableConf.params[6], this));
     dbPredicates.insert(make_pair(infot.id, infot));
 }
 #endif
@@ -86,9 +86,9 @@ void EDBLayer::addMAPITable(const EDBConf::Table &tableConf) {
 void EDBLayer::addMDLiteTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
     const string pn = tableConf.predname;
-    infot.id = (PredId_t) predDictionary.getOrAdd(pn);
+    infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.type = tableConf.type;
-    MDLiteTable *table = new MDLiteTable(tableConf.params[0], tableConf.params[1]);
+    MDLiteTable *table = new MDLiteTable(infot.id, tableConf.params[0], tableConf.params[1], this);
     infot.manager = std::shared_ptr<EDBTable>(table);
     infot.arity = table->getArity();
     dbPredicates.insert(make_pair(infot.id, infot));
@@ -1266,20 +1266,24 @@ std::shared_ptr<Column> EDBTable::checkIn(
     //  throw 10;
     //    }
 
-    LOG(DEBUGL) << "EDBTable::checkIn";
+    LOG(DEBUGL) << "EDBTable::checkIn, literal = " << l.tostring() << ", posInL = " << (int) posInL;
     std::vector<uint8_t> posVars = l.getPosVars();
     std::vector<uint8_t> fieldsToSort;
-    fieldsToSort.push_back(posVars[posInL]);
+    for (int i = 0; i < posVars.size(); i++) {
+	if (i == posInL) {
+	    fieldsToSort.push_back(i);
+	    break;
+	}
+    }
     EDBIterator *iter = getSortedIterator(l, fieldsToSort);
 
     //Output
     std::unique_ptr<ColumnWriter> col(new ColumnWriter());
     size_t idx1 = 0;
-    const uint8_t varIndex = posVars[posInL];
     sizeOutput = 0;
     while (iter->hasNext()) {
         iter->next();
-        const Term_t v2 = iter->getElementAt(varIndex);
+        const Term_t v2 = iter->getElementAt(posInL);
         while (values[idx1] < v2) {
             idx1++;
             if (idx1 == values.size()) {

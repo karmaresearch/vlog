@@ -202,13 +202,14 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
 bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
         std::vector<RuleExecutionDetails> &ruleset,
         std::vector<StatIteration> &costRules,
+	const uint32_t limitView,
         bool fixpoint, unsigned long *timeout) {
 #if DEBUG
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 #endif
     bool newDer = false;
-    for (int i = 0; i < edbRuleset.size(); ++i) {
-        newDer |= executeRule(edbRuleset[i], iteration, NULL);
+    for (size_t i = 0; i < edbRuleset.size(); ++i) {
+        newDer |= executeRule(edbRuleset[i], iteration, limitView, NULL);
         iteration++;
     }
 #if DEBUG
@@ -217,7 +218,7 @@ bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
 #endif
 
     if (ruleset.size() > 0) {
-        newDer |= executeUntilSaturation(ruleset, costRules, fixpoint, timeout);
+        newDer |= executeUntilSaturation(ruleset, costRules, limitView,  fixpoint, timeout);
     }
     return newDer;
 }
@@ -312,21 +313,21 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout) {
         while (true) {
             bool resp1;
             if (loopNr == 0)
-                resp1 = executeRules(tmpEDBRules, tmpIDBRules, costRules, true, timeout);
+                resp1 = executeRules(tmpEDBRules, tmpIDBRules, costRules, 0, true, timeout);
             else
-                resp1 = executeRules(emptyRuleset, tmpIDBRules, costRules, true, timeout);
+                resp1 = executeRules(emptyRuleset, tmpIDBRules, costRules, 0, true, timeout);
             bool resp2;
             if (loopNr == 0)
-                resp2 = executeRules(tmpExtEDBRules, tmpExtIDBRules, costRules, false, timeout);
+                resp2 = executeRules(tmpExtEDBRules, tmpExtIDBRules, costRules, iteration == 0 ? 1 : iteration, false, timeout);
             else
-                resp2 = executeRules(emptyRuleset, tmpExtIDBRules, costRules, false, timeout);
+                resp2 = executeRules(emptyRuleset, tmpExtIDBRules, costRules, iteration == 0 ? 1 : iteration, false, timeout);
             if (!resp1 && !resp2) {
                 break; //Fix-point
             }
             loopNr++;
         }
     } else {
-        executeRules(allEDBRules, allIDBRules, costRules, true, timeout);
+        executeRules(allEDBRules, allIDBRules, costRules, 0, true, timeout);
     }
 
     running = false;
@@ -358,6 +359,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout) {
 bool SemiNaiver::executeUntilSaturation(
         std::vector<RuleExecutionDetails> &ruleset,
         std::vector<StatIteration> &costRules,
+	const uint32_t limitView,
         bool fixpoint, unsigned long *timeout) {
     size_t currentRule = 0;
     uint32_t rulesWithoutDerivation = 0;
@@ -371,6 +373,7 @@ bool SemiNaiver::executeUntilSaturation(
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         bool response = executeRule(ruleset[currentRule],
                 iteration,
+		limitView,
                 NULL);
         newDer |= response;
 	if (timeout != NULL && *timeout != 0) {
@@ -387,7 +390,14 @@ bool SemiNaiver::executeUntilSaturation(
         stat.time = sec.count() * 1000;
         stat.derived = response;
         costRules.push_back(stat);
-        ruleset[currentRule].lastExecution = iteration++;
+	if (limitView > 0) {
+	    // Don't use iteration here, because lastExecution determines which data we'll look at during the next round,
+	    // and limitView determines which data we are considering now. There should not be a gap.
+	    ruleset[currentRule].lastExecution = limitView;
+	} else {
+	    ruleset[currentRule].lastExecution = iteration;
+	}
+	iteration++;
 
 	if (timeout != NULL && *timeout != 0) {
 	    std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
@@ -398,7 +408,7 @@ bool SemiNaiver::executeUntilSaturation(
 	}
 
         if (response) {
-            if (ruleset[currentRule].rule.isRecursive()) {
+            if (ruleset[currentRule].rule.isRecursive() && limitView == 0) {
                 //Is the rule recursive? Go until saturation...
                 int recursiveIterations = 0;
                 do {
@@ -407,6 +417,7 @@ bool SemiNaiver::executeUntilSaturation(
                     recursiveIterations++;
                     response = executeRule(ruleset[currentRule],
                             iteration,
+			    limitView,
                             NULL);
                     newDer |= response;
                     stat.iteration = iteration;
@@ -569,6 +580,7 @@ void SemiNaiver::addDataToIDBRelation(const Predicate pred,
 
 bool SemiNaiver::checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
         const RuleExecutionPlan &plan,
+	uint32_t limitView,
         std::vector<size_t> &cards) {
     const uint8_t nBodyLiterals = (uint8_t) plan.plan.size();
     bool isOneRelEmpty = false;
@@ -581,6 +593,12 @@ bool SemiNaiver::checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
             min = ruleDetails.lastExecution;
         if (max == 1)
             max = ruleDetails.lastExecution - 1;
+	if (limitView > 0 && max >= limitView) {
+	    max = limitView - 1;
+	}
+	if (min > max) {
+	    return true;
+	}
 
         cards.push_back(estimateCardTable(*plan.plan[i], min, max));
         LOG(DEBUGL) << "Estimation of the atom " <<
@@ -911,12 +929,12 @@ void SemiNaiver::saveStatistics(StatsRule &stats) {
 }
 
 bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
-        const uint32_t iteration,
+        const uint32_t iteration, const uint32_t limitView,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
     bool answer = true;
     std::vector<Literal> heads = rule.getHeads();
-    answer &= executeRule(ruleDetails, heads, iteration, finalResultContainer);
+    answer &= executeRule(ruleDetails, heads, iteration, limitView, finalResultContainer);
     return answer;
 }
 
@@ -924,6 +942,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         std::vector<Literal> &heads,
         const uint32_t iteration,
+        const uint32_t limitView,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
 
@@ -977,7 +996,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         const uint8_t nBodyLiterals = (uint8_t) plan.plan.size();
 
         //**** Should I skip the evaluation because some atoms are empty? ***
-        bool isOneRelEmpty = checkIfAtomsAreEmpty(ruleDetails, plan, cards);
+        bool isOneRelEmpty = checkIfAtomsAreEmpty(ruleDetails, plan, limitView, cards);
         if (isOneRelEmpty) {
             LOG(DEBUGL) << "Aborting this combination";
             continue;
@@ -1077,6 +1096,16 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 min = ruleDetails.lastExecution;
             if (max == 1)
                 max = ruleDetails.lastExecution - 1;
+	    if (limitView != 0) {
+		// For execution of the restricted chase, we must limit the view: we may not include data from the current round.
+		// We use a parameter "limitView", which in this case indicates the iteration number after the last round.
+		if (max >= limitView) {
+		    max = limitView - 1;
+		}
+	    }
+	    if (min > max) {
+		continue;
+	    }
             LOG(DEBUGL) << "Evaluating atom " << optimalOrderIdx << " " << bodyLiteral->tostring() <<
                 " min=" << min << " max=" << max;
 

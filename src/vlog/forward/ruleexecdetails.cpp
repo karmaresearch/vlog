@@ -132,7 +132,6 @@ void RuleExecutionDetails::checkFilteringStrategy(
         const Literal &literal, const Literal &head, RuleExecutionPlan &hv) {
     //Two conditions: head and last literals must be compatible, and they must
     //share at least one variable in the same position
-    Substitution substitutions[SIZETUPLE];
 
     std::vector<uint8_t> vars = literal.getAllVars();
     std::vector<uint8_t> sharedVars = head.getSharedVars(vars);
@@ -366,6 +365,7 @@ void RuleExecutionDetails::createExecutionPlans() {
                 itr != posIdbLiterals.end();
                 ++itr) {
             RuleExecutionPlan p;
+	    p.filterLastHashMap = false;
             p.dependenciesExtVars = dependenciesExtVars;
             size_t idx = 0;
 
@@ -429,7 +429,8 @@ void RuleExecutionDetails::createExecutionPlans() {
         //Create a single plan. Here they are all EDBs. So the ranges are all the same
         std::vector<const Literal*> v;
         RuleExecutionPlan p;
-        p.dependenciesExtVars = dependenciesExtVars;
+	p.filterLastHashMap = false;
+	p.dependenciesExtVars = dependenciesExtVars;
         for (std::vector<Literal>::const_iterator itr = bodyLiterals.begin();
                 itr != bodyLiterals.end();
                 ++itr) {

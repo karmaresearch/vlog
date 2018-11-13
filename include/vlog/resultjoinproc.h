@@ -74,6 +74,9 @@ class ResultJoinProcessor {
                 const int nthreads) :
             ResultJoinProcessor(rowsize, new Term_t[rowsize], true, nCopyFromFirst,
                     nCopyFromSecond, posFromFirst, posFromSecond, nthreads) {
+		for (int i = 0; i < rowsize; i++) {
+		    row[i] = 0;
+		}   
             }
 
         ResultJoinProcessor(const uint8_t rowsize, Term_t *row,

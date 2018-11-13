@@ -20,3 +20,6 @@
 *.iobj
 *.ipdb
 testOutput
+.classpath
+.project
+.settings

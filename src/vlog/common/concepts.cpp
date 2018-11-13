@@ -246,13 +246,13 @@ bool Literal::sameVarSequenceAs(const Literal &l) const {
     return false;
 }
 
-int Literal::subsumes(Substitution *substitutions, const Literal &l, const Literal &m) {
+int Literal::subsumes(std::vector<Substitution> &substitutions, const Literal &l, const Literal &m) {
+    substitutions.clear();
     if (l.getPredicate().getId() != m.getPredicate().getId()) {
         return -1;
     }
     assert (l.getTupleSize() == m.getTupleSize());
 
-    int tupleSize = 0;
     for (int i = 0; i < l.getTupleSize(); ++i) {
         VTerm tl = l.getTermAtPos(i);
         VTerm tm = m.getTermAtPos(i);
@@ -261,7 +261,7 @@ int Literal::subsumes(Substitution *substitutions, const Literal &l, const Liter
 
         if (tl.isVariable()) {
             bool found = false;
-            for (int j = 0; j < tupleSize && !found; ++j) {
+            for (int j = 0; j < substitutions.size() && !found; ++j) {
                 if (substitutions[j].origin == tl.getId()) {
                     found = true;
                     if (substitutions[j].destination != tm) {
@@ -269,24 +269,25 @@ int Literal::subsumes(Substitution *substitutions, const Literal &l, const Liter
                     }
                 }
             }
-            if (!found)
-                substitutions[tupleSize++] = Substitution(tl.getId(), tm);
+            if (!found) {
+                substitutions.push_back(Substitution(tl.getId(), tm));
+	    }
         } else {
             if (tm.isVariable())
                 return -1;
         }
     }
-    return tupleSize;
+    return substitutions.size();
 }
 
-int Literal::getSubstitutionsA2B(Substitution *substitutions,
+int Literal::getSubstitutionsA2B(std::vector<Substitution> &substitutions,
         const Literal &a, const Literal &b) {
+    substitutions.clear();
     if (a.getPredicate().getId() != b.getPredicate().getId()) {
         return -1;
     }
     assert(a.getTupleSize() == b.getTupleSize());
 
-    int tupleSize = 0;
     for (int i = 0; i < a.getTupleSize(); ++i) {
         VTerm ta = a.getTermAtPos(i);
         VTerm tb = b.getTermAtPos(i);
@@ -298,7 +299,7 @@ int Literal::getSubstitutionsA2B(Substitution *substitutions,
         if (ta.isVariable()) {
             bool found = false;
             //Is there already a substitution?
-            for (int j = 0; j < tupleSize && !found; ++j) {
+            for (int j = 0; j < substitutions.size() && !found; ++j) {
                 if (substitutions[j].origin == ta.getId()) {
                     found = true;
                     if (substitutions[j].destination != tb) {
@@ -316,21 +317,21 @@ int Literal::getSubstitutionsA2B(Substitution *substitutions,
                 }
             }
             if (!found)
-                substitutions[tupleSize++] = Substitution(ta.getId(), tb);
+                substitutions.push_back(Substitution(ta.getId(), tb));
         } else {
             //if (tm.isVariable())
             //    return -1;
         }
     }
-    return tupleSize;
+    return substitutions.size();
 }
 
-Literal Literal::substitutes(Substitution * subs, const int nsubs) const {
+Literal Literal::substitutes(std::vector<Substitution> &subs) const {
     VTuple newTuple((uint8_t) this->tuple.getSize());
     for (uint8_t i = 0; i < newTuple.getSize(); ++i) {
         bool found = false;
         int j = 0;
-        while (j < nsubs && !found) {
+        while (j < subs.size() && !found) {
             if (subs[j].origin == tuple.get(i).getId()) {
                 found = true;
                 break;
@@ -440,7 +441,7 @@ bool Literal::operator==(const Literal & other) const {
 bool Rule::checkRecursion(const std::vector<Literal> &heads,
         const std::vector<Literal> &body) {
     for (const auto bodyLit : body) {
-        Substitution subs[10];
+	std::vector<Substitution> subs;
         for(const auto& head : heads) {
             if (Literal::getSubstitutionsA2B(subs, bodyLit, head) != -1)
                 return true;
@@ -465,10 +466,6 @@ void Rule::checkRule() const {
         }
     }
     LOG(DEBUGL) << "Rule " << this->tostring() << " has " << varCount << " variables";
-    if (varCount > SIZETUPLE) {
-        LOG(ERRORL) << "SIZETUPLE needs to be set to at least " << varCount << "!";
-        abort();
-    }
 }
 
 bool Rule::doesVarAppearsInFollowingPatterns(int startingPattern, uint8_t value) const {
@@ -512,14 +509,14 @@ Rule Rule::normalizeVars() const {
     }
     std::vector<Literal> newheads;
     for(auto &head : heads) {
-        Literal newHead = head.substitutes(&subs[0], subs.size());
+        Literal newHead = head.substitutes(subs);
         LOG(DEBUGL) << "head = " << head.tostring() << ", newHead = " << newHead.tostring();
         newheads.push_back(newHead);
     }
     std::vector<Literal> newBody;
     for (std::vector<Literal>::const_iterator itr = body.cbegin(); itr != body.cend();
             ++itr) {
-        newBody.push_back(itr->substitutes(&subs[0], subs.size()));
+        newBody.push_back(itr->substitutes(subs));
     }
     return Rule(ruleId, newheads, newBody);
 }
