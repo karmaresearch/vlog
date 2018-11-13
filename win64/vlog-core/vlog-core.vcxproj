@@ -44,6 +44,7 @@
     <ClCompile Include="..\..\src\vlog\forward\seminaiver_threaded.cpp" />
     <ClCompile Include="..\..\src\vlog\inmemory\inmemorytable.cpp" />
     <ClCompile Include="..\..\src\vlog\magic\wizard.cpp" />
+    <ClCompile Include="..\..\src\vlog\ml\ml.cpp" />
     <ClCompile Include="..\..\src\vlog\reasoner.cpp" />
     <ClCompile Include="..\..\src\vlog\sparql\sparqliterator.cpp" />
     <ClCompile Include="..\..\src\vlog\sparql\sparqltable.cpp" />
@@ -78,6 +79,7 @@
     <ClInclude Include="..\..\include\vlog\inmemory\inmemorytable.h" />
     <ClInclude Include="..\..\include\vlog\joinprocessor.h" />
     <ClInclude Include="..\..\include\vlog\materialization.h" />
+    <ClInclude Include="..\..\include\vlog\ml\ml.h" />
     <ClInclude Include="..\..\include\vlog\optimizer.h" />
     <ClInclude Include="..\..\include\vlog\qsqquery.h" />
     <ClInclude Include="..\..\include\vlog\qsqr.h" />

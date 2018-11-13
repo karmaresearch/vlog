@@ -141,6 +141,9 @@
     <ClCompile Include="..\..\src\vlog\sparql\sparqltable.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\vlog\ml\ml.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\launcher\vloglayer.h">
@@ -279,6 +282,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\vlog\inmemory\inmemorytable.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\vlog\ml\ml.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
