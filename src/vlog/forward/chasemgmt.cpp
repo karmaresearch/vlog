@@ -85,7 +85,7 @@ ChaseMgmt::ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
 
 static bool checkValue(uint64_t target, uint64_t v, std::vector<uint64_t> &toCheck) {
     LOG(TRACEL) << "checkValue: target = " << target << ", v = " << v;
-    if (v == target) {
+    if ((v & RULEVARMASK) == target) {
 	return true;
     }
     if (v != 0) {
@@ -109,7 +109,7 @@ bool ChaseMgmt::Rows::checkRecursive(uint64_t target, uint64_t value, std::vecto
     size_t offset = (value % SIZE_BLOCK) * sizerow;
     auto block = blocks[blockNo].get();
     for (size_t i = offset; i < offset + sizerow; i++) {
-	if (checkValue(target, block[i] & RULEVARMASK, toCheck)) {
+	if (checkValue(target, block[i], toCheck)) {
 	    return true;
 	}
     }
