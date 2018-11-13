@@ -135,6 +135,12 @@
     <ClCompile Include="..\..\src\vlog\web\webinterface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\vlog\sparql\sparqliterator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\vlog\sparql\sparqltable.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\launcher\vloglayer.h">

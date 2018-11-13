@@ -146,7 +146,7 @@ std::string escape(const std::string &s) {
     for (std::string::const_iterator i = s.cbegin(),
             n = s.cend(); i != n; ++i) {
         std::string::value_type c = (*i);
-        if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+        if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
             escaped << c;
             continue;
         }
