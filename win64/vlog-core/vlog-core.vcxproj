@@ -44,7 +44,10 @@
     <ClCompile Include="..\..\src\vlog\forward\seminaiver_threaded.cpp" />
     <ClCompile Include="..\..\src\vlog\inmemory\inmemorytable.cpp" />
     <ClCompile Include="..\..\src\vlog\magic\wizard.cpp" />
+    <ClCompile Include="..\..\src\vlog\ml\ml.cpp" />
     <ClCompile Include="..\..\src\vlog\reasoner.cpp" />
+    <ClCompile Include="..\..\src\vlog\sparql\sparqliterator.cpp" />
+    <ClCompile Include="..\..\src\vlog\sparql\sparqltable.cpp" />
     <ClCompile Include="..\..\src\vlog\text\elastictable.cpp" />
     <ClCompile Include="..\..\src\vlog\trident\tridentiterator.cpp" />
     <ClCompile Include="..\..\src\vlog\trident\tridenttable.cpp" />
@@ -76,6 +79,7 @@
     <ClInclude Include="..\..\include\vlog\inmemory\inmemorytable.h" />
     <ClInclude Include="..\..\include\vlog\joinprocessor.h" />
     <ClInclude Include="..\..\include\vlog\materialization.h" />
+    <ClInclude Include="..\..\include\vlog\ml\ml.h" />
     <ClInclude Include="..\..\include\vlog\optimizer.h" />
     <ClInclude Include="..\..\include\vlog\qsqquery.h" />
     <ClInclude Include="..\..\include\vlog\qsqr.h" />
@@ -144,7 +148,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>VLOG_SHARED_LIB;WIN32;_DEBUG;VLOGCORE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>VLOG_SHARED_LIB;WIN32;SPARQL=1;CURL_STATICLIB;_DEBUG;VLOGCORE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <AdditionalIncludeDirectories>..\..\..\deps_kognac\include;..\..\..\kognac\include;..\..\..\trident\rdf3x\include;..\..\..\trident\include;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -158,7 +162,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>..\..\..\deps_kognac\lib\zlib.lib;..\..\..\kognac\win64\x64\Debug\kognac-core.lib;..\..\..\trident\win64\x64\Debug\trident-core.lib;..\..\..\trident\win64\x64\Debug\trident-sparql.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>..\..\..\deps_kognac\lib\zlib.lib;..\..\..\deps_kognac\lib\libcurl_a.lib;..\..\..\kognac\win64\x64\Debug\kognac-core.lib;..\..\..\trident\win64\x64\Debug\trident-core.lib;..\..\..\trident\win64\x64\Debug\trident-sparql.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -169,7 +173,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>VLOG_SHARED_LIB;WIN32;NDEBUG;VLOGCORE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>VLOG_SHARED_LIB;WIN32;SPARQL=1;CURL_STATICLIB;NDEBUG;VLOGCORE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>..\..\..\deps_kognac\include;..\..\..\kognac\include;..\..\..\trident\rdf3x\include;..\..\..\trident\include;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -180,7 +184,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>..\..\..\deps_kognac\lib\zlib.lib;..\..\..\kognac\win64\x64\Release\kognac-core.lib;..\..\..\trident\win64\x64\Release\trident-core.lib;..\..\..\trident\win64\x64\Release\trident-sparql.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>..\..\..\deps_kognac\lib\zlib.lib;..\..\..\deps_kognac\lib\libcurl_a.lib;..\..\..\kognac\win64\x64\Release\kognac-core.lib;..\..\..\trident\win64\x64\Release\trident-core.lib;..\..\..\trident\win64\x64\Release\trident-sparql.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
