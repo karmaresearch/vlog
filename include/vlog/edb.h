@@ -78,6 +78,8 @@ class EDBLayer {
             std::shared_ptr<EDBTable> manager;
         };
 
+        const EDBConf &conf;
+
         std::unique_ptr<Dictionary> predDictionary;
         std::map<PredId_t, EDBInfoTable> dbPredicates;
 
@@ -116,9 +118,9 @@ class EDBLayer {
         void handlePrevSemiNaiver();
 
     public:
-        EDBLayer(EDBConf &conf, bool multithreaded,
+        EDBLayer(const EDBConf &conf, bool multithreaded,
                  std::shared_ptr<SemiNaiver> prevSemiNaiver = NULL) :
-                prevSemiNaiver(prevSemiNaiver) {
+                conf(conf), prevSemiNaiver(prevSemiNaiver) {
             const std::vector<EDBConf::Table> tables = conf.getTables();
 
             predDictionary = std::unique_ptr<Dictionary>(new Dictionary());
@@ -288,6 +290,10 @@ class EDBLayer {
 
         // For JNI interface ...
         VLIBEXP void addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows);
+
+        const EDBConf &getConf() const {
+            return conf;
+        }
 
         ~EDBLayer() {
             for (int i = 0; i < MAX_NPREDS; ++i) {

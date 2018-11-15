@@ -511,33 +511,30 @@ void launchFullMat(int argc,
         if (! vm["dred"].empty()) {
             std::string dredDir = vm["dred"].as<string>();
 
-            std::cerr << "FIXME create a fitting EDBConf programmatically. It should contain";
-            std::cerr << "an EDBonIDB table for each sn->IDB table. Subclass EDBConf!" << std::endl;
-
-            std::cerr << "FIXME ensure that the predId's of the EDBonEIB stuff are" << std::endl;
-            std::cerr << "handled correctly: either indirection or identical." << std::endl;
-            std::cerr << "One way to implement: get all (existing?) predicates from" << std::endl;
-            std::cerr << "sn->program. Create a vector<Predicate> that associates" << std::endl;
-            std::cerr << "a PredId_t with a Predicate. Pre-feed that to the dred_layer." << std::endl;
-            std::cerr << "Do I need to subclass EDBLayer for that too, so it can pre-set" << std::endl;
-            std::cerr << "the PredId_t -> Predicate bindings? And what if the existing" << std::endl;
-            std::cerr << "predicate Ids are not contiguous?" << std::endl;
-
             // std::string conf_str = createIncrOverdeleteConf(sn, dredDir);
             // EDBConf conf(conf_str, false);
-            EDBConf conf(dredDir + "/edb.conf");
+            LOG(ERRORL) << "FIXME: currently E has fixed name TE";
+            std::vector<std::string> remove_pred_names(1, "TE");
+            std::string confContents = IncrOverdelete::confContents(
+                    sn, dredDir, remove_pred_names);
+
+            LOG(INFOL) << "Generated edb.conf:";
+            LOG(INFOL) << confContents;
+
+            EDBConf conf(confContents, false);
             EDBLayer dred_layer(conf, false, sn);
 
+            std::vector<PredId_t> remove_pred;
+            for (const auto &n: remove_pred_names) {
+                remove_pred.push_back(getPredicateID(dred_layer, n));
+            }
             EDBRemoveLiterals *rm = new EDBRemoveLiterals(dredDir + "/remove",
                                                           &dred_layer);
             rm->dump(std::cerr, &dred_layer);
-            std::cerr << "FIXME: currently E has fixed name TE" << std::endl;
-            PredId_t remove_pred = getPredicateID(dred_layer, "TE");
             // Would like to move the thing i.s.o. copy RFHH
-            dred_layer.setRemoveLiterals(remove_pred, *rm);
+            dred_layer.setRemoveLiterals(remove_pred[0], *rm);
 
-            std::vector<PredId_t> remove_preds = dred_layer.getAllPredicateIDs();
-            IncrOverdelete dred_overdelete(sn, remove_preds, &dred_layer);
+            IncrOverdelete dred_overdelete(sn, remove_pred, &dred_layer);
             std::string overdelete_rules = dred_overdelete.convertRules();
             std::cout << "Overdelete rule set:" << std::endl;
             std::cout << overdelete_rules;

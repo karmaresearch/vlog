@@ -435,7 +435,6 @@ class Program {
         // Adds predicate if it doesn't exist yet
         VLIBEXP Predicate getPredicate(const std::string &p, uint8_t adornment);
 
-        // Adds predicate if it doesn't exist yet
         VLIBEXP Predicate getPredicate(const PredId_t id) const;
 
         VLIBEXP int64_t getOrAddPredicate(const std::string &p, uint8_t cardinality);

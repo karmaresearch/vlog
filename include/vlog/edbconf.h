@@ -30,7 +30,7 @@ public:
 
     EDBConf(string rawcontent) : EDBConf(rawcontent, true) {}
 
-    const std::vector<Table> &getTables() {
+    const std::vector<Table> &getTables() const {
         return tables;
     }
 };

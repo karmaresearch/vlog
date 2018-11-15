@@ -88,12 +88,16 @@ public:
 class IncrOverdelete : public IncrementalState {
 
 private:
+    const std::vector<InmemoryTable> &eMinus;      // the deletes
     std::unordered_map<PredId_t, std::string> dMinus_pred;
     std::unordered_map<PredId_t, std::string> eMinus_pred;
-    const std::vector<InmemoryTable> &eMinus;      // the deletes
 
     static std::string name2dMinus(const std::string &name) {
         return name + "@dMinus";
+    }
+
+    static std::string name2eMinus(const std::string &name) {
+        return name + "@eMinus";
     }
 
 public:
@@ -103,20 +107,67 @@ public:
                    // const
                    EDBLayer *layer) :
             IncrementalState(from, layer), eMinus(eMinus) {
-        LOG(ERRORL) << "FIXME: implement " << __func__;
-
         Program *fromProgram = fromSemiNaiver->getProgram();
         for (auto p : eMinus_preds) {
             eMinus_pred[p] = layer->getPredName(p);
         }
+    }
 
-        LOG(ERRORL) << "FIXME: add the IDBonEDB stuff";
+    /**
+     * Create an appropriate EDBConf for the Overdelete
+     * 1) copy all EDB predicates (incl. names) from the previous EDBLayer
+     * 2) for each IDB p predicate in prevSemiNaiver, specify a new
+     *    table of type EDBonIDB
+     * 3) for each table p of removes, specify an inmemory table with
+     *    predicate p@eMinus
+     */
+    static std::string confContents(// const
+                                    std::shared_ptr<SemiNaiver> fromSemiNaiver,
+                                    const std::string &dred_dir,
+                                    const std::vector<std::string> &eMinus) {
+        std::ostringstream os;
+
+        size_t nTables = 0;
+        const EDBLayer &layer = fromSemiNaiver->getEDBLayer();
+        const EDBConf &old_conf = layer.getConf();
+        const std::vector<EDBConf::Table> tables = old_conf.getTables();
+        for (const auto &t : tables) {
+            std::string predName = "EDB" + std::to_string(nTables);
+            os << predName << "_predname=" << t.predname << std::endl;
+            os << predName << "_type=" << t.type << std::endl;
+            for (size_t j = 0; j < t.params.size(); ++j) {
+                os << predName << "_" << "param" << std::to_string(j) << "=" <<
+                    t.params[j] << std::endl;
+            }
+            ++nTables;
+        }
+
+        // const
+        Program *fromProgram = fromSemiNaiver->getProgram();
+        std::vector<std::string> predicates = fromProgram->getAllPredicateStrings();
+        for (auto p : predicates) {
+            std::string predName = "EDB" + std::to_string(nTables);
+            os << predName << "_predname" << "=" << p << std::endl;
+            os << predName << "_type=EDBonIDB" << std::endl;
+            ++nTables;
+        }
+
+        for (auto rm : eMinus) {
+            std::string predName = "EDB" + std::to_string(nTables);
+            os << predName << "_predname" << "=" << name2eMinus(rm) << std::endl;
+            os << predName << "_type=INMEMORY" << std::endl;
+            os << predName << "_param0=" << dred_dir << std::endl;
+            os << predName << "_param1=" << rm << "_remove" << std::endl;
+            ++nTables;
+        }
+
+        return os.str();
     }
 
     /**
      * Gupta, Mumick, Subrahmanian
      * dMinus(p(x*)) :- s1, ..., dMinus(si), ..., sn
-     * dMinus(si): q = pred(si).
+     * dMinus(si): (let q = pred(si))
      *      if q in EDB: Q && Eminus
      *      else: dMinus(q(x*)) so we can iterate
      * si:
