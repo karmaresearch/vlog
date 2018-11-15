@@ -682,7 +682,7 @@ std::string Rule::toprettystring(Program * program, EDBLayer *db) const {
     return output;
 }
 
-bool Program::areExistentialRules() {
+bool Program::areExistentialRules() const {
     for(auto& rule : allrules) {
         if (rule.isExistential()) {
             return true;
@@ -906,7 +906,7 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     return literal;
 }
 
-PredId_t Program::getPredicateID(std::string & p, const uint8_t card) {
+PredId_t Program::getPredicateID(const std::string & p, const uint8_t card) {
     PredId_t predid = (PredId_t) dictPredicates.getOrAdd(p);
     if (predid >= MAX_NPREDS) {
         LOG(DEBUGL) << "Too many predicates";
@@ -922,7 +922,7 @@ PredId_t Program::getPredicateID(std::string & p, const uint8_t card) {
     return predid;
 }
 
-std::string Program::getPredicateName(const PredId_t id) {
+std::string Program::getPredicateName(const PredId_t id) const {
     return dictPredicates.getRawValue(id);
 }
 
@@ -974,11 +974,11 @@ void Program::addAllRules(std::vector<Rule> &rules) {
     }
 }
 
-bool Program::isPredicateIDB(const PredId_t id) {
+bool Program::isPredicateIDB(const PredId_t id) const {
     return !kb->doesPredExists(id);
 }
 
-int Program::getNEDBPredicates() {
+int Program::getNEDBPredicates() const {
     int n = 0;
     for (const auto &el : dictPredicates.getMap()) {
         if (kb->doesPredExists(el.second)) {
@@ -988,7 +988,7 @@ int Program::getNEDBPredicates() {
     return n;
 }
 
-int Program::getNIDBPredicates() {
+int Program::getNIDBPredicates() const {
     int n = 0;
     for (const auto &el : dictPredicates.getMap()) {
         if (!kb->doesPredExists(el.second)) {
@@ -1169,7 +1169,7 @@ std::vector<Rule> Program::getAllRulesByPredicate(PredId_t predid) const {
     return out;
 }
 
-std::vector<Rule> Program::getAllRules() {
+std::vector<Rule> Program::getAllRules() const {
     return allrules;
 }
 
@@ -1192,11 +1192,11 @@ void Program::sortRulesByIDBPredicates() {
     }
 }
 
-Predicate Program::getPredicate(std::string & p) {
+Predicate Program::getPredicate(const std::string & p) {
     return getPredicate(p, 0);
 }
 
-Predicate Program::getPredicate(const PredId_t id) {
+Predicate Program::getPredicate(const PredId_t id) const {
     if (kb->doesPredExists(id)) {
         return Predicate(id, 0, EDB, kb->getPredArity(id));
     }
@@ -1207,7 +1207,7 @@ Predicate Program::getPredicate(const PredId_t id) {
     return Predicate(id, 0, IDB, 0);
 }
 
-Predicate Program::getPredicate(std::string & p, uint8_t adornment) {
+Predicate Program::getPredicate(const std::string & p, uint8_t adornment) {
     PredId_t id = (PredId_t) dictPredicates.getOrAdd(p);
     if (kb->doesPredExists(id)) {
         return Predicate(id, adornment, EDB, kb->getPredArity(id));
@@ -1219,7 +1219,7 @@ Predicate Program::getPredicate(std::string & p, uint8_t adornment) {
     return Predicate(id, 0, IDB, 0);
 }
 
-int64_t Program::getOrAddPredicate(std::string & p, uint8_t cardinality) {
+int64_t Program::getOrAddPredicate(const std::string & p, uint8_t cardinality) {
     PredId_t id = (PredId_t) dictPredicates.getOrAdd(p);
     if (cardPredicates.find(id) == cardPredicates.end()) {
         cardPredicates.insert(make_pair(id, cardinality));
@@ -1232,11 +1232,11 @@ int64_t Program::getOrAddPredicate(std::string & p, uint8_t cardinality) {
     return id;
 }
 
-std::string Program::getAllPredicates() {
+std::string Program::getAllPredicates() const {
     return dictPredicates.tostring();
 }
 
-std::vector<std::string> Program::getAllPredicateStrings() {
+std::vector<std::string> Program::getAllPredicateStrings() const {
     return dictPredicates.getKeys();
 }
 
@@ -1252,7 +1252,7 @@ std::vector<PredId_t> Program::getAllEDBPredicateIds() {
     return output;
 }
 
-std::string Program::tostring() {
+std::string Program::tostring() const {
     std::string output = "";
     /*for (int i = 0; i < MAX_NPREDS; ++i) {
       for (std::vector<Rule>::iterator itr = rules[i].begin(); itr != rules[i].end();

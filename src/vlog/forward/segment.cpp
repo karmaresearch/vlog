@@ -35,7 +35,6 @@ void Segment::checkSizes() const {
     if (nfields > 0) {
         size_t sz = 0;
         if (columns[0] != NULL) {
-            std::cerr << "DEBUG Now call columns[0]->size()" << std::endl;
             sz = columns[0]->size();
         }
         for (uint8_t i = 1; i < nfields; ++i) {

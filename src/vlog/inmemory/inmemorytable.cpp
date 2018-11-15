@@ -198,6 +198,28 @@ InmemoryTable::InmemoryTable(PredId_t predid, std::vector<std::vector<std::strin
     }
 }
 
+InmemoryTable::InmemoryTable(PredId_t predid,
+                             const std::vector<std::vector<Term_t>> &entries,
+                             EDBLayer *layer) {
+    arity = entries[0].size();
+    this->predid = predid;
+    this->layer = layer;
+    //Load the table in the database
+    SegmentInserter *inserter = NULL;
+    for (auto &row : entries) {
+	if (inserter == NULL) {
+	    inserter = new SegmentInserter(arity);
+	}
+	inserter->addRow(row.data());
+    }
+    if (arity == 0) {
+	segment = NULL;
+    } else {
+	segment = inserter->getSortedAndUniqueSegment();
+	delete inserter;
+    }
+}
+
 void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
         std::vector<uint8_t> *posToFilter,
         std::vector<Term_t> *valuesToFilter) {

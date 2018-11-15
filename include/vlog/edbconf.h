@@ -20,7 +20,7 @@ public:
         Table(bool encoded) : encoded(encoded) {}
     };
 
-private:
+protected:
     std::vector<Table> tables;
 
     void parse(string f);

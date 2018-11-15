@@ -654,12 +654,14 @@ class EDBColumn : public Column {
     private:
         EDBLayer &layer;
         const Literal l;
+        const PredId_t pred_id;
         const uint8_t posColumn;
         const std::vector<uint8_t> presortPos;
         bool unq;
 
         EDBColumn(const EDBColumn &el) : layer(el.layer),
-        l(el.l), posColumn(el.posColumn), presortPos(el.presortPos),
+        l(el.l), pred_id(l.getPredicate().getId()),
+        posColumn(el.posColumn), presortPos(el.presortPos),
         unq(el.unq) {
         }
 
@@ -671,11 +673,6 @@ class EDBColumn : public Column {
         EDBColumn(EDBLayer &layer, const Literal &l, uint8_t posColumn,
                 const std::vector<uint8_t> presortPos, const bool unq);
 
-        // debug RFHH
-        ~EDBColumn() {
-            std::cerr << "Destroy EDBColumn " << this << std::endl;
-        }
-
         size_t size() const;
 
         size_t estimateSize() const;
@@ -683,7 +680,7 @@ class EDBColumn : public Column {
         bool isEmpty() const {
             // FIXME test just for presence of a first element i.s.o.
             // traversing with the RemovalIterator
-            if (layer.hasRemoveLiterals()) {
+            if (layer.hasRemoveLiterals(pred_id)) {
                 return isEmptyRemovals();
             } else {
                 return size() == 0;

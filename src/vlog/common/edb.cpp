@@ -20,6 +20,7 @@
 #include <vlog/sparql/sparqltable.h>
 #endif
 #include <vlog/inmemory/inmemorytable.h>
+#include <vlog/incremental/edb-table-from-idb.h>
 
 #include <unordered_map>
 #include <climits>
@@ -105,6 +106,9 @@ void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
     infot.manager = std::shared_ptr<EDBTable>(table);
     infot.arity = table->getArity();
     dbPredicates.insert(make_pair(infot.id, infot));
+
+    LOG(INFOL) << "Imported InmemoryTable " << pn << " size " << table->getSize();
+    // table->dump(std::cerr);
 }
 
 void EDBLayer::addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows) {
@@ -119,6 +123,9 @@ void EDBLayer::addInmemoryTable(std::string predicate, std::vector<std::vector<s
     infot.arity = table->getArity();
     infot.manager = std::shared_ptr<EDBTable>(table);
     dbPredicates.insert(make_pair(infot.id, infot));
+
+    LOG(INFOL) << "Imported InmemoryTable/predicate " << predicate;
+    // table->dump(std::cerr);
 }
 
 #ifdef SPARQL
@@ -137,6 +144,27 @@ void EDBLayer::addSparqlTable(const EDBConf::Table &tableConf) {
     dbPredicates.insert(make_pair(infot.id, infot));
 }
 #endif
+
+void EDBLayer::addEDBonIDBTable(const EDBConf::Table &tableConf) {
+    EDBInfoTable infot;
+    const string pn = tableConf.predname;
+
+    Term_t tid;
+    if (! predDictionary->get(pn, tid)) {
+        LOG(ERRORL) << "predicate should have been pre-registered in EDB";
+        throw "predicate should have been pre-registered in EDB";
+    }
+    PredId_t pid = (PredId_t)tid;
+    infot.id = pid;
+    infot.type = tableConf.type;
+    EDBonIDBTable *table = new EDBonIDBTable(infot.id, this, prevSemiNaiver);
+    infot.manager = std::shared_ptr<EDBTable>(table);
+    infot.arity = table->getNTerms();
+    dbPredicates.insert(make_pair(infot.id, infot));
+
+    LOG(INFOL) << "Inserted EDBonIDB table, predicate " << pn;
+    // table->dump(std::cout);
+}
 
 bool EDBLayer::doesPredExists(PredId_t id) const {
     return dbPredicates.count(id);
@@ -374,16 +402,16 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
     if (dbPredicates.count(predid)) {
         auto p = dbPredicates.find(predid);
         auto itr = p->second.manager->getIterator(query);
-        if (removals.size() > 0) {
-            std::cerr << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator" << std::endl;
-            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals, itr);
+        if (hasRemoveLiterals(predid)) {
+            LOG(INFOL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
+            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals[predid], itr);
             return ritr;
         } else {
             return itr;
         }
 
     } else {
-        std::cerr << "FIXME: untested -- HERE " << __func__ << ":" << __LINE__ << " inject RemoveIterator" << std::endl;
+        LOG(INFOL) << "FIXME: untested -- HERE " << __func__ << ":" << __LINE__ << " inject RemoveIterator";
         bool equalFields = query.hasRepeatedVars();
         IndexedTupleTable *rel = tmpRelations[predid];
         uint8_t size = rel->getSizeTuple();
@@ -410,9 +438,9 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
                 throw 10;
         }
 
-        if (removals.size() > 0) {
-            std::cerr << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator" << std::endl;
-            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals, itr);
+        if (hasRemoveLiterals(predid)) {
+            LOG(INFOL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
+            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals[predid], itr);
             return ritr;
         } else {
             return itr;
@@ -429,16 +457,16 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
     if (dbPredicates.count(predid)) {
         auto p = dbPredicates.find(predid);
         auto itr = p->second.manager->getSortedIterator(query, fields);
-        if (removals.size() > 0) {
-            std::cerr << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator" << std::endl;
-            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals, itr);
+        if (hasRemoveLiterals(predid)) {
+            LOG(DEBUGL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
+            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals[predid], itr);
             return ritr;
         } else {
             return itr;
         }
 
     } else {
-        std::cerr << "FIXME -- untested: HERE " << __func__ << ":" << __LINE__ << " inject RemoveIterator" << std::endl;
+        LOG(DEBUGL) << "FIXME -- untested: HERE " << __func__ << ":" << __LINE__ << " inject RemoveIterator";
         bool equalFields = false;
         if (query.hasRepeatedVars()) {
             equalFields = true;
@@ -479,9 +507,9 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
             default:
                 throw 10;
         }
-        if (removals.size() > 0) {
-            std::cerr << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator" << std::endl;
-            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals, itr);
+        if (hasRemoveLiterals(predid)) {
+            LOG(DEBUGL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
+            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals[predid], itr);
             return ritr;
         } else {
             return itr;
@@ -656,9 +684,10 @@ bool EDBLayer::checkValueInTmpRelation(const uint8_t relId, const uint8_t posInR
 }
 
 void EDBLayer::releaseIterator(EDBIterator * itr) {
-    if (dbPredicates.count(itr->getPredicateID())) {
-        auto p = dbPredicates.find(itr->getPredicateID());
-        if (removals.size() > 0) {
+    PredId_t pred_id = itr->getPredicateID();
+    if (dbPredicates.count(pred_id)) {
+        auto p = dbPredicates.find(pred_id);
+        if (hasRemoveLiterals(pred_id)) {
             auto ritr = dynamic_cast<EDBRemovalIterator *>(itr);
             p->second.manager->releaseIterator(ritr->getUnderlyingIterator());
             delete itr;
@@ -1349,13 +1378,56 @@ std::shared_ptr<Column> EDBTable::checkIn(
 }
 
 
+// Import all predicates from existing SemiNaiver ->Program into this
+// EDB layer: they are all present as EDB predicates. Thingy: I want them
+// to have the same PredId_t so lookup in the EDBonIDB is simple.
+void EDBLayer::handlePrevSemiNaiver() {
+
+    struct NamedPredicate {
+        NamedPredicate(Predicate pred, const std::string &name) :
+                pred(pred), name(name) {
+        };
+
+        Predicate pred;
+        std::string name;
+    };
+
+    const uint64_t dictStart = 1;
+
+    // const
+    Program *program = prevSemiNaiver->getProgram();
+    // Program has no method to expose all PredId's, look them up through the
+    // predicate name
+    const std::vector<std::string> pred_names = program->getAllPredicateStrings();
+    // Need to unique_ptr<> the thingy because Predicate has no default constructor
+    auto pred = std::vector<std::unique_ptr<NamedPredicate>>(pred_names.size() + dictStart);
+    for (const std::string &n : pred_names) {
+        Predicate p = program->getPredicate(n);
+        if (p.getId() >= pred.size()) {
+            LOG(ERRORL) << "Predicates are not contiguous. Cannot import to new EDBLayer!";
+            throw("Importing predicates: they are not contiguous");
+        }
+        pred[p.getId()] = std::unique_ptr<NamedPredicate>(new NamedPredicate(p, n));
+    }
+
+    for (::size_t i = dictStart; i < pred.size(); ++i) {
+        const auto &p = pred[i];
+        PredId_t id = predDictionary->getOrAdd(p->name);
+        if (id != p->pred.getId()) {
+            LOG(ERRORL) << "Predicates not contiguous in insert, how can that be?";
+            throw("Copy previous SN predicates: not contiguous after all");
+        }
+    }
+}
+
+
 EDBRemoveLiterals::EDBRemoveLiterals(const std::string &file, EDBLayer *layer) : layer(layer), num_rows(0) {
     std::ifstream infile(file);
     std::string token;
     std::vector<Term_t> terms;
     PredId_t pred;
     while (infile >> token) {
-        std::cerr << "Read token '" << token << "'" << std::endl;
+        LOG(DEBUGL) << "Read token '" << token << "'";
         uint64_t val;
         if (token == ".") {
             insert(terms);
@@ -1382,7 +1454,7 @@ EDBRemoveItem *EDBRemoveLiterals::insert_recursive(const std::vector<Term_t> &te
 
 
 void EDBRemoveLiterals::insert(const std::vector<Term_t> &terms) {
-    removals.has[terms[0]] = insert_recursive(terms, 1);
+    removed.has[terms[0]] = insert_recursive(terms, 1);
     ++num_rows;
 }
 
@@ -1394,7 +1466,7 @@ static void dump_map(std::ostream &os, const std::unordered_map<Term_t, EDBRemov
 }
 
 bool EDBRemoveLiterals::present(const std::vector<Term_t> &terms) const {
-    const EDBRemoveItem *m = &removals;
+    const EDBRemoveItem *m = &removed;
     for (auto i = 0; i < terms.size(); ++i) {
         // dump_map(std::cerr, m->has);
         // dump_recursive(std::cerr, layer, &(*m));
@@ -1404,14 +1476,18 @@ bool EDBRemoveLiterals::present(const std::vector<Term_t> &terms) const {
         }
         m = f->second;
     }
-    if (true) {
-        std::cerr << "Hit row in removals: ";
-        std::cerr << "[";
-        for (auto t : terms) {
-            std::cerr << t << " ";
-        }
-        std::cerr << "]" << std::endl;
+
+#ifdef DEBUG
+    ostringstream os;
+    os << "Hit row in removed: ";
+    os << "[";
+    for (auto t : terms) {
+        os << t << " ";
     }
+    os << "]";
+    LOG(DEBUGL) << os.str();
+#endif
+
     return true;
 }
 
@@ -1448,8 +1524,8 @@ std::ostream &EDBRemoveLiterals::dump_recursive(std::ostream &of, EDBLayer *laye
 }
 
 std::ostream &EDBRemoveLiterals::dump(std::ostream &of, /* const */ EDBLayer *layer) const {
-    dump_recursive(of, layer, &removals);
-    dump_recursive_name(of, layer, &removals);
+    dump_recursive(of, layer, &removed);
+    dump_recursive_name(of, layer, &removed);
 
     return of;
 }

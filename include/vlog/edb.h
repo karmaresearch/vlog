@@ -17,6 +17,9 @@
 #include <map>
 
 class Column;
+class SemiNaiver;       // Why cannot I break the software hierarchy? RFHH
+class EDBFCInternalTable;
+
 class EDBMemIterator : public EDBIterator {
     private:
         uint8_t nfields = 0;
@@ -81,7 +84,7 @@ class EDBRemoveItem {
 
 class EDBRemoveLiterals {
     private:
-        EDBRemoveItem removals;
+        EDBRemoveItem removed;
         EDBLayer *layer;
         size_t num_rows;
 
@@ -134,8 +137,7 @@ class EDBRemovalIterator : public EDBIterator {
             }
 
             hasNext_ahead = false;
-            bool found_remove_match = true;
-            while (found_remove_match) {
+            while (true) {
                 if (! itr->hasNext()) {
                     return false;
                 }
@@ -239,13 +241,29 @@ class EDBLayer {
         VLIBEXP void addInmemoryTable(const EDBConf::Table &tableConf);
         VLIBEXP void addSparqlTable(const EDBConf::Table &tableConf);
 
-        EDBRemoveLiterals removals;
+        VLIBEXP void addEDBonIDBTable(const EDBConf::Table &tableConf);
+
+        // literals to be removed during iteration
+        std::unordered_map<PredId_t, EDBRemoveLiterals> removals;
+
+        // For incremental reasoning: EDBonIDB must know which SemiNaiver to
+        // query
+        std::shared_ptr<SemiNaiver> prevSemiNaiver;
+
+        // need to import the mapping predid -> Predicate from prevSemiNaiver
+        void handlePrevSemiNaiver();
 
     public:
-        EDBLayer(EDBConf &conf, bool multithreaded) {
+        EDBLayer(EDBConf &conf, bool multithreaded,
+                 std::shared_ptr<SemiNaiver> prevSemiNaiver = NULL) :
+                prevSemiNaiver(prevSemiNaiver) {
             const std::vector<EDBConf::Table> tables = conf.getTables();
 
             predDictionary = std::unique_ptr<Dictionary>(new Dictionary());
+
+            if (prevSemiNaiver != NULL) {
+                handlePrevSemiNaiver();
+            }
 
             for (const auto &table : tables) {
                 if (table.type == "Trident") {
@@ -272,6 +290,8 @@ class EDBLayer {
                 } else if (table.type == "SPARQL") {
                     addSparqlTable(table);
 #endif
+                } else if (table.type == "EDBonIDB") {
+                    addEDBonIDBTable(table);
                 } else {
                     LOG(ERRORL) << "Type of table is not supported";
                     throw 10;
@@ -395,12 +415,13 @@ class EDBLayer {
 
         void releaseIterator(EDBIterator *itr);
 
-        void setRemoveLiterals(EDBRemoveLiterals &rm) {
-            removals = rm;
+        VLIBEXP void setRemoveLiterals(PredId_t pred, EDBRemoveLiterals &rm) {
+            removals[pred] = rm;
         }
 
-        bool hasRemoveLiterals() const {
-            return removals.size() > 0;
+        VLIBEXP bool hasRemoveLiterals(PredId_t pred) const {
+            return removals.find(pred) != removals.end() &&
+                removals.at(pred).size() > 0;
         }
 
         // For JNI interface ...

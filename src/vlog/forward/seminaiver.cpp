@@ -381,6 +381,7 @@ bool SemiNaiver::executeUntilSaturation(
 	    }
 	}
         std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+
         StatIteration stat;
         stat.iteration = iteration;
         stat.rule = &ruleset[currentRule].rule;
@@ -718,7 +719,8 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
 
                 std::shared_ptr<const FCInternalTable> table =
                     literalItr.getCurrentTable();
-                std::cerr << "Program says Predicate is " << program->getPredicateName(const_cast<EDBFCInternalTable *>(dynamic_cast<const EDBFCInternalTable *>(table.get()))->getQuery().getPredicate().getId()) << std::endl;
+                LOG(DEBUGL) << "Program says Predicate is " <<
+                    program->getPredicateName(const_cast<EDBFCInternalTable *>(dynamic_cast<const EDBFCInternalTable *>(table.get()))->getQuery().getPredicate().getId());
                 FCInternalTableItr *interitr = table->getIterator();
 
                 bool unique = uniqueResults && firstEndTable->isEmpty();
@@ -933,6 +935,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     currentRule = rule.tostring(program, &layer);
 #endif
 
+    LOG(INFOL) << "Iteration: " << iteration <<
+        " Rule: " << rule.tostring(program, &layer);
     LOG(DEBUGL) << "Iteration: " << iteration <<
         " Rule: " << rule.tostring(program, &layer);
 

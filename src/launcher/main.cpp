@@ -10,6 +10,10 @@
 #include <vlog/utils.h>
 #include <vlog/ml/ml.h>
 
+//Incremental, will probably move away
+#include <vlog/inmemory/inmemorytable.h>
+#include <vlog/incremental/incremental-concepts.h>
+
 //Used to load a Trident KB
 #include <vlog/trident/tridenttable.h>
 #include <launcher/vloglayer.h>
@@ -235,6 +239,8 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "Set maximum number of threads to use for inter-rule parallelism. Default is 0", false);
     query_options.add<string>("", "rm", "",
             "File with facts to suppress (remove) from the EDB", false);
+    query_options.add<string>("", "dred", "",
+            "Directory with files with facts to add/remove from the EDB", false);
 
     query_options.add<bool>("", "shufflerules", false,
             "shuffle rules randomly instead of using heuristics (only for <mat>, and only when running multithreaded).", false);
@@ -372,6 +378,45 @@ void startServer(int argc,
 }
 #endif
 
+
+static void store_mat(const std::string &path, ProgramArgs &vm,
+                      const std::shared_ptr<SemiNaiver> sn) {
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+
+    Exporter exp(sn);
+
+    string storemat_format = vm["storemat_format"].as<string>();
+
+    if (storemat_format == "files" || storemat_format == "csv") {
+        sn->storeOnFiles(path,
+                vm["decompressmat"].as<bool>(), 0, storemat_format == "csv");
+    } else if (storemat_format == "db") {
+        //I will store the details on a Trident index
+        exp.generateTridentDiffIndex(path);
+    } else if (storemat_format == "nt") {
+        exp.generateNTTriples(path, vm["decompressmat"].as<bool>());
+    } else {
+        LOG(ERRORL) << "Option 'storemat_format' not recognized";
+        throw 10;
+    }
+
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    LOG(INFOL) << "Time to index and store the materialization on disk = " << sec.count() << " seconds";
+}
+
+static PredId_t getPredicateID(// const
+                               EDBLayer &layer, const std::string &name) {
+    std::cerr << "FIXME: add an API call to edblayer to get pred_id from pred name" << std::endl;
+    auto preds = layer.getAllPredicateIDs();
+    for (auto p : preds) {
+        if (layer.getPredName(p) == "TE") {
+            return p;
+        }
+    }
+    LOG(ERRORL) << "Cannot find PredId for " << name;
+    throw 10;   // Follow convetion
+}
+
 void launchFullMat(int argc,
         const char** argv,
         string pathExec,
@@ -463,6 +508,69 @@ void launchFullMat(int argc,
         LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
         sn->printCountAllIDBs("");
 
+        if (! vm["dred"].empty()) {
+            std::string dredDir = vm["dred"].as<string>();
+
+            std::cerr << "FIXME create a fitting EDBConf programmatically. It should contain";
+            std::cerr << "an EDBonIDB table for each sn->IDB table. Subclass EDBConf!" << std::endl;
+
+            std::cerr << "FIXME ensure that the predId's of the EDBonEIB stuff are" << std::endl;
+            std::cerr << "handled correctly: either indirection or identical." << std::endl;
+            std::cerr << "One way to implement: get all (existing?) predicates from" << std::endl;
+            std::cerr << "sn->program. Create a vector<Predicate> that associates" << std::endl;
+            std::cerr << "a PredId_t with a Predicate. Pre-feed that to the dred_layer." << std::endl;
+            std::cerr << "Do I need to subclass EDBLayer for that too, so it can pre-set" << std::endl;
+            std::cerr << "the PredId_t -> Predicate bindings? And what if the existing" << std::endl;
+            std::cerr << "predicate Ids are not contiguous?" << std::endl;
+
+            // std::string conf_str = createIncrOverdeleteConf(sn, dredDir);
+            // EDBConf conf(conf_str, false);
+            EDBConf conf(dredDir + "/edb.conf");
+            EDBLayer dred_layer(conf, false, sn);
+
+            EDBRemoveLiterals *rm = new EDBRemoveLiterals(dredDir + "/remove",
+                                                          &dred_layer);
+            rm->dump(std::cerr, &dred_layer);
+            std::cerr << "FIXME: currently E has fixed name TE" << std::endl;
+            PredId_t remove_pred = getPredicateID(dred_layer, "TE");
+            // Would like to move the thing i.s.o. copy RFHH
+            dred_layer.setRemoveLiterals(remove_pred, *rm);
+
+            std::vector<PredId_t> remove_preds = dred_layer.getAllPredicateIDs();
+            IncrOverdelete dred_overdelete(sn, remove_preds, &dred_layer);
+            std::string overdelete_rules = dred_overdelete.convertRules();
+            std::cout << "Overdelete rule set:" << std::endl;
+            std::cout << overdelete_rules;
+
+            Program overdeleteProgram(&dred_layer);
+            overdeleteProgram.readFromString(overdelete_rules, 
+                                             vm["rewriteMultihead"].as<bool>());
+            // Create a Program, create a SemiNaiver, run...
+
+            //Prepare the materialization
+            std::shared_ptr<SemiNaiver> overdelete = Reasoner::getSemiNaiver(dred_layer,
+                    &overdeleteProgram, vm["no-intersect"].empty(),
+                    vm["no-filtering"].empty(),
+                    !vm["multithreaded"].empty(),
+                    vm["restrictedChase"].as<bool>(),
+                    nthreads,
+                    interRuleThreads,
+                    ! vm["shufflerules"].empty());
+            LOG(INFOL) << "Starting overdeletion materialization";
+            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+            overdelete->run();
+            std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+            LOG(INFOL) << "Runtime overdelete = " << sec.count() * 1000 << " milliseconds";
+
+            if (vm["storemat_path"].as<string>() != "") {
+                store_mat(vm["storemat_path"].as<string>() + ".dred", vm, overdelete);
+            }
+
+            // delete rm;       Why memory error?
+
+            // Continue same with Rederive
+        }
+
 #if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
         if (vm["monitorThread"].as<bool>()) {
             isFinished = true;
@@ -471,29 +579,8 @@ void launchFullMat(int argc,
         }
 #endif
 
-
         if (vm["storemat_path"].as<string>() != "") {
-            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-
-            Exporter exp(sn);
-
-            string storemat_format = vm["storemat_format"].as<string>();
-
-            if (storemat_format == "files" || storemat_format == "csv") {
-                sn->storeOnFiles(vm["storemat_path"].as<string>(),
-                        vm["decompressmat"].as<bool>(), 0, storemat_format == "csv");
-            } else if (storemat_format == "db") {
-                //I will store the details on a Trident index
-                exp.generateTridentDiffIndex(vm["storemat_path"].as<string>());
-            } else if (storemat_format == "nt") {
-                exp.generateNTTriples(vm["storemat_path"].as<string>(), vm["decompressmat"].as<bool>());
-            } else {
-                LOG(ERRORL) << "Option 'storemat_format' not recognized";
-                throw 10;
-            }
-
-            std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-            LOG(INFOL) << "Time to index and store the materialization on disk = " << sec.count() << " seconds";
+            store_mat(vm["storemat_path"].as<string>(), vm, sn);
         }
 #ifdef WEBINTERFACE
         if (webint) {
@@ -824,13 +911,16 @@ int main(int argc, const char** argv) {
             rm = new EDBRemoveLiterals(vm["rm"].as<string>(), layer);
             rm->dump(std::cerr, layer);
             // Would like to move the thing i.s.o. copy RFHH
-            layer->setRemoveLiterals(*rm);
+            std::cerr << "FIXME: currently E has fixed name TE" << std::endl;
+            PredId_t remove_pred = getPredicateID(*layer, "TE");
+            layer->setRemoveLiterals(remove_pred, *rm);
         }
         // EDBLayer layer(conf, false);
         launchFullMat(argc, argv, full_path, *layer, vm,
                 vm["rules"].as<string>());
         delete layer;
         if (! vm["rm"].empty()) {
+            std::cerr << "FIXME: need to delete this RemoveLiterals" << std::endl;
             // delete rm;
         }
     } else if (cmd == "rulesgraph") {

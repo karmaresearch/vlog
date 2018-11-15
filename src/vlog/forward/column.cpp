@@ -234,11 +234,11 @@ EDBColumn::EDBColumn(EDBLayer &edb, const Literal &lit, uint8_t posColumn,
         const std::vector<uint8_t> presortPos, const bool unq) :
     layer(edb),
     l(lit),
+    pred_id(l.getPredicate().getId()),
     posColumn(posColumn),
     presortPos(presortPos),
     unq(unq) {
         assert(!unq || presortPos.empty());
-        std::cerr << "Create EDBColumn " << this << std::endl;
     }
 
 bool EDBColumn::isEmptyRemovals() const {
