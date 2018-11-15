@@ -870,7 +870,7 @@ std::shared_ptr<Column> EDBLayer::checkIn(
 
 }
 
-bool EDBLayer::getDictNumber(const char *text, const size_t sizeText, uint64_t &id) {
+bool EDBLayer::getDictNumber(const char *text, const size_t sizeText, uint64_t &id) const {
     bool resp = false;
     if (dbPredicates.size() > 0) {
         resp = dbPredicates.begin()->second.manager->
@@ -903,7 +903,7 @@ bool EDBLayer::getOrAddDictNumber(const char *text, const size_t sizeText,
     return resp;
 }
 
-bool EDBLayer::getDictText(const uint64_t id, char *text) {
+bool EDBLayer::getDictText(const uint64_t id, char *text) const {
     bool resp = false;
     if (dbPredicates.size() > 0) {
         resp = dbPredicates.begin()->second.manager->getDictText(id, text);
@@ -919,7 +919,7 @@ bool EDBLayer::getDictText(const uint64_t id, char *text) {
     return resp;
 }
 
-std::string EDBLayer::getDictText(const uint64_t id) {
+std::string EDBLayer::getDictText(const uint64_t id) const {
     std::string t = "";
     bool resp = false;
     if (dbPredicates.size() > 0) {
@@ -931,7 +931,7 @@ std::string EDBLayer::getDictText(const uint64_t id) {
     return t;
 }
 
-uint64_t EDBLayer::getNTerms() {
+uint64_t EDBLayer::getNTerms() const {
     uint64_t size = 0;
     if (dbPredicates.size() > 0) {
         size = dbPredicates.begin()->second.manager->getNTerms();
@@ -942,46 +942,46 @@ uint64_t EDBLayer::getNTerms() {
     return size;
 }
 
-Predicate EDBLayer::getDBPredicate(int idPredicate) {
+Predicate EDBLayer::getDBPredicate(int idPredicate) const {
     if (!dbPredicates.count(idPredicate)) {
         throw 10; //cannot happen
     }
-    EDBInfoTable &info = dbPredicates.find(idPredicate)->second;
+    const EDBInfoTable &info = dbPredicates.find(idPredicate)->second;
     return Predicate(idPredicate, 0, EDB, info.arity);
 }
 
-std::vector<PredId_t> EDBLayer::getAllPredicateIDs() {
+std::vector<PredId_t> EDBLayer::getAllPredicateIDs() const {
     std::vector<PredId_t> out;
-    for(auto &t : dbPredicates) {
+    for(const auto &t : dbPredicates) {
         out.push_back(t.first);
     }
     return out;
 }
 
-uint64_t EDBLayer::getPredSize(PredId_t id) {
+uint64_t EDBLayer::getPredSize(PredId_t id) const {
     if (dbPredicates.count(id)) {
-        return dbPredicates[id].manager->getSize();
+        return dbPredicates.at(id).manager->getSize();
     }
     return 0;
 }
 
-string EDBLayer::getPredType(PredId_t id) {
+string EDBLayer::getPredType(PredId_t id) const {
     if (dbPredicates.count(id)) {
-        return dbPredicates[id].type;
+        return dbPredicates.at(id).type;
     }
     return 0;
 }
 
-string EDBLayer::getPredName(PredId_t id) {
+string EDBLayer::getPredName(PredId_t id) const {
     if (dbPredicates.count(id)) {
         return predDictionary->getRawValue(id);
     }
     return 0;
 }
 
-uint8_t EDBLayer::getPredArity(PredId_t id) {
+uint8_t EDBLayer::getPredArity(PredId_t id) const {
     if (dbPredicates.count(id)) {
-        return dbPredicates[id].arity;
+        return dbPredicates.at(id).arity;
     }
     return 0;
 }

@@ -167,15 +167,15 @@ class EDBLayer {
             }
         }
 
-        std::vector<PredId_t> getAllPredicateIDs();
+        std::vector<PredId_t> getAllPredicateIDs() const;
 
-        uint64_t getPredSize(PredId_t id);
+        uint64_t getPredSize(PredId_t id) const;
 
-        string getPredType(PredId_t id);
+        string getPredType(PredId_t id) const;
 
-        string getPredName(PredId_t id);
+        string getPredName(PredId_t id) const;
 
-        uint8_t getPredArity(PredId_t id);
+        uint8_t getPredArity(PredId_t id) const;
 
         void addTmpRelation(Predicate &pred, IndexedTupleTable *table);
 
@@ -248,18 +248,18 @@ class EDBLayer {
                 uint8_t posColumn);
 
         VLIBEXP bool getDictNumber(const char *text,
-                const size_t sizeText, uint64_t &id);
+                const size_t sizeText, uint64_t &id) const;
 
         VLIBEXP bool getOrAddDictNumber(const char *text,
                 const size_t sizeText, uint64_t &id);
 
-        VLIBEXP bool getDictText(const uint64_t id, char *text);
+        VLIBEXP bool getDictText(const uint64_t id, char *text) const;
 
-        VLIBEXP std::string getDictText(const uint64_t id);
+        VLIBEXP std::string getDictText(const uint64_t id) const;
 
-        Predicate getDBPredicate(int idx);
+        Predicate getDBPredicate(int idx) const;
 
-        std::shared_ptr<EDBTable> getEDBTable(PredId_t id) {
+        std::shared_ptr<EDBTable> getEDBTable(PredId_t id) const {
             if (dbPredicates.count(id)) {
                 return dbPredicates.find(id)->second.manager;
             } else {
@@ -267,7 +267,7 @@ class EDBLayer {
             }
         }
 
-        string getTypeEDBPredicate(PredId_t id) {
+        string getTypeEDBPredicate(PredId_t id) const {
             if (dbPredicates.count(id)) {
                 return dbPredicates.find(id)->second.type;
             } else {
@@ -275,7 +275,7 @@ class EDBLayer {
             }
         }
 
-        VLIBEXP uint64_t getNTerms();
+        VLIBEXP uint64_t getNTerms() const;
 
         void releaseIterator(EDBIterator *itr);
 

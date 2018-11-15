@@ -13,17 +13,14 @@ class IncrementalState {
 
 protected:
     // const
-    std::shared_ptr<SemiNaiver> fromSemiNaiver;
-    // const
-    EDBLayer *layer;
+    const std::shared_ptr<SemiNaiver> fromSemiNaiver;
+    const EDBLayer *layer;
 
     std::unordered_set<PredId_t> inPreviousSemiNaiver;
     std::string rules;
 
-    IncrementalState(// const
-                     std::shared_ptr<SemiNaiver> from,
-                     // const
-                     EDBLayer *layer) :
+    IncrementalState(const std::shared_ptr<SemiNaiver> from,
+                     const EDBLayer *layer) :
         fromSemiNaiver(from), layer(layer) {
     }
 
@@ -36,8 +33,7 @@ protected:
         return ABC;
     }
 
-    static std::string printArgs(const Literal &lit, // const
-                                 EDBLayer *kb) {
+    static std::string printArgs(const Literal &lit, const EDBLayer *kb) {
         std::ostringstream args;
         const VTuple &tuple = lit.getTuple();
         args << "(";
@@ -101,11 +97,9 @@ private:
     }
 
 public:
-    IncrOverdelete(// const
-                   std::shared_ptr<SemiNaiver> from,
+    IncrOverdelete(const std::shared_ptr<SemiNaiver> from,
                    const std::vector<PredId_t> &eMinus_preds,
-                   // const
-                   EDBLayer *layer) :
+                   const EDBLayer *layer) :
             IncrementalState(from, layer), eMinus(eMinus) {
         Program *fromProgram = fromSemiNaiver->getProgram();
         for (auto p : eMinus_preds) {
@@ -121,8 +115,7 @@ public:
      * 3) for each table p of removes, specify an inmemory table with
      *    predicate p@eMinus
      */
-    static std::string confContents(// const
-                                    std::shared_ptr<SemiNaiver> fromSemiNaiver,
+    static std::string confContents(const std::shared_ptr<SemiNaiver> fromSemiNaiver,
                                     const std::string &dred_dir,
                                     const std::vector<std::string> &eMinus) {
         std::ostringstream os;
@@ -142,8 +135,7 @@ public:
             ++nTables;
         }
 
-        // const
-        Program *fromProgram = fromSemiNaiver->getProgram();
+        const Program *fromProgram = fromSemiNaiver->getProgram();
         std::vector<std::string> predicates = fromProgram->getAllPredicateStrings();
         for (auto p : predicates) {
             std::string predName = "EDB" + std::to_string(nTables);
@@ -175,7 +167,7 @@ public:
      *      else: as from I (materialization) of previous Program
      */
     virtual std::string convertRules() {
-        // const
+        const
         Program *fromProgram = fromSemiNaiver->getProgram();
         const std::vector<Rule> rs = fromProgram->getAllRules();
         // const
@@ -250,10 +242,44 @@ public:
     }
 };
 
-/*
 class IncrRederive : public IncrementalState {
+public:
+    IncrRederive(const std::shared_ptr<SemiNaiver> from,
+                 const EDBLayer *layer) :
+            IncrementalState(from, layer) {
+    }
+
+    /**
+     * Create an appropriate EDBConf for the Rederive
+     */
+    static std::string confContents(// const
+                                    std::shared_ptr<SemiNaiver> fromSemiNaiver,
+                                    const std::string &dred_dir,
+                                    const std::vector<std::string> &ePlus) {
+        std::ostringstream os;
+
+        size_t nTables = 0;
+
+        return os.str();
+    }
+
+    /**
+     * Gupta, Mumick, Subrahmanian
+     * dPlus(p(x*)) :- dMinus(p(x*)), s1, ..., sn
+     * si: (let q = pred(si))
+     *      if q in EDB: Q - eMinus
+     *      else: I(DeltaMinus) + dPlus(p(x*))
+     *          Is this the same as:
+     *              si :- I(DeltaMinus) (as far as in Q)
+     *              si :- dPlus(p[x*])
+     *         Or is it easier to initialize si to
+     *         I(DeltaMinus) (as far as in Q) and then solve?
+     */
+    virtual std::string convertRules() {
+    }
 };
 
+/*
 class IncrAdd : public IncrementalState {
 };
 */
