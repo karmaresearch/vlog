@@ -908,11 +908,15 @@ int main(int argc, const char** argv) {
         EDBLayer *layer = new EDBLayer(conf, ! vm["multithreaded"].empty());
         EDBRemoveLiterals *rm;
         if (! vm["rm"].empty()) {
-            rm = new EDBRemoveLiterals(vm["rm"].as<string>(), layer);
-            rm->dump(std::cerr, layer);
-            // Would like to move the thing i.s.o. copy RFHH
+            std::string path(vm["rm"].as<string>());
             std::cerr << "FIXME: currently E has fixed name TE" << std::endl;
             PredId_t remove_pred = getPredicateID(*layer, "TE");
+            InmemoryTable rmTable(Utils::parentDir(path), Utils::filename(path),
+                                  remove_pred, layer);
+            // rm = new EDBRemoveLiterals(vm["rm"].as<string>(), layer);
+            rm = new EDBRemoveLiterals(&rmTable, remove_pred, layer);
+            rm->dump(std::cerr, layer);
+            // Would like to move the thing i.s.o. copy RFHH
             layer->setRemoveLiterals(remove_pred, *rm);
         }
         // EDBLayer layer(conf, false);

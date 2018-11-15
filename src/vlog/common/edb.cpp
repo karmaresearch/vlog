@@ -34,9 +34,9 @@ void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithread
         throw 10;
     }
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
-    infot.arity = 3;
     infot.type = tableConf.type;
     infot.manager = std::shared_ptr<EDBTable>(new TridentTable(kbpath, multithreaded, this));
+    infot.arity = infot.manager->getArity();
     dbPredicates.insert(make_pair(infot.id, infot));
     LOG(DEBUGL) << "Inserted " << pn << " with number " << infot.id;
 }
@@ -159,7 +159,7 @@ void EDBLayer::addEDBonIDBTable(const EDBConf::Table &tableConf) {
     infot.type = tableConf.type;
     EDBonIDBTable *table = new EDBonIDBTable(infot.id, this, prevSemiNaiver);
     infot.manager = std::shared_ptr<EDBTable>(table);
-    infot.arity = table->getNTerms();
+    infot.arity = table->getArity();
     dbPredicates.insert(make_pair(infot.id, infot));
 
     LOG(INFOL) << "Inserted EDBonIDB table, predicate " << pn;
@@ -1439,6 +1439,29 @@ EDBRemoveLiterals::EDBRemoveLiterals(const std::string &file, EDBLayer *layer) :
     }
 }
 
+EDBRemoveLiterals::EDBRemoveLiterals(EDBTable *table, PredId_t predid,
+                                     EDBLayer *layer) {
+    uint8_t arity = table->getArity();
+    Predicate pred(predid, 0, EDB, arity);
+    VTuple t = VTuple(arity);
+    for (uint8_t i = 0; i < t.getSize(); ++i) {
+        t.set(VTerm(i + 1, 0), i);
+    }
+    Literal lit(pred, t);
+    EDBIterator *itr = table->getIterator(lit);
+    std::vector<Term_t> terms(arity);
+    while (itr->hasNext()) {
+        itr->next();
+        for (uint8_t m = 0; m < arity; ++m) {
+            terms[m] = itr->getElementAt(m);
+        }
+        insert(terms);
+    }
+
+    dump(std::cerr, layer);
+
+    table->releaseIterator(itr);
+}
 
 EDBRemoveItem *EDBRemoveLiterals::insert_recursive(const std::vector<Term_t> &terms, size_t offset) {
     EDBRemoveItem *item;

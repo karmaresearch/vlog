@@ -85,7 +85,7 @@ class InmemoryTable : public EDBTable {
                       const std::vector<std::vector<Term_t>> &entries,
                       EDBLayer *layer);
 
-        uint8_t getArity() const;
+        virtual uint8_t getArity() const;
 
         void query(QSQQuery *query, TupleTable *outputTable,
                 std::vector<uint8_t> *posToFilter,
@@ -122,8 +122,8 @@ class InmemoryTable : public EDBTable {
         std::ostream &dump(std::ostream &os) {
             std::string name = layer->getPredName(predid);
             os << "Table " << name << std::endl;
-            Predicate pred(predid, 0, EDB, getNTerms());
-            VTuple t = VTuple(getNTerms());
+            Predicate pred(predid, 0, EDB, arity);
+            VTuple t = VTuple(arity);
             for (uint8_t i = 0; i < t.getSize(); ++i) {
                 t.set(VTerm(i + 1, 0), i);
             }

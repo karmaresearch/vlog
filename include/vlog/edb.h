@@ -96,6 +96,7 @@ class EDBRemoveLiterals {
     public:
         EDBRemoveLiterals() { }
         EDBRemoveLiterals(const std::string &file, EDBLayer *layer);
+        EDBRemoveLiterals(EDBTable *table, PredId_t predid, EDBLayer *layer);
 
         void insert(const std::vector<Term_t> &terms);
 

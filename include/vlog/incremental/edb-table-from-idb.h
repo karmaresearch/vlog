@@ -300,6 +300,10 @@ public:
     }
 
     virtual uint64_t getNTerms() {
+        return 0;
+    }
+
+    virtual uint8_t getArity() const {
         return idbTable->getSizeRow();
     }
 

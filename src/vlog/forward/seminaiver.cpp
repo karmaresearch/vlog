@@ -719,8 +719,6 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
 
                 std::shared_ptr<const FCInternalTable> table =
                     literalItr.getCurrentTable();
-                LOG(DEBUGL) << "Program says Predicate is " <<
-                    program->getPredicateName(const_cast<EDBFCInternalTable *>(dynamic_cast<const EDBFCInternalTable *>(table.get()))->getQuery().getPredicate().getId());
                 FCInternalTableItr *interitr = table->getIterator();
 
                 bool unique = uniqueResults && firstEndTable->isEmpty();
