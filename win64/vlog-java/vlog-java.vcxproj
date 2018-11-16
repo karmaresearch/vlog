@@ -26,7 +26,7 @@
     <ProjectGuid>{E27A8DA0-0C4D-412F-BD6E-D84B77573E7A}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>vlogjava</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -75,7 +75,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>..\..\..\deps_kognac\include;..\..\..\kognac\include;..\..\..\trident\rdf3x\include;..\..\..\trident\include;..\..\include;C:\Program Files\Java\jdk1.8.0_161\include\win32;C:\Program Files\Java\jdk1.8.0_161\include;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\deps\include;..\..\..\kognac\include;..\..\..\trident\rdf3x\include;..\..\..\trident\include;..\..\include;C:\Program Files\Java\jdk1.8.0_192\include\win32;C:\Program Files\Java\jdk1.8.0_192\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
@@ -85,7 +85,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>..\..\..\deps_kognac\include;..\..\..\kognac\include;..\..\..\trident\rdf3x\include;..\..\..\trident\include;..\..\include;C:\Program Files\Java\jdk1.8.0_161\include\win32;C:\Program Files\Java\jdk1.8.0_161\include;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\..\deps\include;..\..\..\kognac\include;..\..\..\trident\rdf3x\include;..\..\..\trident\include;..\..\include;C:\Program Files\Java\jdk1.8.0_192\include\win32;C:\Program Files\Java\jdk1.8.0_192\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

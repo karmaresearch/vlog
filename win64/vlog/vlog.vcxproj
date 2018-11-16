@@ -26,7 +26,7 @@
     <ProjectGuid>{7017EF1D-3511-4F8E-8F6D-8B7227237912}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>vlog</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -110,13 +110,13 @@
       <PreprocessorDefinitions>WIN32;SPARQL=1;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalIncludeDirectories>..\..\..\trident\rdf3x\include;..\..\..\deps_kognac\include;..\..\..\kognac\include;..\..\..\trident\include;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\trident\rdf3x\include;..\..\..\deps\include;..\..\..\kognac\include;..\..\..\trident\include;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4244;4996;4018</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>..\x64\Debug\vlog-core.lib;..\..\..\deps_kognac\lib\zlib.lib;..\..\..\kognac\win64\x64\Debug\kognac-core.lib;..\..\..\trident\win64\x64\Debug\trident-core.lib;..\..\..\trident\win64\x64\Debug\trident-sparql.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>..\x64\Debug\vlog-core.lib;..\..\..\deps\lib\zlib.lib;..\..\..\kognac\win64\x64\Debug\kognac-core.lib;..\..\..\trident\win64\x64\Debug\trident-core.lib;..\..\..\trident\win64\x64\Debug\trident-sparql.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <StackReserveSize>8388608</StackReserveSize>
     </Link>
   </ItemDefinitionGroup>
@@ -148,7 +148,7 @@
       <SDLCheck>false</SDLCheck>
       <PreprocessorDefinitions>WIN32;SPARQL=1;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>..\..\include;..\..\..\kognac\include;..\..\..\trident\include;..\..\..\trident\rdf3x\include;..\..\..\deps_kognac\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\include;..\..\..\kognac\include;..\..\..\trident\include;..\..\..\trident\rdf3x\include;..\..\..\deps\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4244;4996;4018;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -157,7 +157,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>..\x64\Release\vlog-core.lib;..\..\..\deps_kognac\lib\zlib.lib;..\..\..\kognac\win64\x64\Release\kognac-core.lib;..\..\..\trident\win64\x64\Release\trident-core.lib;..\..\..\trident\win64\x64\Release\trident-sparql.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>..\x64\Release\vlog-core.lib;..\..\..\deps\lib\zlib.lib;..\..\..\kognac\win64\x64\Release\kognac-core.lib;..\..\..\trident\win64\x64\Release\trident-core.lib;..\..\..\trident\win64\x64\Release\trident-sparql.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <StackReserveSize>8388608</StackReserveSize>
     </Link>
   </ItemDefinitionGroup>

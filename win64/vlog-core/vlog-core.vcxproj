@@ -109,7 +109,7 @@
     <ProjectGuid>{0DB16150-B796-4A04-888A-EBFA9D4AD66F}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>vlogcore</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -150,7 +150,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>VLOG_SHARED_LIB;WIN32;SPARQL=1;CURL_STATICLIB;_DEBUG;VLOGCORE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>..\..\..\deps_kognac\include;..\..\..\kognac\include;..\..\..\trident\rdf3x\include;..\..\..\trident\include;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\deps\include;..\..\..\kognac\include;..\..\..\trident\rdf3x\include;..\..\..\trident\include;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
@@ -162,7 +162,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>..\..\..\deps_kognac\lib\zlib.lib;..\..\..\deps_kognac\lib\libcurl_a.lib;..\..\..\kognac\win64\x64\Debug\kognac-core.lib;..\..\..\trident\win64\x64\Debug\trident-core.lib;..\..\..\trident\win64\x64\Debug\trident-sparql.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>..\..\..\deps\lib\zlib.lib;..\..\..\deps\lib\libcurl_a.lib;..\..\..\deps\lib\libssl.lib;..\..\..\kognac\win64\x64\Debug\kognac-core.lib;..\..\..\trident\win64\x64\Debug\trident-core.lib;..\..\..\trident\win64\x64\Debug\trident-sparql.lib;crypt32.lib;wldap32.lib;normaliz.lib;Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -176,7 +176,7 @@
       <PreprocessorDefinitions>VLOG_SHARED_LIB;WIN32;SPARQL=1;CURL_STATICLIB;NDEBUG;VLOGCORE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalIncludeDirectories>..\..\..\deps_kognac\include;..\..\..\kognac\include;..\..\..\trident\rdf3x\include;..\..\..\trident\include;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\deps\include;..\..\..\kognac\include;..\..\..\trident\rdf3x\include;..\..\..\trident\include;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4244;4996;4018;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -184,7 +184,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>..\..\..\deps_kognac\lib\zlib.lib;..\..\..\deps_kognac\lib\libcurl_a.lib;..\..\..\kognac\win64\x64\Release\kognac-core.lib;..\..\..\trident\win64\x64\Release\trident-core.lib;..\..\..\trident\win64\x64\Release\trident-sparql.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>..\..\..\deps\lib\zlib.lib;..\..\..\deps\lib\liblz4_static.lib;..\..\..\deps\lib\libcurl_a.lib;..\..\..\deps\lib\libssl.lib;..\..\..\kognac\win64\x64\Release\kognac-core.lib;..\..\..\trident\win64\x64\Release\trident-core.lib;..\..\..\trident\win64\x64\Release\trident-sparql.lib;crypt32.lib;wldap32.lib;normaliz.lib;Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
