@@ -108,7 +108,7 @@ class EDBLayer {
         VLIBEXP void addEDBonIDBTable(const EDBConf::Table &tableConf);
 
         // literals to be removed during iteration
-        std::unordered_map<PredId_t, EDBRemoveLiterals> removals;
+        std::unordered_map<PredId_t, const EDBRemoveLiterals *> removals;
 
         // For incremental reasoning: EDBonIDB must know which SemiNaiver to
         // query
@@ -279,13 +279,13 @@ class EDBLayer {
 
         void releaseIterator(EDBIterator *itr);
 
-        VLIBEXP void setRemoveLiterals(PredId_t pred, EDBRemoveLiterals &rm) {
-            removals[pred] = rm;
+        VLIBEXP void addRemoveLiterals(const std::unordered_map<PredId_t, const EDBRemoveLiterals *> &rm) {
+            removals.insert(rm.begin(), rm.end());
         }
 
         VLIBEXP bool hasRemoveLiterals(PredId_t pred) const {
             return removals.find(pred) != removals.end() &&
-                removals.at(pred).size() > 0;
+                removals.at(pred)->size() > 0;
         }
 
         // For JNI interface ...

@@ -13,14 +13,14 @@
 class EDBonIDBIterator : public EDBIterator {
 protected:
     const Literal &query;
-    std::shared_ptr<SemiNaiver> prevSemiNaiver;
+    const std::shared_ptr<SemiNaiver> prevSemiNaiver;
     const PredId_t predid;
     FCIterator idbItr;
     std::shared_ptr<const FCInternalTable> idbInternalTable;
     FCInternalTableItr *idbInternalItr;
 
 public:
-    EDBonIDBIterator(const Literal &query, std::shared_ptr<SemiNaiver> SN) :
+    EDBonIDBIterator(const Literal &query, const std::shared_ptr<SemiNaiver> SN) :
             query(query), prevSemiNaiver(SN),
             predid(query.getPredicate().getId()), idbInternalItr(NULL) {
         init();
@@ -107,7 +107,7 @@ class EDBonIDBSortedIterator : public EDBIterator {
 protected:
     const Literal &query;
     const std::vector<uint8_t> &fields;
-    std::shared_ptr<SemiNaiver> prevSemiNaiver;
+    const std::shared_ptr<SemiNaiver> prevSemiNaiver;
     EDBLayer *layer;
     const PredId_t predid;
     InmemoryTable *inmemoryTable;
@@ -116,7 +116,7 @@ protected:
 public:
     EDBonIDBSortedIterator(const Literal &query,
                            const std::vector<uint8_t> &fields,
-                           std::shared_ptr<SemiNaiver> SN,
+                           const std::shared_ptr<SemiNaiver> SN,
                            EDBLayer *layer) :
             query(query), fields(fields), prevSemiNaiver(SN), layer(layer),
             predid(query.getPredicate().getId()) {
@@ -222,17 +222,14 @@ public:
 class EDBonIDBTable : public EDBTable {
 private:
     PredId_t    predid;
-    // const
     EDBLayer *layer;
-    // const
-    std::shared_ptr<SemiNaiver> prevSemiNaiver;
+    const std::shared_ptr<SemiNaiver> prevSemiNaiver;
     const FCTable *idbTable;
     size_t cardinality;
 
 public:
     EDBonIDBTable(PredId_t predid, EDBLayer *layer,
-                  // const
-                  std::shared_ptr<SemiNaiver> prevSN) :
+                  const std::shared_ptr<SemiNaiver> prevSN) :
             predid(predid), layer(layer), prevSemiNaiver(prevSN),
             idbTable(prevSN->getTable(predid, prevSN->getCurrentIteration())) {
         cardinality = prevSN->getProgram()->getPredicateCard(predid);

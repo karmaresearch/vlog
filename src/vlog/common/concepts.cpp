@@ -88,7 +88,7 @@ std::string Literal::tostring() const {
     return tostring(NULL, NULL);
 }
 
-std::string Literal::tostring(Program *program, EDBLayer *db) const {
+std::string Literal::tostring(const Program *program, const EDBLayer *db) const {
 
     std::string predName;
     if (program != NULL)
@@ -134,7 +134,8 @@ std::string Literal::tostring(Program *program, EDBLayer *db) const {
     return out;
 }
 
-std::string Literal::toprettystring(Program *program, EDBLayer *db) const {
+std::string Literal::toprettystring(const Program *program,
+                                    const EDBLayer *db) const {
 
     std::string predName;
     if (program != NULL)

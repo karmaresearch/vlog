@@ -404,8 +404,7 @@ static void store_mat(const std::string &path, ProgramArgs &vm,
     LOG(INFOL) << "Time to index and store the materialization on disk = " << sec.count() << " seconds";
 }
 
-static PredId_t getPredicateID(// const
-                               EDBLayer &layer, const std::string &name) {
+static PredId_t getPredicateID(const EDBLayer &layer, const std::string &name) {
     std::cerr << "FIXME: add an API call to edblayer to get pred_id from pred name" << std::endl;
     auto preds = layer.getAllPredicateIDs();
     for (auto p : preds) {
@@ -522,30 +521,32 @@ void launchFullMat(int argc,
             LOG(INFOL) << confContents;
 
             EDBConf conf(confContents, false);
-            EDBLayer dred_layer(conf, false, sn);
+            EDBLayer overdelete_layer(conf, false, sn);
 
             std::vector<PredId_t> remove_pred;
+            std::unordered_map<PredId_t, const EDBRemoveLiterals *> rm;
             for (const auto &n: remove_pred_names) {
-                remove_pred.push_back(getPredicateID(dred_layer, n));
+                PredId_t p = getPredicateID(overdelete_layer, n);
+                remove_pred.push_back(p);
+                rm[p] = new EDBRemoveLiterals(dredDir + "/" + n + "_remove",
+                                              &overdelete_layer);
+                rm[p]->dump(std::cerr, &overdelete_layer);
             }
-            EDBRemoveLiterals *rm = new EDBRemoveLiterals(dredDir + "/remove",
-                                                          &dred_layer);
-            rm->dump(std::cerr, &dred_layer);
-            // Would like to move the thing i.s.o. copy RFHH
-            dred_layer.setRemoveLiterals(remove_pred[0], *rm);
+            overdelete_layer.addRemoveLiterals(rm);
 
-            IncrOverdelete dred_overdelete(sn, remove_pred, &dred_layer);
+            IncrOverdelete dred_overdelete(sn, remove_pred, &overdelete_layer);
             std::string overdelete_rules = dred_overdelete.convertRules();
             std::cout << "Overdelete rule set:" << std::endl;
             std::cout << overdelete_rules;
 
-            Program overdeleteProgram(&dred_layer);
+            Program overdeleteProgram(&overdelete_layer);
             overdeleteProgram.readFromString(overdelete_rules, 
                                              vm["rewriteMultihead"].as<bool>());
             // Create a Program, create a SemiNaiver, run...
 
             //Prepare the materialization
-            std::shared_ptr<SemiNaiver> overdelete = Reasoner::getSemiNaiver(dred_layer,
+            std::shared_ptr<SemiNaiver> overdelete = Reasoner::getSemiNaiver(
+                    overdelete_layer,
                     &overdeleteProgram, vm["no-intersect"].empty(),
                     vm["no-filtering"].empty(),
                     !vm["multithreaded"].empty(),
@@ -560,10 +561,13 @@ void launchFullMat(int argc,
             LOG(INFOL) << "Runtime overdelete = " << sec.count() * 1000 << " milliseconds";
 
             if (vm["storemat_path"].as<string>() != "") {
-                store_mat(vm["storemat_path"].as<string>() + ".dred", vm, overdelete);
+                store_mat(vm["storemat_path"].as<string>() + ".overdelete", vm, overdelete);
             }
 
-            // delete rm;       Why memory error?
+            for (auto &r : rm) {
+                delete r.second;
+                // delete rm;       Why memory error?
+            }
 
             // Continue same with Rederive
         }
@@ -914,14 +918,16 @@ int main(int argc, const char** argv) {
             rm = new EDBRemoveLiterals(&rmTable, remove_pred, layer);
             rm->dump(std::cerr, layer);
             // Would like to move the thing i.s.o. copy RFHH
-            layer->setRemoveLiterals(remove_pred, *rm);
+            std::unordered_map<PredId_t, const EDBRemoveLiterals *> rm_map;
+            rm_map[remove_pred] = rm;
+            layer->addRemoveLiterals(rm_map);
         }
         // EDBLayer layer(conf, false);
         launchFullMat(argc, argv, full_path, *layer, vm,
                 vm["rules"].as<string>());
         delete layer;
         if (! vm["rm"].empty()) {
-            std::cerr << "FIXME: need to delete this RemoveLiterals" << std::endl;
+            LOG(ERRORL) << "FIXME: need to delete this RemoveLiterals";
             // delete rm;
         }
     } else if (cmd == "rulesgraph") {

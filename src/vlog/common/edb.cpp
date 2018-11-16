@@ -404,7 +404,7 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
         auto itr = p->second.manager->getIterator(query);
         if (hasRemoveLiterals(predid)) {
             LOG(INFOL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
-            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals[predid], itr);
+            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), *removals[predid], itr);
             return ritr;
         } else {
             return itr;
@@ -440,7 +440,7 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
 
         if (hasRemoveLiterals(predid)) {
             LOG(INFOL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
-            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals[predid], itr);
+            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), *removals[predid], itr);
             return ritr;
         } else {
             return itr;
@@ -459,7 +459,7 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
         auto itr = p->second.manager->getSortedIterator(query, fields);
         if (hasRemoveLiterals(predid)) {
             LOG(DEBUGL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
-            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals[predid], itr);
+            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), *removals[predid], itr);
             return ritr;
         } else {
             return itr;
@@ -509,7 +509,7 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
         }
         if (hasRemoveLiterals(predid)) {
             LOG(DEBUGL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
-            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), removals[predid], itr);
+            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), *removals[predid], itr);
             return ritr;
         } else {
             return itr;

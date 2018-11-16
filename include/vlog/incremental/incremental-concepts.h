@@ -83,7 +83,7 @@ public:
 
 class IncrOverdelete : public IncrementalState {
 
-private:
+protected:
     const std::vector<InmemoryTable> &eMinus;      // the deletes
     std::unordered_map<PredId_t, std::string> dMinus_pred;
     std::unordered_map<PredId_t, std::string> eMinus_pred;
@@ -167,11 +167,9 @@ public:
      *      else: as from I (materialization) of previous Program
      */
     virtual std::string convertRules() {
-        const
-        Program *fromProgram = fromSemiNaiver->getProgram();
+        const Program *fromProgram = fromSemiNaiver->getProgram();
         const std::vector<Rule> rs = fromProgram->getAllRules();
-        // const
-        EDBLayer *fromKB = fromProgram->getKB();
+        const EDBLayer *fromKB = fromProgram->getKB();
 
         // process the first head of all rules
         for (const auto &r : rs) {
@@ -242,18 +240,52 @@ public:
     }
 };
 
+#if STILL_TYPING
+/**
+ * Gupta, Mumick, Subrahmanian
+ *
+ * dPlus(p(x*)) :- dMinus(p(x*)), s1, ..., sn
+ * si: (let q = pred(si))
+ *    if q in EDB: Q - eMinus     -- the same as for OverDelete
+ *    else: I(DeltaMinus) + dPlus(p(x*))
+ *
+ * To express this in Datalog, define the following:
+ *
+ * E'               E from original problem - eMinus
+ * dMinus(q)        EDB from the set of OverDeletes
+ * v(q)             EDB from I(q) - dMinus(q)
+ * dPlus(q)         new IDB predicate for each q in IDB
+ *
+ * So rule transformations in 2 parts:
+ * 1) generate rules so dPLus(p) is initialised from v(p) = I(p) - dMinus(p)
+ *    dPlus(p()) :- v(p())
+ * 2) transform rules as in paper:
+ *    dPlus(p()) :- dMinus(p()), s1, ..., sn
+ *    with: (let q be predicate of si; let Q be set of q)
+ *    q in E': no change
+ *    else:    si = dPlus(q())
+ *
+ * Hence, need to generate an EDBonIDB table for each IDB predicate p in
+ * (I - dMinus(p())). Implement EDBonIDB table on v(p) for p in original
+ * problem with a removal attribute that contains dMinus(p).
+ * Moreover, require an EDBonIDB table for each predicate p in DeltaMinus.
+ */
 class IncrRederive : public IncrementalState {
+
+protected:
+    const std::vector<InmemoryTable> &eMinus;      // the deletes
+
 public:
     IncrRederive(const std::shared_ptr<SemiNaiver> from,
+                 const std::vector<PredId_t> &eMinus_preds,
                  const EDBLayer *layer) :
-            IncrementalState(from, layer) {
+            IncrementalState(from, layer), eMinus(eMinus) {
     }
 
     /**
      * Create an appropriate EDBConf for the Rederive
      */
-    static std::string confContents(// const
-                                    std::shared_ptr<SemiNaiver> fromSemiNaiver,
+    static std::string confContents(const std::shared_ptr<SemiNaiver> fromSemiNaiver,
                                     const std::string &dred_dir,
                                     const std::vector<std::string> &ePlus) {
         std::ostringstream os;
@@ -264,20 +296,40 @@ public:
     }
 
     /**
-     * Gupta, Mumick, Subrahmanian
-     * dPlus(p(x*)) :- dMinus(p(x*)), s1, ..., sn
-     * si: (let q = pred(si))
-     *      if q in EDB: Q - eMinus
-     *      else: I(DeltaMinus) + dPlus(p(x*))
-     *          Is this the same as:
-     *              si :- I(DeltaMinus) (as far as in Q)
-     *              si :- dPlus(p[x*])
-     *         Or is it easier to initialize si to
-     *         I(DeltaMinus) (as far as in Q) and then solve?
+     * Create a Rederive rule set as described above
      */
     virtual std::string convertRules() {
+        const Program *fromProgram = fromSemiNaiver->getProgram();
+        const std::vector<Rule> rs = fromProgram->getAllRules();
+        const EDBLayer *fromKB = fromProgram->getKB();
+
+        // process the first head of all rules
+        for (const auto &r : rs) {
+            const std::vector<Literal> &hs = r.getHeads();
+            if (hs.size() > 1) {
+                LOG(WARNL) << "No support for rules with multiple heads";
+            }
+            const Literal &h = r.getFirstHead();
+            // create new IDB predicate dq = dMinus(h(...)) with the
+            // same arity as h
+            PredId_t pred = h.getPredicate().getId();
+            std::string name = fromProgram->getPredicateName(pred);
+            dMinus_pred[pred] = name2dMinus(name);
+
+            // create EDB predicate which dispatches to the
+            // old IDB predicate. Retain name/PredId_t q.
+            inPreviousSemiNaiver.insert(pred);
+        }
+
+        // process the bodies of all rules
+        for (const auto &r : rs) {
+            const Literal h = r.getFirstHead();
+            const PredId_t hid = h.getPredicate().getId();
+            const std::vector<Literal> &bs = r.getBody();
+            for (::size_t i = 0; i < bs.size(); ++i) {
     }
 };
+#endif
 
 /*
 class IncrAdd : public IncrementalState {

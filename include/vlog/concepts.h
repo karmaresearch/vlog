@@ -276,9 +276,9 @@ class Literal {
 
         std::vector<uint8_t> getAllVars() const;
 
-        std::string tostring(Program *program, EDBLayer *db) const;
+        std::string tostring(const Program *program, const EDBLayer *db) const;
 
-        std::string toprettystring(Program *program, EDBLayer *db) const;
+        std::string toprettystring(const Program *program, const EDBLayer *db) const;
 
         std::string tostring() const;
 
