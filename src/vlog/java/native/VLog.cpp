@@ -43,7 +43,7 @@ public:
     }
 };
 
-static std::map<jint, struct VLogInfo *> vlogMap;
+static std::map<jint, VLogInfo *> vlogMap;
 
 static bool logLevelSet = false;
 

@@ -41,7 +41,7 @@ class ML {
 
         static PredId_t getMatchingIDB(EDBLayer& db, Program &p, vector<uint64_t>& tuple);
 
-        static std::vector<std::pair<std::string, int>> generateTrainingQueries(
+		VLIBEXP static std::vector<std::pair<std::string, int>> generateTrainingQueries(
                 EDBLayer &db,
                 Program &p,
                 std::vector<uint8_t>& vt,
