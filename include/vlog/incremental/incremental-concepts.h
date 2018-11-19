@@ -12,21 +12,36 @@
 class IncrementalState {
 
 protected:
+    // const
+    ProgramArgs &vm;
     const std::shared_ptr<SemiNaiver> fromSemiNaiver;
-    const std::vector<PredId_t> &eMinus;
+    const std::vector<std::string> &eMinus;
 
-    const EDBLayer *layer;
+    EDBConf *conf;
+    EDBLayer *layer;
+    Program *program;
 
+    std::string dredDir;
     std::shared_ptr<SemiNaiver> sn;
 
     // cache vm[*]
     int nthreads;
     int interRuleThreads;
 
-    IncrementalState(const std::shared_ptr<SemiNaiver> from,
-                     const std::vector<PredId_t> &eMinus,
-                     const EDBLayer *layer) :
-            fromSemiNaiver(from), eMinus(eMinus), layer(layer) {
+    IncrementalState(// const
+                     ProgramArgs &vm,
+                     const std::shared_ptr<SemiNaiver> from,
+                     const std::vector<std::string> &eMinus) :
+            vm(vm), fromSemiNaiver(from), eMinus(eMinus) {
+        dredDir = vm["dred"].as<string>();
+        nthreads = vm["nthreads"].as<int>();
+        if (vm["multithreaded"].empty()) {
+            nthreads = -1;
+        }
+        interRuleThreads = vm["interRuleThreads"].as<int>();
+        if (vm["multithreaded"].empty()) {
+            interRuleThreads = 0;
+        }
     }
 
     virtual ~IncrementalState() {
@@ -85,22 +100,74 @@ public:
         sn->run();
     }
 
-    const std::shared_ptr<SemiNaiver> getSN() {
+    const std::shared_ptr<SemiNaiver> getSN() const {
         return sn;
     }
 };
 
 
 class IncrOverdelete : public IncrementalState {
+protected:
+    std::unordered_map<PredId_t, const EDBRemoveLiterals *> rm;
 
 public:
-    IncrOverdelete(const std::shared_ptr<SemiNaiver> from,
-                   const std::vector<PredId_t> &eMinus_preds,
-                   const EDBLayer *layer) :
-            IncrementalState(from, eMinus_preds, layer) {
+    IncrOverdelete(// const
+                   ProgramArgs &vm, const std::shared_ptr<SemiNaiver> from,
+                   const std::vector<std::string> &eMinus) :
+            IncrementalState(vm, from, eMinus) {
+
+        // Overdelete
+        // Create a Program, create a SemiNaiver, run...
+        LOG(INFOL) << "***************** Create Overdelete";
+
+        std::string confString = confContents();
+
+        LOG(INFOL) << "Generated edb.conf:";
+        LOG(INFOL) << confString;
+
+        conf = new EDBConf(confString, false);
+        layer = new EDBLayer(*conf, false, from);
+
+        std::vector<PredId_t> remove_pred;
+        // const
+        Program *fromProgram = fromSemiNaiver->getProgram();
+        for (const auto &n: eMinus) {
+            PredId_t p = fromProgram->getPredicate(n).getId();
+            remove_pred.push_back(p);
+            PredId_t pMinus = fromProgram->getPredicate(name2eMinus(n)).getId();
+            rm[p] = new EDBRemoveLiterals(pMinus, layer);
+            rm[p]->dump(std::cerr, layer);
+        }
+        layer->addRemoveLiterals(rm);
+
+        std::string overdelete_rules = convertRules();
+        std::cout << "Overdelete rule set:" << std::endl;
+        std::cout << overdelete_rules;
+
+        program = new Program(layer);
+        program->readFromString(overdelete_rules, 
+                                vm["rewriteMultihead"].as<bool>());
+
+        //Prepare the materialization
+        sn = Reasoner::getSemiNaiver(
+                *layer,
+                program,
+                vm["no-intersect"].empty(),
+                vm["no-filtering"].empty(),
+                !vm["multithreaded"].empty(),
+                vm["restrictedChase"].as<bool>(),
+                nthreads,
+                interRuleThreads,
+                ! vm["shufflerules"].empty());
     }
 
     virtual ~IncrOverdelete() {
+        for (auto r: rm) {
+            delete r.second;
+        }
+        delete program;
+        delete layer;
+        delete conf;
     }
 
     /**
@@ -114,14 +181,12 @@ public:
      * Note: this is necessary to create an EDBConf, so there is no EDBLayer
      * yet. Therefore, this is a static method.
      */
-    static std::string confContents(const std::shared_ptr<SemiNaiver> fromSemiNaiver,
-                                    const std::string &dred_dir,
-                                    const std::vector<std::string> &eMinus) {
+    std::string confContents() const {
         std::ostringstream os;
 
         size_t nTables = 0;
-        const EDBLayer &layer = fromSemiNaiver->getEDBLayer();
-        const EDBConf &old_conf = layer.getConf();
+        const EDBLayer &old_layer = fromSemiNaiver->getEDBLayer();
+        const EDBConf &old_conf = old_layer.getConf();
         const std::vector<EDBConf::Table> tables = old_conf.getTables();
         for (const auto &t : tables) {
             std::string predName = "EDB" + std::to_string(nTables);
@@ -151,7 +216,7 @@ public:
             std::string predName = "EDB" + std::to_string(nTables);
             os << predName << "_predname" << "=" << name2eMinus(rm) << std::endl;
             os << predName << "_type=INMEMORY" << std::endl;
-            os << predName << "_param0=" << dred_dir << std::endl;
+            os << predName << "_param0=" << dredDir << std::endl;
             os << predName << "_param1=" << rm << "_remove" << std::endl;
             ++nTables;
         }
@@ -253,7 +318,7 @@ public:
 #endif
 };
 
-// #if STILL_TYPING
+#if STILL_TYPING
 /**
  * Gupta, Mumick, Subrahmanian
  *
@@ -299,7 +364,7 @@ protected:
 public:
     IncrRederive(const std::shared_ptr<SemiNaiver> from,
                  const std::shared_ptr<SemiNaiver> overdelete_SN,
-                 const std::vector<PredId_t> &eMinus,
+                 const std::vector<std::string> &eMinus,
                  const EDBLayer *layer) :
             IncrementalState(from, eMinus, layer), overdelete_SN(overdelete_SN) {
     }
@@ -437,7 +502,7 @@ public:
         return rules.str();
     }
 };
-// #endif
+#endif
 
 /*
 class IncrAdd : public IncrementalState {

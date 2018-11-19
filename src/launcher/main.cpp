@@ -512,65 +512,25 @@ void launchFullMat(int argc,
         if (! vm["dred"].empty()) {
             std::chrono::system_clock::time_point start;
             std::chrono::duration<double> sec;
-            std::string dredDir = vm["dred"].as<string>();
 
-            // Overdelete
-            // Create a Program, create a SemiNaiver, run...
             LOG(INFOL) << "***************** Create Overdelete";
 
             LOG(ERRORL) << "FIXME: currently E has fixed name TE";
             std::vector<std::string> remove_pred_names(1, "TE");
-            std::string confContents = IncrOverdelete::confContents(
-                    sn, dredDir, remove_pred_names);
 
-            LOG(INFOL) << "Generated edb.conf:";
-            LOG(INFOL) << confContents;
-
-            EDBConf overdelete_conf(confContents, false);
-            EDBLayer overdelete_layer(overdelete_conf, false, sn);
-
-            std::vector<PredId_t> remove_pred;
-            std::unordered_map<PredId_t, const EDBRemoveLiterals *> rm;
-            for (const auto &n: remove_pred_names) {
-                PredId_t p = getPredicateID(overdelete_layer, n);
-                remove_pred.push_back(p);
-                PredId_t pMinus = getPredicateID(overdelete_layer,
-                                                 IncrementalState::name2eMinus(n));
-                rm[p] = new EDBRemoveLiterals(pMinus, &overdelete_layer);
-                rm[p]->dump(std::cerr, &overdelete_layer);
-            }
-            overdelete_layer.addRemoveLiterals(rm);
-
-            IncrOverdelete dred_overdelete(sn, remove_pred, &overdelete_layer);
-            std::string overdelete_rules = dred_overdelete.convertRules();
-            std::cout << "Overdelete rule set:" << std::endl;
-            std::cout << overdelete_rules;
-
-            Program overdeleteProgram(&overdelete_layer);
-            overdeleteProgram.readFromString(overdelete_rules, 
-                                             vm["rewriteMultihead"].as<bool>());
-
-            //Prepare the materialization
-            std::shared_ptr<SemiNaiver> overdelete = Reasoner::getSemiNaiver(
-                    overdelete_layer,
-                    &overdeleteProgram, vm["no-intersect"].empty(),
-                    vm["no-filtering"].empty(),
-                    !vm["multithreaded"].empty(),
-                    vm["restrictedChase"].as<bool>(),
-                    nthreads,
-                    interRuleThreads,
-                    ! vm["shufflerules"].empty());
+            IncrOverdelete overdelete(vm, sn, remove_pred_names);
 
             LOG(INFOL) << "Starting overdeletion materialization";
             start = std::chrono::system_clock::now();
-            overdelete->run();
+            overdelete.run();
             sec = std::chrono::system_clock::now() - start;
             LOG(INFOL) << "Runtime overdelete = " << sec.count() * 1000 << " milliseconds";
 
             if (vm["storemat_path"].as<string>() != "") {
-                store_mat(vm["storemat_path"].as<string>() + ".overdelete", vm, overdelete);
+                store_mat(vm["storemat_path"].as<string>() + ".overdelete", vm, overdelete.getSN());
             }
 
+#if 0
             // Continue same with Rederive
             // Create a Program, create a SemiNaiver, run...
             LOG(INFOL) << "***************** Create Rederive";
@@ -651,10 +611,10 @@ void launchFullMat(int argc,
 
             LOG(ERRORL) << "DRED: add the Additions step";
 
-
             for (auto &r : rm) {
                 delete r.second;
             }
+#endif
         }
 
 #if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
