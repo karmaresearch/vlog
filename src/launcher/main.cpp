@@ -405,7 +405,8 @@ static void store_mat(const std::string &path, ProgramArgs &vm,
     LOG(INFOL) << "Time to index and store the materialization on disk = " << sec.count() << " seconds";
 }
 
-static PredId_t getPredicateID(const EDBLayer &layer, const std::string &name) {
+static PredId_t getPredicateID(const EDBLayer &layer,
+                               const std::string &name) {
     std::cerr << "FIXME: add an API call to edblayer to get pred_id from pred name" << std::endl;
     auto preds = layer.getAllPredicateIDs();
     for (auto p : preds) {
@@ -515,10 +516,8 @@ void launchFullMat(int argc,
 
             // Overdelete
             // Create a Program, create a SemiNaiver, run...
-            LOG(INFOL) << "***************** Start Overdelete";
+            LOG(INFOL) << "***************** Create Overdelete";
 
-            // std::string conf_str = createIncrOverdeleteConf(sn, dredDir);
-            // EDBConf conf(conf_str, false);
             LOG(ERRORL) << "FIXME: currently E has fixed name TE";
             std::vector<std::string> remove_pred_names(1, "TE");
             std::string confContents = IncrOverdelete::confContents(
@@ -561,6 +560,7 @@ void launchFullMat(int argc,
                     nthreads,
                     interRuleThreads,
                     ! vm["shufflerules"].empty());
+
             LOG(INFOL) << "Starting overdeletion materialization";
             start = std::chrono::system_clock::now();
             overdelete->run();
@@ -573,31 +573,35 @@ void launchFullMat(int argc,
 
             // Continue same with Rederive
             // Create a Program, create a SemiNaiver, run...
-            LOG(INFOL) << "***************** Start Rederive";
+            LOG(INFOL) << "***************** Create Rederive";
 
-            LOG(ERRORL) << "For now, grab the EDBConf from a file";
-            EDBConf rederive_conf(dredDir + "/edb.conf-rederive");
+            confContents = IncrRederive::confContents(sn, overdelete, dredDir, remove_pred_names);
+            LOG(INFOL) << "Generated rederive edb.conf:";
+            LOG(INFOL) << confContents;
+
+            // LOG(ERRORL) << "For now, grab the EDBConf from a file";
+            // EDBConf rederive_conf(dredDir + "/edb.conf-rederive");
+            EDBConf rederive_conf(confContents, false);
             EDBLayer rederive_layer(rederive_conf, false, overdelete);
 
-            // The Removals should contain not only E- for TE but also
-            // q@dMinus for q (all q)
+            // The Removals should contain not only TE@dMinus (= E^-) for TE
+            // but also q@dMinus for q (all q)
 
-            LOG(ERRORL) << "For now, fixed EDB removal named TE@eMinus";
             rm.clear();
-            for (const auto &r: std::vector<std::string>(1, "TE")) {
+            // Add the user removals
+            for (const auto &r: remove_pred_names) {
                 std::string rm_name = dred_overdelete.name2eMinus(r);
                 PredId_t e = overdelete->getProgram()->getPredicate(r).getId();
                 PredId_t rm_pred = overdelete->getProgram()->getPredicate(rm_name).getId();
                 rm[e] = new EDBRemoveLiterals(rm_pred, &rederive_layer);
             }
 
-            // const
-            Program *program = sn->getProgram();
-            const std::vector<std::string> idbs = program->getAllPredicateStrings();
+            Program *sn_program = sn->getProgram();
+            const std::vector<std::string> idbs = sn_program->getAllPredicateStrings();
             std::vector<std::pair<PredId_t, std::string>> idb_pred;
             for (const std::string &p : idbs) {
-                PredId_t pred = program->getPredicate(p).getId();
-                if (program->isPredicateIDB(pred)) {
+                PredId_t pred = sn_program->getPredicate(p).getId();
+                if (sn_program->isPredicateIDB(pred)) {
                     idb_pred.push_back(std::pair<PredId_t, std::string>(pred, p));
                 }
             }
@@ -644,6 +648,8 @@ void launchFullMat(int argc,
             if (vm["storemat_path"].as<string>() != "") {
                 store_mat(vm["storemat_path"].as<string>() + ".rederive", vm, rederive);
             }
+
+            LOG(ERRORL) << "DRED: add the Additions step";
 
 
             for (auto &r : rm) {

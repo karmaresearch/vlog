@@ -35,12 +35,16 @@ class EDBRemoveLiterals {
 
         EDBRemoveItem *insert_recursive(const std::vector<Term_t> &terms, size_t offset);
 
-        std::ostream &dump_recursive(std::ostream &of, EDBLayer *layer, const EDBRemoveItem *item) const;
-        std::ostream &dump_recursive_name(std::ostream &of, EDBLayer *layer, const EDBRemoveItem *item) const;
+        std::ostream &dump_recursive(std::ostream &of,
+                                     EDBLayer *layer,
+                                     const EDBRemoveItem *item) const;
+        std::ostream &dump_recursive_name(std::ostream &of,
+                                          EDBLayer *layer,
+                                          const EDBRemoveItem *item) const;
 
     public:
-        EDBRemoveLiterals() { }
-        EDBRemoveLiterals(const std::string &file, EDBLayer *layer);
+        EDBRemoveLiterals(const std::string &file,
+                          EDBLayer *layer);
         // Looks up the table in layer
         EDBRemoveLiterals(PredId_t predid, EDBLayer *layer);
 
@@ -52,7 +56,8 @@ class EDBRemoveLiterals {
             return num_rows;
         }
 
-        std::ostream &dump(std::ostream &of, /* const */ EDBLayer *layer) const;
+        std::ostream &dump(std::ostream &of,
+                           /* const */ EDBLayer *layer) const;
 
         ~EDBRemoveLiterals() { }
 };

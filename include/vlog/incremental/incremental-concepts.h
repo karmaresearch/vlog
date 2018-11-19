@@ -12,18 +12,24 @@
 class IncrementalState {
 
 protected:
-    // const
     const std::shared_ptr<SemiNaiver> fromSemiNaiver;
+    const std::vector<PredId_t> &eMinus;
+
     const EDBLayer *layer;
 
-    std::unordered_set<PredId_t> inPreviousSemiNaiver;
-    std::string rules;
+    std::shared_ptr<SemiNaiver> sn;
 
-    std::unordered_map<PredId_t, std::string> dMinus_pred;
+    // cache vm[*]
+    int nthreads;
+    int interRuleThreads;
 
     IncrementalState(const std::shared_ptr<SemiNaiver> from,
+                     const std::vector<PredId_t> &eMinus,
                      const EDBLayer *layer) :
-        fromSemiNaiver(from), layer(layer) {
+            fromSemiNaiver(from), eMinus(eMinus), layer(layer) {
+    }
+
+    virtual ~IncrementalState() {
     }
 
     static std::string int2ABC(int x) {
@@ -60,12 +66,12 @@ protected:
         return args.str();
     }
 
+    virtual std::string convertRules() = 0;
+
 public:
     std::shared_ptr<SemiNaiver> getPrevSemiNaiver() const {
         return fromSemiNaiver;
     }
-
-    virtual std::string convertRules() = 0;
 
     static std::string name2dMinus(const std::string &name) {
         return name + "@dMinus";
@@ -73,6 +79,14 @@ public:
 
     static std::string name2eMinus(const std::string &name) {
         return name + "@eMinus";
+    }
+
+    void run() {
+        sn->run();
+    }
+
+    const std::shared_ptr<SemiNaiver> getSN() {
+        return sn;
     }
 };
 
@@ -83,7 +97,10 @@ public:
     IncrOverdelete(const std::shared_ptr<SemiNaiver> from,
                    const std::vector<PredId_t> &eMinus_preds,
                    const EDBLayer *layer) :
-            IncrementalState(from, layer) {
+            IncrementalState(from, eMinus_preds, layer) {
+    }
+
+    virtual ~IncrOverdelete() {
     }
 
     /**
@@ -117,13 +134,17 @@ public:
             ++nTables;
         }
 
-        const Program *fromProgram = fromSemiNaiver->getProgram();
+        // const
+        Program *fromProgram = fromSemiNaiver->getProgram();
         std::vector<std::string> predicates = fromProgram->getAllPredicateStrings();
         for (auto p : predicates) {
-            std::string predName = "EDB" + std::to_string(nTables);
-            os << predName << "_predname" << "=" << p << std::endl;
-            os << predName << "_type=EDBonIDB" << std::endl;
-            ++nTables;
+            PredId_t pred = fromProgram->getPredicate(p).getId();
+            if (fromProgram->isPredicateIDB(pred)) {
+                std::string predName = "EDB" + std::to_string(nTables);
+                os << predName << "_predname" << "=" << p << std::endl;
+                os << predName << "_type=EDBonIDB" << std::endl;
+                ++nTables;
+            }
         }
 
         for (auto rm : eMinus) {
@@ -149,6 +170,7 @@ public:
      *      else: as from I (materialization) of previous Program
      */
     virtual std::string convertRules() {
+        std::unordered_map<PredId_t, std::string> dMinus_pred;
         const Program *fromProgram = fromSemiNaiver->getProgram();
         const std::vector<Rule> rs = fromProgram->getAllRules();
 
@@ -167,7 +189,6 @@ public:
 
             // create EDB predicate which dispatches to the
             // old IDB predicate. Retain name/PredId_t q.
-            inPreviousSemiNaiver.insert(pred);
         }
 
         // process the bodies of all rules
@@ -220,6 +241,7 @@ public:
         return rules.str();
     }
 
+#if 0
     std::vector<PredId_t> getIDBPredicates() const {
         std::vector<PredId_t> res;
         for (auto p_s : dMinus_pred) {
@@ -228,6 +250,7 @@ public:
 
         return res;
     }
+#endif
 };
 
 // #if STILL_TYPING
@@ -264,7 +287,6 @@ class IncrRederive : public IncrementalState {
 
 protected:
     const std::shared_ptr<SemiNaiver> overdelete_SN;
-    const std::vector<InmemoryTable> &eMinus;      // the deletes
 
     static std::string name2dPlus(const std::string &pred) {
         return pred + "@dPlus";
@@ -277,10 +299,12 @@ protected:
 public:
     IncrRederive(const std::shared_ptr<SemiNaiver> from,
                  const std::shared_ptr<SemiNaiver> overdelete_SN,
-                 const std::vector<PredId_t> &eMinus_preds,
+                 const std::vector<PredId_t> &eMinus,
                  const EDBLayer *layer) :
-            IncrementalState(from, layer), overdelete_SN(overdelete_SN),
-            eMinus(eMinus) {
+            IncrementalState(from, eMinus, layer), overdelete_SN(overdelete_SN) {
+    }
+
+    virtual ~IncrRederive() {
     }
 
     /**
@@ -292,10 +316,29 @@ public:
     static std::string confContents(const std::shared_ptr<SemiNaiver> fromSN,
                                     const std::shared_ptr<SemiNaiver> overdeleteSN,
                                     const std::string &dred_dir,
-                                    const std::vector<std::string> &ePlus) {
+                                    const std::vector<std::string> &eMinus) {
         std::ostringstream os;
 
-        size_t nTables = 0;
+        // Start out with the tables as in OverDelete
+        std::string fromContents = IncrOverdelete::confContents(fromSN, dred_dir, eMinus);
+        os << fromContents;
+
+        // Add the dpred@dMinus tables, one for each IDB predicate
+        // const
+        Program *sn_program = fromSN->getProgram();
+
+        size_t nTables = sn_program->getNEDBPredicates() +
+                             sn_program->getNIDBPredicates() + eMinus.size();
+        std::vector<std::string> idb_names;
+        for (const std::string &p : sn_program->getAllPredicateStrings()) {
+            PredId_t pred = sn_program->getPredicate(p).getId();
+            if (sn_program->isPredicateIDB(pred)) {
+                std::string predName = "EDB" + std::to_string(nTables);
+                os << predName << "_predname=" << p << "@dMinus\n";
+                os << predName << "_type=EDBonIDB\n";
+                ++nTables;
+            }
+        }
 
         return os.str();
     }
@@ -317,6 +360,7 @@ public:
         const std::vector<Rule> rs = fromProgram->getAllRules();
         const EDBLayer *fromKB = fromProgram->getKB();
 
+        std::unordered_map<PredId_t, std::string> dMinus_pred;
         std::unordered_map<PredId_t, std::string> actual_pred;
         std::unordered_map<PredId_t, std::string> dPlus_pred;
         std::unordered_map<PredId_t, std::string> v_pred;
@@ -338,10 +382,6 @@ public:
             v_pred[pred] = name2v(name);
             dPlus_pred[pred] = name2dPlus(name);
             pred_args[pred] = printArgs(h, fromKB);
-
-            // create EDB predicate which dispatches to the
-            // old IDB predicate. Retain name/PredId_t q.
-            inPreviousSemiNaiver.insert(pred);
         }
 
         std::ostringstream rules;      // assemble textual rules

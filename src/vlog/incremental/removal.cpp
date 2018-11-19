@@ -12,7 +12,9 @@
 #include <climits>
 
 
-EDBRemoveLiterals::EDBRemoveLiterals(const std::string &file, EDBLayer *layer) : layer(layer), num_rows(0) {
+EDBRemoveLiterals::EDBRemoveLiterals(const std::string &file,
+                                     EDBLayer *layer) :
+        layer(layer), num_rows(0) {
     std::ifstream infile(file);
     std::string token;
     std::vector<Term_t> terms;
@@ -31,7 +33,8 @@ EDBRemoveLiterals::EDBRemoveLiterals(const std::string &file, EDBLayer *layer) :
 }
 
 // Looks up the table in layer
-EDBRemoveLiterals::EDBRemoveLiterals(PredId_t predid, EDBLayer *layer) {
+EDBRemoveLiterals::EDBRemoveLiterals(PredId_t predid,
+                                     EDBLayer *layer) {
     // const
     std::shared_ptr<EDBTable> table = layer->getEDBTable(predid);
 EDBonIDBTable *eoit = dynamic_cast<EDBonIDBTable *>(table.get());
@@ -83,7 +86,8 @@ void EDBRemoveLiterals::insert(const std::vector<Term_t> &terms) {
 }
 
 
-static void dump_map(std::ostream &os, const std::unordered_map<Term_t, EDBRemoveItem *> &m) {
+static void dump_map(std::ostream &os,
+                     const std::unordered_map<Term_t, EDBRemoveItem *> &m) {
     for (auto &r : m) {
         os << "    " << r.first << " -> " << r.second << std::endl;
     }
@@ -116,7 +120,9 @@ bool EDBRemoveLiterals::present(const std::vector<Term_t> &terms) const {
 }
 
 
-std::ostream &EDBRemoveLiterals::dump_recursive_name(std::ostream &of, EDBLayer *layer, const EDBRemoveItem *item) const {
+std::ostream &EDBRemoveLiterals::dump_recursive_name(
+        std::ostream &of, EDBLayer *layer,
+        const EDBRemoveItem *item) const {
     if (item == NULL) {
         return of;
     }
@@ -133,7 +139,9 @@ std::ostream &EDBRemoveLiterals::dump_recursive_name(std::ostream &of, EDBLayer 
 }
 
 
-std::ostream &EDBRemoveLiterals::dump_recursive(std::ostream &of, EDBLayer *layer, const EDBRemoveItem *item) const {
+std::ostream &EDBRemoveLiterals::dump_recursive(
+        std::ostream &of, EDBLayer *layer,
+        const EDBRemoveItem *item) const {
     if (item == NULL) {
         return of;
     }
@@ -147,7 +155,9 @@ std::ostream &EDBRemoveLiterals::dump_recursive(std::ostream &of, EDBLayer *laye
     return of;
 }
 
-std::ostream &EDBRemoveLiterals::dump(std::ostream &of, /* const */ EDBLayer *layer) const {
+std::ostream &EDBRemoveLiterals::dump(
+        std::ostream &of,
+        /* const */ EDBLayer *layer) const {
     dump_recursive(of, layer, &removed);
     dump_recursive_name(of, layer, &removed);
 
