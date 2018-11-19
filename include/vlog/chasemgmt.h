@@ -95,13 +95,16 @@ class ChaseMgmt {
         std::vector<std::unique_ptr<ChaseMgmt::RuleContainer>> rules;
         const bool restricted;
 	const bool checkCyclic;
+	const int ruleToCheck;
 	bool cyclic;
 
 	bool checkRecursive(uint64_t target, uint64_t rv, int level);
 
+	bool checkNestedRecursive(uint64_t target, uint64_t rv, int level);
+
     public:
         ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
-                const bool restricted, const bool checkCyclic);
+                const bool restricted, const bool checkCyclic, const int ruleToCheck = -1);
 
         std::shared_ptr<Column> getNewOrExistingIDs(
                 uint32_t ruleid,
@@ -110,6 +113,8 @@ class ChaseMgmt {
                 uint64_t size);
 
         bool checkCyclicTerms(uint32_t ruleid);
+
+	bool checkRecursive(uint64_t rv);
 
         bool isRestricted() {
             return restricted;

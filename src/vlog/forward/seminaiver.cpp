@@ -225,7 +225,7 @@ bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
 }
 
 void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
-        bool checkCyclicTerms) {
+        bool checkCyclicTerms, int singleRuleToCheck) {
     this->checkCyclicTerms = checkCyclicTerms;
     this->foundCyclicTerms = false;
     running = true;
@@ -271,7 +271,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
     std::copy(allEDBRules.begin(), allEDBRules.end(), std::back_inserter(allrules));
     std::copy(allIDBRules.begin(), allIDBRules.end(), std::back_inserter(allrules));
     chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt(allrules,
-                restrictedChase, checkCyclicTerms));
+                restrictedChase, checkCyclicTerms, singleRuleToCheck));
 #if DEBUG
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(DEBUGL) << "Runtime ruleset optimization ms = " << sec.count() * 1000;

@@ -173,7 +173,7 @@ class SemiNaiver {
         virtual FCTable *getTable(const PredId_t pred, const uint8_t card);
 
         VLIBEXP void run(size_t lastIteration, size_t iteration, unsigned long *timeout = NULL,
-                bool checkCyclicTerms = false);
+                bool checkCyclicTerms = false, int singleRule = -1);
 
         VLIBEXP void storeOnFile(std::string path, const PredId_t pred, const bool decompress,
                 const int minLevel, const bool csv);
@@ -223,8 +223,8 @@ class SemiNaiver {
         virtual FCIterator getTable(const Literal &literal, const size_t minIteration,
                 const size_t maxIteration, TableFilterer *filter);
 
-        void checkAcyclicity() {
-	    run(0, 1, NULL, true);
+        void checkAcyclicity(int singleRule = -1) {
+	    run(0, 1, NULL, true, singleRule);
 	}
 
         //Statistics methods

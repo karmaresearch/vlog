@@ -69,7 +69,7 @@ bool ChaseMgmt::RuleContainer::containsCyclicTerms() {
 
 //************** CHASE MGMT ***************
 ChaseMgmt::ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
-        const bool restricted, const bool checkCyclic) : restricted(restricted), checkCyclic(checkCyclic), cyclic(false) {
+        const bool restricted, const bool checkCyclic, const int ruleToCheck) : restricted(restricted), checkCyclic(checkCyclic), ruleToCheck(ruleToCheck), cyclic(false) {
     this->rules.resize(rules.size());
     for(const auto &r : rules) {
         if (r.rule.getId() >= rules.size()) {
@@ -124,6 +124,10 @@ bool ChaseMgmt::checkRecursive(uint64_t target, uint64_t rv, int level) {
 	LOG(DEBUGL) << "Found an immediate cycle at level " << level;
 	return true;
     }
+    return checkNestedRecursive(target, rv, level);
+}
+
+bool ChaseMgmt::checkNestedRecursive(uint64_t target, uint64_t rv, int level) {
 
     //Recursive check required.
     auto &ruleContainer = rules[GET_RULE(rv)];
@@ -147,7 +151,11 @@ bool ChaseMgmt::checkRecursive(uint64_t target, uint64_t rv, int level) {
 	}
     }
     return false;
+}
 
+// Check if rv is recursive.
+bool ChaseMgmt::checkRecursive(uint64_t rv) {
+    return checkNestedRecursive(rv & RULEVARMASK, rv, 0);
 }
 
 std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
@@ -176,7 +184,8 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
 		throw 10;
 	    }
 	    row[j] = readers[j]->next();
-	    if (checkCyclic && ! cyclic) {
+	    if (checkCyclic && (ruleToCheck < 0 || ruleToCheck == ruleid) && ! cyclic) {
+		// Check if we are about to introduce a cyclic term ...
 		if ((row[j] & RULEVARMASK) != 0) {
 		    LOG(TRACEL) << "to check: " << rulevar << ", read value " << row[j];
 		    cyclic = checkRecursive(rulevar, row[j], 0);

@@ -12,6 +12,8 @@ class Checker {
 
 	static bool MFA(Program &p);
 
+	static bool MFC(Program &p);
+
     public:
         static int check(std::string ruleFile, std::string alg, EDBLayer &db);
 

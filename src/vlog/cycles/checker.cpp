@@ -13,11 +13,18 @@ int Checker::check(std::string ruleFile, std::string alg, EDBLayer &db) {
     p.readFromFile(ruleFile, false); //we do not rewrite the heads
 
     if (alg == "MFA") {
+	// Model Faithful Acyclic
 	return MFA(p) ? 1 : 0;
     } else if (alg == "JA") {
+	// Joint Acyclic
 	return JA(p, false) ? 1 : 0;
     } else if (alg == "RJA") {
+	// Restricted Joint Acyclic
 	return JA(p, true) ? 1 : 0;
+    } else if (alg == "MFC") {
+	// Model Faithful Cyclic
+	// This one, as the name already suggests, is the other way around: if true, there is a cycle.
+	return MFC(p) ? 0 : 1;
     } else {
 	// TODO: RMFA, MSA, RMSA, RMFC
 	LOG(ERRORL) << "Unknown algorithm: " << alg;
@@ -25,6 +32,7 @@ int Checker::check(std::string ruleFile, std::string alg, EDBLayer &db) {
     }
 }
 
+// Add entries to the critical instance for each predicate, not just EDB ones.
 static void addIDBCritical(Program &p, EDBLayer *db) {
     bool hasNewEDB[256];
     memset(hasNewEDB, 0, 256);
@@ -432,6 +440,79 @@ bool Checker::JA(Program &p, bool restricted) {
     return true;
 }
 
+bool Checker::MFC(Program &p) {
+    // First, create a copy of the rules.
+    std::vector<std::string> rules;
+    std::vector<Rule> r = p.getAllRules();
+    for (auto rule : r) {
+	std::string ruleString = rule.toprettystring(&p, p.getKB());
+	rules.push_back(ruleString);
+    }
+    // Then, for each existential rule, do the MFC check.
+    int ruleCount = 0;
+    for (auto rule : r) {
+	if (rule.isExistential()) {
+	    // Create an EDB set, by taking the body of this rule, and replace each variable with a unique constant.
+	    std::vector<std::string> newRules = rules;
+	    auto body = rule.getBody();
+	    std::map<PredId_t, std::vector<std::vector<std::string>>> edbSet;
+	    for (auto lit : body) {
+		PredId_t predid = lit.getPredicate().getId();
+		std::vector<std::string> value;
+		VTuple tpl = lit.getTuple();
+		for (int i = 0; i < tpl.getSize(); i++) {
+		    VTerm t = tpl.get(i);
+		    std::string val;
+		    if (t.isVariable()) {
+			uint8_t id = t.getId();
+			val = "_GENC" + std::to_string(id);
+		    } else {
+			val = p.getKB()->getDictText(t.getValue());
+		    }
+		    value.push_back(val);
+                }
+		edbSet[predid].push_back(value);
+	    }
+
+	    EDBConf conf("", false);
+	    EDBLayer layer(conf, false);
+
+	    for (auto pair : edbSet) {
+		std::string edbName = "__DUMMY__" + std::to_string(pair.first);
+		layer.addInmemoryTable(edbName, pair.second);
+		int cardinality = pair.second[0].size();
+		std::string rule = p.getPredicateName(pair.first) + "(";
+		std::string paramList = "";
+		for (int i = 0; i < cardinality; i++) {
+		    paramList = paramList + "A" + std::to_string(i);
+		    if (i < cardinality - 1) {
+			paramList = paramList + ",";
+		    }
+		}
+		rule = rule + paramList + ") :- " + edbName + "(" + paramList + ")";
+		LOG(DEBUGL) << "Adding rule: \"" << rule << "\"";
+		newRules.push_back(rule);
+	    }
+
+	    // Now create a new program, and materialize. But: don't apply rules to recursive terms.
+	    Program newProgram(&layer);
+	    int count = 0;
+	    for (auto rule : newRules) {
+		newProgram.parseRule(rule, false);
+		count++;
+	    }
+	    std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
+		    &newProgram, true, true, false, false, 1, 1, false);
+	    sn->checkAcyclicity(ruleCount);
+	    // If we produce a cyclic term FOR THIS RULE, we have MFC.
+	    if (sn->isFoundCyclicTerms()) {
+		return true;	// MFC
+	    }
+	}
+	ruleCount++;
+    }
+    return false;
+}
 
 Graph::Graph(int V)
 {
