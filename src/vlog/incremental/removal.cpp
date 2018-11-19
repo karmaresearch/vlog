@@ -1,5 +1,7 @@
 #include <vlog/incremental/removal.h>
 
+#include <vlog/incremental/edb-table-from-idb.h>
+
 #include <vlog/edb.h>
 #if 0
 #include <vlog/concepts.h>
@@ -28,8 +30,17 @@ EDBRemoveLiterals::EDBRemoveLiterals(const std::string &file, EDBLayer *layer) :
     }
 }
 
-EDBRemoveLiterals::EDBRemoveLiterals(EDBTable *table, PredId_t predid,
-                                     EDBLayer *layer) {
+// Looks up the table in layer
+EDBRemoveLiterals::EDBRemoveLiterals(PredId_t predid, EDBLayer *layer) {
+    // const
+    std::shared_ptr<EDBTable> table = layer->getEDBTable(predid);
+EDBonIDBTable *eoit = dynamic_cast<EDBonIDBTable *>(table.get());
+if (eoit != NULL) {
+    eoit->dump(std::cerr);
+    eoit->dump(std::cerr);
+    std::cerr << "Incorporate Table " << eoit->layer->getPredName(eoit->getPredicateID()) << std::endl;
+    std::cerr << (void *)eoit << " " << (void *)&table << std::endl;
+}
     uint8_t arity = table->getArity();
     Predicate pred(predid, 0, EDB, arity);
     VTuple t = VTuple(arity);
@@ -37,19 +48,20 @@ EDBRemoveLiterals::EDBRemoveLiterals(EDBTable *table, PredId_t predid,
         t.set(VTerm(i + 1, 0), i);
     }
     Literal lit(pred, t);
+
     EDBIterator *itr = table->getIterator(lit);
     std::vector<Term_t> terms(arity);
     while (itr->hasNext()) {
         itr->next();
         for (uint8_t m = 0; m < arity; ++m) {
             terms[m] = itr->getElementAt(m);
+std::cerr << "    elt(" << (int)m << ") " << itr->getElementAt(m) << " item[" << (int)m << "] " << terms[m] << std::endl;
         }
         insert(terms);
     }
+    table->releaseIterator(itr);
 
     dump(std::cerr, layer);
-
-    table->releaseIterator(itr);
 }
 
 EDBRemoveItem *EDBRemoveLiterals::insert_recursive(const std::vector<Term_t> &terms, size_t offset) {

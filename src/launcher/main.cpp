@@ -12,6 +12,7 @@
 
 //Incremental, will probably move away
 #include <vlog/inmemory/inmemorytable.h>
+#include <vlog/incremental/edb-table-from-idb.h>
 #include <vlog/incremental/incremental-concepts.h>
 
 //Used to load a Trident KB
@@ -408,7 +409,7 @@ static PredId_t getPredicateID(const EDBLayer &layer, const std::string &name) {
     std::cerr << "FIXME: add an API call to edblayer to get pred_id from pred name" << std::endl;
     auto preds = layer.getAllPredicateIDs();
     for (auto p : preds) {
-        if (layer.getPredName(p) == "TE") {
+        if (layer.getPredName(p) == name) {
             return p;
         }
     }
@@ -508,7 +509,13 @@ void launchFullMat(int argc,
         sn->printCountAllIDBs("");
 
         if (! vm["dred"].empty()) {
+            std::chrono::system_clock::time_point start;
+            std::chrono::duration<double> sec;
             std::string dredDir = vm["dred"].as<string>();
+
+            // Overdelete
+            // Create a Program, create a SemiNaiver, run...
+            LOG(INFOL) << "***************** Start Overdelete";
 
             // std::string conf_str = createIncrOverdeleteConf(sn, dredDir);
             // EDBConf conf(conf_str, false);
@@ -520,16 +527,15 @@ void launchFullMat(int argc,
             LOG(INFOL) << "Generated edb.conf:";
             LOG(INFOL) << confContents;
 
-            EDBConf conf(confContents, false);
-            EDBLayer overdelete_layer(conf, false, sn);
+            EDBConf overdelete_conf(confContents, false);
+            EDBLayer overdelete_layer(overdelete_conf, false, sn);
 
             std::vector<PredId_t> remove_pred;
             std::unordered_map<PredId_t, const EDBRemoveLiterals *> rm;
             for (const auto &n: remove_pred_names) {
                 PredId_t p = getPredicateID(overdelete_layer, n);
                 remove_pred.push_back(p);
-                rm[p] = new EDBRemoveLiterals(dredDir + "/" + n + "_remove",
-                                              &overdelete_layer);
+                rm[p] = new EDBRemoveLiterals(p, &overdelete_layer);
                 rm[p]->dump(std::cerr, &overdelete_layer);
             }
             overdelete_layer.addRemoveLiterals(rm);
@@ -542,7 +548,6 @@ void launchFullMat(int argc,
             Program overdeleteProgram(&overdelete_layer);
             overdeleteProgram.readFromString(overdelete_rules, 
                                              vm["rewriteMultihead"].as<bool>());
-            // Create a Program, create a SemiNaiver, run...
 
             //Prepare the materialization
             std::shared_ptr<SemiNaiver> overdelete = Reasoner::getSemiNaiver(
@@ -555,21 +560,93 @@ void launchFullMat(int argc,
                     interRuleThreads,
                     ! vm["shufflerules"].empty());
             LOG(INFOL) << "Starting overdeletion materialization";
-            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+            start = std::chrono::system_clock::now();
             overdelete->run();
-            std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+            sec = std::chrono::system_clock::now() - start;
             LOG(INFOL) << "Runtime overdelete = " << sec.count() * 1000 << " milliseconds";
 
             if (vm["storemat_path"].as<string>() != "") {
                 store_mat(vm["storemat_path"].as<string>() + ".overdelete", vm, overdelete);
             }
 
-            for (auto &r : rm) {
-                delete r.second;
-                // delete rm;       Why memory error?
+            // Continue same with Rederive
+            // Create a Program, create a SemiNaiver, run...
+            LOG(INFOL) << "***************** Start Rederive";
+
+            LOG(ERRORL) << "For now, grab the EDBConf from a file";
+            EDBConf rederive_conf(dredDir + "/edb.conf-rederive");
+            EDBLayer rederive_layer(rederive_conf, false, overdelete);
+
+            // The Removals should contain not only E- for TE but also
+            // q@dMinus for q (all q)
+
+            LOG(ERRORL) << "For now, fixed EDB removal named TE@eMinus";
+            rm.clear();
+            for (const auto &r: std::vector<std::string>(1, "TE")) {
+                std::string rm_name = dred_overdelete.name2eMinus(r);
+                PredId_t e = overdelete->getProgram()->getPredicate(r).getId();
+                PredId_t rm_pred = overdelete->getProgram()->getPredicate(rm_name).getId();
+                rm[e] = new EDBRemoveLiterals(rm_pred, &rederive_layer);
             }
 
-            // Continue same with Rederive
+            // const
+            Program *program = sn->getProgram();
+            const std::vector<std::string> idbs = program->getAllPredicateStrings();
+            std::vector<std::pair<PredId_t, std::string>> idb_pred;
+            for (const std::string &p : idbs) {
+                PredId_t pred = program->getPredicate(p).getId();
+                if (program->isPredicateIDB(pred)) {
+                    idb_pred.push_back(std::pair<PredId_t, std::string>(pred, p));
+                }
+            }
+
+            for (const auto &pp : idb_pred) {
+                // Read the Q^v values from our own EDB tables
+                std::string rm_name = dred_overdelete.name2dMinus(pp.second);
+                PredId_t rm_pred = overdelete->getProgram()->getPredicate(rm_name).getId();
+                std::cerr << "dMinus table for " << pp.second << " is "<< rm_name << std::endl;
+                // Feed that to the Removal
+                rm[pp.first] = new EDBRemoveLiterals(rm_pred, &rederive_layer);
+            }
+            for (const auto &r : rm) {
+                LOG(INFOL) << "******************** Add removal predicate for predicate " << r.first;
+            }
+            rederive_layer.addRemoveLiterals(rm);
+
+            IncrRederive dred_rederive(sn, overdelete, remove_pred,
+                                       &rederive_layer);
+            std::string rederive_rules = dred_rederive.convertRules();
+            std::cout << "Rederive rule set:" << std::endl;
+            std::cout << rederive_rules;
+
+            Program rederiveProgram(&rederive_layer);
+            rederiveProgram.readFromString(rederive_rules,
+                                           vm["rewriteMultihead"].as<bool>());
+
+            //Prepare the materialization
+            std::shared_ptr<SemiNaiver> rederive = Reasoner::getSemiNaiver(
+                    rederive_layer,
+                    &rederiveProgram, vm["no-intersect"].empty(),
+                    vm["no-filtering"].empty(),
+                    !vm["multithreaded"].empty(),
+                    vm["restrictedChase"].as<bool>(),
+                    nthreads,
+                    interRuleThreads,
+                    ! vm["shufflerules"].empty());
+            LOG(INFOL) << "Starting overdeletion materialization";
+            start = std::chrono::system_clock::now();
+            rederive->run();
+            sec = std::chrono::system_clock::now() - start;
+            LOG(INFOL) << "Runtime overdelete = " << sec.count() * 1000 << " milliseconds";
+
+            if (vm["storemat_path"].as<string>() != "") {
+                store_mat(vm["storemat_path"].as<string>() + ".rederive", vm, rederive);
+            }
+
+
+            for (auto &r : rm) {
+                delete r.second;
+            }
         }
 
 #if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
@@ -914,8 +991,8 @@ int main(int argc, const char** argv) {
             PredId_t remove_pred = getPredicateID(*layer, "TE");
             InmemoryTable rmTable(Utils::parentDir(path), Utils::filename(path),
                                   remove_pred, layer);
-            // rm = new EDBRemoveLiterals(vm["rm"].as<string>(), layer);
-            rm = new EDBRemoveLiterals(&rmTable, remove_pred, layer);
+            rm = new EDBRemoveLiterals(vm["rm"].as<string>(), layer);
+            // rm = new EDBRemoveLiterals(rmTable, remove_pred, layer);
             rm->dump(std::cerr, layer);
             // Would like to move the thing i.s.o. copy RFHH
             std::unordered_map<PredId_t, const EDBRemoveLiterals *> rm_map;

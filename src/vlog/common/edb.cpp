@@ -38,6 +38,7 @@ void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithread
     infot.manager = std::shared_ptr<EDBTable>(new TridentTable(kbpath, multithreaded, this));
     infot.arity = infot.manager->getArity();
     dbPredicates.insert(make_pair(infot.id, infot));
+    LOG(INFOL) << "Inserted " << pn << " with number " << infot.id;
     LOG(DEBUGL) << "Inserted " << pn << " with number " << infot.id;
 }
 
@@ -107,7 +108,7 @@ void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
     infot.arity = table->getArity();
     dbPredicates.insert(make_pair(infot.id, infot));
 
-    LOG(INFOL) << "Imported InmemoryTable " << pn << " size " << table->getSize();
+    LOG(INFOL) << "Imported InmemoryTable " << pn << " id " << infot.id << " size " << table->getSize();
     // table->dump(std::cerr);
 }
 
@@ -124,7 +125,7 @@ void EDBLayer::addInmemoryTable(std::string predicate, std::vector<std::vector<s
     infot.manager = std::shared_ptr<EDBTable>(table);
     dbPredicates.insert(make_pair(infot.id, infot));
 
-    LOG(INFOL) << "Imported InmemoryTable/predicate " << predicate;
+    LOG(INFOL) << "Imported InmemoryTable id " << infot.id << " predicate " << predicate;
     // table->dump(std::cerr);
 }
 
@@ -162,7 +163,7 @@ void EDBLayer::addEDBonIDBTable(const EDBConf::Table &tableConf) {
     infot.arity = table->getArity();
     dbPredicates.insert(make_pair(infot.id, infot));
 
-    LOG(INFOL) << "Inserted EDBonIDB table, predicate " << pn;
+    LOG(INFOL) << "Inserted EDBonIDB table id " << infot.id << " predicate " << pn;
     // table->dump(std::cout);
 }
 

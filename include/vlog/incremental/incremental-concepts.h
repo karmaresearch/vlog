@@ -19,6 +19,9 @@ protected:
     std::unordered_set<PredId_t> inPreviousSemiNaiver;
     std::string rules;
 
+    std::unordered_map<PredId_t, std::string> dMinus_pred;
+    std::unordered_map<PredId_t, std::string> eMinus_pred;
+
     IncrementalState(const std::shared_ptr<SemiNaiver> from,
                      const EDBLayer *layer) :
         fromSemiNaiver(from), layer(layer) {
@@ -65,18 +68,12 @@ public:
 
     virtual std::string convertRules() = 0;
 
-    bool predInPreviousSemiNaiver(const Literal &literal) const {
-        return inPreviousSemiNaiver.find(literal.getPredicate().getId()) !=
-            inPreviousSemiNaiver.end();
+    static std::string name2dMinus(const std::string &name) {
+        return name + "@dMinus";
     }
 
-    const std::string &getRules() const {
-        return rules;
-    }
-
-    bool hasLiteral(const Literal &literal) const {
-        LOG(ERRORL) << "FIXME: implement hasLiteral";
-        return false;
+    static std::string name2eMinus(const std::string &name) {
+        return name + "@eMinus";
     }
 };
 
@@ -85,16 +82,6 @@ class IncrOverdelete : public IncrementalState {
 
 protected:
     const std::vector<InmemoryTable> &eMinus;      // the deletes
-    std::unordered_map<PredId_t, std::string> dMinus_pred;
-    std::unordered_map<PredId_t, std::string> eMinus_pred;
-
-    static std::string name2dMinus(const std::string &name) {
-        return name + "@dMinus";
-    }
-
-    static std::string name2eMinus(const std::string &name) {
-        return name + "@eMinus";
-    }
 
 public:
     IncrOverdelete(const std::shared_ptr<SemiNaiver> from,
@@ -114,6 +101,9 @@ public:
      *    table of type EDBonIDB
      * 3) for each table p of removes, specify an inmemory table with
      *    predicate p@eMinus
+     *
+     * Note: this is necessary to create an EDBConf, so there is no EDBLayer
+     * yet. Therefore, this is a static method.
      */
     static std::string confContents(const std::shared_ptr<SemiNaiver> fromSemiNaiver,
                                     const std::string &dred_dir,
@@ -169,13 +159,12 @@ public:
     virtual std::string convertRules() {
         const Program *fromProgram = fromSemiNaiver->getProgram();
         const std::vector<Rule> rs = fromProgram->getAllRules();
-        const EDBLayer *fromKB = fromProgram->getKB();
 
         // process the first head of all rules
         for (const auto &r : rs) {
             const std::vector<Literal> &hs = r.getHeads();
             if (hs.size() > 1) {
-                LOG(WARNL) << "No support for rules with multiple heads";
+                LOG(ERRORL) << "No support for rules with multiple heads";
             }
             const Literal &h = r.getFirstHead();
             // create new IDB predicate dq = dMinus(h(...)) with the
@@ -190,15 +179,16 @@ public:
         }
 
         // process the bodies of all rules
+        const EDBLayer *fromKB = fromProgram->getKB();
+        std::ostringstream rules;      // assemble textual rules
         for (const auto &r : rs) {
             const Literal h = r.getFirstHead();
             const PredId_t hid = h.getPredicate().getId();
             const std::vector<Literal> &bs = r.getBody();
             for (::size_t i = 0; i < bs.size(); ++i) {
-                std::ostringstream rule;      // assemble textual rule
-                rule << dMinus_pred[hid];
-                rule << printArgs(h, fromKB);
-                rule << " :- ";
+                rules << dMinus_pred[hid];
+                rules << printArgs(h, fromKB);
+                rules << " :- ";
                 // Create rule dMinus(si)
                 for (::size_t j = 0; j < bs.size(); ++j) {
                     const auto b = bs[j];
@@ -208,39 +198,47 @@ public:
                         if (b.getPredicate().getType() == EDB) {
                             // new EDB predicate dp which is initialized
                             // to eMinus
-                            rule << layer->getPredName(pred) << "@eMinus";
+                            rules << layer->getPredName(pred) << "@eMinus";
                         } else {
                             // assign dMinus(q)
-                            rule << dMinus_pred[pred];
+                            rules << dMinus_pred[pred];
                         }
                     } else {
                         // case si
                         if (b.getPredicate().getType() == EDB) {
                             // recycle EDB predicate, but with eMinus
                             // in the removalList
-                            rule << fromProgram->getPredicateName(pred) << "@E-eMinus";
+                            rules << fromProgram->getPredicateName(pred) << "@E-eMinus";
                         } else {
                             // retain q
-                            rule << fromProgram->getPredicateName(pred);
+                            rules << fromProgram->getPredicateName(pred);
                         }
                     }
-                    rule << printArgs(b, fromKB);
+                    rules << printArgs(b, fromKB);
 
                     if (j < bs.size() - 1) {
-                        rule << ",";
+                        rules << ",";
                     } else {
-                        rule << "\n";
+                        rules << "\n";
                     }
                 }
-                rules += rule.str();
             }
         }
 
-        return rules;
+        return rules.str();
+    }
+
+    std::vector<PredId_t> getIDBPredicates() const {
+        std::vector<PredId_t> res;
+        for (auto p_s : dMinus_pred) {
+            res.push_back(p_s.first);
+        }
+
+        return res;
     }
 };
 
-#if STILL_TYPING
+// #if STILL_TYPING
 /**
  * Gupta, Mumick, Subrahmanian
  *
@@ -252,8 +250,8 @@ public:
  * To express this in Datalog, define the following:
  *
  * E'               E from original problem - eMinus
- * dMinus(q)        EDB from the set of OverDeletes
- * v(q)             EDB from I(q) - dMinus(q)
+ * dMinus(q)        EDB generated from the set of OverDeletes
+ * v(q)             EDB generated from I(q) - dMinus(q)
  * dPlus(q)         new IDB predicate for each q in IDB
  *
  * So rule transformations in 2 parts:
@@ -273,19 +271,34 @@ public:
 class IncrRederive : public IncrementalState {
 
 protected:
+    const std::shared_ptr<SemiNaiver> overdelete_SN;
     const std::vector<InmemoryTable> &eMinus;      // the deletes
+
+    static std::string name2dPlus(const std::string &pred) {
+        return pred + "@dPlus";
+    }
+
+    static std::string name2v(const std::string &pred) {
+        return pred + "@v";
+    }
 
 public:
     IncrRederive(const std::shared_ptr<SemiNaiver> from,
+                 const std::shared_ptr<SemiNaiver> overdelete_SN,
                  const std::vector<PredId_t> &eMinus_preds,
                  const EDBLayer *layer) :
-            IncrementalState(from, layer), eMinus(eMinus) {
+            IncrementalState(from, layer), overdelete_SN(overdelete_SN),
+            eMinus(eMinus) {
     }
 
     /**
      * Create an appropriate EDBConf for the Rederive
+     *
+     * Note: this is necessary to create an EDBConf, so there is no EDBLayer
+     * yet. Therefore, this is a static method.
      */
-    static std::string confContents(const std::shared_ptr<SemiNaiver> fromSemiNaiver,
+    static std::string confContents(const std::shared_ptr<SemiNaiver> fromSN,
+                                    const std::shared_ptr<SemiNaiver> overdeleteSN,
                                     const std::string &dred_dir,
                                     const std::vector<std::string> &ePlus) {
         std::ostringstream os;
@@ -297,43 +310,109 @@ public:
 
     /**
      * Create a Rederive rule set as described above
+     *
+     * Rule transformations in 2 parts, based on the original rule set:
+     * 1) generate rules so dPLus(p) is initialised from v(p) = I(p) - dMinus(p)
+     *    dPlus(p()) :- v(p())
+     * 2) transform rules as in paper:
+     *    dPlus(p()) :- dMinus(p()), s1, ..., sn
+     *    with: (let q be predicate of si; let Q be set of q)
+     *    q in E': no change
+     *    else:    si = dPlus(q())
      */
     virtual std::string convertRules() {
         const Program *fromProgram = fromSemiNaiver->getProgram();
         const std::vector<Rule> rs = fromProgram->getAllRules();
         const EDBLayer *fromKB = fromProgram->getKB();
 
+        std::unordered_map<PredId_t, std::string> actual_pred;
+        std::unordered_map<PredId_t, std::string> dPlus_pred;
+        std::unordered_map<PredId_t, std::string> v_pred;
+        std::unordered_map<PredId_t, std::string> pred_args;
+
         // process the first head of all rules
         for (const auto &r : rs) {
             const std::vector<Literal> &hs = r.getHeads();
             if (hs.size() > 1) {
-                LOG(WARNL) << "No support for rules with multiple heads";
+                LOG(ERRORL) << "No support for rules with multiple heads";
             }
             const Literal &h = r.getFirstHead();
-            // create new IDB predicate dq = dMinus(h(...)) with the
+            // create new IDB predicate dq = dPlus(h(...)) with the
             // same arity as h
             PredId_t pred = h.getPredicate().getId();
             std::string name = fromProgram->getPredicateName(pred);
+            actual_pred[pred] = name;
             dMinus_pred[pred] = name2dMinus(name);
+            v_pred[pred] = name2v(name);
+            dPlus_pred[pred] = name2dPlus(name);
+            pred_args[pred] = printArgs(h, fromKB);
 
             // create EDB predicate which dispatches to the
             // old IDB predicate. Retain name/PredId_t q.
             inPreviousSemiNaiver.insert(pred);
         }
 
-        // process the bodies of all rules
+        std::ostringstream rules;      // assemble textual rules
+
+        for (const auto &pn : pred_args) {
+            PredId_t hid = pn.first;
+
+            // create the union rule 1)
+            rules << v_pred[hid];
+            rules << pn.second;
+            rules << " :- ";
+            rules << dPlus_pred[hid];
+            rules << pn.second;
+            rules << "\n";
+
+            // create the union rule 2)
+            rules << v_pred[hid];
+            rules << pn.second;
+            rules << " :- ";
+            rules << actual_pred[hid];
+            rules << pn.second;
+            rules << "\n";
+        }
+
         for (const auto &r : rs) {
             const Literal h = r.getFirstHead();
             const PredId_t hid = h.getPredicate().getId();
             const std::vector<Literal> &bs = r.getBody();
-            for (::size_t i = 0; i < bs.size(); ++i) {
+
+            // create the transformed rule
+            rules << dPlus_pred[hid];
+            rules << printArgs(h, fromKB);
+            rules << " :- ";
+            rules << dMinus_pred[hid];
+            rules << printArgs(h, fromKB);
+            // Create rule dPlus(si)
+            for (const auto &b: bs) {
+                rules << ",";
+                PredId_t pred = b.getPredicate().getId();
+                if (b.getPredicate().getType() == EDB) {
+                    // recycle EDB predicate, but with eMinus
+                    // in the removalList
+                    rules << fromProgram->getPredicateName(pred);
+                } else {
+                    // retain q
+                    rules << v_pred[pred];
+                }
+                rules << printArgs(b, fromKB);
+            }
+            rules << "\n";
+        }
+
+        return rules.str();
     }
 };
-#endif
+// #endif
 
 /*
 class IncrAdd : public IncrementalState {
 };
 */
+
+class DRed {
+};
 
 #endif  // def INCREMENTAL__CONCEPTS_H__

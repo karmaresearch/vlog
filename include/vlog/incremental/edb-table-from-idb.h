@@ -9,6 +9,7 @@
 
 #include <vlog/fcinttable.h>
 #include <vlog/seminaiver.h>
+#include <vlog/inmemory/inmemorytable.h>
 
 class EDBonIDBIterator : public EDBIterator {
 protected:
@@ -67,6 +68,7 @@ public:
     }
 
     virtual Term_t getElementAt(const uint8_t p) {
+        std::cerr << "get element[" << (int)p << "] of " << query.tostring() << " = " << idbInternalItr->getCurrentValue(p) << std::endl;
         LOG(DEBUGL) << "get element[" << (int)p << "] of " << query.tostring() << " = " << idbInternalItr->getCurrentValue(p);
         return idbInternalItr->getCurrentValue(p);
     }
@@ -173,6 +175,7 @@ public:
     }
 
     virtual Term_t getElementAt(const uint8_t p) {
+        std::cerr << "Sorted/get element[" << (int)p << "] of " << query.tostring() << " = " << itr->getElementAt(p) << std::endl;
         LOG(DEBUGL) << "get element[" << (int)p << "] of " << query.tostring() << " = " << itr->getElementAt(p);
         return itr->getElementAt(p);
     }
@@ -222,12 +225,12 @@ public:
 class EDBonIDBTable : public EDBTable {
 private:
     PredId_t    predid;
-    EDBLayer *layer;
     const std::shared_ptr<SemiNaiver> prevSemiNaiver;
     const FCTable *idbTable;
     size_t cardinality;
 
 public:
+    EDBLayer *layer;
     EDBonIDBTable(PredId_t predid, EDBLayer *layer,
                   const std::shared_ptr<SemiNaiver> prevSN) :
             predid(predid), layer(layer), prevSemiNaiver(prevSN),
@@ -268,6 +271,14 @@ public:
 
     virtual EDBIterator *getIterator(const Literal &q) {
         LOG(DEBUGL) << "Get iterator for query " << q.tostring(NULL, layer);
+static int recursing = 0;
+if (recursing == 0) {
+recursing++;
+std::cerr << "In " << __func__ << std::endl;
+dump(std::cerr);
+std::cerr << "Leave " << __func__ << std::endl;
+recursing--;
+}
         return new EDBonIDBIterator(q, prevSemiNaiver);
     }
 
@@ -308,10 +319,14 @@ public:
         return idbTable->getNAllRows();
     }
 
+    virtual PredId_t getPredicateID() const {
+        return predid;
+    }
+
     std::ostream &dump(std::ostream &os) {
         std::string name = layer->getPredName(predid);
-        os << "Table " << name << std::endl;
-        const uint8_t sizeRow = getNTerms();
+        os << (void *)this << " Table " << name << std::endl;
+        const uint8_t sizeRow = getArity();
         Predicate pred(predid, 0, EDB, sizeRow);
         VTuple t = VTuple(sizeRow);
         for (uint8_t i = 0; i < t.getSize(); ++i) {
