@@ -56,7 +56,7 @@ class SegmentIterator {
         std::vector<std::unique_ptr<ColumnReader>> readers;
 
     protected:
-        Term_t values[32];
+        Term_t values[256];
         SegmentIterator() {
         }
 
