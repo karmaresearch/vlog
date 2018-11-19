@@ -20,7 +20,6 @@ protected:
     std::string rules;
 
     std::unordered_map<PredId_t, std::string> dMinus_pred;
-    std::unordered_map<PredId_t, std::string> eMinus_pred;
 
     IncrementalState(const std::shared_ptr<SemiNaiver> from,
                      const EDBLayer *layer) :
@@ -80,18 +79,11 @@ public:
 
 class IncrOverdelete : public IncrementalState {
 
-protected:
-    const std::vector<InmemoryTable> &eMinus;      // the deletes
-
 public:
     IncrOverdelete(const std::shared_ptr<SemiNaiver> from,
                    const std::vector<PredId_t> &eMinus_preds,
                    const EDBLayer *layer) :
-            IncrementalState(from, layer), eMinus(eMinus) {
-        Program *fromProgram = fromSemiNaiver->getProgram();
-        for (auto p : eMinus_preds) {
-            eMinus_pred[p] = layer->getPredName(p);
-        }
+            IncrementalState(from, layer) {
     }
 
     /**
@@ -198,7 +190,7 @@ public:
                         if (b.getPredicate().getType() == EDB) {
                             // new EDB predicate dp which is initialized
                             // to eMinus
-                            rules << layer->getPredName(pred) << "@eMinus";
+                            rules << name2eMinus(layer->getPredName(pred));
                         } else {
                             // assign dMinus(q)
                             rules << dMinus_pred[pred];

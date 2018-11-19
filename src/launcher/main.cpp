@@ -535,7 +535,9 @@ void launchFullMat(int argc,
             for (const auto &n: remove_pred_names) {
                 PredId_t p = getPredicateID(overdelete_layer, n);
                 remove_pred.push_back(p);
-                rm[p] = new EDBRemoveLiterals(p, &overdelete_layer);
+                PredId_t pMinus = getPredicateID(overdelete_layer,
+                                                 IncrementalState::name2eMinus(n));
+                rm[p] = new EDBRemoveLiterals(pMinus, &overdelete_layer);
                 rm[p]->dump(std::cerr, &overdelete_layer);
             }
             overdelete_layer.addRemoveLiterals(rm);

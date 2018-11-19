@@ -122,12 +122,12 @@ class EDBRemovalIterator : public EDBIterator {
         }
 
         virtual void moveTo(const uint8_t field, const Term_t t) {
-            std::cerr << "FIXME: what should I do in " << __func__ << "?" << std::endl;
+            LOG(ERRORL) << "FIXME: what should I do in " << __func__ << "?";
             itr->moveTo(field, t);
         }
 
         virtual void skipDuplicatedFirstColumn() {
-            std::cerr << "FIXME: what should I do in " << __func__ << "?" << std::endl;
+            LOG(ERRORL) << "FIXME: what should I do in " << __func__ << "?";
             itr->skipDuplicatedFirstColumn();
         }
 

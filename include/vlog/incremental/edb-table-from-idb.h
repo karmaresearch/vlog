@@ -68,7 +68,6 @@ public:
     }
 
     virtual Term_t getElementAt(const uint8_t p) {
-        std::cerr << "get element[" << (int)p << "] of " << query.tostring() << " = " << idbInternalItr->getCurrentValue(p) << std::endl;
         LOG(DEBUGL) << "get element[" << (int)p << "] of " << query.tostring() << " = " << idbInternalItr->getCurrentValue(p);
         return idbInternalItr->getCurrentValue(p);
     }
@@ -175,7 +174,6 @@ public:
     }
 
     virtual Term_t getElementAt(const uint8_t p) {
-        std::cerr << "Sorted/get element[" << (int)p << "] of " << query.tostring() << " = " << itr->getElementAt(p) << std::endl;
         LOG(DEBUGL) << "get element[" << (int)p << "] of " << query.tostring() << " = " << itr->getElementAt(p);
         return itr->getElementAt(p);
     }
@@ -271,14 +269,6 @@ public:
 
     virtual EDBIterator *getIterator(const Literal &q) {
         LOG(DEBUGL) << "Get iterator for query " << q.tostring(NULL, layer);
-static int recursing = 0;
-if (recursing == 0) {
-recursing++;
-std::cerr << "In " << __func__ << std::endl;
-dump(std::cerr);
-std::cerr << "Leave " << __func__ << std::endl;
-recursing--;
-}
         return new EDBonIDBIterator(q, prevSemiNaiver);
     }
 
