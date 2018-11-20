@@ -893,7 +893,7 @@ int main(int argc, const char** argv) {
                                   remove_pred, layer);
             rm = new EDBRemoveLiterals(vm["rm"].as<string>(), layer);
             // rm = new EDBRemoveLiterals(rmTable, remove_pred, layer);
-            rm->dump(std::cerr, layer);
+            rm->dump(std::cerr, *layer);
             // Would like to move the thing i.s.o. copy RFHH
             std::unordered_map<PredId_t, const EDBRemoveLiterals *> rm_map;
             rm_map[remove_pred] = rm;

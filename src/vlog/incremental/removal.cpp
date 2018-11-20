@@ -35,15 +35,7 @@ EDBRemoveLiterals::EDBRemoveLiterals(const std::string &file,
 // Looks up the table in layer
 EDBRemoveLiterals::EDBRemoveLiterals(PredId_t predid,
                                      EDBLayer *layer) {
-    // const
-    std::shared_ptr<EDBTable> table = layer->getEDBTable(predid);
-EDBonIDBTable *eoit = dynamic_cast<EDBonIDBTable *>(table.get());
-if (eoit != NULL) {
-    eoit->dump(std::cerr);
-    eoit->dump(std::cerr);
-    std::cerr << "Incorporate Table " << eoit->layer->getPredName(eoit->getPredicateID()) << std::endl;
-    std::cerr << (void *)eoit << " " << (void *)&table << std::endl;
-}
+    const std::shared_ptr<EDBTable> table = layer->getEDBTable(predid);
     uint8_t arity = table->getArity();
     Predicate pred(predid, 0, EDB, arity);
     VTuple t = VTuple(arity);
@@ -58,13 +50,12 @@ if (eoit != NULL) {
         itr->next();
         for (uint8_t m = 0; m < arity; ++m) {
             terms[m] = itr->getElementAt(m);
-std::cerr << "    elt(" << (int)m << ") " << itr->getElementAt(m) << " item[" << (int)m << "] " << terms[m] << std::endl;
         }
         insert(terms);
     }
     table->releaseIterator(itr);
 
-    dump(std::cerr, layer);
+    // dump(std::cerr, *layer);
 }
 
 EDBRemoveItem *EDBRemoveLiterals::insert_recursive(const std::vector<Term_t> &terms, size_t offset) {
@@ -96,8 +87,6 @@ static void dump_map(std::ostream &os,
 bool EDBRemoveLiterals::present(const std::vector<Term_t> &terms) const {
     const EDBRemoveItem *m = &removed;
     for (auto i = 0; i < terms.size(); ++i) {
-        // dump_map(std::cerr, m->has);
-        // dump_recursive(std::cerr, layer, &(*m));
         const auto f = m->has.find(terms[i]);
         if (f == m->has.end()) {
             return false;
@@ -121,7 +110,8 @@ bool EDBRemoveLiterals::present(const std::vector<Term_t> &terms) const {
 
 
 std::ostream &EDBRemoveLiterals::dump_recursive_name(
-        std::ostream &of, EDBLayer *layer,
+        std::ostream &of,
+        const EDBLayer &layer,
         const EDBRemoveItem *item) const {
     if (item == NULL) {
         return of;
@@ -129,7 +119,7 @@ std::ostream &EDBRemoveLiterals::dump_recursive_name(
 
     for (auto rm = item->has.begin(); rm != item->has.end(); ++rm) {
         char name[1024];
-        layer->getDictText(rm->first, name);
+        layer.getDictText(rm->first, name);
         of << name << ",";
         dump_recursive_name(of, layer, rm->second);
         of << std::endl;
@@ -140,7 +130,7 @@ std::ostream &EDBRemoveLiterals::dump_recursive_name(
 
 
 std::ostream &EDBRemoveLiterals::dump_recursive(
-        std::ostream &of, EDBLayer *layer,
+        std::ostream &of,
         const EDBRemoveItem *item) const {
     if (item == NULL) {
         return of;
@@ -148,7 +138,7 @@ std::ostream &EDBRemoveLiterals::dump_recursive(
 
     for (auto rm = item->has.begin(); rm != item->has.end(); ++rm) {
         of << rm->first << ",";
-        dump_recursive(of, layer, rm->second);
+        dump_recursive(of, rm->second);
         of << std::endl;
     }
 
@@ -157,8 +147,8 @@ std::ostream &EDBRemoveLiterals::dump_recursive(
 
 std::ostream &EDBRemoveLiterals::dump(
         std::ostream &of,
-        /* const */ EDBLayer *layer) const {
-    dump_recursive(of, layer, &removed);
+        const EDBLayer &layer) const {
+    dump_recursive(of, &removed);
     dump_recursive_name(of, layer, &removed);
 
     return of;

@@ -105,11 +105,11 @@ IncrOverdelete::IncrOverdelete(// const
         remove_pred.push_back(p);
         PredId_t pMinus = program->getPredicate(name2eMinus(n)).getId();
         rm[p] = new EDBRemoveLiterals(pMinus, layer);
-        rm[p]->dump(std::cerr, layer);
+        // rm[p]->dump(std::cerr, *layer);
     }
     layer->addRemoveLiterals(rm);
 
-    std::cerr << "Check confContents again: " << confContents() << std::endl;
+    // std::cerr << "Check confContents again: " << confContents() << std::endl;
 
     //Prepare the materialization
     sn = Reasoner::getSemiNaiver(
@@ -160,7 +160,6 @@ std::string IncrOverdelete::confContents() const {
     for (auto p : predicates) {
         PredId_t pred = fromProgram->getPredicate(p).getId();
         if (fromProgram->isPredicateIDB(pred)) {
-            std::cerr << "*********** IDB pred " << p << std::endl;
             std::string predName = "EDB" + std::to_string(nTables);
             os << predName << "_predname" << "=" << p << std::endl;
             os << predName << "_type=EDBonIDB" << std::endl;
@@ -343,7 +342,7 @@ IncrRederive::IncrRederive(// const
         // Read the Q^v values from our own EDB tables
         std::string rm_name = name2dMinus(pp.second);
         PredId_t rm_pred = op->getPredicate(rm_name).getId();
-        std::cerr << "dMinus table for " << pp.second << " is "<< rm_name << std::endl;
+        LOG(DEBUGL) << "dMinus table for " << pp.second << " is "<< rm_name;
         // Feed that to the Removal
         rm[pp.first] = new EDBRemoveLiterals(rm_pred, layer);
     }

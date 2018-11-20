@@ -274,7 +274,7 @@ public:
 
     virtual EDBIterator *getSortedIterator(const Literal &query,
                                            const std::vector<uint8_t> &fields) {
-        LOG(DEBUGL) << "Get SortedIterator for query " <<
+        LOG(INFOL) << "Get SortedIterator for query " <<
             query.tostring(NULL, layer) << " fields " << fields.size();
         LOG(INFOL) << "FIXME: implement cache for sorted query";
         return new EDBonIDBSortedIterator(query, fields, prevSemiNaiver, layer);

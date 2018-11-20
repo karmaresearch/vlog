@@ -18,8 +18,6 @@ class EDBRemoveItem {
         EDBRemoveItem() { }
 
         ~EDBRemoveItem() {
-            // std::cerr << "For now, don't delete the lower RemoveItems" << std::endl;
-            // return;
             for (auto & c : has) {
                 delete c.second;
             }
@@ -36,10 +34,9 @@ class EDBRemoveLiterals {
         EDBRemoveItem *insert_recursive(const std::vector<Term_t> &terms, size_t offset);
 
         std::ostream &dump_recursive(std::ostream &of,
-                                     EDBLayer *layer,
                                      const EDBRemoveItem *item) const;
         std::ostream &dump_recursive_name(std::ostream &of,
-                                          EDBLayer *layer,
+                                          const EDBLayer &layer,
                                           const EDBRemoveItem *item) const;
 
     public:
@@ -57,7 +54,7 @@ class EDBRemoveLiterals {
         }
 
         std::ostream &dump(std::ostream &of,
-                           /* const */ EDBLayer *layer) const;
+                           const EDBLayer &layer) const;
 
         ~EDBRemoveLiterals() { }
 };
