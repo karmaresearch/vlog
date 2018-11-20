@@ -232,10 +232,10 @@ FCBlock Reasoner::getBlockFromQuery(Literal constantsQuery, Literal &boundQuery,
         table = std::shared_ptr<FCInternalTable>(new SingletonTable(0));
     } else {
         SegmentInserter inserter(nconstants);
-        Term_t tuple[128];
+        Term_t tuple[256];
         uint8_t nPosToCopy = 0;
-        uint8_t posToCopy[128];
-        assert(boundQuery.getTupleSize() <= 128);
+        uint8_t posToCopy[256];
+        assert(boundQuery.getTupleSize() <= 256);
         for (uint8_t i = 0; i < (uint8_t) boundQuery.getTupleSize(); ++i) {
             if (!boundQuery.getTermAtPos(i).isVariable()) {
                 posToCopy[nPosToCopy++] = i;
@@ -522,9 +522,9 @@ TupleIterator *Reasoner::getMagicIterator(Literal &query,
 
 
     //To use if the flag returnOnlyVars is set to false
-    uint64_t outputTuple[128];    // Used in trident method, so no Term_t
+    uint64_t outputTuple[256];    // Used in trident method, so no Term_t
     uint8_t nPosToCopy = 0;
-    uint8_t posToCopy[128];
+    uint8_t posToCopy[256];
     std::vector<uint8_t> newPosJoins; //This is used because I need the posJoins in the original triple, and not on the variables
     if (posJoins != NULL) {
         newPosJoins = *posJoins;
@@ -848,7 +848,7 @@ TupleIterator *Reasoner::getEDBIterator(Literal &query,
         TupleIterator *itr = new TupleTableItr(ptable);
         while (itr->hasNext()) {
             itr->next();
-            uint64_t row[128];
+            uint64_t row[256];
             int cnt = 0;
             for (int i = 0; i < cardinality; i++) {
                 if (v.get(i).isVariable()) {

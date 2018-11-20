@@ -93,7 +93,7 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
 	LOG(DEBUGL) << "Reading " << tablefile;
 	while (! ifs->eof()) {
 	    std::vector<std::string> row = readRow(*ifs);
-	    Term_t rowc[128];
+	    Term_t rowc[256];
 	    if (arity == 0) {
 		arity = row.size();
 	    }
@@ -171,7 +171,7 @@ InmemoryTable::InmemoryTable(PredId_t predid, std::vector<std::vector<std::strin
     //Load the table in the database
     SegmentInserter *inserter = NULL;
     for (auto &row : entries) {
-	Term_t rowc[128];
+	Term_t rowc[256];
         if (arity == 0) {
             arity = row.size();
         }
@@ -201,7 +201,7 @@ InmemoryTable::InmemoryTable(PredId_t predid, std::vector<std::vector<std::strin
 void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
         std::vector<uint8_t> *posToFilter,
         std::vector<Term_t> *valuesToFilter) {
-    Term_t row[128];
+    Term_t row[256];
     const Literal *lit = query->getLiteral();
     uint8_t *pos = query->getPosToCopy();
     const uint8_t npos = query->getNPosToCopy();

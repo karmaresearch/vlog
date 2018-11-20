@@ -110,7 +110,7 @@ void SparqlTable::query(QSQQuery *query, TupleTable *outputTable,
 	throw 10;
     }
 
-    Term_t row[128];
+    Term_t row[256];
     uint8_t *pos = query->getPosToCopy();
     const uint8_t npos = query->getNPosToCopy();
     if (posToFilter == NULL || posToFilter->size() == 0) {

@@ -52,7 +52,7 @@ void MAPITable::executeQuery(const std::string &query, SegmentInserter *inserter
 	    LOG(ERRORL) << "Number of fields in query result " << nfields << ", arity should be " << arity << ", this result is ignored";
 	    continue;
 	}
-	uint64_t row[128];
+	uint64_t row[256];
 	for (int i = 0; i < nfields; i++) {
 	    char *field = mapi_fetch_field(handle, i);
 	    layer->getOrAddDictNumber(field, strlen(field), row[i]);
