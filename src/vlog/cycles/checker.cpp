@@ -23,8 +23,9 @@ int Checker::check(std::string ruleFile, std::string alg, EDBLayer &db) {
 	return JA(p, true) ? 1 : 0;
     } else if (alg == "MFC") {
 	// Model Faithful Cyclic
-	// This one, as the name already suggests, is the other way around: if true, there is a cycle.
-	return MFC(p) ? 0 : 1;
+	// This one, as the name already suggests, is the other way around: if true, there is a cycle,
+	// so we know it won't terminate in some cases.
+	return MFC(p) ? 2 : 0;
     } else {
 	// TODO: RMFA, MSA, RMSA, RMFC
 	LOG(ERRORL) << "Unknown algorithm: " << alg;

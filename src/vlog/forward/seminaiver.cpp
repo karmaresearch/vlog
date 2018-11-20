@@ -1073,7 +1073,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                             finalResultContainer == NULL,
                             !multithreaded ? -1 : nthreads,
                             this,
-                            chaseMgmt);
+                            chaseMgmt,
+			    chaseMgmt->hasRuleToCheck());
                 } else {
                     if (heads.size() == 1) {
                         FCTable *table = getTable(heads[0].getPredicate().getId(),

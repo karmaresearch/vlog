@@ -124,6 +124,9 @@ bool ChaseMgmt::checkRecursive(uint64_t target, uint64_t rv, int level) {
 	LOG(DEBUGL) << "Found an immediate cycle at level " << level;
 	return true;
     }
+    if (mask == 0) {
+	return false;
+    }
     return checkNestedRecursive(target, rv, level);
 }
 
@@ -155,7 +158,11 @@ bool ChaseMgmt::checkNestedRecursive(uint64_t target, uint64_t rv, int level) {
 
 // Check if rv is recursive.
 bool ChaseMgmt::checkRecursive(uint64_t rv) {
-    return checkNestedRecursive(rv & RULEVARMASK, rv, 0);
+    uint64_t mask = rv & RULEVARMASK;
+    if (mask == 0) {
+	return false;
+    }
+    return checkNestedRecursive(mask, rv, 0);
 }
 
 std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(

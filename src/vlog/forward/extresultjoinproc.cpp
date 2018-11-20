@@ -22,10 +22,11 @@ ExistentialRuleProcessor::ExistentialRuleProcessor(
         const bool addToEndTable,
         const int nthreads,
         SemiNaiver *sn,
-        std::shared_ptr<ChaseMgmt> chaseMgmt) :
+        std::shared_ptr<ChaseMgmt> chaseMgmt,
+	bool filterRecursive) :
     FinalRuleProcessor(posFromFirst, posFromSecond, listDerivations,
             heads, detailsRule, ruleExecOrder, iteration,
-            addToEndTable, nthreads, sn), chaseMgmt(chaseMgmt) {
+            addToEndTable, nthreads, sn), chaseMgmt(chaseMgmt), filterRecursive(filterRecursive) {
         this->sn = sn;
 
         //When I consolidate, should I assign values to the existential columns?
@@ -176,6 +177,46 @@ void ExistentialRuleProcessor::filterDerivations(FCTable *t,
         outputProc.push_back(el);
 }
 
+// Filters out rows with recursive terms
+void ExistentialRuleProcessor::retainNonRecursive(
+	uint64_t &sizecolumns,
+        std::vector<std::shared_ptr<Column>> &c) {
+    std::vector<ColumnWriter> writers;
+    std::vector<std::unique_ptr<ColumnReader>> readers;
+    for(uint8_t i = 0; i < c.size(); ++i) {
+	readers.push_back(c[i]->getReader());
+    }
+    writers.resize(c.size());
+    uint64_t idxs = 0;
+    uint64_t cols[256];
+    for(uint64_t i = 0; i < sizecolumns; ++i) {
+	bool copy = true;
+	for(uint8_t j = 0; copy && j < c.size(); ++j) {
+	    if (!readers[j]->hasNext()) {
+		throw 10;
+	    }
+	    cols[j] = readers[j]->next();
+	    if (chaseMgmt->checkRecursive(cols[j])) {
+		copy = false;
+		break;
+	    }
+	}
+	if (copy) {
+	    for(uint8_t j = 0; j < c.size(); ++j) {
+		writers[j].add(cols[j]);
+	    }
+	}
+    }
+    //Copy back the retricted columns
+    for(uint8_t i = 0; i < c.size(); ++i) {
+	c[i] = writers[i].getColumn();
+    }
+    sizecolumns = 0;
+    if (c.size() > 0) {
+	sizecolumns = c[0]->size();
+    }
+}
+
 void ExistentialRuleProcessor::retainNonExisting(
         std::vector<uint64_t> &filterRows,
         uint64_t &sizecolumns,
@@ -293,6 +334,14 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
 	if (!filterRows.empty()) {
 	    retainNonExisting(filterRows, sizecolumns, c);
 	}
+    }
+
+    if (filterRecursive) {
+	retainNonRecursive(sizecolumns, c);
+    }
+
+    if (sizecolumns == 0) {
+	return;
     }
 
     std::vector<std::shared_ptr<Column>> knownColumns;
@@ -437,6 +486,14 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
 	if (!filterRows.empty()) {
 	    retainNonExisting(filterRows, sizecolumns, c);
 	}
+    }
+
+    if (filterRecursive) {
+	retainNonRecursive(sizecolumns, c);
+    }
+
+    if (sizecolumns == 0) {
+	return;
     }
 
     //Create existential columns store them in a vector with the corresponding
@@ -605,6 +662,14 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                 retainNonExisting(filterRows, nrows, allColumns);
             }
         }
+
+	if (filterRecursive) {
+	    retainNonRecursive(nrows, allColumns);
+	}
+
+	if (nrows == 0) {
+	    return;
+	}
 
         //Populate the known columns (they will be the arguments to get the
         //fresh IDs)

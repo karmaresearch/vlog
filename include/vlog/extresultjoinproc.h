@@ -11,6 +11,7 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
 
         //If the data is added row by row, then I set the following flag to true
         bool replaceExtColumns;
+	bool filterRecursive;
         uint8_t nConstantColumns;
         uint8_t posConstantColumns[256];
         uint8_t nKnownColumns;
@@ -44,6 +45,10 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 uint64_t &sizecolumns,
                 std::vector<std::shared_ptr<Column>> &c);
 
+        void retainNonRecursive(
+                uint64_t &sizecolumns,
+                std::vector<std::shared_ptr<Column>> &c);
+
     public:
         ExistentialRuleProcessor(
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
@@ -56,7 +61,8 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 const bool addToEndTable,
                 const int nthreads,
                 SemiNaiver *sn,
-                std::shared_ptr<ChaseMgmt> chaseMgmt);
+                std::shared_ptr<ChaseMgmt> chaseMgmti,
+		bool filterRecursive = false);
 
         void addColumns(const int blockid, FCInternalTableItr *itr,
                 const bool unique, const bool sorted,

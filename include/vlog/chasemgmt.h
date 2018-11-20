@@ -119,6 +119,10 @@ class ChaseMgmt {
         bool isRestricted() {
             return restricted;
         }
+
+	bool hasRuleToCheck() {
+	    return ruleToCheck >= 0;
+	}
 };
 
 #endif
