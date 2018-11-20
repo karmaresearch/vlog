@@ -513,10 +513,10 @@ void launchFullMat(int argc,
             std::chrono::system_clock::time_point start;
             std::chrono::duration<double> sec;
 
-            LOG(INFOL) << "***************** Create Overdelete";
-
             LOG(ERRORL) << "FIXME: currently E has fixed name TE";
             std::vector<std::string> remove_pred_names(1, "TE");
+
+            LOG(INFOL) << "***************** Create Overdelete";
 
             IncrOverdelete overdelete(vm, sn, remove_pred_names);
 
@@ -530,91 +530,23 @@ void launchFullMat(int argc,
                 store_mat(vm["storemat_path"].as<string>() + ".overdelete", vm, overdelete.getSN());
             }
 
-#if 0
             // Continue same with Rederive
             // Create a Program, create a SemiNaiver, run...
             LOG(INFOL) << "***************** Create Rederive";
 
-            confContents = IncrRederive::confContents(sn, overdelete, dredDir, remove_pred_names);
-            LOG(INFOL) << "Generated rederive edb.conf:";
-            LOG(INFOL) << confContents;
+            IncrRederive rederive(vm, sn, remove_pred_names, overdelete);
 
-            // LOG(ERRORL) << "For now, grab the EDBConf from a file";
-            // EDBConf rederive_conf(dredDir + "/edb.conf-rederive");
-            EDBConf rederive_conf(confContents, false);
-            EDBLayer rederive_layer(rederive_conf, false, overdelete);
-
-            // The Removals should contain not only TE@dMinus (= E^-) for TE
-            // but also q@dMinus for q (all q)
-
-            rm.clear();
-            // Add the user removals
-            for (const auto &r: remove_pred_names) {
-                std::string rm_name = dred_overdelete.name2eMinus(r);
-                PredId_t e = overdelete->getProgram()->getPredicate(r).getId();
-                PredId_t rm_pred = overdelete->getProgram()->getPredicate(rm_name).getId();
-                rm[e] = new EDBRemoveLiterals(rm_pred, &rederive_layer);
-            }
-
-            Program *sn_program = sn->getProgram();
-            const std::vector<std::string> idbs = sn_program->getAllPredicateStrings();
-            std::vector<std::pair<PredId_t, std::string>> idb_pred;
-            for (const std::string &p : idbs) {
-                PredId_t pred = sn_program->getPredicate(p).getId();
-                if (sn_program->isPredicateIDB(pred)) {
-                    idb_pred.push_back(std::pair<PredId_t, std::string>(pred, p));
-                }
-            }
-
-            for (const auto &pp : idb_pred) {
-                // Read the Q^v values from our own EDB tables
-                std::string rm_name = dred_overdelete.name2dMinus(pp.second);
-                PredId_t rm_pred = overdelete->getProgram()->getPredicate(rm_name).getId();
-                std::cerr << "dMinus table for " << pp.second << " is "<< rm_name << std::endl;
-                // Feed that to the Removal
-                rm[pp.first] = new EDBRemoveLiterals(rm_pred, &rederive_layer);
-            }
-            for (const auto &r : rm) {
-                LOG(INFOL) << "******************** Add removal predicate for predicate " << r.first;
-            }
-            rederive_layer.addRemoveLiterals(rm);
-
-            IncrRederive dred_rederive(sn, overdelete, remove_pred,
-                                       &rederive_layer);
-            std::string rederive_rules = dred_rederive.convertRules();
-            std::cout << "Rederive rule set:" << std::endl;
-            std::cout << rederive_rules;
-
-            Program rederiveProgram(&rederive_layer);
-            rederiveProgram.readFromString(rederive_rules,
-                                           vm["rewriteMultihead"].as<bool>());
-
-            //Prepare the materialization
-            std::shared_ptr<SemiNaiver> rederive = Reasoner::getSemiNaiver(
-                    rederive_layer,
-                    &rederiveProgram, vm["no-intersect"].empty(),
-                    vm["no-filtering"].empty(),
-                    !vm["multithreaded"].empty(),
-                    vm["restrictedChase"].as<bool>(),
-                    nthreads,
-                    interRuleThreads,
-                    ! vm["shufflerules"].empty());
-            LOG(INFOL) << "Starting overdeletion materialization";
+            LOG(INFOL) << "Starting rederive materialization";
             start = std::chrono::system_clock::now();
-            rederive->run();
+            rederive.run();
             sec = std::chrono::system_clock::now() - start;
             LOG(INFOL) << "Runtime overdelete = " << sec.count() * 1000 << " milliseconds";
 
             if (vm["storemat_path"].as<string>() != "") {
-                store_mat(vm["storemat_path"].as<string>() + ".rederive", vm, rederive);
+                store_mat(vm["storemat_path"].as<string>() + ".rederive", vm, rederive.getSN());
             }
 
-            LOG(ERRORL) << "DRED: add the Additions step";
-
-            for (auto &r : rm) {
-                delete r.second;
-            }
-#endif
+            LOG(ERRORL) << "FIXME: DRed: add the Additions step";
         }
 
 #if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
