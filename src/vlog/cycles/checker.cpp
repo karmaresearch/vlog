@@ -507,6 +507,7 @@ bool Checker::MFC(Program &p) {
 	    sn->checkAcyclicity(ruleCount);
 	    // If we produce a cyclic term FOR THIS RULE, we have MFC.
 	    if (sn->isFoundCyclicTerms()) {
+		LOG(INFOL) << "MFC: Cyclic rule: " << rule.toprettystring(&p, p.getKB());
 		return true;	// MFC
 	    }
 	}
