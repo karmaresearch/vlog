@@ -663,20 +663,20 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
             }
         }
 
-	if (filterRecursive) {
-	    retainNonRecursive(nrows, allColumns);
-	}
-
-	if (nrows == 0) {
-	    return;
-	}
-
         //Populate the known columns (they will be the arguments to get the
         //fresh IDs)
         std::vector<std::shared_ptr<Column>> knownColumns;
         for(int i = 0; i < colsForExt.size(); ++i) {
             knownColumns.push_back(allColumns[colsForExt[i]]);
         }
+
+	if (filterRecursive) {
+	    retainNonRecursive(nrows, knownColumns);
+	}
+
+	if (nrows == 0) {
+	    return;
+	}
 
         for(auto &el : posExtColumns) {
             auto extcolumn = chaseMgmt->getNewOrExistingIDs(
