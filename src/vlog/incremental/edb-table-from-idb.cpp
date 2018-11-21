@@ -115,8 +115,6 @@ public:
             predid(query.getPredicate().getId()), ownsTable(true) {
         LOG(DEBUGL) << "EDBonIDBSortedIterator, query " << query.tostring() <<
             ", fields.size() " << fields.size();
-        LOG(INFOL) << "FIXME: if fields implies a no-op, dispatch to non-sorted Iterator";
-
         inmemoryTable = createSortedTable(query, fields, SN, layer);
         if (inmemoryTable != NULL) {
             itr = inmemoryTable->getSortedIterator(query, fields);
@@ -222,10 +220,10 @@ public:
     */
 
     virtual ~EDBonIDBSortedIterator() {
-        LOG(ERRORL) << "Need to cache inmemoryTable";
         if (inmemoryTable != NULL) {
             inmemoryTable->releaseIterator(itr);
             if (ownsTable) {
+                LOG(ERRORL) << "Need to cache inmemoryTable for " << query.tostring(NULL, layer) << " fields size " << fields.size();
                 delete inmemoryTable;
             }
         }
@@ -279,8 +277,11 @@ EDBIterator *EDBonIDBTable::getSortedIterator(const Literal &query,
     if (isNatural(query, fields)) {
         LOG(INFOL) << "'Natural' sorted query " << query.tostring(NULL, layer);
         if (naturalTable == NULL) {
+            LOG(INFOL) << "create new naturalTable";
             naturalTable = EDBonIDBSortedIterator::createSortedTable(
                                 query, fields, prevSemiNaiver, layer);
+        } else {
+            LOG(INFOL) << "Use cached naturalTable";
         }
         return new EDBonIDBSortedIterator(query, fields, layer,
                                           naturalTable);

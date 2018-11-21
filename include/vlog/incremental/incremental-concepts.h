@@ -88,14 +88,6 @@ protected:
 
     std::string convertRules() const;
 
-    static std::string name2dPlus(const std::string &pred) {
-        return pred + "@dPlus";
-    }
-
-    static std::string name2v(const std::string &pred) {
-        return pred + "@v";
-    }
-
 public:
     IncrRederive(// const
                  ProgramArgs vm,
@@ -106,14 +98,51 @@ public:
     virtual ~IncrRederive() {
     }
 
+    static std::string name2dPlus(const std::string &pred) {
+        return pred + "@dPlus";
+    }
+
+    static std::string name2v(const std::string &pred) {
+        return pred + "@v";
+    }
+
     std::string confContents() const;
 };
 
 
-/*
 class IncrAdd : public IncrementalState {
+    const IncrOverdelete &overdelete;
+    const IncrRederive &rederive;
+    const std::vector<std::string> &eAdd;
+
+    std::string convertRules() const;
+
+public:
+    IncrAdd(// const
+            ProgramArgs vm,
+            const std::shared_ptr<SemiNaiver> from,
+            const std::vector<std::string> &eMinus,
+            const std::vector<std::string> &eAdd,
+            const IncrOverdelete &overdelete,
+            const IncrRederive &rederive);
+
+    virtual ~IncrAdd();
+
+    static std::string name2eAdd(const std::string &pred) {
+        return pred + "@eAdd";
+    }
+
+    static std::string name2dAdd(const std::string &pred) {
+        return pred + "@dAdd";
+    }
+
+    static std::string name2u(const std::string &pred) {
+        return pred + "@u";
+    }
+
+    std::string confContents() const;
 };
-*/
+
 
 class DRed {
 };

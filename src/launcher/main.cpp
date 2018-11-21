@@ -515,6 +515,7 @@ void launchFullMat(int argc,
 
             LOG(ERRORL) << "FIXME: currently E has fixed name TE";
             std::vector<std::string> remove_pred_names(1, "TE");
+            std::vector<std::string> add_pred_names(1, "TE");
 
             LOG(INFOL) << "***************** Create Overdelete";
 
@@ -547,6 +548,9 @@ void launchFullMat(int argc,
             }
 
             LOG(ERRORL) << "FIXME: DRed: add the Additions step";
+
+            IncrAdd addition(vm, sn, remove_pred_names, add_pred_names,
+                             overdelete, rederive);
         }
 
 #if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)

@@ -81,7 +81,6 @@ IncrOverdelete::IncrOverdelete(// const
 
     // Overdelete
     // Create a Program, create a SemiNaiver, run...
-    LOG(INFOL) << "***************** Create Overdelete";
 
     std::string confString = confContents();
 
@@ -167,12 +166,12 @@ std::string IncrOverdelete::confContents() const {
         }
     }
 
-    for (auto rm : eMinus) {
+    for (auto pred : eMinus) {
         std::string predName = "EDB" + std::to_string(nTables);
-        os << predName << "_predname" << "=" << name2eMinus(rm) << std::endl;
+        os << predName << "_predname" << "=" << name2eMinus(pred) << std::endl;
         os << predName << "_type=INMEMORY" << std::endl;
         os << predName << "_param0=" << dredDir << std::endl;
-        os << predName << "_param1=" << rm << "_remove" << std::endl;
+        os << predName << "_param1=" << pred << "_remove" << std::endl;
         ++nTables;
     }
 
@@ -241,6 +240,7 @@ std::string IncrOverdelete::convertRules() const {
                     if (b.getPredicate().getType() == EDB) {
                         // recycle EDB predicate, but with eMinus
                         // in the removalList
+                        LOG(ERRORL) << "Wrong generated predicate name";
                         rules << fromProgram->getPredicateName(pred) << "@E-eMinus";
                     } else {
                         // retain q
@@ -488,4 +488,227 @@ std::string IncrRederive::convertRules() const {
     }
 
     return rules.str();
+}
+
+
+IncrAdd::IncrAdd(// const
+                 ProgramArgs vm,
+                 const std::shared_ptr<SemiNaiver> from,
+                 const std::vector<std::string> &eMinus,
+                 const std::vector<std::string> &eAdd,
+                 const IncrOverdelete &overdelete,
+                 const IncrRederive &rederive) :
+        IncrementalState(vm, from, eMinus), eAdd(eAdd), overdelete(overdelete),
+        rederive(rederive) {
+    std::string confString = confContents();
+    LOG(INFOL) << "Generated additions edb.conf:";
+    LOG(INFOL) << confString;
+
+    // LOG(ERRORL) << "For now, grab an additions EDBConf from file";
+    // conf = new EDBConf(vm["dred"].as<string>() + "/edb.conf-additions");
+    conf = new EDBConf(confString, false);
+    layer = new EDBLayer(*conf, false, rederive.getSN());
+
+    std::string rules = convertRules();
+    std::cout << "Rederive rule set:" << std::endl;
+    std::cout << rules;
+
+    program = new Program(layer);
+    program->readFromString(rules, vm["rewriteMultihead"].as<bool>());
+
+    // The Removals should contain not only TE@dMinus (= E^-) for TE
+    // but also q@dMinus for q (all q)
+
+    // Add the user removals
+    for (const auto &r: eMinus) {
+        std::string rm_name = name2eMinus(r);
+        PredId_t e = program->getPredicate(r).getId();
+        PredId_t rm_pred = program->getPredicate(rm_name).getId();
+        rm[e] = new EDBRemoveLiterals(rm_pred, layer);
+    }
+
+    Program *sn_program = fromSemiNaiver->getProgram();
+    const std::vector<std::string> idbs = sn_program->getAllPredicateStrings();
+    std::vector<std::pair<PredId_t, std::string>> idb_pred;
+    for (const std::string &p : idbs) {
+        PredId_t pred = sn_program->getPredicate(p).getId();
+        if (sn_program->isPredicateIDB(pred)) {
+            idb_pred.push_back(std::pair<PredId_t, std::string>(pred, p));
+        }
+    }
+
+    // const
+    Program *op = overdelete.getSN()->getProgram();
+    for (const auto &pp : idb_pred) {
+        // Read the Q^v values from our own EDB tables
+        std::string rm_name = name2dMinus(pp.second);
+        PredId_t rm_pred = op->getPredicate(rm_name).getId();
+        LOG(DEBUGL) << "dMinus table for " << pp.second << " is "<< rm_name;
+        // Feed that to the Removal
+        rm[pp.first] = new EDBRemoveLiterals(rm_pred, layer);
+    }
+    for (const auto &r : rm) {
+        LOG(INFOL) << "******************** Add removal predicate for predicate " << r.first;
+    }
+    layer->addRemoveLiterals(rm);
+
+    //Prepare the materialization
+    sn = Reasoner::getSemiNaiver(
+            *layer,
+            program,
+            vm["no-intersect"].empty(),
+            vm["no-filtering"].empty(),
+            !vm["multithreaded"].empty(),
+            vm["restrictedChase"].as<bool>(),
+            nthreads,
+            interRuleThreads,
+            ! vm["shufflerules"].empty());
+}
+
+IncrAdd::~IncrAdd() {
+}
+
+
+/**
+ * Gupta, Mumick, Subrahmanian
+ * dAdd(p(x*)) :- s1, ..., dAdd(si), ..., sn
+ * dAdd(si): (let q = pred(si))
+ *      if q in EDB(eAdd): q@eAdd       the additions)
+ *      else: dAdd(q(x*))               so we can iterate
+ * si:
+ *      union of dAdd(q) and q from Q^v, the result of the Rederive:
+ *              Q^rederive = Q^I - Q@dMinus + Q@dPlus
+ *      like with rederive, define an intermediate predicate u(q):
+ *      u(q) :- dAdd(q)
+ *      u(q) :- Q^I - q@dMinus          this is an EDBonIDB relation
+ *      u(q) :- q@dPlus                 this is an EDBonIDB relation
+ */
+std::string IncrAdd::convertRules() const {
+    const Program *fromProgram = fromSemiNaiver->getProgram();
+    const std::vector<Rule> rs = fromProgram->getAllRules();
+    const EDBLayer *fromKB = fromProgram->getKB();
+
+    std::unordered_map<PredId_t, std::string> predicates;
+    std::unordered_map<PredId_t, std::string> dAdd_pred;
+    std::unordered_map<PredId_t, std::string> u_pred;
+    std::unordered_map<PredId_t, std::string> pred_args;
+
+    // process the first head of all rules
+    for (const auto &r : rs) {
+        const std::vector<Literal> &hs = r.getHeads();
+        if (hs.size() > 1) {
+            LOG(ERRORL) << "No support for rules with multiple heads";
+        }
+        const Literal &h = r.getFirstHead();
+        PredId_t pred = h.getPredicate().getId();
+        std::string name = fromProgram->getPredicateName(pred);
+        predicates[pred] = name;
+        dAdd_pred[pred] = name2dAdd(name);
+        u_pred[pred] = name2u(name);
+        pred_args[pred] = printArgs(h, fromKB);
+    }
+
+    std::ostringstream rules;
+
+    // Create rules for q@u
+    for (const auto &p: predicates) {
+        // q@u :- q@dAdd
+        rules << name2u(p.second) << pred_args[p.first] << " :- ";
+        rules << name2dAdd(p.second) << pred_args[p.first] << "\n";
+
+        // q@u :- q     implementation knows this is Q - q@dMinus
+        rules << name2u(p.second) << pred_args[p.first] << " :- ";
+        rules << fromProgram->getPredicateName(p.first) << pred_args[p.first];
+        rules << "\n";
+
+        // q@u :- q@dPlus
+        rules << name2u(p.second) << pred_args[p.first] << " :- ";
+        rules << IncrRederive::name2dPlus(p.second) << pred_args[p.first] << "\n";
+    }
+
+    // process the bodies of all rules
+    for (const auto &r : rs) {
+        const Literal h = r.getFirstHead();
+        const PredId_t hid = h.getPredicate().getId();
+        const std::vector<Literal> &bs = r.getBody();
+        for (::size_t i = 0; i < bs.size(); ++i) {
+            rules << dAdd_pred[hid];
+            rules << printArgs(h, fromKB);
+            rules << " :- ";
+            // Create rule dAdd(q)
+            for (::size_t j = 0; j < bs.size(); ++j) {
+                const auto b = bs[j];
+                PredId_t pred = b.getPredicate().getId();
+                if (i == j) {
+                    // case dAdd(si)
+                    if (b.getPredicate().getType() == EDB) {
+                        // new EDB predicate dp which is initialized
+                        // to eAdd
+                        rules << name2eAdd(layer->getPredName(pred));
+                    } else {
+                        // assign dAdd(q)
+                        rules << dAdd_pred[pred];
+                    }
+                } else {
+                    // case si
+                    if (b.getPredicate().getType() == EDB) {
+                        // recycle EDB predicate, but with eMinus
+                        // in the removalList
+                        LOG(ERRORL) << "Wrong generated predicate name";
+                        rules << fromProgram->getPredicateName(pred) << "@E-eMinus";
+                    } else {
+                        // retain q
+                        rules << name2u(fromProgram->getPredicateName(pred));
+                    }
+                }
+                rules << printArgs(b, fromKB);
+
+                if (j < bs.size() - 1) {
+                    rules << ",";
+                } else {
+                    rules << "\n";
+                }
+            }
+        }
+    }
+
+    return rules.str();
+}
+
+std::string IncrAdd::confContents() const {
+    std::ostringstream os;
+
+    std::string fromContents = rederive.confContents();
+    LOG(INFOL) << "Inherit conf from rederive:";
+    LOG(INFOL) << fromContents;
+
+    os << fromContents;
+
+    // Add the dpred@dPlus tables, one for each IDB predicate
+    // const
+    Program *rd_program = rederive.getSN()->getProgram();
+
+    size_t nTables = rd_program->getNEDBPredicates();
+    std::vector<std::string> idb_names;
+    for (const std::string &p : rd_program->getAllPredicateStrings()) {
+        PredId_t pred = rd_program->getPredicate(p).getId();
+        if (rd_program->isPredicateIDB(pred)) {
+            std::string predName = "EDB" + std::to_string(nTables);
+            os << predName << "_predname=" << p << "\n";
+            os << predName << "_type=EDBonIDB\n";
+            ++nTables;
+        }
+    }
+
+    for (auto pred : eAdd) {
+        std::string predName = "EDB" + std::to_string(nTables);
+        os << predName << "_predname" << "=" << name2eAdd(pred) << std::endl;
+        os << predName << "_type=INMEMORY" << std::endl;
+        os << predName << "_param0=" << dredDir << std::endl;
+        os << predName << "_param1=" << pred << "_add" << std::endl;
+        ++nTables;
+    }
+
+    return os.str();
+    
 }

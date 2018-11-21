@@ -278,17 +278,23 @@ size_t EDBColumn::size() const {
         }
     }
 #if DEBUG
-    std::cerr << "DEBUG column size calls size() via getReader()" << std::endl;
-    size_t sz = getReader()->asVector().size();
-    if (sz != retval) {
-        LOG(TRACEL) << "query = " << l.tostring();
-        LOG(TRACEL) << "sz = " << sz << ", should be " << retval;
-        LOG(TRACEL) << "unq = " << unq << ", l.getNVars = " << (int) l.getNVars();
-        std::cerr << "Mismatch between calculated and cached Column " << this << " size: " << sz << " vs. " << retval << " l.getNVars " << static_cast<int>(l.getNVars()) << std::endl;
-        // throw 10;
+    if (layer.hasRemoveLiterals(pred_id)) {
+        std::cerr << "DEBUG column size calls size() via getReader()" << std::endl;
+        size_t sz = getReader()->asVector().size();
+        if (sz != retval) {
+            LOG(INFOL) << "query " << l.tostring();
+            LOG(INFOL) << "Mismatch between calculated and cached Column " <<
+                " pred. " << pred_id << " size: " << sz << " vs. " << retval <<
+                " l.getNVars " << static_cast<int>(l.getNVars());
+        }
+        retval = sz;
     }
 #else
-    std::cerr << "column size cached " << retval << " calculated " << getReader()->asVector().size() << std::endl;
+    if (layer.hasRemoveLiterals(pred_id)) {
+        size_t sz = getReader()->asVector().size();
+        LOG(INFOL) << "column size cached " << retval << " calculated " << sz;
+        retval = sz;
+    }
 #endif
     return retval;
 }
