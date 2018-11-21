@@ -140,6 +140,9 @@ std::vector<Literal> getVectorLiteral(JNIEnv *env, VLogInfo *f, jobjectArray h, 
 	jsize vtuplesz = env->GetArrayLength(jterms);
 
 	// Collect conversions from terms
+	if (vtuplesz != (uint8_t) vtuplesz) {
+	    throwIllegalArgumentException(env, ("Arity of predicate " + predicate + " too large (" + std::to_string(vtuplesz) + " > 255)").c_str());
+	}
 	VTuple tuple((uint8_t) vtuplesz);
 	std::vector<VTerm> t;
 
@@ -164,7 +167,8 @@ std::vector<Literal> getVectorLiteral(JNIEnv *env, VLogInfo *f, jobjectArray h, 
 	    // For now, we only have two choices.
 	    if (type != 0) {
 		// Variable
-		t.push_back(VTerm((uint8_t) dict.getOrAdd(name), 0));
+		uint64_t v = dict.getOrAdd(name);
+		t.push_back(VTerm((uint8_t) v, 0));
 	    } else {
 		// Constant
 		// name = program->rewriteRDFOWLConstants(name);
@@ -339,6 +343,9 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_addData(JNIEnv *env, jobject
 	    return;
 	}
 	jint arity = env->GetArrayLength(atom);
+	if (arity != (uint8_t) arity) {
+	    throwIllegalArgumentException(env, ("Arity of " + pred + " too large (" + std::to_string(arity) + " > 255)").c_str());
+	}
 	for (int j = 0; j < arity; j++) {
 	    jstring v = (jstring) env->GetObjectArrayElement(atom, (jsize) j);
 	    if (v == NULL) {
@@ -591,6 +598,12 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setRules(JNIEnv *env, jobjec
 	    std::vector<Literal> vhead = getVectorLiteral(env, f, head, dictVariables);
 	    std::vector<Literal> vbody = getVectorLiteral(env, f, body, dictVariables);
 
+	    // Test number of variables
+	    uint64_t v = dictVariables.getOrAdd("___DUMMY___DUMMY___DUMMY");
+	    if (v > 256) {
+		throwIllegalArgumentException(env, ("Too many variables in rule " + std::to_string(i)).c_str());
+	    }
+
 	    // And add the rule.
 	    f->program->addRule(vhead, vbody, rewrite != 0);
 	}
@@ -694,7 +707,6 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_writePredicateToCsv(JNIEnv *
  * Signature: (I[JLjava/lang/String;Z)V
  */
 JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_queryToCsv(JNIEnv *env, jobject obj, jint pred, jlongArray q, jstring jfile, jboolean filterBlanks) {
-    char buffer[65536];
     VLogInfo *f = getVLogInfo(env, obj);
     if (f == NULL || f->program == NULL) {
 	throwNotStartedException(env, "VLog is not started yet");
