@@ -325,6 +325,13 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout) {
                 break; //Fix-point
             }
             loopNr++;
+	    if (timeout != NULL && *timeout != 0) {
+		std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
+		if (s.count() > *timeout) {
+		    *timeout = 0;	// To indicate materialization was stopped because of timeout.
+		    break;
+		}
+	    }
         }
     } else {
         executeRules(allEDBRules, allIDBRules, costRules, 0, true, timeout);
