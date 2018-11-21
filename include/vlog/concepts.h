@@ -448,15 +448,15 @@ class Program {
 	    kb = e;
 	}
 
-        void parseRule(std::string rule, bool rewriteMultihead);
+	std::string parseRule(std::string rule, bool rewriteMultihead);
 
 	VLIBEXP std::vector<PredId_t> getAllPredicateIDs() const;
 
         VLIBEXP Literal parseLiteral(std::string literal, Dictionary &dictVariables);
 
-        VLIBEXP void readFromFile(std::string pathFile, bool rewriteMultihead = false);
+        VLIBEXP std::string readFromFile(std::string pathFile, bool rewriteMultihead = false);
 
-        VLIBEXP void readFromString(std::string rules, bool rewriteMultihead = false);
+        VLIBEXP std::string readFromString(std::string rules, bool rewriteMultihead = false);
 
         PredId_t getPredicateID(std::string &p, const uint8_t card);
 

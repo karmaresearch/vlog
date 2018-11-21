@@ -624,7 +624,10 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_setRulesFile(JNIEnv *env, jo
 	throwIOException(env, ("File " + fileName + " does not exist").c_str());
 	return;
     }
-    f->program->readFromFile(fileName, rewrite != 0);
+    std::string s = f->program->readFromFile(fileName, rewrite != 0);
+    if (s != "") {
+	throwIOException(env, s.c_str());
+    }
 }
 
 /*

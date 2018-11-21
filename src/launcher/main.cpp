@@ -341,7 +341,11 @@ string flattenAllArgs(int argc,
 void writeRuleDependencyGraph(EDBLayer &db, string pathRules, string filegraph) {
     LOG(INFOL) << " Write the graph file to " << filegraph;
     Program p(&db);
-    p.readFromFile(pathRules, false);
+    std::string s = p.readFromFile(pathRules, false);
+    if (s != "") {
+	LOG(ERRORL) << s;
+	return;
+    }
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(db,
             &p, true, true, false, false, 1, 1, false);
 
@@ -386,7 +390,11 @@ void launchFullMat(int argc,
         std::string pathRules) {
     //Load a program with all the rules
     Program p(&db);
-    p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+    std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+    if (s != "") {
+	LOG(ERRORL) << s;
+	return;
+    }
 
     //Existential check
     if (p.areExistentialRules()) {
@@ -518,7 +526,11 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     Program p(&edb);
     string pathRules = vm["rules"].as<string>();
     if (pathRules != "") {
-        p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+	std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+	if (s != "") {
+	    LOG(ERRORL) << s;
+	    return;
+	}
         p.sortRulesByIDBPredicates();
     }
 
@@ -565,7 +577,11 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     if (db == NULL) {
         if (pathRules == "") {
             // Use default rule
-            p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+	    std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+	    if (s != "") {
+		LOG(ERRORL) << s;
+		return;
+	    }
             p.sortRulesByIDBPredicates();
         }
         db = new VLogLayer(edb, p, vm["reasoningThreshold"].as<int64_t>(), "TI", "TE");
@@ -704,7 +720,11 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     Program p(&edb);
     string pathRules = vm["rules"].as<string>();
     if (pathRules != "") {
-        p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+	std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+	if (s != "") {
+	    LOG(ERRORL) << s;
+	    return;
+	}
         p.sortRulesByIDBPredicates();
     }
 
@@ -961,7 +981,11 @@ int main(int argc, const char** argv) {
         vt.push_back(vt2);
         vt.push_back(vt3);
         vt.push_back(vt4);
-        p.readFromFile(rulesFile);
+	std::string s = p.readFromFile(rulesFile);
+	if (s != "") {
+	    cerr << s << endl;
+	    return 1;
+	}
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         std::vector<std::pair<std::string,int>> trainingQueries = ML::generateTrainingQueries(*layer, p, vt, vm);
         std::chrono::duration<double> sec = std::chrono::system_clock::now()- start;
