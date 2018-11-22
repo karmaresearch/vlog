@@ -189,6 +189,8 @@ class EDBLayer {
 
         uint8_t getPredArity(PredId_t id) const;
 
+        PredId_t getPredID(const std::string &name) const;
+
         void addTmpRelation(Predicate &pred, IndexedTupleTable *table);
 
         bool isTmpRelationEmpty(Predicate &pred) {

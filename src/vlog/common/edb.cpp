@@ -435,7 +435,7 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
         }
 
     } else {
-        LOG(INFOL) << "FIXME: untested -- HERE " << __func__ << ":" << __LINE__ << " inject RemoveIterator";
+        LOG(INFOL) << "untested -- HERE " << __func__ << ":" << __LINE__ << " inject RemoveIterator";
         bool equalFields = query.hasRepeatedVars();
         IndexedTupleTable *rel = tmpRelations[predid];
         uint8_t size = rel->getSizeTuple();
@@ -490,7 +490,7 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
         }
 
     } else {
-        LOG(DEBUGL) << "FIXME -- untested: HERE " << __func__ << ":" << __LINE__ << " inject RemoveIterator";
+        LOG(DEBUGL) << "untested -- HERE " << __func__ << ":" << __LINE__ << " inject RemoveIterator";
         bool equalFields = false;
         if (query.hasRepeatedVars()) {
             equalFields = true;
@@ -1010,6 +1010,15 @@ uint8_t EDBLayer::getPredArity(PredId_t id) const {
     return 0;
 }
 
+PredId_t EDBLayer::getPredID(const std::string &name) const {
+    for (const auto &p : dbPredicates) {
+        if (predDictionary->getRawValue(p.first) == name) {
+            return p.first;
+        }
+    }
+    return -1;
+}
+
 void EDBMemIterator::init1(PredId_t id, std::vector<Term_t>* v, const bool c1, const Term_t vc1) {
     predid = id;
     nfields = 1;
@@ -1402,8 +1411,8 @@ std::shared_ptr<Column> EDBTable::checkIn(
 }
 
 
-// Import all predicates from existing SemiNaiver ->Program into this
-// EDB layer: they are all present as EDB predicates. Thingy: I want them
+// Import all predicates from pre-existing prevSemiNaiver-s ->Program into this
+// EDB layer: they are all needed as EDB predicates. Thingy: I want them
 // to have the same PredId_t so lookup in the EDBonIDB is simple.
 void EDBLayer::handlePrevSemiNaiver() {
 
@@ -1421,18 +1430,21 @@ void EDBLayer::handlePrevSemiNaiver() {
     for (auto pSN : prevSemiNaiver) {
         // const
         Program *program = pSN.second->getProgram();
-        // Program has no method to expose all PredId's, look them up through the
-        // predicate name
+        // Program has no method to expose all PredId's, look them up through
+        // the predicate name
         const std::vector<std::string> pred_names = program->getAllPredicateStrings();
-        // Need to unique_ptr<> the thingy because Predicate has no default constructor
-        auto pred = std::vector<std::unique_ptr<NamedPredicate>>(pred_names.size() + dictStart);
+        // Need to unique_ptr<> the thingy because Predicate has no default
+        // constructor
+        auto pred = std::vector<std::unique_ptr<NamedPredicate>>(
+                        pred_names.size() + dictStart);
         for (const std::string &n : pred_names) {
             Predicate p = program->getPredicate(n);
             if (p.getId() >= pred.size()) {
                 LOG(ERRORL) << "Predicates are not contiguous. Cannot import to new EDBLayer!";
                 throw("Importing predicates: they are not contiguous");
             }
-            pred[p.getId()] = std::unique_ptr<NamedPredicate>(new NamedPredicate(p, n));
+            pred[p.getId()] = std::unique_ptr<NamedPredicate>(
+                                new NamedPredicate(p, n));
         }
 
         for (::size_t i = dictStart; i < pred.size(); ++i) {
