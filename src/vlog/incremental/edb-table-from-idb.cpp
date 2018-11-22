@@ -266,6 +266,31 @@ EDBonIDBTable::~EDBonIDBTable() {
     delete naturalTable;
 }
 
+void EDBonIDBTable::query(QSQQuery *query, TupleTable *outputTable,
+                          std::vector<uint8_t> *posToFilter,
+                          std::vector<Term_t> *valuesToFilter) {
+    LOG(INFOL) << "Cloned this code from InmemoryTable";
+
+    Term_t row[128];
+    const Literal *lit = query->getLiteral();
+    uint8_t *pos = query->getPosToCopy();
+    const uint8_t npos = query->getNPosToCopy();
+    size_t sz = lit->getTupleSize();
+    EDBIterator *iter = getIterator(*lit);
+    if (posToFilter == NULL || posToFilter->size() == 0) {
+        while (iter->hasNext()) {
+            iter->next();
+            for (uint8_t i = 0; i < npos; ++i) {
+                row[i] = iter->getElementAt(pos[i]);
+            }
+            outputTable->addRow(row);
+        }
+        return;
+    }
+
+    LOG(ERRORL) << "Not implemented yet";
+    throw 10;
+}
 
 EDBIterator *EDBonIDBTable::getIterator(const Literal &q) {
     LOG(DEBUGL) << "Get iterator for query " << q.tostring(NULL, layer);
@@ -275,7 +300,7 @@ EDBIterator *EDBonIDBTable::getIterator(const Literal &q) {
 EDBIterator *EDBonIDBTable::getSortedIterator(const Literal &query,
                                        const std::vector<uint8_t> &fields) {
     if (isNatural(query, fields)) {
-        LOG(INFOL) << "'Natural' sorted query " << query.tostring(NULL, layer);
+        LOG(DEBUGL) << "'Natural' sorted query " << query.tostring(NULL, layer);
         if (naturalTable == NULL) {
             LOG(INFOL) << "create new naturalTable";
             naturalTable = EDBonIDBSortedIterator::createSortedTable(
@@ -287,7 +312,7 @@ EDBIterator *EDBonIDBTable::getSortedIterator(const Literal &query,
                                           naturalTable);
     }
 
-    LOG(INFOL) << "Get SortedIterator for query " <<
+    LOG(DEBUGL) << "Get SortedIterator for query " <<
         query.tostring(NULL, layer) << " fields " << fields.size();
     LOG(INFOL) << "FIXME: implement cache for sorted query";
 

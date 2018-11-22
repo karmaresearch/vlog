@@ -678,8 +678,6 @@ class EDBColumn : public Column {
         size_t estimateSize() const;
 
         bool isEmpty() const {
-            // FIXME test just for presence of a first element i.s.o.
-            // traversing with the RemovalIterator
             if (layer.hasRemoveLiterals(pred_id)) {
                 return isEmptyRemovals();
             } else {

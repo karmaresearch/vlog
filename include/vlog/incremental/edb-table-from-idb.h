@@ -36,9 +36,7 @@ public:
     //execute the query on the knowledge base
     virtual void query(QSQQuery *query, TupleTable *outputTable,
                        std::vector<uint8_t> *posToFilter,
-                       std::vector<Term_t> *valuesToFilter) {
-        LOG(ERRORL) << "FIXME: implement " << __func__;
-    }
+                       std::vector<Term_t> *valuesToFilter);
 
     virtual size_t estimateCardinality(const Literal &query) {
         return getCardinality(query);
