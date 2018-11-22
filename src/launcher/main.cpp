@@ -405,19 +405,6 @@ static void store_mat(const std::string &path, ProgramArgs &vm,
     LOG(INFOL) << "Time to index and store the materialization on disk = " << sec.count() << " seconds";
 }
 
-static PredId_t getPredicateID(const EDBLayer &layer,
-                               const std::string &name) {
-    std::cerr << "FIXME: add an API call to edblayer to get pred_id from pred name" << std::endl;
-    auto preds = layer.getAllPredicateIDs();
-    for (auto p : preds) {
-        if (layer.getPredName(p) == name) {
-            return p;
-        }
-    }
-    LOG(ERRORL) << "Cannot find PredId for " << name;
-    throw 10;   // Follow convetion
-}
-
 void launchFullMat(int argc,
         const char** argv,
         string pathExec,
@@ -547,7 +534,9 @@ void launchFullMat(int argc,
                 store_mat(vm["storemat_path"].as<string>() + ".rederive", vm, rederive.getSN());
             }
 
-            LOG(ERRORL) << "FIXME: DRed: add the Additions step";
+            // Continue same with Addition
+            // Create a Program, create a SemiNaiver, run...
+            LOG(INFOL) << "***************** Create Addition";
 
             IncrAdd addition(vm, sn, remove_pred_names, add_pred_names,
                              overdelete, rederive);
@@ -902,7 +891,7 @@ int main(int argc, const char** argv) {
         if (! vm["rm"].empty()) {
             std::string path(vm["rm"].as<string>());
             std::cerr << "FIXME: currently E has fixed name TE" << std::endl;
-            PredId_t remove_pred = getPredicateID(*layer, "TE");
+            PredId_t remove_pred = layer->getPredID("TE");
             InmemoryTable rmTable(Utils::parentDir(path), Utils::filename(path),
                                   remove_pred, layer);
             rm = new EDBRemoveLiterals(vm["rm"].as<string>(), layer);
