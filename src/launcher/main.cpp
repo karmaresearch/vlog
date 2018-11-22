@@ -242,6 +242,10 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "File with facts to suppress (remove) from the EDB", false);
     query_options.add<string>("", "dred", "",
             "Directory with files with facts to add/remove from the EDB", false);
+    query_options.add<string>("", "dred-rm", "",
+            "file with facts to remove from the EDB", false);
+    query_options.add<string>("", "dred-add", "",
+            "file with facts to add to the EDB", false);
 
     query_options.add<bool>("", "shufflerules", false,
             "shuffle rules randomly instead of using heuristics (only for <mat>, and only when running multithreaded).", false);
@@ -500,9 +504,20 @@ void launchFullMat(int argc,
             std::chrono::system_clock::time_point start;
             std::chrono::duration<double> sec;
 
-            LOG(ERRORL) << "FIXME: currently E has fixed name TE";
-            std::vector<std::string> remove_pred_names(1, "TE");
-            std::vector<std::string> add_pred_names(1, "TE");
+            std::vector<std::string> remove_pred_names;
+            if (vm["dred-rm"].empty()) {
+                LOG(INFOL) << "use default remove table TE_remove";
+                remove_pred_names.push_back("TE");
+            } else {
+                remove_pred_names.push_back(vm["dred-rm"].as<string>());
+            }
+            std::vector<std::string> add_pred_names;
+            if (vm["dred-add"].empty()) {
+                LOG(INFOL) << "use default add table TE_add";
+                add_pred_names.push_back("TE");
+            } else {
+                add_pred_names.push_back(vm["dred-add"].as<string>());
+            }
 
             LOG(INFOL) << "***************** Create Overdelete";
 
