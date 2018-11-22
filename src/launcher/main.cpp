@@ -541,7 +541,7 @@ void launchFullMat(int argc,
             start = std::chrono::system_clock::now();
             rederive.run();
             sec = std::chrono::system_clock::now() - start;
-            LOG(INFOL) << "Runtime overdelete = " << sec.count() * 1000 << " milliseconds";
+            LOG(INFOL) << "Runtime rederive = " << sec.count() * 1000 << " milliseconds";
 
             if (vm["storemat_path"].as<string>() != "") {
                 store_mat(vm["storemat_path"].as<string>() + ".rederive", vm, rederive.getSN());
@@ -551,6 +551,16 @@ void launchFullMat(int argc,
 
             IncrAdd addition(vm, sn, remove_pred_names, add_pred_names,
                              overdelete, rederive);
+
+            LOG(INFOL) << "Starting addition materialization";
+            start = std::chrono::system_clock::now();
+            addition.run();
+            sec = std::chrono::system_clock::now() - start;
+            LOG(INFOL) << "Runtime addition = " << sec.count() * 1000 << " milliseconds";
+
+            if (vm["storemat_path"].as<string>() != "") {
+                store_mat(vm["storemat_path"].as<string>() + ".add", vm, addition.getSN());
+            }
         }
 
 #if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)

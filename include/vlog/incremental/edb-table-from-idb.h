@@ -22,12 +22,12 @@ private:
     const FCTable *idbTable;
     EDBTable *naturalTable;
     size_t cardinality;
+    EDBLayer *layer;
 
     static bool isNatural(const Literal &query,
                           const std::vector<uint8_t> fields);
 
 public:
-    EDBLayer *layer;
     EDBonIDBTable(PredId_t predid, EDBLayer *layer,
                   const std::shared_ptr<SemiNaiver> prevSN);
 

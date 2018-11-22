@@ -201,7 +201,11 @@ InmemoryTable::InmemoryTable(PredId_t predid, std::vector<std::vector<std::strin
 InmemoryTable::InmemoryTable(PredId_t predid,
                              const std::vector<std::vector<Term_t>> &entries,
                              EDBLayer *layer) {
-    arity = entries[0].size();
+    if (entries.size() > 0) {
+        arity = entries[0].size();
+    } else {
+        arity = 0;
+    }
     this->predid = predid;
     this->layer = layer;
     //Load the table in the database

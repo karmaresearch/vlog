@@ -88,7 +88,9 @@ IncrOverdelete::IncrOverdelete(// const
     LOG(INFOL) << confString;
 
     conf = new EDBConf(confString, false);
-    layer = new EDBLayer(*conf, false, from);
+    NamedSemiNaiver from_map;
+    from_map["base"] = from;
+    layer = new EDBLayer(*conf, false, from_map);
 
     std::string overdelete_rules = convertRules();
     std::cout << "Overdelete rule set:" << std::endl;
@@ -162,6 +164,7 @@ std::string IncrOverdelete::confContents() const {
             std::string predName = "EDB" + std::to_string(nTables);
             os << predName << "_predname" << "=" << p << std::endl;
             os << predName << "_type=EDBonIDB" << std::endl;
+            os << predName << "_param0=base" << std::endl;
             ++nTables;
         }
     }
@@ -306,7 +309,10 @@ IncrRederive::IncrRederive(// const
     LOG(INFOL) << confString;
 
     conf = new EDBConf(confString, false);
-    layer = new EDBLayer(*conf, false, overdelete.getSN());
+    NamedSemiNaiver from_map;
+    from_map["base"] = from;
+    from_map["overdelete"] = overdelete.getSN();
+    layer = new EDBLayer(*conf, false, from_map);
 
     std::string rules = convertRules();
     std::cout << "Rederive rule set:" << std::endl;
@@ -371,17 +377,27 @@ IncrRederive::IncrRederive(// const
 std::string IncrRederive::confContents() const {
     std::ostringstream os;
 
-    // Start out with the tables as in OverDelete
-    std::string fromContents = overdelete.confContents();
-    os << fromContents;
+    // Wrap the tables in OverDelete in an EDBimporter
+
+    size_t nTables = 0;
+    const EDBLayer &old_layer = overdelete.getSN()->getEDBLayer();
+    const EDBConf &old_conf = old_layer.getConf();
+    const std::vector<EDBConf::Table> tables = old_conf.getTables();
+    for (const auto &t : tables) {
+        std::string predName = "EDB" + std::to_string(nTables);
+        os << predName << "_predname=" << t.predname << std::endl;
+        os << predName << "_type=EDBimporter" << std::endl;
+        os << predName << "_" << "param0=overdelete" << std::endl;
+        ++nTables;
+    }
+
     LOG(INFOL) << "Inherit conf from overdelete:";
-    LOG(INFOL) << fromContents;
+    LOG(INFOL) << "\n" << os.str();
 
     // Add the dpred@dMinus tables, one for each IDB predicate
     // const
     Program *od_program = overdelete.getSN()->getProgram();
 
-    size_t nTables = od_program->getNEDBPredicates();
     std::vector<std::string> idb_names;
     for (const std::string &p : od_program->getAllPredicateStrings()) {
         PredId_t pred = od_program->getPredicate(p).getId();
@@ -389,6 +405,7 @@ std::string IncrRederive::confContents() const {
             std::string predName = "EDB" + std::to_string(nTables);
             os << predName << "_predname=" << p << "\n";
             os << predName << "_type=EDBonIDB\n";
+            os << predName << "_param0=overdelete\n";
             ++nTables;
         }
     }
@@ -491,6 +508,22 @@ std::string IncrRederive::convertRules() const {
 }
 
 
+/**
+ * Class IncrAdd: additions for the DRed algorithm
+ *
+ * Gupta, Mumick, Subrahmanian
+ * dAdd(p(x*)) :- s1, ..., dAdd(si), ..., sn
+ * dAdd(si): (let q = pred(si))
+ *      if q in EDB(eAdd): q@eAdd       the additions)
+ *      else: dAdd(q(x*))               so we can iterate
+ * si:
+ *      union of dAdd(q) and q from Q^v, the result of the Rederive:
+ *              Q^rederive = Q^I - Q@dMinus + Q@dPlus
+ *      like with rederive, define an intermediate predicate u(q):
+ *      u(q) :- dAdd(q)
+ *      u(q) :- Q^I - q@dMinus          this is an "EDB" relation
+ *      u(q) :- q@dPlus                 this is an "EDB" relation
+ */
 IncrAdd::IncrAdd(// const
                  ProgramArgs vm,
                  const std::shared_ptr<SemiNaiver> from,
@@ -507,10 +540,14 @@ IncrAdd::IncrAdd(// const
     // LOG(ERRORL) << "For now, grab an additions EDBConf from file";
     // conf = new EDBConf(vm["dred"].as<string>() + "/edb.conf-additions");
     conf = new EDBConf(confString, false);
-    layer = new EDBLayer(*conf, false, rederive.getSN());
+    NamedSemiNaiver from_map;
+    from_map["base"] = from;
+    from_map["overdelete"] = overdelete.getSN();
+    from_map["rederive"] = rederive.getSN();
+    layer = new EDBLayer(*conf, false, from_map);
 
     std::string rules = convertRules();
-    std::cout << "Rederive rule set:" << std::endl;
+    std::cout << "Addition rule set:" << std::endl;
     std::cout << rules;
 
     program = new Program(layer);
@@ -569,20 +606,6 @@ IncrAdd::~IncrAdd() {
 }
 
 
-/**
- * Gupta, Mumick, Subrahmanian
- * dAdd(p(x*)) :- s1, ..., dAdd(si), ..., sn
- * dAdd(si): (let q = pred(si))
- *      if q in EDB(eAdd): q@eAdd       the additions)
- *      else: dAdd(q(x*))               so we can iterate
- * si:
- *      union of dAdd(q) and q from Q^v, the result of the Rederive:
- *              Q^rederive = Q^I - Q@dMinus + Q@dPlus
- *      like with rederive, define an intermediate predicate u(q):
- *      u(q) :- dAdd(q)
- *      u(q) :- Q^I - q@dMinus          this is an EDBonIDB relation
- *      u(q) :- q@dPlus                 this is an EDBonIDB relation
- */
 std::string IncrAdd::convertRules() const {
     const Program *fromProgram = fromSemiNaiver->getProgram();
     const std::vector<Rule> rs = fromProgram->getAllRules();
@@ -678,17 +701,27 @@ std::string IncrAdd::convertRules() const {
 std::string IncrAdd::confContents() const {
     std::ostringstream os;
 
-    std::string fromContents = rederive.confContents();
-    LOG(INFOL) << "Inherit conf from rederive:";
-    LOG(INFOL) << fromContents;
+    // Wrap the tables in OverDelete in an EDBimporter
 
-    os << fromContents;
+    size_t nTables = 0;
+    const EDBLayer &old_layer = rederive.getSN()->getEDBLayer();
+    const EDBConf &old_conf = old_layer.getConf();
+    const std::vector<EDBConf::Table> tables = old_conf.getTables();
+    for (const auto &t : tables) {
+        std::string predName = "EDB" + std::to_string(nTables);
+        os << predName << "_predname=" << t.predname << std::endl;
+        os << predName << "_type=EDBimporter" << std::endl;
+        os << predName << "_" << "param0=rederive" << std::endl;
+        ++nTables;
+    }
+
+    LOG(INFOL) << "Inherit conf from rederive:";
+    LOG(INFOL) << "\n" << os.str();
 
     // Add the dpred@dPlus tables, one for each IDB predicate
     // const
     Program *rd_program = rederive.getSN()->getProgram();
 
-    size_t nTables = rd_program->getNEDBPredicates();
     std::vector<std::string> idb_names;
     for (const std::string &p : rd_program->getAllPredicateStrings()) {
         PredId_t pred = rd_program->getPredicate(p).getId();
@@ -696,6 +729,7 @@ std::string IncrAdd::confContents() const {
             std::string predName = "EDB" + std::to_string(nTables);
             os << predName << "_predname=" << p << "\n";
             os << predName << "_type=EDBonIDB\n";
+            os << predName << "_param0=rederive\n";
             ++nTables;
         }
     }

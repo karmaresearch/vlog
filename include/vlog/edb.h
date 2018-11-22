@@ -22,6 +22,11 @@ class Column;
 class SemiNaiver;       // Why cannot I break the software hierarchy? RFHH
 class EDBFCInternalTable;
 
+using RemoveLiteralOf = std::unordered_map<PredId_t, const EDBRemoveLiterals *>;
+
+using NamedSemiNaiver = std::unordered_map<std::string,
+                                           std::shared_ptr<SemiNaiver>>;
+
 class EDBMemIterator : public EDBIterator {
     private:
         uint8_t nfields = 0;
@@ -106,26 +111,27 @@ class EDBLayer {
         VLIBEXP void addSparqlTable(const EDBConf::Table &tableConf);
 
         VLIBEXP void addEDBonIDBTable(const EDBConf::Table &tableConf);
+        VLIBEXP void addEDBimporter(const EDBConf::Table &tableConf);
 
         // literals to be removed during iteration
-        std::unordered_map<PredId_t, const EDBRemoveLiterals *> removals;
+        RemoveLiteralOf removals;
 
-        // For incremental reasoning: EDBonIDB must know which SemiNaiver to
+        // For incremental reasoning: EDBonIDB must know which SemiNaiver(s) to
         // query
-        std::shared_ptr<SemiNaiver> prevSemiNaiver;
+        NamedSemiNaiver prevSemiNaiver;
 
         // need to import the mapping predid -> Predicate from prevSemiNaiver
         void handlePrevSemiNaiver();
 
     public:
         EDBLayer(const EDBConf &conf, bool multithreaded,
-                 std::shared_ptr<SemiNaiver> prevSemiNaiver = NULL) :
+                 const NamedSemiNaiver &prevSemiNaiver) :
                 conf(conf), prevSemiNaiver(prevSemiNaiver) {
             const std::vector<EDBConf::Table> tables = conf.getTables();
 
             predDictionary = std::unique_ptr<Dictionary>(new Dictionary());
 
-            if (prevSemiNaiver != NULL) {
+            if (prevSemiNaiver.size() != 0) {
                 handlePrevSemiNaiver();
             }
 
@@ -156,6 +162,8 @@ class EDBLayer {
 #endif
                 } else if (table.type == "EDBonIDB") {
                     addEDBonIDBTable(table);
+                } else if (table.type == "EDBimporter") {
+                    addEDBimporter(table);
                 } else {
                     LOG(ERRORL) << "Type of table is not supported";
                     throw 10;
@@ -165,6 +173,10 @@ class EDBLayer {
             for (int i = 0; i < MAX_NPREDS; ++i) {
                 tmpRelations[i] = NULL;
             }
+        }
+
+        EDBLayer(const EDBConf &conf, bool multithreaded) :
+            EDBLayer(conf, multithreaded, NamedSemiNaiver()) {
         }
 
         std::vector<PredId_t> getAllPredicateIDs() const;
@@ -279,7 +291,7 @@ class EDBLayer {
 
         void releaseIterator(EDBIterator *itr);
 
-        VLIBEXP void addRemoveLiterals(const std::unordered_map<PredId_t, const EDBRemoveLiterals *> &rm) {
+        VLIBEXP void addRemoveLiterals(const RemoveLiteralOf &rm) {
             removals.insert(rm.begin(), rm.end());
         }
 

@@ -164,7 +164,7 @@ public:
             rows.push_back(term);
         }
 
-        if (rows.size() == 0) {
+        if (false && rows.size() == 0) {
             return NULL;
         } else {
             return new InmemoryTable(predid, rows, layer);

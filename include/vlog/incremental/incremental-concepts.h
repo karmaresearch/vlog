@@ -11,6 +11,9 @@
 #include <vlog/inmemory/inmemorytable.h>
 
 
+/**
+ * Base class for all DRed operation classes (overdelete, rederive, add)
+ */
 class IncrementalState {
 
 protected:
@@ -26,7 +29,7 @@ protected:
     std::string dredDir;
     std::shared_ptr<SemiNaiver> sn;
 
-    std::unordered_map<PredId_t, const EDBRemoveLiterals *> rm;
+    RemoveLiteralOf rm;
 
     // cache vm[*]
     int nthreads;
@@ -144,7 +147,19 @@ public:
 };
 
 
+/**
+ * Envelope class for all the DRed operations
+ */
 class DRed {
+public:
+    DRed(// const
+         ProgramArgs vm,
+         const std::shared_ptr<SemiNaiver> from,
+         const std::vector<std::string> &eMinus,
+         const std::vector<std::string> &eAdd);
+
+    virtual ~DRed() {
+    }
 };
 
 #endif  // def INCREMENTAL__CONCEPTS_H__

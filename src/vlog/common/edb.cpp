@@ -21,8 +21,8 @@
 #endif
 #include <vlog/inmemory/inmemorytable.h>
 #include <vlog/incremental/edb-table-from-idb.h>
+#include <vlog/incremental/edb-table-importer.h>
 
-#include <unordered_map>
 #include <climits>
 
 void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithreaded) {
@@ -158,7 +158,30 @@ void EDBLayer::addEDBonIDBTable(const EDBConf::Table &tableConf) {
     PredId_t pid = (PredId_t)tid;
     infot.id = pid;
     infot.type = tableConf.type;
-    EDBonIDBTable *table = new EDBonIDBTable(infot.id, this, prevSemiNaiver);
+    EDBonIDBTable *table = new EDBonIDBTable(infot.id, this,
+                             prevSemiNaiver[tableConf.params[0]]);
+    infot.manager = std::shared_ptr<EDBTable>(table);
+    infot.arity = table->getArity();
+    dbPredicates.insert(make_pair(infot.id, infot));
+
+    LOG(INFOL) << "Inserted EDBonIDB table id " << infot.id << " predicate " << pn;
+    // table->dump(std::cout);
+}
+
+void EDBLayer::addEDBimporter(const EDBConf::Table &tableConf) {
+    EDBInfoTable infot;
+    const string pn = tableConf.predname;
+
+    Term_t tid;
+    if (! predDictionary->get(pn, tid)) {
+        LOG(ERRORL) << "predicate should have been pre-registered in EDB";
+        throw "predicate should have been pre-registered in EDB";
+    }
+    PredId_t pid = (PredId_t)tid;
+    infot.id = pid;
+    infot.type = tableConf.type;
+    EDBimporter *table = new EDBimporter(infot.id, this,
+                                         prevSemiNaiver[tableConf.params[0]]);
     infot.manager = std::shared_ptr<EDBTable>(table);
     infot.arity = table->getArity();
     dbPredicates.insert(make_pair(infot.id, infot));
@@ -1395,28 +1418,30 @@ void EDBLayer::handlePrevSemiNaiver() {
 
     const uint64_t dictStart = 1;
 
-    // const
-    Program *program = prevSemiNaiver->getProgram();
-    // Program has no method to expose all PredId's, look them up through the
-    // predicate name
-    const std::vector<std::string> pred_names = program->getAllPredicateStrings();
-    // Need to unique_ptr<> the thingy because Predicate has no default constructor
-    auto pred = std::vector<std::unique_ptr<NamedPredicate>>(pred_names.size() + dictStart);
-    for (const std::string &n : pred_names) {
-        Predicate p = program->getPredicate(n);
-        if (p.getId() >= pred.size()) {
-            LOG(ERRORL) << "Predicates are not contiguous. Cannot import to new EDBLayer!";
-            throw("Importing predicates: they are not contiguous");
+    for (auto pSN : prevSemiNaiver) {
+        // const
+        Program *program = pSN.second->getProgram();
+        // Program has no method to expose all PredId's, look them up through the
+        // predicate name
+        const std::vector<std::string> pred_names = program->getAllPredicateStrings();
+        // Need to unique_ptr<> the thingy because Predicate has no default constructor
+        auto pred = std::vector<std::unique_ptr<NamedPredicate>>(pred_names.size() + dictStart);
+        for (const std::string &n : pred_names) {
+            Predicate p = program->getPredicate(n);
+            if (p.getId() >= pred.size()) {
+                LOG(ERRORL) << "Predicates are not contiguous. Cannot import to new EDBLayer!";
+                throw("Importing predicates: they are not contiguous");
+            }
+            pred[p.getId()] = std::unique_ptr<NamedPredicate>(new NamedPredicate(p, n));
         }
-        pred[p.getId()] = std::unique_ptr<NamedPredicate>(new NamedPredicate(p, n));
-    }
 
-    for (::size_t i = dictStart; i < pred.size(); ++i) {
-        const auto &p = pred[i];
-        PredId_t id = predDictionary->getOrAdd(p->name);
-        if (id != p->pred.getId()) {
-            LOG(ERRORL) << "Predicates not contiguous in insert, how can that be?";
-            throw("Copy previous SN predicates: not contiguous after all");
+        for (::size_t i = dictStart; i < pred.size(); ++i) {
+            const auto &p = pred[i];
+            PredId_t id = predDictionary->getOrAdd(p->name);
+            if (id != p->pred.getId()) {
+                LOG(ERRORL) << "Predicates not contiguous in insert, how can that be?";
+                throw("Copy previous SN predicates: not contiguous after all");
+            }
         }
     }
-}
+    }
