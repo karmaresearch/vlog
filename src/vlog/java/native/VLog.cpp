@@ -317,6 +317,10 @@ JNIEXPORT void JNICALL Java_karmaresearch_vlog_VLog_addData(JNIEnv *env, jobject
 	vlogMap[id] = f;
     }
 
+    if (! logLevelSet) {
+	Logger::setMinLevel(INFOL);
+    }
+
     if (f->layer == NULL) {
 	EDBConf conf("", false);
 	f->layer = new EDBLayer(conf, false);
