@@ -298,7 +298,8 @@ class EDBLayer {
         }
 
         VLIBEXP bool hasRemoveLiterals(PredId_t pred) const {
-            return removals.find(pred) != removals.end() &&
+            return ! removals.empty() &&
+                removals.find(pred) != removals.end() &&
                 removals.at(pred)->size() > 0;
         }
 
