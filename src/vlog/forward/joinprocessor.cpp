@@ -1497,6 +1497,10 @@ void JoinExecutor::do_merge_join_classicalgo(const std::vector<const std::vector
         uint8_t p1 = fields1[0];
         uint8_t p2 = fields2[0];
 
+        assert(p1 < vectors1.size());
+        assert(p2 < vectors2.size());
+        assert(l1 < (*vectors1[p1]).size());
+        assert(u2 - 1 < (*vectors2[p2]).size());
         if ((*vectors1[p1])[l1] > (*vectors2[p2])[u2 - 1]) {
             LOG(TRACEL) << "No possible results: begin value of range larger than end value of vector2";
             return;

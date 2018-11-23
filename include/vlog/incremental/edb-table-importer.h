@@ -15,6 +15,8 @@ protected:
     std::shared_ptr<EDBTable> edbTable;
     EDBLayer *layer;
 
+    size_t countCardinality(const Literal &query) const;
+
 public:
     EDBimporter(PredId_t predid, EDBLayer *layer,
                 const std::shared_ptr<SemiNaiver> prevSN);
@@ -25,6 +27,7 @@ public:
     virtual void query(QSQQuery *query, TupleTable *outputTable,
                        std::vector<uint8_t> *posToFilter,
                        std::vector<Term_t> *valuesToFilter) {
+        LOG(ERRORL) << "Need to consider possible Removals";
         edbTable->query(query, outputTable, posToFilter, valuesToFilter);
     }
 
@@ -32,11 +35,11 @@ public:
         return edbTable->estimateCardinality(query);
     }
 
-    virtual size_t getCardinality(const Literal &query) {
-        return edbTable->getCardinality(query);
-    }
+    // Would like this to be const
+    virtual size_t getCardinality(const Literal &query);
 
     virtual size_t getCardinalityColumn(const Literal &query, uint8_t posColumn) {
+        LOG(ERRORL) << "Need to consider possible Removals";
         return edbTable->getCardinalityColumn(query, posColumn);
     }
 

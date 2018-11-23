@@ -104,7 +104,8 @@ IncrOverdelete::IncrOverdelete(// const
     for (const auto &n: eMinus) {
         PredId_t p = program->getPredicate(n).getId();
         remove_pred.push_back(p);
-        PredId_t pMinus = program->getPredicate(name2eMinus(n)).getId();
+        LOG(ERRORL) << "FIXME: the removal predicate is called " << name2eMinus("TE") << " here";
+        PredId_t pMinus = program->getPredicate(name2eMinus("TE")).getId();
         rm[p] = new EDBRemoveLiterals(pMinus, layer);
         // rm[p]->dump(std::cerr, *layer);
     }
@@ -171,7 +172,9 @@ std::string IncrOverdelete::confContents() const {
 
     for (auto pred : eMinus) {
         std::string predName = "EDB" + std::to_string(nTables);
-        os << predName << "_predname" << "=" << name2eMinus(pred) << std::endl;
+        // os << predName << "_predname" << "=" << name2eMinus(pred) << std::endl;
+        LOG(ERRORL) << "FIXME: the removal predicate is called " << name2eMinus("TE") << " here";
+        os << predName << "_predname" << "=" << name2eMinus("TE") << std::endl;
         os << predName << "_type=INMEMORY" << std::endl;
         os << predName << "_param0=" << dredDir << std::endl;
         os << predName << "_param1=" << pred << "_remove" << std::endl;
@@ -326,7 +329,8 @@ IncrRederive::IncrRederive(// const
 
     // Add the user removals
     for (const auto &r: eMinus) {
-        std::string rm_name = name2eMinus(r);
+        LOG(ERRORL) << "FIXME: the removal predicate is called " << name2eMinus("TE") << " here";
+        std::string rm_name = name2eMinus("TE");
         PredId_t e = program->getPredicate(r).getId();
         PredId_t rm_pred = program->getPredicate(rm_name).getId();
         rm[e] = new EDBRemoveLiterals(rm_pred, layer);
@@ -348,7 +352,7 @@ IncrRederive::IncrRederive(// const
         // Read the Q^v values from our own EDB tables
         std::string rm_name = name2dMinus(pp.second);
         PredId_t rm_pred = op->getPredicate(rm_name).getId();
-        LOG(DEBUGL) << "dMinus table for " << pp.second << " is "<< rm_name;
+        LOG(INFOL) << "dMinus table for " << pp.second << " is "<< rm_name;
         // Feed that to the Removal
         rm[pp.first] = new EDBRemoveLiterals(rm_pred, layer);
     }
@@ -394,7 +398,7 @@ std::string IncrRederive::confContents() const {
     LOG(INFOL) << "Inherit conf from overdelete:";
     LOG(INFOL) << "\n" << os.str();
 
-    // Add the dpred@dMinus tables, one for each IDB predicate
+    // Add the pred@dMinus tables, one for each IDB predicate
     // const
     Program *od_program = overdelete.getSN()->getProgram();
 

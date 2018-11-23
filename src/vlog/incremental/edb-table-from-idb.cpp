@@ -28,7 +28,7 @@ public:
     }
 
     virtual bool hasNext() {
-        LOG(DEBUGL) << "         hasNext() on " << query.tostring();
+        LOG(TRACEL) << "         hasNext() on " << query.tostring();
         if (idbInternalItr == NULL) {
             return false;
         }
@@ -50,7 +50,7 @@ public:
     }
 
     virtual void next() {
-        LOG(DEBUGL) << "         next() on " << query.tostring();
+        LOG(TRACEL) << "         next() on " << query.tostring();
         if (! idbInternalItr->hasNext()) {
             LOG(ERRORL) << "next() on a table that hasNext() = false";
             throw 10;               // follow convention
@@ -59,7 +59,7 @@ public:
     }
 
     virtual Term_t getElementAt(const uint8_t p) {
-        LOG(DEBUGL) << "get element[" << (int)p << "] of " << query.tostring() << " = " << idbInternalItr->getCurrentValue(p);
+        LOG(TRACEL) << "get element[" << (int)p << "] of " << query.tostring() << " = " << idbInternalItr->getCurrentValue(p);
         return idbInternalItr->getCurrentValue(p);
     }
 
@@ -172,7 +172,7 @@ public:
     }
 
     virtual bool hasNext() {
-        LOG(DEBUGL) << "         hasNext() on " << query.tostring();
+        LOG(TRACEL) << "         hasNext() on " << query.tostring();
         if (inmemoryTable == NULL) {
             return false;
         }
@@ -181,12 +181,12 @@ public:
     }
 
     virtual void next() {
-        LOG(DEBUGL) << "         next() on " << query.tostring();
+        LOG(TRACEL) << "         next() on " << query.tostring();
         return itr->next();
     }
 
     virtual Term_t getElementAt(const uint8_t p) {
-        LOG(DEBUGL) << "get element[" << (int)p << "] of " << query.tostring() << " = " << itr->getElementAt(p);
+        LOG(TRACEL) << "get element[" << (int)p << "] of " << query.tostring() << " = " << itr->getElementAt(p);
         return itr->getElementAt(p);
     }
 
@@ -276,7 +276,7 @@ void EDBonIDBTable::query(QSQQuery *query, TupleTable *outputTable,
     uint8_t *pos = query->getPosToCopy();
     const uint8_t npos = query->getNPosToCopy();
     size_t sz = lit->getTupleSize();
-    EDBIterator *iter = getIterator(*lit);
+    EDBIterator *iter = layer->getIterator(*lit);
     if (posToFilter == NULL || posToFilter->size() == 0) {
         while (iter->hasNext()) {
             iter->next();
@@ -292,6 +292,29 @@ void EDBonIDBTable::query(QSQQuery *query, TupleTable *outputTable,
     throw 10;
 }
 
+size_t EDBonIDBTable::countCardinality(const Literal &query) const {
+    size_t card = 0;
+    // Go through the layer to get a Removals-aware iterator
+    EDBIterator *iter = layer->getIterator(query);
+    while (iter->hasNext()) {
+        iter->next();
+        ++card;
+    }
+
+    return card;
+}
+
+size_t EDBonIDBTable::getCardinality(const Literal &query) {
+    LOG(INFOL) << "Need to consider possible Removals";
+    PredId_t pred = query.getPredicate().getId();
+    if (! layer->hasRemoveLiterals(pred)) {
+        LOG(ERRORL) << "Derive cardinality without considering query???";
+        return prevSemiNaiver->getProgram()->getPredicateCard(predid);
+    }
+
+    return countCardinality(query);
+}
+
 EDBIterator *EDBonIDBTable::getIterator(const Literal &q) {
     LOG(DEBUGL) << "Get iterator for query " << q.tostring(NULL, layer);
     return new EDBonIDBIterator(q, prevSemiNaiver);
@@ -300,6 +323,8 @@ EDBIterator *EDBonIDBTable::getIterator(const Literal &q) {
 EDBIterator *EDBonIDBTable::getSortedIterator(const Literal &query,
                                        const std::vector<uint8_t> &fields) {
     if (isNatural(query, fields)) {
+    LOG(ERRORL) << "For now, disable 'Natural' optimization";
+    if (false) {
         LOG(DEBUGL) << "'Natural' sorted query " << query.tostring(NULL, layer);
         if (naturalTable == NULL) {
             LOG(INFOL) << "create new naturalTable";
@@ -310,6 +335,7 @@ EDBIterator *EDBonIDBTable::getSortedIterator(const Literal &query,
         }
         return new EDBonIDBSortedIterator(query, fields, layer,
                                           naturalTable);
+    }
     }
 
     LOG(DEBUGL) << "Get SortedIterator for query " <<

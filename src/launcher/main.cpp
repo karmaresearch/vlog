@@ -557,21 +557,23 @@ void launchFullMat(int argc,
                 store_mat(vm["storemat_path"].as<string>() + ".rederive", vm, rederive.getSN());
             }
 
-            // Continue same with Addition
-            // Create a Program, create a SemiNaiver, run...
-            LOG(INFOL) << "***************** Create Addition";
+            if (false) {
+                // Continue same with Addition
+                // Create a Program, create a SemiNaiver, run...
+                LOG(INFOL) << "***************** Create Addition";
 
-            IncrAdd addition(vm, sn, remove_pred_names, add_pred_names,
-                             overdelete, rederive);
+                IncrAdd addition(vm, sn, remove_pred_names, add_pred_names,
+                                 overdelete, rederive);
 
-            LOG(INFOL) << "Starting addition materialization";
-            start = std::chrono::system_clock::now();
-            addition.run();
-            sec = std::chrono::system_clock::now() - start;
-            LOG(INFOL) << "Runtime addition = " << sec.count() * 1000 << " milliseconds";
+                LOG(INFOL) << "Starting addition materialization";
+                start = std::chrono::system_clock::now();
+                addition.run();
+                sec = std::chrono::system_clock::now() - start;
+                LOG(INFOL) << "Runtime addition = " << sec.count() * 1000 << " milliseconds";
 
-            if (vm["storemat_path"].as<string>() != "") {
-                store_mat(vm["storemat_path"].as<string>() + ".add", vm, addition.getSN());
+                if (vm["storemat_path"].as<string>() != "") {
+                    store_mat(vm["storemat_path"].as<string>() + ".add", vm, addition.getSN());
+                }
             }
         }
 

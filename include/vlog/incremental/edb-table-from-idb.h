@@ -26,6 +26,7 @@ private:
 
     static bool isNatural(const Literal &query,
                           const std::vector<uint8_t> fields);
+    size_t countCardinality(const Literal &query) const;
 
 public:
     EDBonIDBTable(PredId_t predid, EDBLayer *layer,
@@ -42,9 +43,7 @@ public:
         return getCardinality(query);
     }
 
-    virtual size_t getCardinality(const Literal &query) {
-        return cardinality;
-    }
+    virtual size_t getCardinality(const Literal &query);
 
     virtual size_t getCardinalityColumn(const Literal &query, uint8_t posColumn) {
         LOG(ERRORL) << "FIXME: implement " << __func__;
