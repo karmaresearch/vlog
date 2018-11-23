@@ -78,6 +78,7 @@ class SemiNaiver {
 
         bool checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
                 const RuleExecutionPlan &plan,
+		uint32_t limitView,
                 std::vector<size_t> &cards);
 
         void processRuleFirstAtom(const uint8_t nBodyLiterals,
@@ -100,11 +101,13 @@ class SemiNaiver {
         bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
                 std::vector<RuleExecutionDetails> &allIDBRules,
                 std::vector<StatIteration> &costRules,
+		const uint32_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
                 std::vector<Literal> &heads,
                 const uint32_t iteration,
+		const uint32_t limitView,
                 std::vector<ResultJoinProcessor*> *finalResultContainer);
 
         size_t estimateCardTable(const Literal &literal,
@@ -121,6 +124,7 @@ class SemiNaiver {
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
                 const uint32_t iteration,
+		const uint32_t limitView,
                 std::vector<ResultJoinProcessor*> *finalResultContainer);
 
         virtual FCIterator getTableFromEDBLayer(const Literal & literal);
@@ -134,6 +138,7 @@ class SemiNaiver {
         virtual bool executeUntilSaturation(
                 std::vector<RuleExecutionDetails> &ruleset,
                 std::vector<StatIteration> &costRules,
+		uint32_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
 
     public:

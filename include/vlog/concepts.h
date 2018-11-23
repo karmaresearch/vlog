@@ -56,25 +56,30 @@ class VTerm {
 };
 
 /*** TUPLES ***/
-#define SIZETUPLE 16
 class VTuple {
     private:
         const uint8_t sizetuple;
-        VTerm terms[SIZETUPLE];
+        VTerm *terms;
     public:
         VTuple(const uint8_t sizetuple) : sizetuple(sizetuple) {
-            if (sizetuple > SIZETUPLE) {
-                LOG(ERRORL) << "Need to recompile the program to support larger "
-                    "cardinalities " << sizetuple;
-                throw 10;
-            }
+	    terms = new VTerm[sizetuple];
         }
+
+	VTuple(const VTuple &v) : sizetuple(v.sizetuple) {
+	    terms = new VTerm[sizetuple];
+	    for (int i = 0; i < sizetuple; i++) {
+		terms[i] = v.terms[i];
+	    }
+	}
+
         size_t getSize() const {
             return sizetuple;
         }
+
         VTerm get(const int pos) const {
             return terms[pos];
         }
+
         void set(const VTerm term, const int pos) {
             terms[pos] = term;
         }
@@ -114,6 +119,27 @@ class VTuple {
             }
             return false;
         }
+
+	/*
+	VTuple & operator=(const VTuple &v) {
+	    if (this == &v) {
+		return *this;
+	    }
+	    if (terms != NULL) {
+		delete[] terms;
+	    }
+	    sizetuple = v.sizetuple;
+	    terms = new VTerm[sizetuple];
+	    for (int i = 0; i < sizetuple; i++) {
+		terms[i] = v.terms[i];
+	    }
+	    return *this;
+	}
+	*/
+
+	~VTuple() {
+	    delete[] terms;
+	}
 };
 
 struct hash_VTuple {
@@ -249,12 +275,12 @@ class Literal {
 
         static int mgu(Substitution *substitutions, const Literal &l, const Literal &m);
 
-        static int subsumes(Substitution *substitutions, const Literal &from, const Literal &to);
+        static int subsumes(std::vector<Substitution> &substitutions, const Literal &from, const Literal &to);
 
         static int getSubstitutionsA2B(
-                Substitution *substitutions, const Literal &a, const Literal &b);
+                std::vector<Substitution> &substitutions, const Literal &a, const Literal &b);
 
-        Literal substitutes(Substitution *substitions, const int nsubs) const;
+        Literal substitutes(std::vector<Substitution> &substitions) const;
 
         bool sameVarSequenceAs(const Literal &l) const;
 
@@ -407,7 +433,7 @@ class Program {
         //Move them to the EDB layer ...
         //Dictionary additionalConstants;
 
-        void parseRule(std::string rule, bool rewriteMultihead);
+	std::string parseRule(std::string rule, bool rewriteMultihead);
 
         void rewriteRule(Rule &r);
 
@@ -420,9 +446,9 @@ class Program {
 
         VLIBEXP Literal parseLiteral(std::string literal, Dictionary &dictVariables);
 
-        VLIBEXP void readFromFile(std::string pathFile, bool rewriteMultihead = false);
+        VLIBEXP std::string readFromFile(std::string pathFile, bool rewriteMultihead = false);
 
-        VLIBEXP void readFromString(std::string rules, bool rewriteMultihead = false);
+        VLIBEXP std::string readFromString(std::string rules, bool rewriteMultihead = false);
 
         // Adds predicate if it doesn't exist yet
         PredId_t getPredicateID(const std::string &p, const uint8_t card);

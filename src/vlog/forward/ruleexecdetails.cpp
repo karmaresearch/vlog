@@ -132,7 +132,6 @@ void RuleExecutionDetails::checkFilteringStrategy(
         const Literal &literal, const Literal &head, RuleExecutionPlan &hv) {
     //Two conditions: head and last literals must be compatible, and they must
     //share at least one variable in the same position
-    Substitution substitutions[SIZETUPLE];
 
     std::vector<uint8_t> vars = literal.getAllVars();
     std::vector<uint8_t> sharedVars = head.getSharedVars(vars);

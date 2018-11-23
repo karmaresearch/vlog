@@ -349,7 +349,7 @@ void JoinExecutor::verificativeJoinOneColumn(
                 }
                 size_t idx1 = 0;
                 size_t idx2 = 0;
-                Term_t outputRow[SIZETUPLE];
+                Term_t outputRow[256];
                 std::unique_ptr<ColumnReader> matchedKeysR = matchedKeys->getReader();
 
                 if (matchedKeysR->hasNext()) {
@@ -422,7 +422,7 @@ void JoinExecutor::verificativeJoinOneColumn(
                 throw 10;
 
             itr->next();
-            Term_t outputRow[SIZETUPLE];
+            Term_t outputRow[256];
             size_t idx1 = 0;
             size_t idx2 = 0;
             //FCInternalTableItr *titr = table->getSortedIterator();
@@ -517,7 +517,8 @@ void JoinExecutor::verificativeJoin(
     //       << plan.joinCoordinates[currentLiteral][0].first;
 
     // If the index of the result in the intermediate is equal to the index of the join in the intermediate...
-    if (hv.posFromFirst[currentLiteral][0].second ==
+    if (hv.posFromFirst[currentLiteral].size() > 0 &&
+	    hv.posFromFirst[currentLiteral][0].second ==
             hv.joinCoordinates[currentLiteral][0].first &&
             hv.sizeOutputRelation[currentLiteral] == 1 &&
             currentLiteral == hv.posFromFirst.size() - 1) { //The last literal checks that this is the last join we execute

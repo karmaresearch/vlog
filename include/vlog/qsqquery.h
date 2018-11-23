@@ -8,9 +8,9 @@ class QSQQuery {
 private:
     const Literal literal;
     uint8_t nPosToCopy;
-    uint8_t posToCopy[SIZETUPLE];
+    uint8_t posToCopy[256];
     uint8_t nRepeatedVars;
-    std::pair<uint8_t, uint8_t> repeatedVars[SIZETUPLE - 1];
+    std::pair<uint8_t, uint8_t> repeatedVars[256];
 
 public:
     VLIBEXP QSQQuery(const Literal literal);

@@ -12,9 +12,9 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
         //If the data is added row by row, then I set the following flag to true
         bool replaceExtColumns;
         uint8_t nConstantColumns;
-        uint8_t posConstantColumns[SIZETUPLE * 3];
+        uint8_t posConstantColumns[256];
         uint8_t nKnownColumns;
-        uint8_t posKnownColumns[SIZETUPLE * 3];
+        uint8_t posKnownColumns[256];
         std::map<uint8_t, std::vector<uint8_t>> posExtColumns;
         std::unique_ptr<SegmentInserter> tmpRelation;
         //In the above case, I store the data in a temporary segment, and assign

@@ -66,12 +66,12 @@ bool Materialization::cardIsTooLarge(const Literal &lit, Program &p,
         EDBLayer &layer) {
     //Search among the rules is there is one without IDB and whose head matches
     //lit
-    Substitution subs[SIZETUPLE];
+    std::vector<Substitution> subs;
     for (auto &rule : p.getAllRules()) {
         if (rule.getNIDBPredicates() == 0 && rule.getBody().size() == 1) {
             int nsubs = Literal::subsumes(subs, rule.getFirstHead(), lit);
             if (nsubs != -1) {
-                Literal query = rule.getBody()[0].substitutes(subs, nsubs);
+                Literal query = rule.getBody()[0].substitutes(subs);
                 size_t card = layer.estimateCardinality(query);
                 LOG(DEBUGL) << "Card for literal " << query.tostring(NULL, NULL) << " is " << card;
                 if (card > 10000) {
@@ -87,7 +87,7 @@ bool Materialization::cardIsTooLarge(const Literal &lit, Program &p,
 void Materialization::guessLiteralsFromRules(Program &p, EDBLayer &layer) {
     //Potential literals
     std::vector<std::pair<Literal, int>> allLiterals;
-    Substitution subs[SIZETUPLE];
+    std::vector<Substitution> subs;
 
     //Create a list of potential atoms that should be materialized
     std::vector<Rule> rules = p.getAllRules();
@@ -386,7 +386,7 @@ void Materialization::getAndStorePrematerialization(EDBLayer & kb, Program & p,
 
 void Materialization::rewriteLiteralInProgram(Literal & prematLiteral, Literal & rewrittenLiteral, EDBLayer & kb, Program & p) {
     std::vector<Rule> rewrittenRules;
-    Substitution subs[SIZETUPLE];
+    std::vector<Substitution> subs;
     for (Rule r : p.getAllRules()) {
         bool toBeAdded = true;
 
@@ -406,9 +406,8 @@ void Materialization::rewriteLiteralInProgram(Literal & prematLiteral, Literal &
         std::vector<Literal> newBody;
         for (std::vector<Literal>::const_iterator itr1 = r.getBody().begin();
                 itr1 != r.getBody().end(); itr1++) {
-            int nsubs = 0;
             bool toRewrite = false;
-            nsubs = Literal::subsumes(subs, prematLiteral, *itr1);
+            int nsubs = Literal::subsumes(subs, prematLiteral, *itr1);
             if (nsubs != -1) {
                 toRewrite = true;
                 Predicate pred = rewrittenLiteral.getPredicate();
@@ -420,7 +419,7 @@ void Materialization::rewriteLiteralInProgram(Literal & prematLiteral, Literal &
             if (!toRewrite) {
                 newBody.push_back(*itr1);
             } else {
-                newBody.push_back(rewrittenLiteral.substitutes(subs, nsubs));
+                newBody.push_back(rewrittenLiteral.substitutes(subs));
             }
         }
 

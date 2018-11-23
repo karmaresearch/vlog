@@ -218,7 +218,7 @@ void FilterHashJoin::run(const std::vector<FilterHashJoinBlock> &inputTables, co
 
     LOG(TRACEL) << "FilterHashJoin::run: start = " << startCarprod << ", end = " << endCartprod;
     //Calculate the correct offset of the variables to retrieve the existing bindings
-    uint8_t posOtherVariables[SIZETUPLE];
+    uint8_t posOtherVariables[256];
     uint8_t nconstants = 0; //I need to remove constants when I calculate the positions on the last literal
     if (literalSubsumesHead) {
         int j = 0;
@@ -314,7 +314,7 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
 
     std::vector<std::shared_ptr<Column>> columns(output->getRowSize());
     uint8_t pos = 0;
-    uint8_t otherPos[SIZETUPLE];
+    uint8_t otherPos[256];
 
     for (uint8_t i = 0; i < columns.size(); ++i) {
         bool found = false;
@@ -355,7 +355,7 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
 
     //Are all variables not involved in the join appearing also in the head? (otherwise I need filtering)
     size_t size = 0; //This function is called when I am sure that the literal has some elements. Therefore, I set 1 as default value
-    uint8_t columnIdx[SIZETUPLE];
+    uint8_t columnIdx[256];
     for (uint8_t i = 0; i < nValuesHead; ++i) {
         columnIdx[i] = posValuesHead[i].second;
     }
@@ -554,7 +554,7 @@ void FilterHashJoin::run_processitr_rowversion(FCInternalTableItr *itr, const bo
 
     std::vector<Term_t> joinsContainer1;
     std::vector<std::pair<Term_t, Term_t>> joinsContainer2;
-    Term_t valuesHead[SIZETUPLE];
+    Term_t valuesHead[256];
     bool firstGroup = true;
     std::vector<Term_t> otherVariablesContainer;
     while (itr->hasNext()) {
