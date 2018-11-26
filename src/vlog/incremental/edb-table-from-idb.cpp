@@ -239,7 +239,18 @@ bool EDBonIDBTable::isEmpty(const Literal &query,
         throw 10;
     }
 
-    EDBIterator *iter = layer->getIterator(query);
+    LOG(ERRORL) << "FIXME: Reconstruct fields from posToFilter and valuesToFilter";
+    Predicate pred = query.getPredicate();
+    VTuple tuple = query.getTuple();
+    uint8_t adornment = pred.calculateAdornment(tuple);
+    std::vector<uint8_t> fields;
+    for (size_t i = 0; i < tuple.getSize(); ++i) {
+        if (! (adornment & (0x1 << i))) {
+            fields.push_back(i);
+        }
+    }
+    // Go through the layer to get a Removals-aware iterator
+    EDBIterator *iter = layer->getSortedIterator(query, fields);
     bool empty = ! iter->hasNext();
     layer->releaseIterator(iter);
 

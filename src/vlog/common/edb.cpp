@@ -435,7 +435,6 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
         }
 
     } else {
-        LOG(INFOL) << "untested -- HERE " << __func__ << ":" << __LINE__ << " inject RemoveIterator";
         bool equalFields = query.hasRepeatedVars();
         IndexedTupleTable *rel = tmpRelations[predid];
         uint8_t size = rel->getSizeTuple();
@@ -482,9 +481,9 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
         auto p = dbPredicates.find(predid);
         auto itr = p->second.manager->getSortedIterator(query, fields);
         if (hasRemoveLiterals(predid)) {
-            LOG(DEBUGL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
+            LOG(DEBUGL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject (Sorted) RemoveIterator";
             LOG(INFOL) << "EDBLayer " << (uintptr_t)(void *)this << " Wrap an EDBRemovalIterator for " << literal->tostring();
-            EDBIterator *ritr = new EDBRemovalIterator(query, *removals[predid], itr);
+            EDBIterator *ritr = new EDBRemovalIterator(query, fields, *removals[predid], itr);
             return ritr;
         } else {
             LOG(INFOL) << "EDBLayer " << (uintptr_t)(void *)this << " No wrap of an EDBRemovalIterator for " << literal->tostring();
@@ -492,7 +491,6 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
         }
 
     } else {
-        LOG(DEBUGL) << "untested -- HERE " << __func__ << ":" << __LINE__ << " inject RemoveIterator";
         bool equalFields = false;
         if (query.hasRepeatedVars()) {
             equalFields = true;
@@ -534,8 +532,8 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
                 throw 10;
         }
         if (hasRemoveLiterals(predid)) {
-            LOG(DEBUGL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
-            EDBIterator *ritr = new EDBRemovalIterator(query, *removals[predid], itr);
+            LOG(DEBUGL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject (Sorted) RemoveIterator";
+            EDBIterator *ritr = new EDBRemovalIterator(query, fields, *removals[predid], itr);
             return ritr;
         } else {
             return itr;

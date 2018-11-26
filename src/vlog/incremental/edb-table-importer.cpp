@@ -15,11 +15,28 @@ EDBimporter::~EDBimporter() {
 bool EDBimporter::isEmpty(const Literal &query,
                           std::vector<uint8_t> *posToFilter,
                           std::vector<Term_t> *valuesToFilter) {
+    // fast path
     if (edbTable->isEmpty(query, posToFilter, valuesToFilter)) {
         return true;
     }
 
-    EDBIterator *iter = layer->getIterator(query);
+    if (posToFilter != NULL) {
+        LOG(ERRORL) << "Not implemented:" << __func__;
+        throw 10;
+    }
+
+    LOG(ERRORL) << "FIXME: Reconstruct fields from posToFilter and valuesToFilter";
+    Predicate pred = query.getPredicate();
+    VTuple tuple = query.getTuple();
+    uint8_t adornment = pred.calculateAdornment(tuple);
+    std::vector<uint8_t> fields;
+    for (size_t i = 0; i < tuple.getSize(); ++i) {
+        if (! (adornment & (0x1 << i))) {
+            fields.push_back(i);
+        }
+    }
+    // Go through the layer to get a Removals-aware iterator
+    EDBIterator *iter = layer->getSortedIterator(query, fields);
     bool empty = ! iter->hasNext();
 
     layer->releaseIterator(iter);

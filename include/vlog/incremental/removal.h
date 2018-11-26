@@ -62,7 +62,9 @@ class EDBRemoveLiterals {
 
 class EDBRemovalIterator : public EDBIterator {
     private:
-        uint8_t arity;
+        // uint8_t arity;
+        const std::vector<uint8_t> &fields;
+        uint8_t adornment;
         const Literal &query;
         const EDBRemoveLiterals &removeTuples;
         EDBIterator *itr;
@@ -73,17 +75,38 @@ class EDBRemovalIterator : public EDBIterator {
         bool hasNext_ahead;
 
     public:
+        // Around a non-sorted Iterator
         EDBRemovalIterator(const Literal &query,
                            const EDBRemoveLiterals &removeTuples,
                            EDBIterator *itr) :
-                query(query), removeTuples(removeTuples), itr(itr),
+                query(query), fields(std::vector<uint8_t>()),
+                removeTuples(removeTuples), itr(itr),
                 expectNext(false) {
+            // arity = query.getTuple().getSize();
+            adornment = 0;
+            current_term.resize(query.getTuple().getSize());
+            term_ahead.resize(query.getTuple().getSize());
+        }
+
+        // Around a SortedIterator
+        EDBRemovalIterator(const Literal &query,
+                           const std::vector<uint8_t> &fields,
+                           const EDBRemoveLiterals &removeTuples,
+                           EDBIterator *itr) :
+                query(query), fields(fields), removeTuples(removeTuples),
+                itr(itr), expectNext(false) {
             Predicate pred = query.getPredicate();
             VTuple tuple = query.getTuple();
-            uint8_t adornment = pred.calculateAdornment(tuple);
-            arity = tuple.getSize() - pred.getNFields(adornment);
-            current_term.resize(arity);
-            term_ahead.resize(arity);
+            adornment = pred.calculateAdornment(tuple);
+            // arity = tuple.getSize() - pred.getNFields(adornment);
+            // arity = fields.size();
+            current_term.resize(tuple.getSize());
+            term_ahead.resize(tuple.getSize());
+            for (int i = 0; i < tuple.getSize(); ++i) {
+                if (adornment & (0x1 << i)) {
+                    term_ahead[i] = tuple.get(i).getValue();
+                }
+            }
         }
 
         virtual bool hasNext() {
@@ -97,8 +120,19 @@ class EDBRemovalIterator : public EDBIterator {
                     return false;
                 }
                 itr->next();
-                for (int i = 0; i < arity; ++i) {
-                    term_ahead[i] = itr->getElementAt(i);
+                if (adornment == 0) {
+                    // fast path
+                    for (int i = 0; i < term_ahead.size(); ++i) {
+                        term_ahead[i] = itr->getElementAt(i);
+                    }
+                } else {
+                    int it = 0;
+                    for (int i = 0; i < term_ahead.size(); ++i) {
+                        if (! (adornment & (0x1 << i))) {
+                            term_ahead[i] = itr->getElementAt(it);
+                            it++;
+                        }
+                    }
                 }
                 if (! removeTuples.present(term_ahead)) {
                     break;
