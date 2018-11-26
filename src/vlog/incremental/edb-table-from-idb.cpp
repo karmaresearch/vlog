@@ -231,6 +231,21 @@ public:
 };
 
 
+bool EDBonIDBTable::isEmpty(const Literal &query,
+                            std::vector<uint8_t> *posToFilter,
+                            std::vector<Term_t> *valuesToFilter) {
+    if (posToFilter != NULL) {
+        LOG(ERRORL) << "Not implemented:" << __func__;
+        throw 10;
+    }
+
+    EDBIterator *iter = layer->getIterator(query);
+    bool empty = ! iter->hasNext();
+    layer->releaseIterator(iter);
+
+    return empty;
+}
+
 /**
  * Transfer an IDB predicate of the previous SemiNaiver to be
  * a new 'EDB' predicate.
@@ -285,6 +300,7 @@ void EDBonIDBTable::query(QSQQuery *query, TupleTable *outputTable,
             }
             outputTable->addRow(row);
         }
+        layer->releaseIterator(iter);
         return;
     }
 
@@ -292,7 +308,7 @@ void EDBonIDBTable::query(QSQQuery *query, TupleTable *outputTable,
     throw 10;
 }
 
-size_t EDBonIDBTable::countCardinality(const Literal &query) const {
+size_t EDBonIDBTable::countCardinality(const Literal &query) {
     size_t card = 0;
     // Go through the layer to get a Removals-aware iterator
     EDBIterator *iter = layer->getIterator(query);
@@ -300,6 +316,7 @@ size_t EDBonIDBTable::countCardinality(const Literal &query) const {
         iter->next();
         ++card;
     }
+    layer->releaseIterator(iter);
 
     return card;
 }
@@ -308,7 +325,12 @@ size_t EDBonIDBTable::getCardinality(const Literal &query) {
     LOG(INFOL) << "Need to consider possible Removals";
     PredId_t pred = query.getPredicate().getId();
     if (! layer->hasRemoveLiterals(pred)) {
-        LOG(ERRORL) << "Derive cardinality without considering query???";
+        uint8_t nVars = query.getNVars();
+        LOG(ERRORL) << "Derive cardinality (vars " << (int)nVars << ") without considering query " << query.tostring() << "???";
+        if (prevSemiNaiver->getProgram()->getPredicateCard(predid) != countCardinality(query)) {
+            LOG(ERRORL) << "getProgram card " << prevSemiNaiver->getProgram()->getPredicateCard(predid) << " counted " << countCardinality(query);
+            return countCardinality(query);
+        }
         return prevSemiNaiver->getProgram()->getPredicateCard(predid);
     }
 
@@ -360,7 +382,7 @@ std::ostream &EDBonIDBTable::dump(std::ostream &os) {
     }
     Literal lit(pred, t);
     os << "Literal@" << int(sizeRow) << " " << lit.tostring() << std::endl;
-    EDBIterator *itr = getIterator(lit);
+    EDBIterator *itr = layer->getIterator(lit);
     while (itr->hasNext()) {
         itr->next();
         for (uint8_t m = 0; m < sizeRow; ++m) {
@@ -376,7 +398,7 @@ std::ostream &EDBonIDBTable::dump(std::ostream &os) {
         os << std::endl;
     }
 
-    releaseIterator(itr);
+    layer->releaseIterator(itr);
 
     return os;
 }

@@ -186,7 +186,7 @@ void EDBLayer::addEDBimporter(const EDBConf::Table &tableConf) {
     infot.arity = table->getArity();
     dbPredicates.insert(make_pair(infot.id, infot));
 
-    LOG(INFOL) << "Inserted EDBonIDB table id " << infot.id << " predicate " << pn;
+    LOG(INFOL) << "Inserted EDBimporter table id " << infot.id << " predicate " << pn;
     // table->dump(std::cout);
 }
 
@@ -428,7 +428,7 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
         auto itr = p->second.manager->getIterator(query);
         if (hasRemoveLiterals(predid)) {
             LOG(INFOL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
-            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), *removals[predid], itr);
+            EDBIterator *ritr = new EDBRemovalIterator(query, *removals[predid], itr);
             return ritr;
         } else {
             return itr;
@@ -464,7 +464,7 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
 
         if (hasRemoveLiterals(predid)) {
             LOG(INFOL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
-            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), *removals[predid], itr);
+            EDBIterator *ritr = new EDBRemovalIterator(query, *removals[predid], itr);
             return ritr;
         } else {
             return itr;
@@ -483,9 +483,11 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
         auto itr = p->second.manager->getSortedIterator(query, fields);
         if (hasRemoveLiterals(predid)) {
             LOG(DEBUGL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
-            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), *removals[predid], itr);
+            LOG(INFOL) << "EDBLayer " << (uintptr_t)(void *)this << " Wrap an EDBRemovalIterator for " << literal->tostring();
+            EDBIterator *ritr = new EDBRemovalIterator(query, *removals[predid], itr);
             return ritr;
         } else {
+            LOG(INFOL) << "EDBLayer " << (uintptr_t)(void *)this << " No wrap of an EDBRemovalIterator for " << literal->tostring();
             return itr;
         }
 
@@ -533,7 +535,7 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
         }
         if (hasRemoveLiterals(predid)) {
             LOG(DEBUGL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
-            EDBIterator *ritr = new EDBRemovalIterator(getPredArity(predid), *removals[predid], itr);
+            EDBIterator *ritr = new EDBRemovalIterator(query, *removals[predid], itr);
             return ritr;
         } else {
             return itr;

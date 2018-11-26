@@ -109,6 +109,9 @@ IncrOverdelete::IncrOverdelete(// const
         rm[p] = new EDBRemoveLiterals(pMinus, layer);
         // rm[p]->dump(std::cerr, *layer);
     }
+    for (const auto &r : rm) {
+        LOG(INFOL) << "******************** Add removal predicate for predicate " << r.first;
+    }
     layer->addRemoveLiterals(rm);
 
     // std::cerr << "Check confContents again: " << confContents() << std::endl;
@@ -148,11 +151,8 @@ std::string IncrOverdelete::confContents() const {
     for (const auto &t : tables) {
         std::string predName = "EDB" + std::to_string(nTables);
         os << predName << "_predname=" << t.predname << std::endl;
-        os << predName << "_type=" << t.type << std::endl;
-        for (size_t j = 0; j < t.params.size(); ++j) {
-            os << predName << "_" << "param" << std::to_string(j) << "=" <<
-                t.params[j] << std::endl;
-        }
+        os << predName << "_type=EDBimporter" << std::endl;
+        os << predName << "_" << "param0=base" << std::endl;
         ++nTables;
     }
 
@@ -384,15 +384,31 @@ std::string IncrRederive::confContents() const {
     // Wrap the tables in OverDelete in an EDBimporter
 
     size_t nTables = 0;
-    const EDBLayer &old_layer = overdelete.getSN()->getEDBLayer();
-    const EDBConf &old_conf = old_layer.getConf();
-    const std::vector<EDBConf::Table> tables = old_conf.getTables();
-    for (const auto &t : tables) {
+    const EDBLayer &from_layer = fromSemiNaiver->getEDBLayer();
+    const EDBConf &from_conf = from_layer.getConf();
+    const std::vector<EDBConf::Table> from_tables = from_conf.getTables();
+    std::unordered_set<std::string> from_edb;
+    for (const auto &t : from_tables) {
         std::string predName = "EDB" + std::to_string(nTables);
         os << predName << "_predname=" << t.predname << std::endl;
         os << predName << "_type=EDBimporter" << std::endl;
-        os << predName << "_" << "param0=overdelete" << std::endl;
+        os << predName << "_" << "param0=base" << std::endl;
+        from_edb.insert(t.predname);
         ++nTables;
+    }
+
+    const EDBLayer &overdelete_layer = overdelete.getSN()->getEDBLayer();
+    const EDBConf &overdelete_conf = overdelete_layer.getConf();
+    const std::vector<EDBConf::Table> overdelete_tables =
+        overdelete_conf.getTables();
+    for (const auto &t : overdelete_tables) {
+        if (from_edb.find(t.predname) == from_edb.end()) {
+            std::string predName = "EDB" + std::to_string(nTables);
+            os << predName << "_predname=" << t.predname << std::endl;
+            os << predName << "_type=EDBimporter" << std::endl;
+            os << predName << "_" << "param0=overdelete" << std::endl;
+            ++nTables;
+        }
     }
 
     LOG(INFOL) << "Inherit conf from overdelete:";

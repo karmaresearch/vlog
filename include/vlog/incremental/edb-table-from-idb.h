@@ -26,7 +26,8 @@ private:
 
     static bool isNatural(const Literal &query,
                           const std::vector<uint8_t> fields);
-    size_t countCardinality(const Literal &query) const;
+    // should be const
+    size_t countCardinality(const Literal &query);
 
 public:
     EDBonIDBTable(PredId_t predid, EDBLayer *layer,
@@ -49,15 +50,9 @@ public:
         LOG(ERRORL) << "FIXME: implement " << __func__;
     }
 
-    virtual bool isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
-                         std::vector<Term_t> *valuesToFilter) {
-       if (posToFilter == NULL) {
-           return getCardinality(query) == 0;
-       }
-
-       LOG(ERRORL) << "Not implemented:" << __func__;
-       throw 10;
-    }
+    virtual bool isEmpty(const Literal &query,
+                         std::vector<uint8_t> *posToFilter,
+                         std::vector<Term_t> *valuesToFilter);
 
     virtual EDBIterator *getIterator(const Literal &q);
 

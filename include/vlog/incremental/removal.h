@@ -62,7 +62,8 @@ class EDBRemoveLiterals {
 
 class EDBRemovalIterator : public EDBIterator {
     private:
-        const uint8_t arity;
+        uint8_t arity;
+        const Literal &query;
         const EDBRemoveLiterals &removeTuples;
         EDBIterator *itr;
 
@@ -72,10 +73,15 @@ class EDBRemovalIterator : public EDBIterator {
         bool hasNext_ahead;
 
     public:
-        EDBRemovalIterator(const uint8_t arity,
+        EDBRemovalIterator(const Literal &query,
                            const EDBRemoveLiterals &removeTuples,
                            EDBIterator *itr) :
-            arity(arity), removeTuples(removeTuples), itr(itr), expectNext(false) {
+                query(query), removeTuples(removeTuples), itr(itr),
+                expectNext(false) {
+            Predicate pred = query.getPredicate();
+            VTuple tuple = query.getTuple();
+            uint8_t adornment = pred.calculateAdornment(tuple);
+            arity = pred.getNFields(adornment);
             current_term.resize(arity);
             term_ahead.resize(arity);
         }

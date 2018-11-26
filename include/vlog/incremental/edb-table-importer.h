@@ -15,7 +15,8 @@ protected:
     std::shared_ptr<EDBTable> edbTable;
     EDBLayer *layer;
 
-    size_t countCardinality(const Literal &query) const;
+    // should be const
+    size_t countCardinality(const Literal &query);
 
 public:
     EDBimporter(PredId_t predid, EDBLayer *layer,
@@ -43,10 +44,9 @@ public:
         return edbTable->getCardinalityColumn(query, posColumn);
     }
 
-    virtual bool isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
-                         std::vector<Term_t> *valuesToFilter) {
-        return edbTable->isEmpty(query, posToFilter, valuesToFilter);
-    }
+    virtual bool isEmpty(const Literal &query,
+                         std::vector<uint8_t> *posToFilter,
+                         std::vector<Term_t> *valuesToFilter);
 
     virtual EDBIterator *getIterator(const Literal &q) {
         return edbTable->getIterator(q);
