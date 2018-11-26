@@ -81,7 +81,7 @@ class EDBRemovalIterator : public EDBIterator {
             Predicate pred = query.getPredicate();
             VTuple tuple = query.getTuple();
             uint8_t adornment = pred.calculateAdornment(tuple);
-            arity = pred.getNFields(adornment);
+            arity = tuple.getSize() - pred.getNFields(adornment);
             current_term.resize(arity);
             term_ahead.resize(arity);
         }
