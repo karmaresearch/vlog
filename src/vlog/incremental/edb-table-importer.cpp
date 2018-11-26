@@ -46,8 +46,19 @@ bool EDBimporter::isEmpty(const Literal &query,
 
 size_t EDBimporter::countCardinality(const Literal &query) {
     size_t card = 0;
+
+    LOG(ERRORL) << "FIXME: For now, consider all fields";
+    Predicate pred = query.getPredicate();
+    VTuple tuple = query.getTuple();
+    uint8_t adornment = pred.calculateAdornment(tuple);
+    std::vector<uint8_t> fields;
+    for (size_t i = 0; i < tuple.getSize(); ++i) {
+        if (! (adornment & (0x1 << i))) {
+            fields.push_back(i);
+        }
+    }
     // Go through the layer to get a Removals-aware iterator
-    EDBIterator *iter = layer->getIterator(query);
+    EDBIterator *iter = layer->getSortedIterator(query, fields);
     while (iter->hasNext()) {
         iter->next();
         ++card;
