@@ -165,7 +165,7 @@ void EDBLayer::addEDBonIDBTable(const EDBConf::Table &tableConf) {
     dbPredicates.insert(make_pair(infot.id, infot));
 
     LOG(INFOL) << "Inserted EDBonIDB table id " << infot.id << " predicate " << pn;
-    // table->dump(std::cout);
+    table->dump(std::cout);
 }
 
 void EDBLayer::addEDBimporter(const EDBConf::Table &tableConf) {
@@ -187,7 +187,7 @@ void EDBLayer::addEDBimporter(const EDBConf::Table &tableConf) {
     dbPredicates.insert(make_pair(infot.id, infot));
 
     LOG(INFOL) << "Inserted EDBimporter table id " << infot.id << " predicate " << pn;
-    // table->dump(std::cout);
+    table->dump(std::cout);
 }
 
 bool EDBLayer::doesPredExists(PredId_t id) const {

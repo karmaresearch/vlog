@@ -123,6 +123,8 @@ class EDBLayer {
         // need to import the mapping predid -> Predicate from prevSemiNaiver
         void handlePrevSemiNaiver();
 
+        std::string name;
+
     public:
         EDBLayer(const EDBConf &conf, bool multithreaded,
                  const NamedSemiNaiver &prevSemiNaiver) :
@@ -316,6 +318,14 @@ class EDBLayer {
 
         const EDBConf &getConf() const {
             return conf;
+        }
+
+        void setName(const std::string &name) {
+            this->name = name;
+        }
+
+        const std::string &getName() const {
+            return name;
         }
 
         ~EDBLayer() {

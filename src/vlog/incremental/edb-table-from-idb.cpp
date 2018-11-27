@@ -10,17 +10,19 @@
 
 class EDBonIDBIterator : public EDBIterator {
 protected:
-    const Literal &query;
+    const Literal query;
     const PredId_t predid;
     FCIterator idbItr;
     std::shared_ptr<const FCInternalTable> idbInternalTable;
     FCInternalTableItr *idbInternalItr;
+    size_t ticks = 0;
 
 public:
     EDBonIDBIterator(const Literal &query, const std::shared_ptr<SemiNaiver> SN) :
-            query(query), predid(query.getPredicate().getId()),
+            query(EDBonIDBTable::edb2idb(query)),
+            predid(query.getPredicate().getId()),
             idbInternalItr(NULL) {
-        idbItr = SN->getTable(query, 0, SN->getCurrentIteration());
+        idbItr = SN->getTable(this->query, 0, SN->getCurrentIteration());
         if (! idbItr.isEmpty()) {
             idbInternalTable = idbItr.getCurrentTable();
             idbInternalItr = idbInternalTable->getIterator();
@@ -55,6 +57,7 @@ public:
             LOG(ERRORL) << "next() on a table that hasNext() = false";
             throw 10;               // follow convention
         }
+        ++ticks;
         return idbInternalItr->next();
     }
 
@@ -92,30 +95,33 @@ public:
     }
     */
 
-    virtual ~EDBonIDBIterator() {}
+    virtual ~EDBonIDBIterator() {
+        LOG(DEBUGL) << query.tostring() << " num rows queried " << ticks;
+    }
 };
 
 
 class EDBonIDBSortedIterator : public EDBIterator {
 protected:
-    const Literal &query;
+    const Literal query;
     const std::vector<uint8_t> &fields;
     EDBLayer *layer;
     const PredId_t predid;
     bool ownsTable;
     EDBTable *inmemoryTable;
     EDBIterator *itr;
+    size_t ticks = 0;
 
 public:
     EDBonIDBSortedIterator(const Literal &query,
                            const std::vector<uint8_t> &fields,
                            const std::shared_ptr<SemiNaiver> SN,
                            EDBLayer *layer) :
-            query(query), fields(fields), layer(layer),
+            query(EDBonIDBTable::edb2idb(query)), fields(fields), layer(layer),
             predid(query.getPredicate().getId()), ownsTable(true) {
         LOG(DEBUGL) << "EDBonIDBSortedIterator, query " << query.tostring() <<
             ", fields.size() " << fields.size();
-        inmemoryTable = createSortedTable(query, fields, SN, layer);
+        inmemoryTable = createSortedTable(this->query, fields, SN, layer);
         if (inmemoryTable != NULL) {
             itr = inmemoryTable->getSortedIterator(query, fields);
         }
@@ -182,6 +188,7 @@ public:
 
     virtual void next() {
         LOG(TRACEL) << "         next() on " << query.tostring();
+        ticks++;
         return itr->next();
     }
 
@@ -227,6 +234,7 @@ public:
                 delete inmemoryTable;
             }
         }
+        LOG(DEBUGL) << query.tostring() << " num rows queried " << ticks;
     }
 };
 
@@ -384,7 +392,7 @@ void EDBonIDBTable::releaseIterator(EDBIterator *itr) {
 
 std::ostream &EDBonIDBTable::dump(std::ostream &os) {
     std::string name = layer->getPredName(predid);
-    os << (void *)this << " Table " << name << std::endl;
+    os << (void *)this << " Table/EDBonIDB " << name << std::endl;
     const uint8_t sizeRow = getArity();
     Predicate pred(predid, 0, EDB, sizeRow);
     VTuple t = VTuple(sizeRow);

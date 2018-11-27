@@ -90,6 +90,14 @@ public:
         return predid;
     }
 
+    static Literal edb2idb(const Literal &query) {
+        Predicate edbPred(query.getPredicate());
+        Predicate idbPred(edbPred.getId(), edbPred.getAdorment(),
+                          (uint8_t)(edbPred.getType() | IDB),
+                          edbPred.getCardinality());
+        return Literal(idbPred, query.getTuple());
+    }
+
     std::ostream &dump(std::ostream &os);
 };
 

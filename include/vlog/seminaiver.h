@@ -64,6 +64,8 @@ class SemiNaiver {
         PredId_t currentPredicate;
 #endif
 
+        std::string name;
+
     private:
         FCIterator getTableFromIDBLayer(const Literal & literal,
                 const size_t minIteration,
@@ -264,6 +266,14 @@ class SemiNaiver {
 
         std::chrono::system_clock::time_point getStartingTimeMs() {
             return startTime;
+        }
+
+        void setName(const std::string &name) {
+            this->name = name;
+        }
+
+        const std::string &getName() const {
+            return name;
         }
 
 };

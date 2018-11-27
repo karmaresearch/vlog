@@ -1247,6 +1247,11 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
     }
 
+    if (true) {
+        std::string file = name + "." + std::to_string(iteration);
+        storeOnFiles(file, false, 0, false);
+    }
+
     return prodDer;
 }
 

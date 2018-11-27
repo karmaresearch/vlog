@@ -91,6 +91,7 @@ IncrOverdelete::IncrOverdelete(// const
     NamedSemiNaiver from_map;
     from_map["base"] = from;
     layer = new EDBLayer(*conf, false, from_map);
+    layer->setName("overdelete");
 
     std::string overdelete_rules = convertRules();
     std::cout << "Overdelete rule set:" << std::endl;
@@ -125,6 +126,7 @@ IncrOverdelete::IncrOverdelete(// const
             nthreads,
             interRuleThreads,
             ! vm["shufflerules"].empty());
+    sn->setName("overdelete");
 }
 
 
@@ -314,6 +316,7 @@ IncrRederive::IncrRederive(// const
     from_map["base"] = from;
     from_map["overdelete"] = overdelete.getSN();
     layer = new EDBLayer(*conf, false, from_map);
+    layer->setName("rederive");
 
     std::string rules = convertRules();
     std::cout << "Rederive rule set:" << std::endl;
@@ -368,6 +371,7 @@ IncrRederive::IncrRederive(// const
             nthreads,
             interRuleThreads,
             ! vm["shufflerules"].empty());
+    sn->setName("rederive");
 }
 
 
@@ -561,6 +565,7 @@ IncrAdd::IncrAdd(// const
     from_map["overdelete"] = overdelete.getSN();
     from_map["rederive"] = rederive.getSN();
     layer = new EDBLayer(*conf, false, from_map);
+    layer->setName("additions");
 
     std::string rules = convertRules();
     std::cout << "Addition rule set:" << std::endl;
@@ -616,6 +621,7 @@ IncrAdd::IncrAdd(// const
             nthreads,
             interRuleThreads,
             ! vm["shufflerules"].empty());
+    sn->setName("additions");
 }
 
 IncrAdd::~IncrAdd() {

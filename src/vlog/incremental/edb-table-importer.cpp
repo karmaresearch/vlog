@@ -83,3 +83,36 @@ size_t EDBimporter::getCardinality(const Literal &query) {
 
     return countCardinality(query);
 }
+
+std::ostream &EDBimporter::dump(std::ostream &os) {
+    std::string name = layer->getPredName(predid);
+    os << (void *)this << " Table/EDBimporter " << name << std::endl;
+    const uint8_t sizeRow = getArity();
+    Predicate pred(predid, 0, EDB, sizeRow);
+    VTuple t = VTuple(sizeRow);
+    for (uint8_t i = 0; i < t.getSize(); ++i) {
+        t.set(VTerm(i + 1, 0), i);
+    }
+    Literal lit(pred, t);
+    os << "Literal@" << int(sizeRow) << " " << lit.tostring() << std::endl;
+    EDBIterator *itr = layer->getIterator(lit);
+    while (itr->hasNext()) {
+        itr->next();
+        for (uint8_t m = 0; m < sizeRow; ++m) {
+            os << "\t";
+            uint64_t v = itr->getElementAt(m);
+            std::string buffer;
+            if (getDictText(v, buffer)) {
+                os << buffer;
+            } else {
+                os << to_string(v);
+            }
+        }
+        os << std::endl;
+    }
+
+    layer->releaseIterator(itr);
+
+    return os;
+}
+
