@@ -24,8 +24,11 @@ bool EDBimporter::isEmpty(const Literal &query,
         LOG(ERRORL) << "Not implemented:" << __func__;
         throw 10;
     }
+    if (valuesToFilter != NULL) {
+        LOG(ERRORL) << "FIXME: Reconstruct fields from posToFilter and valuesToFilter";
+        throw 10;
+    }
 
-    LOG(ERRORL) << "FIXME: Reconstruct fields from posToFilter and valuesToFilter";
     Predicate pred = query.getPredicate();
     VTuple tuple = query.getTuple();
     uint8_t adornment = pred.calculateAdornment(tuple);
@@ -49,7 +52,6 @@ bool EDBimporter::isEmpty(const Literal &query,
 size_t EDBimporter::countCardinality(const Literal &query) {
     size_t card = 0;
 
-    LOG(ERRORL) << "FIXME: For now, consider all fields";
     Predicate pred = query.getPredicate();
     VTuple tuple = query.getTuple();
     uint8_t adornment = pred.calculateAdornment(tuple);
@@ -73,7 +75,7 @@ size_t EDBimporter::countCardinality(const Literal &query) {
 }
 
 size_t EDBimporter::getCardinality(const Literal &query) {
-    LOG(INFOL) << "Need to consider possible Removals";
+    LOG(DEBUGL) << "Need to consider possible Removals";
     PredId_t pred = query.getPredicate().getId();
     if (! layer->hasRemoveLiterals(pred)) {
         uint8_t nVars = query.getNVars();

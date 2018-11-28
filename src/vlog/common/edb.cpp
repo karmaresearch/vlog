@@ -165,7 +165,7 @@ void EDBLayer::addEDBonIDBTable(const EDBConf::Table &tableConf) {
     dbPredicates.insert(make_pair(infot.id, infot));
 
     LOG(INFOL) << "Inserted EDBonIDB table id " << infot.id << " predicate " << pn;
-    table->dump(std::cout);
+    // table->dump(std::cout);
 }
 
 void EDBLayer::addEDBimporter(const EDBConf::Table &tableConf) {
@@ -187,7 +187,7 @@ void EDBLayer::addEDBimporter(const EDBConf::Table &tableConf) {
     dbPredicates.insert(make_pair(infot.id, infot));
 
     LOG(INFOL) << "Inserted EDBimporter table id " << infot.id << " predicate " << pn;
-    table->dump(std::cout);
+    // table->dump(std::cout);
 }
 
 bool EDBLayer::doesPredExists(PredId_t id) const {
@@ -427,7 +427,7 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
         auto p = dbPredicates.find(predid);
         auto itr = p->second.manager->getIterator(query);
         if (hasRemoveLiterals(predid)) {
-            LOG(INFOL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
+            LOG(DEBUGL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
             EDBIterator *ritr = new EDBRemovalIterator(query, *removals[predid], itr);
             return ritr;
         } else {
@@ -462,7 +462,7 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
         }
 
         if (hasRemoveLiterals(predid)) {
-            LOG(INFOL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
+            LOG(DEBUGL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject RemoveIterator";
             EDBIterator *ritr = new EDBRemovalIterator(query, *removals[predid], itr);
             return ritr;
         } else {
@@ -481,12 +481,11 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
         auto p = dbPredicates.find(predid);
         auto itr = p->second.manager->getSortedIterator(query, fields);
         if (hasRemoveLiterals(predid)) {
-            LOG(DEBUGL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject (Sorted) RemoveIterator";
-            LOG(INFOL) << "EDBLayer=" << name << " Wrap an EDBRemovalIterator for " << literal->tostring();
+            LOG(DEBUGL) << "EDBLayer=" << name << " Wrap an EDBRemovalIterator for " << literal->tostring();
             EDBIterator *ritr = new EDBRemovalIterator(query, fields, *removals[predid], itr);
             return ritr;
         } else {
-            LOG(INFOL) << "EDBLayer=" << name << " No wrap of an EDBRemovalIterator for " << literal->tostring();
+            LOG(DEBUGL) << "EDBLayer=" << name << " No wrap of an EDBRemovalIterator for " << literal->tostring();
             return itr;
         }
 

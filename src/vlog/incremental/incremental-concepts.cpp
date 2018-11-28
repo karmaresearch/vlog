@@ -109,11 +109,9 @@ IncrOverdelete::IncrOverdelete(// const
         PredId_t pMinus = program->getPredicate(name2eMinus("TE")).getId();
         rm[p] = new EDBRemoveLiterals(pMinus, layer);
         // rm[p]->dump(std::cerr, *layer);
-        LOG(INFOL) << "******************** Add removal predicate " << pMinus << " for predicate " << p;
+        LOG(INFOL) << "Add removal predicate " << pMinus << " for predicate " << p;
     }
     layer->addRemoveLiterals(rm);
-
-    // std::cerr << "Check confContents again: " << confContents() << std::endl;
 
     //Prepare the materialization
     sn = Reasoner::getSemiNaiver(
@@ -356,7 +354,7 @@ IncrRederive::IncrRederive(// const
         LOG(INFOL) << "dMinus table for " << pp.second << " is "<< rm_name;
         // Feed that to the Removal
         rm[pp.first] = new EDBRemoveLiterals(rm_pred, layer);
-        LOG(INFOL) << "******************** Add removal predicate " << rm_pred << " for predicate " << pp.first;
+        LOG(INFOL) << "Add removal predicate " << rm_pred << " for predicate " << pp.first;
     }
     layer->addRemoveLiterals(rm);
 
@@ -606,7 +604,7 @@ IncrAdd::IncrAdd(// const
         rm[pp.first] = new EDBRemoveLiterals(rm_pred, layer);
     }
     for (const auto &r : rm) {
-        LOG(INFOL) << "******************** Add removal predicate for predicate " << r.first;
+        LOG(INFOL) << "Add removal predicate for predicate " << r.first;
     }
     layer->addRemoveLiterals(rm);
 

@@ -135,7 +135,7 @@ EDBRemoveLiterals::EDBRemoveLiterals(PredId_t predid, EDBLayer *layer) :
     }
     layer->releaseIterator(itr);
 
-    dump(std::cerr, *layer);
+    // dump(std::cerr, *layer);
 }
 
 

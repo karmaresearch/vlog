@@ -128,7 +128,8 @@ class EDBRemovalIterator : public EDBIterator {
         }
 
         virtual ~EDBRemovalIterator() {
-            LOG(INFOL) << "EDBRemovalIterator: " << query.tostring() << " num rows queried " << ticks;
+            LOG(DEBUGL) << "EDBRemovalIterator: " << query.tostring() <<
+                " num rows queried " << ticks;
         }
 };
 

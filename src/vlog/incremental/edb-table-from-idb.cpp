@@ -96,7 +96,8 @@ public:
     */
 
     virtual ~EDBonIDBIterator() {
-        LOG(DEBUGL) << "EDBonIDBIterator: " << query.tostring() << " num rows queried " << ticks;
+        LOG(DEBUGL) << "EDBonIDBIterator: " << query.tostring() <<
+            " num rows queried " << ticks;
     }
 };
 
@@ -236,7 +237,8 @@ public:
                 delete inmemoryTable;
             }
         }
-        LOG(DEBUGL) << "EDBonIDBSortedIterator: layer=" << layer->getName() << " " << query.tostring() << " num rows queried " << ticks;
+        LOG(DEBUGL) << "EDBonIDBSortedIterator: layer=" << layer->getName() <<
+            " " << query.tostring() << " num rows queried " << ticks;
     }
 };
 
@@ -248,8 +250,11 @@ bool EDBonIDBTable::isEmpty(const Literal &query,
         LOG(ERRORL) << "Not implemented:" << __func__;
         throw 10;
     }
+    if (valuesToFilter != NULL) {
+        LOG(ERRORL) << "FIXME: Reconstruct fields from posToFilter and valuesToFilter";
+        throw 10;
+    }
 
-    LOG(ERRORL) << "FIXME: Reconstruct fields from posToFilter and valuesToFilter";
     VTuple tuple = query.getTuple();
     std::vector<uint8_t> fields;
     Predicate pred = query.getPredicate();
@@ -368,19 +373,16 @@ EDBIterator *EDBonIDBTable::getIterator(const Literal &q) {
 EDBIterator *EDBonIDBTable::getSortedIterator(const Literal &query,
                                        const std::vector<uint8_t> &fields) {
     if (isNatural(query, fields)) {
-    LOG(ERRORL) << "For now, disable 'Natural' optimization";
-    if (false) {
         LOG(DEBUGL) << "'Natural' sorted query " << query.tostring(NULL, layer);
         if (naturalTable == NULL) {
-            LOG(INFOL) << "create new naturalTable";
+            LOG(DEBUGL) << "create new naturalTable";
             naturalTable = EDBonIDBSortedIterator::createSortedTable(
                                 query, fields, prevSemiNaiver, layer);
         } else {
-            LOG(INFOL) << "Use cached naturalTable";
+            LOG(DEBUGL) << "Use cached naturalTable";
         }
         return new EDBonIDBSortedIterator(query, fields, layer,
                                           naturalTable);
-    }
     }
 
     LOG(DEBUGL) << "Get SortedIterator for query " <<
@@ -425,9 +427,3 @@ std::ostream &EDBonIDBTable::dump(std::ostream &os) {
 
     return os;
 }
-
-/*
-std::ostream &operator<<(ostream &os, const EDBonIDBTable &table) {
-    return os << table.dump();
-}
-*/
