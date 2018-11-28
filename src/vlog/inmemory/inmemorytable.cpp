@@ -477,8 +477,10 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
     }
     std::vector<uint8_t> newFields;
     for (auto f : fields) {
+        assert(f < offsets.size());
 	newFields.push_back(offsets[f] + f);
     }
+    assert(newFields.size() == fields.size());
     return getSortedIterator2(query, newFields);
 }
 

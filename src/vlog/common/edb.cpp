@@ -482,11 +482,11 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
         auto itr = p->second.manager->getSortedIterator(query, fields);
         if (hasRemoveLiterals(predid)) {
             LOG(DEBUGL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject (Sorted) RemoveIterator";
-            LOG(INFOL) << "EDBLayer " << (uintptr_t)(void *)this << " Wrap an EDBRemovalIterator for " << literal->tostring();
+            LOG(INFOL) << "EDBLayer=" << name << " Wrap an EDBRemovalIterator for " << literal->tostring();
             EDBIterator *ritr = new EDBRemovalIterator(query, fields, *removals[predid], itr);
             return ritr;
         } else {
-            LOG(INFOL) << "EDBLayer " << (uintptr_t)(void *)this << " No wrap of an EDBRemovalIterator for " << literal->tostring();
+            LOG(INFOL) << "EDBLayer=" << name << " No wrap of an EDBRemovalIterator for " << literal->tostring();
             return itr;
         }
 

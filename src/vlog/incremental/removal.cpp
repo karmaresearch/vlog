@@ -1,7 +1,5 @@
 #include <vlog/incremental/removal.h>
 
-#include <vlog/incremental/edb-table-from-idb.h>
-
 #include <vlog/edb.h>
 #if 0
 #include <vlog/concepts.h>
@@ -10,6 +8,89 @@
 #endif
 
 #include <climits>
+
+// Around a non-sorted Iterator
+EDBRemovalIterator::EDBRemovalIterator(const Literal &query,
+                                       const EDBRemoveLiterals &removeTuples,
+                                       EDBIterator *itr) :
+        query(query), fields(std::vector<uint8_t>()),
+        removeTuples(removeTuples), itr(itr),
+        expectNext(false) {
+    // arity = query.getTuple().getSize();
+    adornment = 0;
+    current_term.resize(query.getTuple().getSize());
+    term_ahead.resize(query.getTuple().getSize(), 0);
+}
+
+// Around a SortedIterator
+EDBRemovalIterator::EDBRemovalIterator(const Literal &query,
+                                       const std::vector<uint8_t> &fields,
+                                       const EDBRemoveLiterals &removeTuples,
+                                       EDBIterator *itr) :
+                query(query), fields(fields), removeTuples(removeTuples),
+                itr(itr), expectNext(false) {
+    Predicate pred = query.getPredicate();
+    VTuple tuple = query.getTuple();
+    adornment = pred.calculateAdornment(tuple);
+    // arity = tuple.getSize() - pred.getNFields(adornment);
+    // arity = fields.size();
+    term_ahead.resize(tuple.getSize(), 0);
+    current_term.resize(tuple.getSize(), 0);
+    for (int i = 0; i < tuple.getSize(); ++i) {
+        if (adornment & (0x1 << i)) {
+            term_ahead[i] = tuple.get(i).getValue();
+            current_term[i] = tuple.get(i).getValue();
+        }
+    }
+}
+
+
+bool EDBRemovalIterator::hasNext() {
+    if (expectNext) {
+        return hasNext_ahead;
+    }
+
+    hasNext_ahead = false;
+    while (true) {
+        if (! itr->hasNext()) {
+            return false;
+        }
+        itr->next();
+        if (adornment == 0) {
+            // fast path
+            for (int i = 0; i < term_ahead.size(); ++i) {
+                term_ahead[i] = itr->getElementAt(i);
+            }
+        } else {
+            // optimize: don't call for constant elements
+            for (int i = 0; i < term_ahead.size(); ++i) {
+                if (! (adornment & (0x1 << i))) {
+                    term_ahead[i] = itr->getElementAt(i);
+                    LOG(DEBUGL) << "removal: set elt[" << i << "] to " << term_ahead[i];
+                }
+            }
+        }
+        if (! removeTuples.present(term_ahead)) {
+            break;
+        }
+        LOG(DEBUGL) << "***** OK: skip one row";
+    }
+
+    hasNext_ahead = true;
+    expectNext = true;
+    return hasNext_ahead;
+}
+
+void EDBRemovalIterator::next() {
+    if (! expectNext) {
+        (void)hasNext();
+    }
+    expectNext = false;
+    hasNext_ahead = false;
+    current_term.swap(term_ahead);
+
+    ++ticks;
+}
 
 
 EDBRemoveLiterals::EDBRemoveLiterals(const std::string &file, EDBLayer *layer) :
@@ -69,7 +150,6 @@ void EDBRemoveLiterals::insert(const std::vector<Term_t> &terms) {
     }
     ++num_rows;
 }
-
 
 static void dump_map(std::ostream &os,
                      const std::unordered_map<Term_t, EDBRemoveItem *> &m) {

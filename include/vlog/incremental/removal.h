@@ -74,86 +74,23 @@ class EDBRemovalIterator : public EDBIterator {
         bool expectNext;
         bool hasNext_ahead;
 
+        size_t ticks = 0;
+
     public:
         // Around a non-sorted Iterator
         EDBRemovalIterator(const Literal &query,
                            const EDBRemoveLiterals &removeTuples,
-                           EDBIterator *itr) :
-                query(query), fields(std::vector<uint8_t>()),
-                removeTuples(removeTuples), itr(itr),
-                expectNext(false) {
-            // arity = query.getTuple().getSize();
-            adornment = 0;
-            current_term.resize(query.getTuple().getSize());
-            term_ahead.resize(query.getTuple().getSize());
-        }
+                           EDBIterator *itr);
 
         // Around a SortedIterator
         EDBRemovalIterator(const Literal &query,
                            const std::vector<uint8_t> &fields,
                            const EDBRemoveLiterals &removeTuples,
-                           EDBIterator *itr) :
-                query(query), fields(fields), removeTuples(removeTuples),
-                itr(itr), expectNext(false) {
-            Predicate pred = query.getPredicate();
-            VTuple tuple = query.getTuple();
-            adornment = pred.calculateAdornment(tuple);
-            // arity = tuple.getSize() - pred.getNFields(adornment);
-            // arity = fields.size();
-            current_term.resize(tuple.getSize());
-            term_ahead.resize(tuple.getSize());
-            for (int i = 0; i < tuple.getSize(); ++i) {
-                if (adornment & (0x1 << i)) {
-                    term_ahead[i] = tuple.get(i).getValue();
-                }
-            }
-        }
+                           EDBIterator *itr);
 
-        virtual bool hasNext() {
-            if (expectNext) {
-                return hasNext_ahead;
-            }
+        virtual bool hasNext();
 
-            hasNext_ahead = false;
-            while (true) {
-                if (! itr->hasNext()) {
-                    return false;
-                }
-                itr->next();
-                if (adornment == 0) {
-                    // fast path
-                    for (int i = 0; i < term_ahead.size(); ++i) {
-                        term_ahead[i] = itr->getElementAt(i);
-                    }
-                } else {
-                    int it = 0;
-                    for (int i = 0; i < term_ahead.size(); ++i) {
-                        if (! (adornment & (0x1 << i))) {
-                            term_ahead[i] = itr->getElementAt(it);
-                            it++;
-                        }
-                    }
-                }
-                if (! removeTuples.present(term_ahead)) {
-                    break;
-                }
-                LOG(DEBUGL) << "***** OK: skip one row";
-            }
-
-            hasNext_ahead = true;
-            expectNext = true;
-            return hasNext_ahead;
-        }
-
-        virtual void next() {
-            if (! expectNext) {
-                (void)hasNext();
-            }
-            expectNext = false;
-            hasNext_ahead = false;
-            current_term.swap(term_ahead);
-            // done in hasNext()
-        }
+        virtual void next();
 
         virtual Term_t getElementAt(const uint8_t p) {
             return current_term[p];
@@ -191,6 +128,7 @@ class EDBRemovalIterator : public EDBIterator {
         }
 
         virtual ~EDBRemovalIterator() {
+            LOG(INFOL) << "EDBRemovalIterator: " << query.tostring() << " num rows queried " << ticks;
         }
 };
 

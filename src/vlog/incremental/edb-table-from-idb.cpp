@@ -96,7 +96,7 @@ public:
     */
 
     virtual ~EDBonIDBIterator() {
-        LOG(DEBUGL) << query.tostring() << " num rows queried " << ticks;
+        LOG(DEBUGL) << "EDBonIDBIterator: " << query.tostring() << " num rows queried " << ticks;
     }
 };
 
@@ -119,8 +119,8 @@ public:
                            EDBLayer *layer) :
             query(EDBonIDBTable::edb2idb(query)), fields(fields), layer(layer),
             predid(query.getPredicate().getId()), ownsTable(true) {
-        LOG(DEBUGL) << "EDBonIDBSortedIterator, query " << query.tostring() <<
-            ", fields.size() " << fields.size();
+        LOG(DEBUGL) << "EDBonIDBSortedIterator, query " <<
+            this->query.tostring() << ", fields.size() " << fields.size();
         inmemoryTable = createSortedTable(this->query, fields, SN, layer);
         if (inmemoryTable != NULL) {
             itr = inmemoryTable->getSortedIterator(query, fields);
@@ -193,7 +193,9 @@ public:
     }
 
     virtual Term_t getElementAt(const uint8_t p) {
-        LOG(TRACEL) << "get element[" << (int)p << "] of " << query.tostring() << " = " << itr->getElementAt(p);
+        if (fields.size() == 1) {
+            LOG(DEBUGL) << "get element[" << (int)p << "] of " << query.tostring() << " = " << itr->getElementAt(p);
+        }
         return itr->getElementAt(p);
     }
 
@@ -234,7 +236,7 @@ public:
                 delete inmemoryTable;
             }
         }
-        LOG(DEBUGL) << query.tostring() << " num rows queried " << ticks;
+        LOG(DEBUGL) << "EDBonIDBSortedIterator: layer=" << layer->getName() << " " << query.tostring() << " num rows queried " << ticks;
     }
 };
 
@@ -248,13 +250,15 @@ bool EDBonIDBTable::isEmpty(const Literal &query,
     }
 
     LOG(ERRORL) << "FIXME: Reconstruct fields from posToFilter and valuesToFilter";
-    Predicate pred = query.getPredicate();
     VTuple tuple = query.getTuple();
-    uint8_t adornment = pred.calculateAdornment(tuple);
     std::vector<uint8_t> fields;
+    Predicate pred = query.getPredicate();
+    uint8_t adornment = pred.calculateAdornment(tuple);
+    uint8_t it = 0;
     for (size_t i = 0; i < tuple.getSize(); ++i) {
         if (! (adornment & (0x1 << i))) {
-            fields.push_back(i);
+            fields.push_back(it);
+            ++it;
         }
     }
     // Go through the layer to get a Removals-aware iterator
