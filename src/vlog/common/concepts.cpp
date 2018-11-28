@@ -742,11 +742,11 @@ std::string trim(const std::string& str,
     return str.substr(strBegin, strRange);
 }
 
-void Program::readFromFile(std::string pathFile, bool rewriteMultihead) {
+std::string Program::readFromFile(std::string pathFile, bool rewriteMultihead) {
     LOG(INFOL) << "Read program from file " << pathFile;
     if (pathFile == "") {
         LOG(INFOL) << "Using default rule TI(A,B,C) :- TE(A,B,C)";
-        parseRule("TI(A,B,C) :- TE(A,B,C)", false);
+        return parseRule("TI(A,B,C) :- TE(A,B,C)", false);
     } else {
         std::ifstream file(pathFile);
         std::string line;
@@ -754,23 +754,31 @@ void Program::readFromFile(std::string pathFile, bool rewriteMultihead) {
 	    line = trim(line);
             if (line != "" && line.substr(0, 2) != "//") {
                 LOG(DEBUGL) << "Parsing rule \"" << line << "\"";
-                parseRule(line, rewriteMultihead);
+		std::string s = parseRule(line, rewriteMultihead);
+		if (s != "") {
+		    return s;
+		}
             }
         }
         //LOG(INFOL) << "New assigned constants: " << additionalConstants.size();
     }
+    return "";
 }
 
-void Program::readFromString(std::string rules, bool rewriteMultihead) {
+std::string Program::readFromString(std::string rules, bool rewriteMultihead) {
     stringstream ss(rules);
     string rule;
     while (getline(ss, rule)) {
 	rule = trim(rule);
         if (rule != "" && rule .substr(0, 2) != "//") {
             LOG(DEBUGL) << "Parsing rule " << rule;
-            parseRule(rule, rewriteMultihead);
+	    std::string s = parseRule(rule, rewriteMultihead);
+	    if (s != "") {
+		return s;
+	    }
         }
     }
+    return "";
     //LOG(INFOL) << "New assigned constants: " << additionalConstants.size();
 }
 
@@ -821,12 +829,12 @@ std::string Program::rewriteRDFOWLConstants(std::string input) {
 Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     size_t posBeginTuple = l.find("(");
     if (posBeginTuple == std::string::npos) {
-        throw 10;
+        throw "Missing '(' in literal";
     }
     std::string predicate = trim(l.substr(0, posBeginTuple));
     std::string tuple = l.substr(posBeginTuple + 1, std::string::npos);
     if (tuple[tuple.size() - 1] != ')') {
-	throw 10;
+	throw "Missing ')' in literal";
     }
     tuple = trim(tuple.substr(0, tuple.size() - 1));
 
@@ -913,7 +921,11 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
 
 	    //Parse the term
         if (std::isupper(term.at(0))) {
-            t.push_back(VTerm((uint8_t) dictVariables.getOrAdd(term), 0));
+	    uint64_t v = dictVariables.getOrAdd(term);
+	    if (v != (uint8_t) v) {
+		throw "Too many variables in rule (> 255)";
+	    }
+            t.push_back(VTerm((uint8_t) v, 0));
         } else {
             //Constant
             term = rewriteRDFOWLConstants(term);
@@ -928,6 +940,10 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
         }
     }
 
+    if (t.size() != (uint8_t) t.size()) {
+	throw "Arity of predicate " + predicate + " is too high (" + std::to_string(t.size()) + " > 255)";
+    }
+
     VTuple t1((uint8_t) t.size());
     int pos = 0;
     for (std::vector<VTerm>::iterator itr = t.begin(); itr != t.end(); ++itr) {
@@ -940,8 +956,7 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
         cardPredicates.insert(make_pair(predid, t.size()));
     } else {
         if (cardPredicates.find(predid)->second != t.size()) {
-            LOG(INFOL) << "Wrong size in predicate: should be " << (int) cardPredicates.find(predid)->second;
-            throw 10;
+            throw ("Wrong arity in predicate: should be " +  std::to_string((int) cardPredicates.find(predid)->second));
         }
     }
     Predicate pred(predid, Predicate::calculateAdornment(t1), kb->doesPredExists(predid) ? EDB : IDB, (uint8_t) t.size());
@@ -1064,13 +1079,13 @@ size_t findEndLiteral(std::string s) {
     return pos;
 }
 
-void Program::parseRule(std::string rule, bool rewriteMultihead) {
+std::string Program::parseRule(std::string rule, bool rewriteMultihead) {
     //split the rule between head and body
     Dictionary dictVariables;
     try {
         size_t posEndHead = rule.find(":-");
         if (posEndHead == std::string::npos) {
-            throw 10;
+            throw "Missing ':-'";
         }
         //process the head(s)
         std::string head = trim(rule.substr(0, posEndHead));
@@ -1112,8 +1127,11 @@ void Program::parseRule(std::string rule, bool rewriteMultihead) {
         //Add the rule
         Rule r = Rule(allrules.size(), lHeads, lBody);
         addRule(r, rewriteMultihead);
-    } catch (int e) {
-        LOG(ERRORL) << "Failed in parsing rule " << rule;
+	return "";
+    } catch (std::string e) {
+	return "Failed parsing rule '" + rule + "': " + e;
+    } catch(char const * e) {
+	return "Failed parsing rule '" + rule + "': " + std::string(e);
     }
 }
 

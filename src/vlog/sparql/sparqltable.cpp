@@ -110,7 +110,7 @@ void SparqlTable::query(QSQQuery *query, TupleTable *outputTable,
 	throw 10;
     }
 
-    Term_t row[128];
+    Term_t row[256];
     uint8_t *pos = query->getPosToCopy();
     const uint8_t npos = query->getNPosToCopy();
     if (posToFilter == NULL || posToFilter->size() == 0) {
@@ -146,7 +146,7 @@ std::string escape(const std::string &s) {
     for (std::string::const_iterator i = s.cbegin(),
             n = s.cend(); i != n; ++i) {
         std::string::value_type c = (*i);
-        if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+        if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
             escaped << c;
             continue;
         }

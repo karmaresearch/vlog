@@ -211,6 +211,13 @@ bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
     bool newDer = false;
     for (size_t i = 0; i < edbRuleset.size(); ++i) {
         newDer |= executeRule(edbRuleset[i], iteration, limitView, NULL);
+	if (timeout != NULL && *timeout != 0) {
+	    std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
+	    if (s.count() > *timeout) {
+		*timeout = 0;	// To indicate materialization was stopped because of timeout.
+		return newDer;
+	    }
+	}
         iteration++;
     }
 #if DEBUG
@@ -314,6 +321,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
         }
         int loopNr = 0;
         std::vector<RuleExecutionDetails> emptyRuleset;
+	bool mayHaveTimeout = timeout != NULL && *timeout != 0;
         while (true) {
             bool resp1;
             if (loopNr == 0)
@@ -331,6 +339,9 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
                 break; //Fix-point
             }
             loopNr++;
+	    if (mayHaveTimeout && *timeout == 0) {
+		break;
+	    }
         }
     } else {
         executeRules(allEDBRules, allIDBRules, costRules, 0, true, timeout);

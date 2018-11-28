@@ -161,8 +161,7 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
     const uint8_t sizerow = rows->getSizeRow();
     assert(sizerow == columns.size());
     std::vector<Term_t> functerms;
-    uint64_t row[128];
-    assert(sizerow <= 128);
+    uint64_t row[256];
 
     std::vector<std::unique_ptr<ColumnReader>> readers;
     for(uint8_t j = 0; j < sizerow; ++j) {
