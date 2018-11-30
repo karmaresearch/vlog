@@ -1,5 +1,0 @@
-/Users/jacopo/prj/vlog/build/CMakeFiles/rebuild_cache.dir
-/Users/jacopo/prj/vlog/build/CMakeFiles/edit_cache.dir
-/Users/jacopo/prj/vlog/build/CMakeFiles/vlog-core.dir
-/Users/jacopo/prj/vlog/build/CMakeFiles/vlog.dir
-/Users/jacopo/prj/vlog/build/CMakeFiles/git-trident.dir
