@@ -108,6 +108,10 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
             else
                 this->allEDBRules.push_back(*d);
             delete d;
+
+            if (!itr->isExistential()) {
+                datalogRules.push_back(*itr);
+            }
         }
 
 #if 0
@@ -211,13 +215,13 @@ bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
     bool newDer = false;
     for (size_t i = 0; i < edbRuleset.size(); ++i) {
         newDer |= executeRule(edbRuleset[i], iteration, limitView, NULL);
-	if (timeout != NULL && *timeout != 0) {
-	    std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
-	    if (s.count() > *timeout) {
-		*timeout = 0;	// To indicate materialization was stopped because of timeout.
-		return newDer;
-	    }
-	}
+        if (timeout != NULL && *timeout != 0) {
+            std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
+            if (s.count() > *timeout) {
+                *timeout = 0;   // To indicate materialization was stopped because of timeout.
+                return newDer;
+            }
+        }
         iteration++;
     }
 #if DEBUG
@@ -232,7 +236,7 @@ bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
 }
 
 void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
-        bool checkCyclicTerms) {
+        bool checkCyclicTerms, int singleRuleToCheck) {
     this->checkCyclicTerms = checkCyclicTerms;
     this->foundCyclicTerms = false;
     running = true;
@@ -252,7 +256,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
             itr != allIDBRules.end();
             ++itr) {
         LOG(DEBUGL) << "Optimizing rule " << itr->rule.tostring(NULL, NULL);
-        itr->createExecutionPlans();
+        itr->createExecutionPlans(checkCyclicTerms);
         itr->calculateNVarsInHeadFromEDB();
         itr->lastExecution = lastExecution;
 
@@ -268,7 +272,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
     for (std::vector<RuleExecutionDetails>::iterator itr = allEDBRules.begin();
             itr != allEDBRules.end();
             ++itr) {
-        itr->createExecutionPlans();
+        itr->createExecutionPlans(checkCyclicTerms);
     }
     for (auto el : allIDBRules)
         LOG(DEBUGL) << el.rule.tostring(program, &layer);
@@ -278,7 +282,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
     std::copy(allEDBRules.begin(), allEDBRules.end(), std::back_inserter(allrules));
     std::copy(allIDBRules.begin(), allIDBRules.end(), std::back_inserter(allrules));
     chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt(allrules,
-                restrictedChase, checkCyclicTerms));
+                restrictedChase, checkCyclicTerms, singleRuleToCheck));
 #if DEBUG
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(DEBUGL) << "Runtime ruleset optimization ms = " << sec.count() * 1000;
@@ -321,7 +325,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
         }
         int loopNr = 0;
         std::vector<RuleExecutionDetails> emptyRuleset;
-	bool mayHaveTimeout = timeout != NULL && *timeout != 0;
+        bool mayHaveTimeout = timeout != NULL && *timeout != 0;
         while (true) {
             bool resp1;
             if (loopNr == 0)
@@ -339,9 +343,9 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
                 break; //Fix-point
             }
             loopNr++;
-	    if (mayHaveTimeout && *timeout == 0) {
-		break;
-	    }
+            if (mayHaveTimeout && *timeout == 0) {
+                break;
+            }
         }
     } else {
         executeRules(allEDBRules, allIDBRules, costRules, 0, true, timeout);
@@ -872,7 +876,8 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
 
 void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
         const std::vector<size_t> &cards,
-        const std::vector<Literal> &heads) {
+        const std::vector<Literal> &heads,
+        bool copyAllVars) {
     //Reorder the atoms in terms of cardinality.
     std::vector<std::pair<uint8_t, size_t>> positionCards;
     for (uint8_t i = 0; i < cards.size(); ++i) {
@@ -932,7 +937,7 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
             LOG(DEBUGL) << "Reordered plan is " << (int)adaptedPosCards[i].first;
             orderLiterals.push_back(adaptedPosCards[i].first);
         }
-        plan = plan.reorder(orderLiterals, heads);
+        plan = plan.reorder(orderLiterals, heads, copyAllVars);
     }
 }
 
@@ -1031,7 +1036,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         }
 
         //Reorder the list of atoms depending on the observed cardinalities
-        reorderPlan(plan, cards, heads);
+        reorderPlan(plan, cards, heads, checkCyclicTerms);
 
 #ifdef DEBUG
         std::string listLiterals = "EXEC COMB: ";
@@ -1086,7 +1091,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                             finalResultContainer == NULL,
                             !multithreaded ? -1 : nthreads,
                             this,
-                            chaseMgmt);
+                            chaseMgmt,
+                            chaseMgmt->hasRuleToCheck());
                 } else {
                     if (heads.size() == 1) {
                         FCTable *table = getTable(heads[0].getPredicate().getId(),

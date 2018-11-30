@@ -165,7 +165,6 @@ class SemiNaiver;
 class FinalRuleProcessor: public ResultJoinProcessor {
     private:
         std::vector<FCBlock> &listDerivations;
-        const uint8_t ruleExecOrder;
         const size_t iteration;
         bool newDerivation;
         std::vector<Literal> &heads;
@@ -173,6 +172,7 @@ class FinalRuleProcessor: public ResultJoinProcessor {
     protected:
         std::vector<std::unique_ptr<SingleHeadFinalRuleProcessor>> atomTables;
         const RuleExecutionDetails *ruleDetails;
+        const uint8_t ruleExecOrder;
         bool addToEndTable;
 
     public:

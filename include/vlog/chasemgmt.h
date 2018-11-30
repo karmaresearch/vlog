@@ -72,7 +72,7 @@ class ChaseMgmt {
 
                 bool existingRow(uint64_t *row, uint64_t &value);
 
-		bool checkRecursive(uint64_t target, uint64_t value, std::vector<uint64_t> &toCheck);
+                bool checkRecursive(uint64_t target, uint64_t value, std::vector<uint64_t> &toCheck);
         };
 
         class RuleContainer {
@@ -94,14 +94,17 @@ class ChaseMgmt {
 
         std::vector<std::unique_ptr<ChaseMgmt::RuleContainer>> rules;
         const bool restricted;
-	const bool checkCyclic;
-	bool cyclic;
+        const bool checkCyclic;
+        const int ruleToCheck;
+        bool cyclic;
 
-	bool checkRecursive(uint64_t target, uint64_t rv, int level);
+        bool checkRecursive(uint64_t target, uint64_t rv, int level);
+
+        bool checkNestedRecursive(uint64_t target, uint64_t rv, int level);
 
     public:
         ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
-                const bool restricted, const bool checkCyclic);
+                const bool restricted, const bool checkCyclic, const int ruleToCheck = -1);
 
         std::shared_ptr<Column> getNewOrExistingIDs(
                 uint32_t ruleid,
@@ -111,8 +114,18 @@ class ChaseMgmt {
 
         bool checkCyclicTerms(uint32_t ruleid);
 
+        bool checkRecursive(uint64_t rv);
+
         bool isRestricted() {
             return restricted;
+        }
+
+        bool hasRuleToCheck() {
+            return ruleToCheck >= 0;
+        }
+
+        bool isCheckCyclicMode() {
+            return checkCyclic;
         }
 };
 

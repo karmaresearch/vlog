@@ -1,0 +1,13 @@
+# Target labels
+ git-trident
+# Source files and their labels
+/Users/jacopo/prj/vlog/build_debug/CMakeFiles/git-trident
+/Users/jacopo/prj/vlog/build_debug/CMakeFiles/git-trident.rule
+/Users/jacopo/prj/vlog/build_debug/CMakeFiles/git-trident-complete.rule
+/Users/jacopo/prj/vlog/build_debug/git-trident-prefix/src/git-trident-stamp/git-trident-install.rule
+/Users/jacopo/prj/vlog/build_debug/git-trident-prefix/src/git-trident-stamp/git-trident-mkdir.rule
+/Users/jacopo/prj/vlog/build_debug/git-trident-prefix/src/git-trident-stamp/git-trident-download.rule
+/Users/jacopo/prj/vlog/build_debug/git-trident-prefix/src/git-trident-stamp/git-trident-update.rule
+/Users/jacopo/prj/vlog/build_debug/git-trident-prefix/src/git-trident-stamp/git-trident-patch.rule
+/Users/jacopo/prj/vlog/build_debug/git-trident-prefix/src/git-trident-stamp/git-trident-configure.rule
+/Users/jacopo/prj/vlog/build_debug/git-trident-prefix/src/git-trident-stamp/git-trident-build.rule

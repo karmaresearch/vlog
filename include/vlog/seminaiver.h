@@ -98,7 +98,8 @@ class SemiNaiver {
 
         void reorderPlan(RuleExecutionPlan &plan,
                 const std::vector<size_t> &cards,
-                const std::vector<Literal> &headLiteral);
+                const std::vector<Literal> &headLiteral,
+                bool copyAllVars);
 
         bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
                 std::vector<RuleExecutionDetails> &allIDBRules,
@@ -120,6 +121,7 @@ class SemiNaiver {
         FCTable *predicatesTables[MAX_NPREDS];
         EDBLayer &layer;
         Program *program;
+        std::vector<Rule> datalogRules; //Needed for RMFA check
         std::vector<RuleExecutionDetails> allIDBRules;
         size_t iteration;
         int nthreads;
@@ -173,7 +175,7 @@ class SemiNaiver {
         virtual FCTable *getTable(const PredId_t pred, const uint8_t card);
 
         VLIBEXP void run(size_t lastIteration, size_t iteration, unsigned long *timeout = NULL,
-                bool checkCyclicTerms = false);
+                bool checkCyclicTerms = false, int singleRule = -1);
 
         VLIBEXP void storeOnFile(std::string path, const PredId_t pred, const bool decompress,
                 const int minLevel, const bool csv);
@@ -201,6 +203,10 @@ class SemiNaiver {
             return program;
         }
 
+        std::vector<Rule> &getDatalogRules() {
+            return datalogRules;
+        }
+
         bool isFoundCyclicTerms() {
             return foundCyclicTerms;
         }
@@ -223,8 +229,8 @@ class SemiNaiver {
         virtual FCIterator getTable(const Literal &literal, const size_t minIteration,
                 const size_t maxIteration, TableFilterer *filter);
 
-        void checkAcyclicity() {
-            run(0, 1, NULL, true);
+        void checkAcyclicity(int singleRule = -1) {
+            run(0, 1, NULL, true, singleRule);
         }
 
         //Statistics methods

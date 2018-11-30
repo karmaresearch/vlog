@@ -433,9 +433,7 @@ class Program {
         //Move them to the EDB layer ...
         //Dictionary additionalConstants;
 
-            std::string parseRule(std::string rule, bool rewriteMultihead);
-
-            void rewriteRule(Rule &r);
+        void rewriteRule(Rule &r);
 
         std::string rewriteRDFOWLConstants(std::string input);
 
@@ -450,7 +448,7 @@ class Program {
             kb = e;
         }
 
-        void parseRule(std::string rule, bool rewriteMultihead);
+        std::string parseRule(std::string rule, bool rewriteMultihead);
 
         VLIBEXP std::vector<PredId_t> getAllPredicateIDs() const;
 

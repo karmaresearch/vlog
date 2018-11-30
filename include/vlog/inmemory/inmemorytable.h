@@ -81,6 +81,11 @@ class InmemoryTable : public EDBTable {
 
         InmemoryTable(PredId_t predid, std::vector<std::vector<std::string>> &entries, EDBLayer *layer);
 
+        InmemoryTable(PredId_t predid,
+                uint8_t arity,
+                std::vector<uint64_t> &entries,
+                EDBLayer *layer);
+
         uint8_t getArity() const;
 
         void query(QSQQuery *query, TupleTable *outputTable,

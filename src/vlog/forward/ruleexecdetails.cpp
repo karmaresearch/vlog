@@ -70,7 +70,7 @@ void RuleExecutionDetails::groupLiteralsBySharedVariables(std::vector<uint8_t> &
 
     for (std::vector<const Literal*>::iterator itr = set.begin(); itr != set.end();
             ++itr) {
-		const Literal *lit = *itr;
+        const Literal *lit = *itr;
         std::vector<uint8_t> sharedVars = lit->getSharedVars(startVars);
         if (sharedVars.size() > 0 || startVars.size() == 0) {
             //copy the remaining
@@ -306,7 +306,7 @@ break;
 }
 }*/
 
-void RuleExecutionDetails::createExecutionPlans() {
+void RuleExecutionDetails::createExecutionPlans(bool copyAllVars) {
     //Init
     std::vector<Literal> bl = rule.getBody();
     bodyLiterals.clear();
@@ -365,7 +365,7 @@ void RuleExecutionDetails::createExecutionPlans() {
                 itr != posIdbLiterals.end();
                 ++itr) {
             RuleExecutionPlan p;
-	    p.filterLastHashMap = false;
+            p.filterLastHashMap = false;
             p.dependenciesExtVars = dependenciesExtVars;
             size_t idx = 0;
 
@@ -403,7 +403,7 @@ void RuleExecutionDetails::createExecutionPlans() {
             //RuleExecutionDetails::checkWhetherEDBsRedundantHead(p, h);
 
             //Calculate all join coordinates
-            p.calculateJoinsCoordinates(heads);
+            p.calculateJoinsCoordinates(heads, copyAllVars);
 
             //New version. Should be able to catch everything
             for (int i = 0; i < p.plan.size(); ++i) {
@@ -429,8 +429,8 @@ void RuleExecutionDetails::createExecutionPlans() {
         //Create a single plan. Here they are all EDBs. So the ranges are all the same
         std::vector<const Literal*> v;
         RuleExecutionPlan p;
-	p.filterLastHashMap = false;
-	p.dependenciesExtVars = dependenciesExtVars;
+        p.filterLastHashMap = false;
+        p.dependenciesExtVars = dependenciesExtVars;
         for (std::vector<Literal>::const_iterator itr = bodyLiterals.begin();
                 itr != bodyLiterals.end();
                 ++itr) {
@@ -443,7 +443,7 @@ void RuleExecutionDetails::createExecutionPlans() {
             RuleExecutionDetails::checkFilteringStrategy(
                     bodyLiterals[bodyLiterals.size() - 1], heads[0], p);
         }
-        p.calculateJoinsCoordinates(heads);
+        p.calculateJoinsCoordinates(heads, copyAllVars);
         orderExecutions.push_back(p);
     }
 }

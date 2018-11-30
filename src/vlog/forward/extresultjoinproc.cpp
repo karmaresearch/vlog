@@ -4,9 +4,9 @@
 
 static bool isPresent(uint8_t el, std::vector<uint8_t> &v) {
     for (int i = 0; i < v.size(); i++) {
-	if (el == v[i]) {
-	    return true;
-	}
+        if (el == v[i]) {
+            return true;
+        }
     }
     return false;
 }
@@ -22,10 +22,11 @@ ExistentialRuleProcessor::ExistentialRuleProcessor(
         const bool addToEndTable,
         const int nthreads,
         SemiNaiver *sn,
-        std::shared_ptr<ChaseMgmt> chaseMgmt) :
+        std::shared_ptr<ChaseMgmt> chaseMgmt,
+        bool filterRecursive) :
     FinalRuleProcessor(posFromFirst, posFromSecond, listDerivations,
             heads, detailsRule, ruleExecOrder, iteration,
-            addToEndTable, nthreads, sn), chaseMgmt(chaseMgmt) {
+            addToEndTable, nthreads, sn), chaseMgmt(chaseMgmt), filterRecursive(filterRecursive) {
         this->sn = sn;
 
         //When I consolidate, should I assign values to the existential columns?
@@ -53,10 +54,10 @@ ExistentialRuleProcessor::ExistentialRuleProcessor(
                         }
                         posExtColumns[term.getId()].push_back(count);
                     } else {
-			if (! isPresent(term.getId(),varsUsedForExt)) {
-			    varsUsedForExt.push_back(term.getId());
-			    colsForExt.push_back(count);
-			}
+                        if (! isPresent(term.getId(),varsUsedForExt)) {
+                            varsUsedForExt.push_back(term.getId());
+                            colsForExt.push_back(count);
+                        }
                         posKnownColumns[nKnownColumns++] = count;
                     }
                 }
@@ -176,6 +177,46 @@ void ExistentialRuleProcessor::filterDerivations(FCTable *t,
         outputProc.push_back(el);
 }
 
+// Filters out rows with recursive terms
+void ExistentialRuleProcessor::retainNonRecursive(
+        uint64_t &sizecolumns,
+        std::vector<std::shared_ptr<Column>> &c) {
+    std::vector<ColumnWriter> writers;
+    std::vector<std::unique_ptr<ColumnReader>> readers;
+    for(uint8_t i = 0; i < c.size(); ++i) {
+        readers.push_back(c[i]->getReader());
+    }
+    writers.resize(c.size());
+    uint64_t idxs = 0;
+    uint64_t cols[256];
+    for(uint64_t i = 0; i < sizecolumns; ++i) {
+        bool copy = true;
+        for(uint8_t j = 0; copy && j < c.size(); ++j) {
+            if (!readers[j]->hasNext()) {
+                throw 10;
+            }
+            cols[j] = readers[j]->next();
+            if (chaseMgmt->checkRecursive(cols[j])) {
+                copy = false;
+                break;
+            }
+        }
+        if (copy) {
+            for(uint8_t j = 0; j < c.size(); ++j) {
+                writers[j].add(cols[j]);
+            }
+        }
+    }
+    //Copy back the retricted columns
+    for(uint8_t i = 0; i < c.size(); ++i) {
+        c[i] = writers[i].getColumn();
+    }
+    sizecolumns = 0;
+    if (c.size() > 0) {
+        sizecolumns = c[0]->size();
+    }
+}
+
 void ExistentialRuleProcessor::retainNonExisting(
         std::vector<uint64_t> &filterRows,
         uint64_t &sizecolumns,
@@ -272,32 +313,44 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     }
 
     if (chaseMgmt->isRestricted()) {
-	std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
-        uint8_t count = 0;
-        for(const auto &at : atomTables) {
-            const auto &h = at->getLiteral();
-            FCTable *t = sn->getTable(h.getPredicate().getId(),
-                    h.getPredicate().getCardinality());
-            filterDerivations(h, t, row, count, ruleDetails, nKnownColumns,
-                    posKnownColumns, c, sizecolumns, filterRows);
-            count += h.getTupleSize();
+        if (chaseMgmt->isCheckCyclicMode()) {
+            RMFA_check();
+        } else {
+            std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
+            uint8_t count = 0;
+            for(const auto &at : atomTables) {
+                const auto &h = at->getLiteral();
+                FCTable *t = sn->getTable(h.getPredicate().getId(),
+                        h.getPredicate().getCardinality());
+                filterDerivations(h, t, row, count, ruleDetails, nKnownColumns,
+                        posKnownColumns, c, sizecolumns, filterRows);
+                count += h.getTupleSize();
+            }
+
+            if (filterRows.size() == sizecolumns * atomTables.size()) {
+                return; //every substitution already exists in the database. Nothing
+                //new can be derived.
+            }
+
+            //Filter out the potential values for the derivation
+            //(only restricted chase can do it)
+            if (!filterRows.empty()) {
+                retainNonExisting(filterRows, sizecolumns, c);
+            }
         }
+    }
 
-	if (filterRows.size() == sizecolumns * atomTables.size()) {
-	    return; //every substitution already exists in the database. Nothing
-	    //new can be derived.
-	}
+    if (filterRecursive) {
+        retainNonRecursive(sizecolumns, c);
+    }
 
-	//Filter out the potential values for the derivation
-	//(only restricted chase can do it)
-	if (!filterRows.empty()) {
-	    retainNonExisting(filterRows, sizecolumns, c);
-	}
+    if (sizecolumns == 0) {
+        return;
     }
 
     std::vector<std::shared_ptr<Column>> knownColumns;
     for(int i = 0; i < colsForExt.size(); ++i) {
-	knownColumns.push_back(c[colsForExt[i]]);
+        knownColumns.push_back(c[colsForExt[i]]);
     }
 
     //Create existential columns
@@ -305,43 +358,43 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     std::map<uint8_t, std::shared_ptr<Column>> extvars;
     uint8_t count = 0;
     for(const auto &at : atomTables) {
-	std::vector<std::shared_ptr<Column>> cols;
-	const auto &literal = at->getLiteral();
-	for(uint8_t i = 0; i < literal.getTupleSize(); ++i) {
-	    // TODO: deal with possible constant fields?
-	    auto t = literal.getTermAtPos(i);
-	    bool found = false;
-	    for(int j = 0; j < nKnownColumns; ++j) {
-		if (posKnownColumns[j].second == i + count) {
-		    found = true;
-		    cols.push_back(c[posKnownColumns[j].second]);
-		    break;
-		}
-	    }
-	    //The column is existential
-	    if (!found) {
-		if (!extvars.count(t.getId())) { //Must be existential
-		    //The body might contain more variables than what
-		    //is needed to create existential columns
-		    //First I copy the columns from the body of the rule
+        std::vector<std::shared_ptr<Column>> cols;
+        const auto &literal = at->getLiteral();
+        for(uint8_t i = 0; i < literal.getTupleSize(); ++i) {
+            // TODO: deal with possible constant fields?
+            auto t = literal.getTermAtPos(i);
+            bool found = false;
+            for(int j = 0; j < nKnownColumns; ++j) {
+                if (posKnownColumns[j].second == i + count) {
+                    found = true;
+                    cols.push_back(c[posKnownColumns[j].second]);
+                    break;
+                }
+            }
+            //The column is existential
+            if (!found) {
+                if (!extvars.count(t.getId())) { //Must be existential
+                    //The body might contain more variables than what
+                    //is needed to create existential columns
+                    //First I copy the columns from the body of the rule
 
-		    auto extcolumn = chaseMgmt->getNewOrExistingIDs(
-			    ruleDetails->rule.getId(),
-			    t.getId(),
-			    knownColumns,
-			    sizecolumns);
-		    extvars.insert(std::make_pair(t.getId(), extcolumn));
-		}
-		cols.push_back(extvars[t.getId()]);
-	    }
-	}
-	at->addColumns(blockid, cols, unique, sorted);
-	count += literal.getTupleSize();
+                    auto extcolumn = chaseMgmt->getNewOrExistingIDs(
+                            ruleDetails->rule.getId(),
+                            t.getId(),
+                            knownColumns,
+                            sizecolumns);
+                    extvars.insert(std::make_pair(t.getId(), extcolumn));
+                }
+                cols.push_back(extvars[t.getId()]);
+            }
+        }
+        at->addColumns(blockid, cols, unique, sorted);
+        count += literal.getTupleSize();
     }
 }
 
 void ExistentialRuleProcessor::processResults(const int blockid, const Term_t *first,
-	FCInternalTableItr* second, const bool unique) {
+        FCInternalTableItr* second, const bool unique) {
     copyRawRow(first, second);
     replaceExtColumns = true;
     if (!tmpRelation) {
@@ -370,15 +423,15 @@ void ExistentialRuleProcessor::processResults(const int blockid,
     tmpRelation->addRow(row);
 }
 
-void ExistentialRuleProcessor::processResults(std::vector<int> &blockid, Term_t *p, 
-	std::vector<bool> &unique, std::mutex *m) {
+void ExistentialRuleProcessor::processResults(std::vector<int> &blockid, Term_t *p,
+        std::vector<bool> &unique, std::mutex *m) {
     //TODO: Chase...
     LOG(ERRORL) << "Not implemented yet";
     throw 10;
 }
 
 void ExistentialRuleProcessor::processResults(const int blockid, FCInternalTableItr *first,
-	FCInternalTableItr* second, const bool unique) {
+        FCInternalTableItr* second, const bool unique) {
     for (uint32_t i = 0; i < nCopyFromFirst; ++i) {
         row[posFromFirst[i].first] = first->getCurrentValue(posFromFirst[i].second);
     }
@@ -416,27 +469,39 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     }
 
     if (chaseMgmt->isRestricted()) {
-	std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
-        uint8_t count = 0;
-        for(const auto &at : atomTables) {
-            const auto &h = at->getLiteral();
-            FCTable *t = sn->getTable(h.getPredicate().getId(),
-                    h.getPredicate().getCardinality());
-            filterDerivations(h, t, row, count, ruleDetails, nCopyFromSecond,
-                    posFromSecond, c, sizecolumns, filterRows);
-            count += h.getTupleSize();
+        if (chaseMgmt->isCheckCyclicMode()) {
+            RMFA_check();
+        } else {
+            std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
+            uint8_t count = 0;
+            for(const auto &at : atomTables) {
+                const auto &h = at->getLiteral();
+                FCTable *t = sn->getTable(h.getPredicate().getId(),
+                        h.getPredicate().getCardinality());
+                filterDerivations(h, t, row, count, ruleDetails, nCopyFromSecond,
+                        posFromSecond, c, sizecolumns, filterRows);
+                count += h.getTupleSize();
+            }
+
+            if (filterRows.size() == sizecolumns * atomTables.size()) {
+                return; //every substitution already exists in the database. Nothing
+                //new can be derived.
+            }
+
+            //Filter out the potential values for the derivation
+            //(only restricted chase can do it)
+            if (!filterRows.empty()) {
+                retainNonExisting(filterRows, sizecolumns, c);
+            }
         }
+    }
 
-	if (filterRows.size() == sizecolumns * atomTables.size()) {
-	    return; //every substitution already exists in the database. Nothing
-	    //new can be derived.
-	}
+    if (filterRecursive) {
+        retainNonRecursive(sizecolumns, c);
+    }
 
-	//Filter out the potential values for the derivation
-	//(only restricted chase can do it)
-	if (!filterRows.empty()) {
-	    retainNonExisting(filterRows, sizecolumns, c);
-	}
+    if (sizecolumns == 0) {
+        return;
     }
 
     //Create existential columns store them in a vector with the corresponding
@@ -476,19 +541,19 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     //Now that the columns are sorted, I no longer care
                     //about the indices
                     std::vector<std::shared_ptr<Column>> depc;
-		    //A column may be used more than once in the head. Filter duplicates out.
-		    //Otherwise, an assert goes off in getNewOrExistingIDs --Ceriel
+                    //A column may be used more than once in the head. Filter duplicates out.
+                    //Otherwise, an assert goes off in getNewOrExistingIDs --Ceriel
                     for(auto &el : depc_t) {
-			bool present = false;
-			for (auto &l : depc) {
-			    if (el.second == l) {
-				present = true;
-				break;
-			    }
-			}
-			if (! present) {
-			    depc.push_back(el.second);
-			}
+                        bool present = false;
+                        for (auto &l : depc) {
+                            if (el.second == l) {
+                                present = true;
+                                break;
+                            }
+                        }
+                        if (! present) {
+                            depc.push_back(el.second);
+                        }
                     }
                     auto extcolumn = chaseMgmt->getNewOrExistingIDs(
                             ruleDetails->rule.getId(),
@@ -545,6 +610,106 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     }
 }
 
+void ExistentialRuleProcessor::RMFA_computeBodyAtoms(std::vector<Literal> &output,
+        uint64_t *row) {
+    const RuleExecutionPlan &plan = ruleDetails->orderExecutions[ruleExecOrder];
+    auto bodyAtoms = plan.plan;
+    int idx = 0;
+    for(const auto &atom : bodyAtoms) {
+        VTuple tuple(atom->getTuple());
+        auto v2p = plan.vars2pos[idx];
+        for(int i = 0; i < v2p.size(); ++i) {
+            auto pair = v2p[i];
+            tuple.set(VTerm(0, row[pair.second]), pair.first);
+        }
+        output.push_back(Literal(atom->getPredicate(), tuple));
+        idx++;
+    }
+}
+
+std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
+        std::vector<Literal> &input) {
+    //Populate the EDB layer
+    EDBLayer layer(sn->getEDBLayer());
+    std::map<PredId_t, std::vector<uint64_t>> edbPredicates;
+    std::map<PredId_t, std::vector<uint64_t>> idbPredicates;
+    for(const auto &literal : input) {
+        auto predid = literal.getPredicate().getId();
+        if (literal.getPredicate().getType() != EDB) {
+            if (!idbPredicates.count(predid)) {
+                idbPredicates.insert(std::make_pair(predid, std::vector<uint64_t>()));
+            }
+            for(uint8_t i = 0; i < literal.getTupleSize(); ++i) {
+                auto t = literal.getTermAtPos(i);
+                idbPredicates[predid].push_back(t.getValue());
+            }
+        } else {
+            if (!edbPredicates.count(predid)) {
+                edbPredicates.insert(std::make_pair(predid, std::vector<uint64_t>()));
+            }
+            for(uint8_t i = 0; i < literal.getTupleSize(); ++i) {
+                auto t = literal.getTermAtPos(i);
+                edbPredicates[predid].push_back(t.getValue());
+            }
+        }
+    }
+    for(auto &pair : edbPredicates) {
+        uint8_t arity = sn->getEDBLayer().getPredArity(pair.first);
+        layer.addInmemoryTable(pair.first, arity, pair.second);
+    }
+
+    //Launch the semi-naive evaluation
+    Program *program = sn->getProgram();
+    std::unique_ptr<SemiNaiver> lsn(new SemiNaiver(sn->getDatalogRules(),
+                layer, program, true, true, false, 1, false));
+
+    //Populate the IDB layer
+    for(auto &pair : idbPredicates) {
+        Predicate pred = sn->getProgram()->getPredicate(pair.first);
+        const uint8_t card = pred.getCardinality();
+
+        //Construct the table
+        SegmentInserter inserter(card);
+        auto els = pair.second.data();
+        for(uint64_t i = 0; i < pair.second.size(); i += card) {
+            inserter.addRow(els + i);
+        }
+
+        //Populate the table
+        std::shared_ptr<const FCInternalTable> ltable(
+                new InmemoryFCInternalTable(card,
+                    0, false, inserter.getSegment()));
+
+        //Define a generic query
+        VTuple tuple(card);
+        for(uint8_t i = 0; i < card; ++i) {
+            tuple.set(VTerm(i, 0), i);
+        }
+        Literal query(pred, tuple);
+        FCBlock block(0, ltable, query, 0, NULL, 0, true);
+        FCTable *table = lsn->getTable(pair.first, card);
+        table->addBlock(block);
+    }
+
+    //Launch the materialization
+    lsn->run();
+    return lsn;
+}
+
+void ExistentialRuleProcessor::RMFA_check() {
+    //In this case I invoke the code needed for the RMFA
+    std::vector<Literal> input; //"input" corresponds to B_\rho,\sigma in the paper
+    //First I need to add to body atoms
+    RMFA_computeBodyAtoms(input, row);
+
+    //TODO: Then I need to add all facts relevant to produce the function terms
+
+    //Finally I need to saturate "input" with the datalog rules
+    std::unique_ptr<SemiNaiver> n = RMFA_saturateInput(input);
+
+    //TODO: Do the check over the saturated output
+}
+
 void ExistentialRuleProcessor::consolidate(const bool isFinished) {
     if (replaceExtColumns && tmpRelation != NULL) {
         //Populate the allColumns vector with known columns and constants
@@ -554,7 +719,7 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
         uint64_t nrows = unfilterdSegment->getNRows();
         for(uint8_t i = 0; i < nKnownColumns; ++i) {
             allColumns[posKnownColumns[i]] = unfilterdSegment->getColumn(
-                        posKnownColumns[i]);
+                    posKnownColumns[i]);
         }
         //Add the constants in the form of columns
         for(int i = 0; i < nConstantColumns; ++i) {
@@ -587,20 +752,26 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                         }
                     }
                 }
-                FCTable *t = sn->getTable(h.getPredicate().getId(),
-                        h.getPredicate().getCardinality());
-                filterDerivations(t, tobeRetained,
-                        columnsToCheck,
-                        filterRows);
+
+
+                if (chaseMgmt->isCheckCyclicMode()) {
+                    RMFA_check();
+                } else {
+                    FCTable *t = sn->getTable(h.getPredicate().getId(),
+                            h.getPredicate().getCardinality());
+                    filterDerivations(t, tobeRetained,
+                            columnsToCheck,
+                            filterRows);
+                }
                 count += h.getTupleSize();
             }
+
             if (filterRows.size() == nrows * atomTables.size()) {
-		tmpRelation = std::unique_ptr<SegmentInserter>();
+                tmpRelation = std::unique_ptr<SegmentInserter>();
                 return; //every substitution already exists in the database.
                 // Nothing new can be derived.
             }
-
-            ////Filter out only valid subs
+            //Filter out only valid subs
             if (!filterRows.empty()) {
                 retainNonExisting(filterRows, nrows, allColumns);
             }
@@ -611,6 +782,14 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
         std::vector<std::shared_ptr<Column>> knownColumns;
         for(int i = 0; i < colsForExt.size(); ++i) {
             knownColumns.push_back(allColumns[colsForExt[i]]);
+        }
+
+        if (filterRecursive) {
+            retainNonRecursive(nrows, knownColumns);
+        }
+
+        if (nrows == 0) {
+            return;
         }
 
         for(auto &el : posExtColumns) {
@@ -624,16 +803,16 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                 allColumns[pos] = extcolumn;
             }
         }
-/*        LOG(DEBUGL) << "N. rows " << nrows;
-        for(int i = 0; i < allColumns.size(); ++i) {
-            auto reader = allColumns[i]->getReader();
-            for(int j = 0; j < 10; ++j) {
-                reader->hasNext();
-                auto v = reader->next();
-                cout << v << "\t";
-            }
-            cout << std::endl;
-        }*/
+        /*        LOG(DEBUGL) << "N. rows " << nrows;
+                  for(int i = 0; i < allColumns.size(); ++i) {
+                  auto reader = allColumns[i]->getReader();
+                  for(int j = 0; j < 10; ++j) {
+                  reader->hasNext();
+                  auto v = reader->next();
+                  cout << v << "\t";
+                  }
+                  cout << std::endl;
+                  }*/
 
         //Add the columns to the head atoms
         int count = 0;
