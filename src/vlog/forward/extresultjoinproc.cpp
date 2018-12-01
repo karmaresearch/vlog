@@ -509,9 +509,9 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                 }
 
                 std::vector<uint8_t> columnsToCheck;
-                  for(uint8_t j = 0; j < nCopyFromSecond; ++j) {
-                  columnsToCheck.push_back(posFromSecond[j].second);
-                  }
+                for(uint8_t j = 0; j < nCopyFromSecond; ++j) {
+                    columnsToCheck.push_back(posFromSecond[j].second);
+                }
 
                 for(size_t i = 0; i < sizecolumns; ++i) {
                     //Fill the row
@@ -758,8 +758,31 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row, const Literal &headLite
     //Finally I need to saturate "input" with the datalog rules
     std::unique_ptr<SemiNaiver> n = RMFA_saturateInput(input);
 
-    //TODO: Check if the head is blocked in this set
-    bool found = false;
+    //Check if the head is blocked in this set
+    bool found = false; //If found = true, then the rule application is blocked
+    auto itr = n->getTable(headLiteral.getPredicate().getId());
+    while(!itr.isEmpty()) {
+        auto table = itr.getCurrentTable();
+        //Iterate over the content of the table
+        auto tbItr = table->getIterator();
+        while (tbItr->hasNext()) {
+            tbItr->next();
+            found = true;
+            for(uint8_t j = 0; j < columnsToCheck.size(); ++j) {
+                auto cId = columnsToCheck[j];
+                if (itr->getCurrentValue(cId) != headrow[cId]) {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) {
+                break;
+            }
+        }
+        if (found)
+            break;
+        itr.moveNextCount();
+    }
     return found;
 }
 
@@ -819,9 +842,9 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                         segmentReaders.push_back(segmentColumns.back()->getReader());
                     }
                     std::vector<std::unique_ptr<ColumnReader>> headReaders;
-                      for(uint8_t i = 0; i < allColumns.size(); ++i) {
-                      headReaders.push_back(allColumns[i]->getReader());
-                      }
+                    for(uint8_t i = 0; i < allColumns.size(); ++i) {
+                        headReaders.push_back(allColumns[i]->getReader());
+                    }
                     //Check the rows, one by one
                     for(size_t i = 0; i < nrows; ++i) {
                         //Fill the row
@@ -833,13 +856,13 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                         }
                         //Fill the potential head
                         for(uint8_t j = 0; j < allColumns.size(); ++j) {
-                          if (!headReaders[j]->hasNext()) {
-                          LOG(ERRORL) << "This should not happen";
-                          }
-                          headrow[j] = headReaders[j]->next();
-                          }
+                            if (!headReaders[j]->hasNext()) {
+                                LOG(ERRORL) << "This should not happen";
+                            }
+                            headrow[j] = headReaders[j]->next();
+                        }
                         if (RMFA_check(tmprow.get(), h, headrow.get(),
-                                                        columnsToCheck)) { //Is it blocked?
+                                    columnsToCheck)) { //Is it blocked?
                             filterRows.push_back(i);
                         }
                     }
