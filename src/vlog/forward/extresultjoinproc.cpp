@@ -328,10 +328,10 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     columnReaders.push_back(c[i]->getReader());
                 }
 
-                //std::vector<uint8_t> posToCheck;
-                //for(uint8_t j = 0; j < nKnownColumns; ++j) {
-                //    posToCheck.push_back(posKnownColumns[j].first);
-                //}
+                std::vector<uint8_t> posToCheck;
+                for(uint8_t j = 0; j < nKnownColumns; ++j) {
+                    posToCheck.push_back(posKnownColumns[j].first);
+                }
 
                 for(size_t i = 0; i < sizecolumns; ++i) {
                     //Fill the row
@@ -341,7 +341,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                         }
                         tmprow[j] = columnReaders[j]->next();
                     }
-                    if (RMFA_check(tmprow.get(), h/*, tmprow.get(), posToCheck*/)) { //Is blocked
+                    if (RMFA_check(tmprow.get(), h, tmprow.get(), posToCheck)) { //Is blocked
                         filterRows.push_back(i);
                     }
                 }
@@ -508,10 +508,10 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     columnReaders.push_back(c[i]->getReader());
                 }
 
-                /*std::vector<uint8_t> columnsToCheck;
-                for(uint8_t j = 0; j < nCopyFromSecond; ++j) {
-                    columnsToCheck.push_back(posFromSecond[j].second);
-                }*/
+                std::vector<uint8_t> columnsToCheck;
+                  for(uint8_t j = 0; j < nCopyFromSecond; ++j) {
+                  columnsToCheck.push_back(posFromSecond[j].second);
+                  }
 
                 for(size_t i = 0; i < sizecolumns; ++i) {
                     //Fill the row
@@ -521,7 +521,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                         }
                         tmprow[j] = columnReaders[j]->next();
                     }
-                    if (RMFA_check(tmprow.get(), h/*, tmprow.get(), columnsToCheck*/)) { //Is blocked
+                    if (RMFA_check(tmprow.get(), h, tmprow.get(), columnsToCheck)) { //Is blocked
                         filterRows.push_back(i);
                     }
                 }
@@ -746,8 +746,8 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
     return lsn;
 }
 
-bool ExistentialRuleProcessor::RMFA_check(uint64_t *row, const Literal &headLiteral/*,
-       uint64_t *headrow, std::vector<uint8_t> &columnsToCheck*/) {
+bool ExistentialRuleProcessor::RMFA_check(uint64_t *row, const Literal &headLiteral,
+        uint64_t *headrow, std::vector<uint8_t> &columnsToCheck) {
     //In this case I invoke the code needed for the RMFA
     std::vector<Literal> input; //"input" corresponds to B_\rho,\sigma in the paper
     //First I need to add to body atoms
@@ -758,10 +758,8 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row, const Literal &headLite
     //Finally I need to saturate "input" with the datalog rules
     std::unique_ptr<SemiNaiver> n = RMFA_saturateInput(input);
 
-    //TODO: Check if there are cyclic terms in the saturated output, if so the
-    //rule is blocked
+    //TODO: Check if the head is blocked in this set
     bool found = false;
-
     return found;
 }
 
@@ -812,18 +810,18 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                     const uint8_t segmentSize = unfilterdSegment->getNColumns();
                     std::unique_ptr<uint64_t[]> tmprow(
                             new uint64_t[segmentSize]);
-                    //std::unique_ptr<uint64_t[]> headrow(
-                    //        new uint64_t[rowsize]);
+                    std::unique_ptr<uint64_t[]> headrow(
+                            new uint64_t[rowsize]);
                     std::vector<std::shared_ptr<Column>> segmentColumns;
                     std::vector<std::unique_ptr<ColumnReader>> segmentReaders;
                     for(uint8_t i = 0; i < segmentSize; ++i) {
                         segmentColumns.push_back(unfilterdSegment->getColumn(i));
                         segmentReaders.push_back(segmentColumns.back()->getReader());
                     }
-                    /*std::vector<std::unique_ptr<ColumnReader>> headReaders;
-                    for(uint8_t i = 0; i < allColumns.size(); ++i) {
-                        headReaders.push_back(allColumns[i]->getReader());
-                    }*/
+                    std::vector<std::unique_ptr<ColumnReader>> headReaders;
+                      for(uint8_t i = 0; i < allColumns.size(); ++i) {
+                      headReaders.push_back(allColumns[i]->getReader());
+                      }
                     //Check the rows, one by one
                     for(size_t i = 0; i < nrows; ++i) {
                         //Fill the row
@@ -834,14 +832,14 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                             tmprow[j] = segmentReaders[j]->next();
                         }
                         //Fill the potential head
-                        /*for(uint8_t j = 0; j < allColumns.size(); ++j) {
-                            if (!headReaders[j]->hasNext()) {
-                                LOG(ERRORL) << "This should not happen";
-                            }
-                            headrow[j] = headReaders[j]->next();
-                        }*/
-                        if (RMFA_check(tmprow.get(), h/*, headrow.get(),
-                                    columnsToCheck*/)) { //Is it blocked?
+                        for(uint8_t j = 0; j < allColumns.size(); ++j) {
+                          if (!headReaders[j]->hasNext()) {
+                          LOG(ERRORL) << "This should not happen";
+                          }
+                          headrow[j] = headReaders[j]->next();
+                          }
+                        if (RMFA_check(tmprow.get(), h, headrow.get(),
+                                                        columnsToCheck)) { //Is it blocked?
                             filterRows.push_back(i);
                         }
                     }

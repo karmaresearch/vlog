@@ -49,8 +49,8 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 uint64_t &sizecolumns,
                 std::vector<std::shared_ptr<Column>> &c);
 
-        bool RMFA_check(uint64_t *row, const Literal &headLiteral/*,
-                uint64_t *headrow, std::vector<uint8_t> &columnsToCheck*/);
+        bool RMFA_check(uint64_t *row, const Literal &headLiteral,
+                uint64_t *headrow, std::vector<uint8_t> &columnsToCheck);
 
         void RMFA_computeBodyAtoms(std::vector<Literal> &output,
                 uint64_t *row);
