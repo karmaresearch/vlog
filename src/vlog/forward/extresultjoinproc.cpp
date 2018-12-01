@@ -770,7 +770,7 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row, const Literal &headLite
             found = true;
             for(uint8_t j = 0; j < columnsToCheck.size(); ++j) {
                 auto cId = columnsToCheck[j];
-                if (itr->getCurrentValue(cId) != headrow[cId]) {
+                if (tbItr->getCurrentValue(cId) != headrow[cId]) {
                     found = false;
                     break;
                 }
