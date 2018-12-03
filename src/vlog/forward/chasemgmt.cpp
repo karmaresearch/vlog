@@ -1,20 +1,12 @@
 #include <vlog/chasemgmt.h>
 
-#define RULE_MASK INT64_C(0xffffff0000000000)
-#define RULE_SHIFT(x) (((uint64_t) ((x) + 1)) << 40)
-#define GET_RULE(x) (((x) >> 40) - 1)
-#define VAR_MASK INT64_C(0x0ff00000000)
-#define VAR_SHIFT(v) ((uint64_t) (v) << 32)
-#define GET_VAR(v) (((v) & VAR_MASK) >> 32)
-#define RULEVARMASK (RULE_MASK|VAR_MASK)
-
 //************** ROWS ***************
 uint64_t ChaseMgmt::Rows::addRow(uint64_t* row) {
     LOG(TRACEL) << "Addrow: " << row[0];
     if (!currentblock || blockCounter >= SIZE_BLOCK) {
         //Create a new block
-        std::unique_ptr<uint64_t> n =
-            std::unique_ptr<uint64_t>(
+        std::unique_ptr<uint64_t[]> n =
+            std::unique_ptr<uint64_t[]>(
                     new uint64_t[sizerow * SIZE_BLOCK]);
         currentblock = n.get();
         blocks.push_back(std::move(n));
@@ -43,6 +35,14 @@ bool ChaseMgmt::Rows::existingRow(uint64_t *row, uint64_t &value) {
     }
     return false;
 }
+
+uint64_t *ChaseMgmt::Rows::getRow(size_t id) {
+    uint64_t blocknr = id / SIZE_BLOCK;
+    uint64_t offset = id % SIZE_BLOCK;
+    auto &block_content = blocks[blocknr];
+    return block_content.get() + offset * sizerow;
+}
+
 //************** END ROWS *************
 
 //************** RULE CONTAINER ***************
@@ -53,7 +53,8 @@ ChaseMgmt::Rows *ChaseMgmt::RuleContainer::getRows(uint8_t var) {
         // The variable is encoded in the space between the rule ID and the
         // counter ID.
         startCounter += VAR_SHIFT(var);
-        vars2rows.insert(std::make_pair(var, Rows(startCounter, sizerow)));
+        vars2rows.insert(std::make_pair(var, Rows(startCounter, sizerow,
+                        dependencies[var])));
     }
     return &vars2rows.find(var)->second;
 }
@@ -79,7 +80,8 @@ ChaseMgmt::ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
         uint64_t ruleBaseCounter = RULE_SHIFT(r.rule.getId());
         this->rules[r.rule.getId()] = std::unique_ptr<ChaseMgmt::RuleContainer>(
                 new ChaseMgmt::RuleContainer(ruleBaseCounter,
-                    r.orderExecutions[0].dependenciesExtVars));
+                    r.orderExecutions[0].dependenciesExtVars,
+                    &r.rule));
     }
 }
 

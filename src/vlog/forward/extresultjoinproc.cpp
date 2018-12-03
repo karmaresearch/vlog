@@ -660,7 +660,8 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     }
 }
 
-void ExistentialRuleProcessor::RMFA_computeBodyAtoms(std::vector<Literal> &output,
+void ExistentialRuleProcessor::RMFA_computeBodyAtoms(
+        std::vector<Literal> &output,
         uint64_t *row) {
     const RuleExecutionPlan &plan = ruleDetails->orderExecutions[ruleExecOrder];
     auto bodyAtoms = plan.plan;
@@ -746,14 +747,77 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
     return lsn;
 }
 
-bool ExistentialRuleProcessor::RMFA_check(uint64_t *row, const Literal &headLiteral,
+void ExistentialRuleProcessor::RMFA_enhanceFunctionTerms(
+        std::vector<Literal> &output,
+        uint64_t &startFreshIDs,
+        size_t startOutput) {
+    size_t oldsize = output.size();
+    //Check every fact until oldsize. If there is a function term, get also
+    //all related facts
+    for(size_t i = startOutput; i < oldsize; ++i) {
+        const auto &literal = output[i];
+        for(uint8_t j = 0; j < literal.getTupleSize(); ++j) {
+            const auto &term = literal.getTermAtPos(j);
+            if (term.getValue() != COUNTER(term.getValue())) {
+                //This is a function term. Get rule ID
+                const uint64_t ruleID = GET_RULE(term.getValue());
+                auto *ruleContainer = chaseMgmt->getRuleContainer(ruleID);
+                //Get var ID
+                const uint64_t varID = GET_VAR(term.getValue());
+                //Get the arguments of the function term from the chase mgmt
+                auto *rows = ruleContainer->getRows(varID);
+                const uint64_t localCounter = COUNTER(term.getValue());
+                const uint64_t *values = rows->getRow(localCounter);
+                const uint64_t nvalues = rows->getSizeRow();
+                //Map them to variables
+                const auto &nameVars = rows->getNameArgVars();
+                std::map<uint8_t, uint64_t> mappings;
+                for(uint8_t i = 0; i < nvalues; ++i) {
+                    mappings.insert(std::make_pair(nameVars[i], values[i]));
+                }
+                //Materialize the remaining facts giving fresh IDs to
+                //the rem. variables
+                auto const *rule = ruleContainer->getRule();
+                for(const auto &literal : rule->getBody()) {
+                    VTuple t(literal.getTupleSize());
+                    for(uint8_t m = 0; m < literal.getTupleSize(); ++m) {
+                        const VTerm term = literal.getTermAtPos(m);
+                        if (term.isVariable()) {
+                            uint8_t varID = term.getId();
+                            if (!mappings.count(varID)) {
+                                mappings.insert(
+                                        std::make_pair(varID,
+                                            startFreshIDs++));
+                            }
+                            t.set(VTerm(0, mappings[varID]), m);
+                        } else {
+                            t.set(term, m);
+                        }
+                    }
+                    output.push_back(Literal(literal.getPredicate(), t));
+                }
+            }
+        }
+    }
+    //Recursively apply the function if there are new literals
+    if (output.size() > oldsize) {
+        RMFA_enhanceFunctionTerms(output, startFreshIDs, oldsize);
+    }
+}
+
+bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
+        const Literal &headLiteral,
         uint64_t *headrow, std::vector<uint8_t> &columnsToCheck) {
+    //Get a starting value for the fresh IDs
+    uint64_t freshIDs = 0; //TODO
+
     //In this case I invoke the code needed for the RMFA
     std::vector<Literal> input; //"input" corresponds to B_\rho,\sigma in the paper
     //First I need to add to body atoms
     RMFA_computeBodyAtoms(input, row);
 
-    //TODO: Then I need to add all facts relevant to produce the function terms
+    //Then I need to add all facts relevant to produce the function terms
+    RMFA_enhanceFunctionTerms(input, freshIDs);
 
     //Finally I need to saturate "input" with the datalog rules
     std::unique_ptr<SemiNaiver> n = RMFA_saturateInput(input);
