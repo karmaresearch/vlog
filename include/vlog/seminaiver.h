@@ -51,6 +51,7 @@ class SemiNaiver {
         bool restrictedChase;
         bool checkCyclicTerms;
         bool foundCyclicTerms;
+        bool ignoreExistentialRules;
         std::shared_ptr<ChaseMgmt> chaseMgmt;
 
         std::chrono::system_clock::time_point startTime;
@@ -121,7 +122,6 @@ class SemiNaiver {
         FCTable *predicatesTables[MAX_NPREDS];
         EDBLayer &layer;
         Program *program;
-        std::vector<Rule> datalogRules; //Needed for RMFA check
         std::vector<RuleExecutionDetails> allIDBRules;
         size_t iteration;
         int nthreads;
@@ -149,19 +149,23 @@ class SemiNaiver {
         VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
-                bool restrictedChase, int nthreads, bool shuffleRules);
+                bool restrictedChase, int nthreads, bool shuffleRules,
+                bool ignoreExistentialRules);
 
         //disable restricted chase
         VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
-                int nthreads, bool shuffleRules) :
+                int nthreads, bool shuffleRules,
+                bool ignoreExistentialRules) :
             SemiNaiver(ruleset, layer, program, opt_intersect, opt_filtering,
-                    multithreaded, false, nthreads, shuffleRules) {
+                    multithreaded, false, nthreads, shuffleRules,
+                    ignoreExistentialRules) {
             }
 
-        VLIBEXP void run(unsigned long *timeout = NULL, bool checkCyclicTerms = false) {
-            run(0, 1, timeout, checkCyclicTerms);
+        VLIBEXP void run(unsigned long *timeout = NULL,
+                bool checkCyclicTerms = false) {
+            run(0, 1, timeout, checkCyclicTerms, -1);
         }
 
         bool opt_filter() {
@@ -174,8 +178,11 @@ class SemiNaiver {
 
         virtual FCTable *getTable(const PredId_t pred, const uint8_t card);
 
-        VLIBEXP void run(size_t lastIteration, size_t iteration, unsigned long *timeout = NULL,
-                bool checkCyclicTerms = false, int singleRule = -1);
+        VLIBEXP void run(size_t lastIteration,
+                size_t iteration,
+                unsigned long *timeout = NULL,
+                bool checkCyclicTerms = false,
+                int singleRule = -1);
 
         VLIBEXP void storeOnFile(std::string path, const PredId_t pred, const bool decompress,
                 const int minLevel, const bool csv);
@@ -201,10 +208,6 @@ class SemiNaiver {
 
         Program *getProgram() {
             return program;
-        }
-
-        std::vector<Rule> &getDatalogRules() {
-            return datalogRules;
         }
 
         bool isFoundCyclicTerms() {

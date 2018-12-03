@@ -339,6 +339,11 @@ class Rule {
                 checkRule();
             }
 
+        Rule(uint32_t ruleId, Rule &r) : ruleId(ruleId),
+            heads(r.heads), body(r.body), _isRecursive(r._isRecursive),
+            existential(r.existential) {
+        }
+
         Rule createAdornment(uint8_t headAdornment) const;
 
         bool isRecursive() const {

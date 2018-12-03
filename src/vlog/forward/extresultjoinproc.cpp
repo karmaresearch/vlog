@@ -711,8 +711,8 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
 
     //Launch the semi-naive evaluation
     Program *program = sn->getProgram();
-    std::unique_ptr<SemiNaiver> lsn(new SemiNaiver(sn->getDatalogRules(),
-                layer, program, true, true, false, 1, false));
+    std::unique_ptr<SemiNaiver> lsn(new SemiNaiver(program->getAllRules(),
+                layer, program, true, true, false, 1, false, true));
 
     //Populate the IDB layer
     for(auto &pair : idbPredicates) {
@@ -809,7 +809,7 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
         const Literal &headLiteral,
         uint64_t *headrow, std::vector<uint8_t> &columnsToCheck) {
     //Get a starting value for the fresh IDs
-    uint64_t freshIDs = 0; //TODO
+    uint64_t freshIDs = 1; //0 is star
 
     //In this case I invoke the code needed for the RMFA
     std::vector<Literal> input; //"input" corresponds to B_\rho,\sigma in the paper

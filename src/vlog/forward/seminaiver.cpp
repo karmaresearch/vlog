@@ -77,7 +77,8 @@ string set_to_string(std::unordered_set<int> s) {
 
 SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
         Program *program, bool opt_intersect, bool opt_filtering,
-        bool multithreaded, bool restrictedChase, int nthreads, bool shuffle) :
+        bool multithreaded, bool restrictedChase, int nthreads, bool shuffle,
+        bool ignoreExistentialRules) :
     opt_intersect(opt_intersect),
     opt_filtering(opt_filtering),
     multithreaded(multithreaded),
@@ -86,14 +87,15 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
     layer(layer),
     program(program),
     nthreads(nthreads),
-    checkCyclicTerms(false) {
+    checkCyclicTerms(false),
+    ignoreExistentialRules(ignoreExistentialRules) {
 
         TableFilterer::setOptIntersect(opt_intersect);
         memset(predicatesTables, 0, sizeof(TupleTable*)*MAX_NPREDS);
 
         LOG(DEBUGL) << "Running SemiNaiver, opt_intersect = " << opt_intersect << ", opt_filtering = " << opt_filtering << ", multithreading = " << multithreaded << ", shuffle = " << shuffle;
 
-        int ruleid = 0;
+        uint32_t ruleid = 0;
         for (std::vector<Rule>::iterator itr = ruleset.begin(); itr != ruleset.end();
                 ++itr) {
             RuleExecutionDetails *d = new RuleExecutionDetails(*itr, ruleid++);
@@ -108,10 +110,6 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
             else
                 this->allEDBRules.push_back(*d);
             delete d;
-
-            if (!itr->isExistential()) {
-                datalogRules.push_back(*itr);
-            }
         }
 
 #if 0
@@ -984,6 +982,11 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     currentRule = rule.tostring(program, &layer);
 #endif
 
+    if (ignoreExistentialRules && rule.isExistential()) {
+        return false; //Skip the execution of existential rules if the flag is
+        //set (should be only during the execution of RMFA
+    }
+
     LOG(DEBUGL) << "Iteration: " << iteration <<
         " Rule: " << rule.tostring(program, &layer);
 
@@ -1131,8 +1134,10 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             if (max == 1)
                 max = ruleDetails.lastExecution - 1;
             if (limitView != 0) {
-                // For execution of the restricted chase, we must limit the view: we may not include data from the current round.
-                // We use a parameter "limitView", which in this case indicates the iteration number after the last round.
+                // For execution of the restricted chase, we must limit the
+                // view: we may not include data from the current round.
+                // We use a parameter "limitView", which in this case indicates
+                // the iteration number after the last round.
                 if (max >= limitView) {
                     max = limitView - 1;
                 }
