@@ -429,8 +429,10 @@ bool SemiNaiver::executeUntilSaturation(
         if (response) {
             if (checkCyclicTerms) {
                 foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
-                if (foundCyclicTerms)
+                if (foundCyclicTerms) {
+                    LOG(DEBUGL) << "Found a cyclic term";
                     return newDer;
+                }
             }
 
             if (ruleset[currentRule].rule.isRecursive() && limitView == 0) {
@@ -1191,7 +1193,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             }
 
             //Prepare for the processing of the next atom (if any)
-            if (!lastLiteral && ! first) {
+            if (!lastLiteral && !first) {
                 currentResults = ((InterTableJoinProcessor*)joinOutput)->getTable();
             }
             if (lastLiteral && finalResultContainer) {

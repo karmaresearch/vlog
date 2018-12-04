@@ -755,13 +755,14 @@ void ExistentialRuleProcessor::RMFA_enhanceFunctionTerms(
     //Check every fact until oldsize. If there is a function term, get also
     //all related facts
     for(size_t i = startOutput; i < oldsize; ++i) {
-        const auto &literal = output[i];
+        const auto literal = output[i];
         for(uint8_t j = 0; j < literal.getTupleSize(); ++j) {
             const auto &term = literal.getTermAtPos(j);
             if (term.getValue() != COUNTER(term.getValue())) {
                 //This is a function term. Get rule ID
                 const uint64_t ruleID = GET_RULE(term.getValue());
                 auto *ruleContainer = chaseMgmt->getRuleContainer(ruleID);
+                assert(ruleContainer != NULL);
                 //Get var ID
                 const uint64_t varID = GET_VAR(term.getValue());
                 //Get the arguments of the function term from the chase mgmt

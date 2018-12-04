@@ -928,7 +928,7 @@ std::shared_ptr<SemiNaiver> Reasoner::getSemiNaiver(EDBLayer &layer,
     } else {
         std::shared_ptr<SemiNaiver> sn(new SemiNaiver(p->getAllRules(),
                     layer, p, opt_intersect, opt_filtering,
-                    opt_threaded, restrictedChase, nthreads, shuffleRules));
+                    opt_threaded, restrictedChase, nthreads, shuffleRules, false));
         return sn;
     }
 }

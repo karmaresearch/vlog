@@ -571,6 +571,9 @@ bool EDBLayer::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
         return p->second.manager->isEmpty(query, posToFilter, valuesToFilter);
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
+        if (!rel) {
+            return true;
+        }
         assert(literal->getTupleSize() <= 2);
 
         std::unique_ptr<Literal> rewrittenLiteral;

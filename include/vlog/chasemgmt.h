@@ -145,7 +145,11 @@ class ChaseMgmt {
         bool checkRecursive(uint64_t rv);
 
         RuleContainer *getRuleContainer(size_t id) const {
-            return rules[id].get();
+            if (id < rules.size()) {
+                return rules[id].get();
+            } else {
+                return NULL;
+            }
         }
 
         bool isRestricted() {
