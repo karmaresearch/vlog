@@ -223,7 +223,7 @@ std::shared_ptr<Segment> Segment::sortBy(const std::vector<uint8_t> *fields,
             return newSeg;
         }
     } //End special case
-    if (nthreads == 1) {
+    if (nthreads <= 1) {
         assert(filterDupls == false);
         return intsort(fields);
     } else {

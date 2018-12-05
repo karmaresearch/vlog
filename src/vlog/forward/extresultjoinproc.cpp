@@ -26,7 +26,8 @@ ExistentialRuleProcessor::ExistentialRuleProcessor(
         bool filterRecursive) :
     FinalRuleProcessor(posFromFirst, posFromSecond, listDerivations,
             heads, detailsRule, ruleExecOrder, iteration,
-            addToEndTable, nthreads, sn), chaseMgmt(chaseMgmt), filterRecursive(filterRecursive) {
+            addToEndTable, nthreads, sn), chaseMgmt(chaseMgmt),
+    filterRecursive(filterRecursive) {
         this->sn = sn;
 
         //When I consolidate, should I assign values to the existential columns?
@@ -323,14 +324,38 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                 //Init
                 std::unique_ptr<uint64_t[]> tmprow(
                         new uint64_t[c.size()]);
+                std::unique_ptr<uint64_t[]> headrow(
+                        new uint64_t[h.getTupleSize()]);
+
                 std::vector<std::unique_ptr<ColumnReader>> columnReaders;
                 for(uint8_t i = 0; i < c.size(); ++i) {
                     columnReaders.push_back(c[i]->getReader());
                 }
 
-                std::vector<uint8_t> posToCheck;
-                for(uint8_t j = 0; j < nKnownColumns; ++j) {
-                    posToCheck.push_back(posKnownColumns[j].first);
+                //Check in the head the positions that should be checked
+                std::vector<uint8_t> posToCheck; //These are positions in the head.
+                std::vector<std::pair<uint8_t, uint8_t>> posToCopy;
+                for(uint8_t j = 0; j < h.getTupleSize(); ++j) {
+                    const auto t = h.getTermAtPos(j);
+                    if (t.isVariable()) {
+                        bool found = false;
+                        for(uint8_t i = 0; i < nCopyFromFirst; ++i) {
+                            if (posFromFirst[i].first == j) {
+                                found = true;
+                                posToCheck.push_back(j);
+                                break;
+                            }
+                        }
+                        for(uint8_t i = 0; i < nCopyFromSecond && !found; ++i) {
+                            if (posFromSecond[i].first == j) {
+                                posToCheck.push_back(j);
+                                break;
+                            }
+                        }
+                    } else {
+                        posToCheck.push_back(j); //constants should be checked as well
+                        headrow[j] = t.getValue();
+                    }
                 }
 
                 for(size_t i = 0; i < sizecolumns; ++i) {
@@ -341,7 +366,12 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                         }
                         tmprow[j] = columnReaders[j]->next();
                     }
-                    if (RMFA_check(tmprow.get(), h, tmprow.get(), posToCheck)) { //Is blocked
+                    //Fill the headrow with the values from row
+                    for(const auto &p : posToCopy) {
+                        headrow[p.first] = tmprow[p.second];
+                    }
+                    if (RMFA_check(tmprow.get(), h, headrow.get(), posToCheck)) {
+                        //It is blocked
                         filterRows.push_back(i);
                     }
                 }
@@ -501,18 +531,32 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
             const auto &h = at->getLiteral();
 
             if (chaseMgmt->isCheckCyclicMode()) {
-                std::unique_ptr<uint64_t[]> tmprow(
-                        new uint64_t[c.size()]);
+                std::unique_ptr<uint64_t[]> tmprow(new uint64_t[c.size()]);
+                std::unique_ptr<uint64_t[]> headrow(new uint64_t[h.getTupleSize()]);
                 std::vector<std::unique_ptr<ColumnReader>> columnReaders;
                 for(uint8_t i = 0; i < c.size(); ++i) {
                     columnReaders.push_back(c[i]->getReader());
                 }
 
                 std::vector<uint8_t> columnsToCheck;
-                for(uint8_t j = 0; j < nCopyFromSecond; ++j) {
-                    columnsToCheck.push_back(posFromSecond[j].second);
+                std::vector<std::pair<uint8_t,uint8_t>> columnsToCopy;
+                for(uint8_t j = 0; j < h.getTupleSize(); ++j) {
+                    VTerm t = h.getTermAtPos(j);
+                    if (t.isVariable()) {
+                        bool found = false;
+                        for(uint8_t m = 0; m < nCopyFromSecond && !found; ++m) {
+                            if (posFromSecond[m].first == count + j) {
+                                found = true;
+                                columnsToCopy.push_back(std::make_pair(
+                                            j, posFromSecond[m].second));
+                                columnsToCheck.push_back(j);
+                            }
+                        }
+                    } else {
+                        headrow[j] = t.getValue();
+                        columnsToCheck.push_back(j);
+                    }
                 }
-
                 for(size_t i = 0; i < sizecolumns; ++i) {
                     //Fill the row
                     for(uint8_t j = 0; j < c.size(); ++j) {
@@ -521,7 +565,11 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                         }
                         tmprow[j] = columnReaders[j]->next();
                     }
-                    if (RMFA_check(tmprow.get(), h, tmprow.get(), columnsToCheck)) { //Is blocked
+                    for(const auto &p : columnsToCopy) {
+                        headrow[p.first] = tmprow[p.second];
+                    }
+                    if (RMFA_check(tmprow.get(), h, headrow.get(),
+                                columnsToCheck)) { //Is blocked
                         filterRows.push_back(i);
                     }
                 }
@@ -530,8 +578,8 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                         h.getPredicate().getCardinality());
                 filterDerivations(h, t, row, count, ruleDetails, nCopyFromSecond,
                         posFromSecond, c, sizecolumns, filterRows);
-                count += h.getTupleSize();
             }
+            count += h.getTupleSize();
         }
 
         if (filterRows.size() == sizecolumns * atomTables.size()) {
@@ -747,6 +795,24 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
     return lsn;
 }
 
+void _addIfNotExist(std::vector<Literal> &output, Literal l) {
+    bool found = false;
+    for(const auto &ol : output) {
+        if (ol.getPredicate().getId() == l.getPredicate().getId()) {
+            found = true;
+            for(uint8_t j = 0; j < ol.getTupleSize(); ++j) {
+                if (ol.getTermAtPos(j).getValue() != l.getTermAtPos(j).getValue()) {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) break;
+        }
+    }
+    if (!found)
+        output.push_back(l);
+}
+
 void ExistentialRuleProcessor::RMFA_enhanceFunctionTerms(
         std::vector<Literal> &output,
         uint64_t &startFreshIDs,
@@ -779,10 +845,10 @@ void ExistentialRuleProcessor::RMFA_enhanceFunctionTerms(
                 //Materialize the remaining facts giving fresh IDs to
                 //the rem. variables
                 auto const *rule = ruleContainer->getRule();
-                for(const auto &literal : rule->getBody()) {
-                    VTuple t(literal.getTupleSize());
-                    for(uint8_t m = 0; m < literal.getTupleSize(); ++m) {
-                        const VTerm term = literal.getTermAtPos(m);
+                for(const auto &bLiteral : rule->getBody()) {
+                    VTuple t(bLiteral.getTupleSize());
+                    for(uint8_t m = 0; m < bLiteral.getTupleSize(); ++m) {
+                        const VTerm term = bLiteral.getTermAtPos(m);
                         if (term.isVariable()) {
                             uint8_t varID = term.getId();
                             if (!mappings.count(varID)) {
@@ -795,7 +861,33 @@ void ExistentialRuleProcessor::RMFA_enhanceFunctionTerms(
                             t.set(term, m);
                         }
                     }
-                    output.push_back(Literal(literal.getPredicate(), t));
+                    _addIfNotExist(output, Literal(bLiteral.getPredicate(), t));
+                }
+                //Also add the original variable
+                assert(!mappings.count(varID));
+                mappings.insert(std::make_pair(varID, term.getValue()));
+
+                //Also consider the possible other head atoms
+                for(const auto &hLiteral : rule->getHeads()) {
+                    if (hLiteral.getPredicate().getId() ==
+                            literal.getPredicate().getId()) {
+                        continue;
+                    }
+                    VTuple t(hLiteral.getTupleSize());
+                    for(uint8_t m = 0; m < hLiteral.getTupleSize(); ++m) {
+                        const VTerm term = hLiteral.getTermAtPos(m);
+                        if (term.isVariable()) {
+                            uint8_t varID = term.getId();
+                            if (!mappings.count(varID)) {
+                               LOG(ERRORL) << "There are existenatial variables not defined. Must implement their retrievals";
+                               throw 10;
+                            }
+                            t.set(VTerm(0, mappings[varID]), m);
+                        } else {
+                            t.set(term, m);
+                        }
+                    }
+                    _addIfNotExist(output, Literal(hLiteral.getPredicate(), t));
                 }
             }
         }
