@@ -82,7 +82,9 @@ class InmemoryTable : public EDBTable {
         InmemoryTable(PredId_t predid, std::vector<std::vector<std::string>> &entries, EDBLayer *layer);
 
         InmemoryTable(PredId_t predid,
-                      const std::vector<std::vector<Term_t>> &entries,
+                      const Literal &query,
+                      // const
+                      EDBIterator *iter,
                       EDBLayer *layer);
 
         virtual uint8_t getArity() const;

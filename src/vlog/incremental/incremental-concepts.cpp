@@ -57,10 +57,12 @@ std::string IncrementalState::printArgs(const Literal &lit, const EDBLayer *kb) 
             args << int2ABC(id);
         } else {
             char rdfowl[MAX_TERM_SIZE];
-            if (! kb->getDictText(id, rdfowl)) {
+            uint64_t value = term.getValue();
+            if (! kb->getDictText(value, rdfowl)) {
                 throw 10;       // Comply with conventions
             }
-            args << Program::rewriteRDFOWLConstants(std::string(rdfowl));
+            // args << Program::rewriteRDFOWLConstants(std::string(rdfowl));
+            args << Program::compressRDFOWLConstants(std::string(rdfowl));
         }
         if (i < tuple.getSize() - 1) {
             args << ",";

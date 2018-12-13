@@ -296,7 +296,11 @@ std::shared_ptr<Segment> Segment::intsort(
                     values.push_back(make_pair(v1, v2));
                 }
                 deleteAllVectors(varColumns, vectors);
+                HiResTimer t_colsort("Segment column sort rows " + std::to_string(allRows));
+                t_colsort.start();
                 std::sort(values.begin(), values.end());
+                t_colsort.stop();
+                LOG(INFOL) << t_colsort.tostring();
                 ColumnWriter sortedColumnsInserters[2];
                 for (const auto v : values) {
                     sortedColumnsInserters[0].add(v.first);

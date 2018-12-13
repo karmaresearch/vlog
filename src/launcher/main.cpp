@@ -45,6 +45,8 @@
 #include <thread>
 #include <cmath>
 
+#include <valgrind/callgrind.h>
+
 using namespace std;
 
 void printHelp(const char *programName, ProgramArgs &desc) {
@@ -501,6 +503,10 @@ void launchFullMat(int argc,
         }
 #endif
 
+        if (vm["dred"].empty()) {
+            CALLGRIND_START_INSTRUMENTATION;
+        }
+
         LOG(INFOL) << "Starting full materialization";
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         sn->run();
@@ -531,49 +537,60 @@ void launchFullMat(int argc,
 
             IncrOverdelete overdelete(vm, sn, remove_pred_names);
 
+            CALLGRIND_START_INSTRUMENTATION;
+
             LOG(INFOL) << "Starting overdeletion materialization";
             start = std::chrono::system_clock::now();
             overdelete.run();
             sec = std::chrono::system_clock::now() - start;
             LOG(INFOL) << "Runtime overdelete = " << sec.count() * 1000 << " milliseconds";
+            overdelete.getSN()->printCountAllIDBs("");
 
             if (vm["storemat_path"].as<string>() != "") {
                 store_mat(vm["storemat_path"].as<string>() + ".overdelete", vm, overdelete.getSN());
             }
 
-            // Continue same with Rederive
-            // Create a Program, create a SemiNaiver, run...
-            LOG(INFOL) << "***************** Create Rederive";
-
-            IncrRederive rederive(vm, sn, remove_pred_names, overdelete);
-
-            LOG(INFOL) << "Starting rederive materialization";
-            start = std::chrono::system_clock::now();
-            rederive.run();
-            sec = std::chrono::system_clock::now() - start;
-            LOG(INFOL) << "Runtime rederive = " << sec.count() * 1000 << " milliseconds";
-
-            if (vm["storemat_path"].as<string>() != "") {
-                store_mat(vm["storemat_path"].as<string>() + ".rederive", vm, rederive.getSN());
-            }
-
             if (false) {
-                // Continue same with Addition
+                // Continue same with Rederive
                 // Create a Program, create a SemiNaiver, run...
-                LOG(INFOL) << "***************** Create Addition";
+                LOG(INFOL) << "***************** Create Rederive";
 
-                IncrAdd addition(vm, sn, remove_pred_names, add_pred_names,
-                                 overdelete, rederive);
+                IncrRederive rederive(vm, sn, remove_pred_names, overdelete);
 
-                LOG(INFOL) << "Starting addition materialization";
+                LOG(INFOL) << "Starting rederive materialization";
                 start = std::chrono::system_clock::now();
-                addition.run();
+                rederive.run();
                 sec = std::chrono::system_clock::now() - start;
-                LOG(INFOL) << "Runtime addition = " << sec.count() * 1000 << " milliseconds";
+                LOG(INFOL) << "Runtime rederive = " << sec.count() * 1000 << " milliseconds";
+                rederive.getSN()->printCountAllIDBs("");
 
                 if (vm["storemat_path"].as<string>() != "") {
-                    store_mat(vm["storemat_path"].as<string>() + ".add", vm, addition.getSN());
+                    store_mat(vm["storemat_path"].as<string>() + ".rederive", vm, rederive.getSN());
                 }
+
+                if (false) {
+                    // Continue same with Addition
+                    // Create a Program, create a SemiNaiver, run...
+                    LOG(INFOL) << "***************** Create Addition";
+
+                    IncrAdd addition(vm, sn, remove_pred_names, add_pred_names,
+                                     overdelete, rederive);
+
+                    LOG(INFOL) << "Starting addition materialization";
+                    start = std::chrono::system_clock::now();
+                    addition.run();
+                    sec = std::chrono::system_clock::now() - start;
+                    LOG(INFOL) << "Runtime addition = " << sec.count() * 1000 << " milliseconds";
+                    addition.getSN()->printCountAllIDBs("");
+
+                    if (vm["storemat_path"].as<string>() != "") {
+                        store_mat(vm["storemat_path"].as<string>() + ".add", vm, addition.getSN());
+                    }
+                } else {
+                    LOG(ERRORL) << "For now, ALSO SKIP ADDITION";
+                }
+            } else {
+                LOG(ERRORL) << "For now, SKIP REDERIVE";
             }
         }
 

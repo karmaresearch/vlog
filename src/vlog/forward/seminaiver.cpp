@@ -11,6 +11,8 @@
 #include <kognac/consts.h>
 #include <kognac/utils.h>
 
+#include <vlog/hi-res-timer.h>
+
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -956,6 +958,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         const uint32_t iteration,
         const uint32_t limitView,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
+    HiResTimer t_iter("SemiNaiver iteration " + std::to_string(iteration));
+    t_iter.start();
     Rule rule = ruleDetails.rule;
 
 #ifdef WEBINTERFACE
@@ -1139,6 +1143,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             } else {
                 //Perform the join
                 std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+                HiResTimer t_join("join");
+                t_join.start();
                 JoinExecutor::join(this, currentResults.get(),
                         lastLiteral ? &heads: NULL,
                         *bodyLiteral, min, max, filterValueVars,
@@ -1151,6 +1157,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                         multithreaded ? nthreads : -1);
                 std::chrono::duration<double> d =
                     std::chrono::system_clock::now() - start;
+                t_join.stop();
+                LOG(INFOL) << t_join.tostring();
                 LOG(DEBUGL) << "Time join: " << d.count() * 1000;
                 durationJoin += d;
             }
@@ -1206,6 +1214,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         }
     }
 
+    t_iter.stop();
+
     std::chrono::duration<double> totalDuration =
         std::chrono::system_clock::now() - startRule;
     double td = totalDuration.count() * 1000;
@@ -1246,6 +1256,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
             durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
     }
+
+    LOG(INFOL) << t_iter.tostring();
 
     return prodDer;
 }

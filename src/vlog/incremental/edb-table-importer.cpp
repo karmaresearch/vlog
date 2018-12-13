@@ -1,5 +1,7 @@
 #include <vlog/incremental/edb-table-importer.h>
 
+#include <vlog/hi-res-timer.h>
+
 
 EDBimporter::EDBimporter(PredId_t predid, EDBLayer *layer,
                          const std::shared_ptr<SemiNaiver> prevSN) :
@@ -50,6 +52,8 @@ bool EDBimporter::isEmpty(const Literal &query,
 }
 
 size_t EDBimporter::countCardinality(const Literal &query) {
+    HiResTimer t_card("EDBImporter count card " + query.tostring());
+    t_card.start();
     size_t card = 0;
 
     Predicate pred = query.getPredicate();
@@ -70,6 +74,8 @@ size_t EDBimporter::countCardinality(const Literal &query) {
         ++card;
     }
     layer->releaseIterator(iter);
+    t_card.stop();
+    LOG(INFOL) << t_card.tostring();
 
     return card;
 }

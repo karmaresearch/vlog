@@ -32,61 +32,61 @@ public:
         edbTable->query(query, outputTable, posToFilter, valuesToFilter);
     }
 
-    virtual size_t estimateCardinality(const Literal &query) {
+    size_t estimateCardinality(const Literal &query) {
         return edbTable->estimateCardinality(query);
     }
 
     // Would like this to be const
-    virtual size_t getCardinality(const Literal &query);
+    size_t getCardinality(const Literal &query);
 
-    virtual size_t getCardinalityColumn(const Literal &query, uint8_t posColumn) {
+    size_t getCardinalityColumn(const Literal &query, uint8_t posColumn) {
         LOG(ERRORL) << "Need to consider possible Removals";
         return edbTable->getCardinalityColumn(query, posColumn);
     }
 
-    virtual bool isEmpty(const Literal &query,
+    bool isEmpty(const Literal &query,
                          std::vector<uint8_t> *posToFilter,
                          std::vector<Term_t> *valuesToFilter);
 
-    virtual EDBIterator *getIterator(const Literal &q) {
+    EDBIterator *getIterator(const Literal &q) {
         return edbTable->getIterator(q);
     }
 
-    virtual EDBIterator *getSortedIterator(const Literal &query,
+    EDBIterator *getSortedIterator(const Literal &query,
                                            const std::vector<uint8_t> &fields) {
         return edbTable->getSortedIterator(query, fields);
     }
 
-    virtual void releaseIterator(EDBIterator *itr) {
+    void releaseIterator(EDBIterator *itr) {
         return edbTable->releaseIterator(itr);
     }
 
-    virtual bool getDictNumber(const char *text, const size_t sizeText,
+    bool getDictNumber(const char *text, const size_t sizeText,
                                uint64_t &id) {
         return edbTable->getDictNumber(text, sizeText, id);
     }
 
-    virtual bool getDictText(const uint64_t id, char *text) {
+    bool getDictText(const uint64_t id, char *text) {
         return edbTable->getDictText(id, text);
     }
 
-    virtual bool getDictText(const uint64_t id, std::string &text) {
+    bool getDictText(const uint64_t id, std::string &text) {
         return edbTable->getDictText(id, text);
     }
 
-    virtual uint64_t getNTerms() {
+    uint64_t getNTerms() {
         return edbTable->getNTerms();
     }
 
-    virtual uint8_t getArity() const {
+    uint8_t getArity() const {
         return edbTable->getArity();
     }
 
-    virtual uint64_t getSize() {
+    uint64_t getSize() {
         return edbTable->getSize();
     }
 
-    virtual PredId_t getPredicateID() const {
+    PredId_t getPredicateID() const {
         return predid;
     }
 

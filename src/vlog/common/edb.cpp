@@ -476,17 +476,16 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
         const std::vector<uint8_t> &fields) {
     const Literal *literal = &query;
     PredId_t predid = literal->getPredicate().getId();
+    EDBIterator *itr;
 
     if (dbPredicates.count(predid)) {
         auto p = dbPredicates.find(predid);
-        auto itr = p->second.manager->getSortedIterator(query, fields);
+        itr = p->second.manager->getSortedIterator(query, fields);
         if (hasRemoveLiterals(predid)) {
             LOG(DEBUGL) << "EDBLayer=" << name << " Wrap an EDBRemovalIterator for " << literal->tostring();
-            EDBIterator *ritr = new EDBRemovalIterator(query, fields, *removals[predid], itr);
-            return ritr;
+            itr = new EDBRemovalIterator(query, fields, *removals[predid], itr);
         } else {
             LOG(DEBUGL) << "EDBLayer=" << name << " No wrap of an EDBRemovalIterator for " << literal->tostring();
-            return itr;
         }
 
     } else {
@@ -504,25 +503,25 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
 
         IndexedTupleTable *rel = tmpRelations[predid];
         uint8_t size = rel->getSizeTuple();
-        EDBMemIterator *itr;
+        EDBMemIterator *mitr;
         switch (size) {
             case 1:
-                itr = memItrFactory.get();
-                itr->init1(predid, rel->getSingleColumn(), c1, vc1);
+                mitr = memItrFactory.get();
+                mitr->init1(predid, rel->getSingleColumn(), c1, vc1);
                 break;
             case 2:
-                itr = memItrFactory.get();
+                mitr = memItrFactory.get();
                 if (c1) {
-                    itr->init2(predid, true, rel->getTwoColumn1(), c1, vc1, c2, vc2, equalFields);
+                    mitr->init2(predid, true, rel->getTwoColumn1(), c1, vc1, c2, vc2, equalFields);
                 } else {
                     if (c2) {
-                        itr->init2(predid, false, rel->getTwoColumn2(), c1, vc1, c2, vc2, equalFields);
+                        mitr->init2(predid, false, rel->getTwoColumn2(), c1, vc1, c2, vc2, equalFields);
                     } else {
                         //No constraints
                         if (fields.size() != 0 && fields[0] == 0) {
-                            itr->init2(predid, true, rel->getTwoColumn1(), c1, vc1, c2, vc2, equalFields);
+                            mitr->init2(predid, true, rel->getTwoColumn1(), c1, vc1, c2, vc2, equalFields);
                         } else {
-                            itr->init2(predid, false, rel->getTwoColumn2(), c1, vc1, c2, vc2, equalFields);
+                            mitr->init2(predid, false, rel->getTwoColumn2(), c1, vc1, c2, vc2, equalFields);
                         }
                     }
                 }
@@ -531,13 +530,14 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
                 throw 10;
         }
         if (hasRemoveLiterals(predid)) {
-            LOG(DEBUGL) << "HERE " << __func__ << ":" << __LINE__ << "=" << query.tostring(NULL, this) << " inject (Sorted) RemoveIterator";
-            EDBIterator *ritr = new EDBRemovalIterator(query, fields, *removals[predid], itr);
-            return ritr;
+            LOG(DEBUGL) << "EDBLayer=" << name << " Wrap an EDBRemovalIterator on EDBMemIterator for " << literal->tostring();
+            itr = new EDBRemovalIterator(query, fields, *removals[predid], mitr);
         } else {
-            return itr;
+            itr = mitr;
         }
     }
+
+    return itr;
 }
 
 size_t EDBLayer::getCardinalityColumn(const Literal &query,
@@ -735,6 +735,16 @@ std::vector<std::shared_ptr<Column>> EDBLayer::checkNewIn(
     return p->second.manager->checkNewIn(valuesToCheck, l, posInL);
 }
 
+template <typename VAR>
+static std::vector<VAR> range(size_t size) {
+    std::vector<VAR> r(size);
+    for (size_t i = 0; i < size; ++i) {
+        r[i] = static_cast<VAR>(i);
+    }
+
+    return r;
+}
+
 static std::vector<std::shared_ptr<Column>> checkNewInGeneric(const Literal &l1,
         std::vector<uint8_t> &posInL1,
         const Literal &l2,
@@ -750,8 +760,10 @@ static std::vector<std::shared_ptr<Column>> checkNewInGeneric(const Literal &l1,
     for (int i = 0; i < posInL2.size(); i++) {
         fieldsToSort2.push_back(posVars2[posInL2[i]]);
     }
-    EDBIterator *itr1 = p->getSortedIterator(l1, fieldsToSort1);
-    EDBIterator *itr2 = p2->getSortedIterator(l2, fieldsToSort2);
+    auto vars1only = range<uint8_t>(posVars1.size());
+    auto vars2only = range<uint8_t>(posVars2.size());
+    EDBIterator *itr1 = p->getSortedIterator(l1, vars1only);
+    EDBIterator *itr2 = p2->getSortedIterator(l2, vars2only);
 
     std::vector<std::shared_ptr<ColumnWriter>> cols;
     for (int i = 0; i < fieldsToSort1.size(); i++) {
@@ -1217,7 +1229,8 @@ std::vector<std::shared_ptr<Column>> EDBTable::checkNewIn(
         fieldsToSort.push_back(posVars[posInL[i]]);
     }
 
-    EDBIterator *iter = getSortedIterator(l, fieldsToSort);
+    auto varsOnly = range<uint8_t>(posVars.size());
+    EDBIterator *iter = getSortedIterator(l, varsOnly);
 
     int sz = checkValues.size();
 
@@ -1377,9 +1390,12 @@ std::shared_ptr<Column> EDBTable::checkIn(
 	    break;
 	}
     }
+    LOG(ERRORL) << "****** Check if this fieldsToSort actually considers variables only";
     EDBIterator *iter = getSortedIterator(l, fieldsToSort);
 
     //Output
+    HiResTimer t_merge("checkIn merge");
+    t_merge.start();
     std::unique_ptr<ColumnWriter> col(new ColumnWriter());
     size_t idx1 = 0;
     sizeOutput = 0;
@@ -1406,6 +1422,9 @@ std::shared_ptr<Column> EDBTable::checkIn(
     }
     iter->clear();
     delete iter;
+    t_merge.stop();
+    LOG(INFOL) << t_merge.tostring();
+
     return col->getColumn();
 }
 

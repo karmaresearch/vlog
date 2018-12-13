@@ -299,7 +299,11 @@ void JoinExecutor::verificativeJoinOneColumn(
     }
     keys.push_back(make_pair(prevKey, std::make_pair(beginning,
                     currentIdx)));
+#define RESET_SORTED_ITR        1
+#if RESET_SORTED_ITR
+#else
     intermediateResults->releaseIterator(itr);
+#endif
 
     //3- Query the KB
     FCIterator tableItr = naiver->getTable(literal, min, max);
@@ -316,7 +320,13 @@ void JoinExecutor::verificativeJoinOneColumn(
         shared_ptr<const Column> column = table->
             getColumn(hv.joinCoordinates[currentLiteral][0].second);
         LOG(TRACEL) << "Count = " << count;
+#if RESET_SORTED_ITR
+        itr->reset();
+#else
         FCInternalTableItr *itr = intermediateResults->sortBy(joinField /*, nthreads */);
+#endif
+        HiResTimer t_iter("verificativeJoin iteration");
+        t_iter.start();
         EDBLayer &layer = naiver->getEDBLayer();
         if (column->isEDB() && layer.supportsCheckIn(((EDBColumn*) column.get())->getLiteral())) {
             //Offload a merge join to the EDB layer
@@ -421,6 +431,7 @@ void JoinExecutor::verificativeJoinOneColumn(
             if (!itr->hasNext())
                 throw 10;
 
+            LOG(TRACEL) << "Column is not EDB";
             itr->next();
             Term_t outputRow[256];
             size_t idx1 = 0;
@@ -493,10 +504,19 @@ void JoinExecutor::verificativeJoinOneColumn(
             output->checkSizes();
 #endif
         }
+#if RESET_SORTED_ITR
+#else
         intermediateResults->releaseIterator(itr);
+#endif
         keys.swap(newKeys);
         tableItr.moveNextCount();
+        t_iter.stop();
+        LOG(INFOL) << t_iter.tostring();
     }
+#if RESET_SORTED_ITR
+    intermediateResults->releaseIterator(itr);
+#else
+#endif
     LOG(TRACEL) << "Loop executed " << count << " times";
 }
 

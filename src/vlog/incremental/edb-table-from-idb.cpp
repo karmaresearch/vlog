@@ -8,239 +8,6 @@
 
 #include <vlog/inmemory/inmemorytable.h>
 
-class EDBonIDBIterator : public EDBIterator {
-protected:
-    const Literal query;
-    const PredId_t predid;
-    FCIterator idbItr;
-    std::shared_ptr<const FCInternalTable> idbInternalTable;
-    FCInternalTableItr *idbInternalItr;
-    size_t ticks = 0;
-
-public:
-    EDBonIDBIterator(const Literal &query, const std::shared_ptr<SemiNaiver> SN) :
-            query(EDBonIDBTable::edb2idb(query)),
-            predid(query.getPredicate().getId()),
-            idbInternalItr(NULL) {
-        idbItr = SN->getTable(this->query, 0, SN->getCurrentIteration());
-        if (! idbItr.isEmpty()) {
-            idbInternalTable = idbItr.getCurrentTable();
-            idbInternalItr = idbInternalTable->getIterator();
-        }
-    }
-
-    virtual bool hasNext() {
-        LOG(TRACEL) << "         hasNext() on " << query.tostring();
-        if (idbInternalItr == NULL) {
-            return false;
-        }
-        if (idbInternalItr->hasNext()) {
-            return true;
-        }
-
-        idbInternalTable->releaseIterator(idbInternalItr);
-        idbItr.moveNextCount();
-        if (idbItr.isEmpty()) {
-            idbInternalItr = NULL;
-            return false;
-        }
-
-        idbInternalTable = idbItr.getCurrentTable();
-        idbInternalItr = idbInternalTable->getIterator();
-
-        return idbInternalItr->hasNext();
-    }
-
-    virtual void next() {
-        LOG(TRACEL) << "         next() on " << query.tostring();
-        if (! idbInternalItr->hasNext()) {
-            LOG(ERRORL) << "next() on a table that hasNext() = false";
-            throw 10;               // follow convention
-        }
-        ++ticks;
-        return idbInternalItr->next();
-    }
-
-    virtual Term_t getElementAt(const uint8_t p) {
-        LOG(TRACEL) << "get element[" << (int)p << "] of " << query.tostring() << " = " << idbInternalItr->getCurrentValue(p);
-        return idbInternalItr->getCurrentValue(p);
-    }
-
-    virtual PredId_t getPredicateID() {
-        return predid;
-    }
-
-    virtual void moveTo(const uint8_t field, const Term_t t) {
-        throw 10;
-    }
-
-    virtual void skipDuplicatedFirstColumn() {
-        LOG(ERRORL) << "FIXME: implement " << typeid(*this).name() << "::" <<
-            __func__;
-    }
-
-    virtual void clear() {
-        LOG(ERRORL) << "FIXME: implement " << typeid(*this).name() << "::" <<
-            __func__;
-    }
-
-    virtual const char *getUnderlyingArray(uint8_t column) {
-        return NULL;
-    }
-
-    /*
-    No need to override
-    virtual std::pair<uint8_t, std::pair<uint8_t, uint8_t>> getSizeElemUnderlyingArray(uint8_t column) {
-        return std::make_pair(0, make_pair(0, 0));
-    }
-    */
-
-    virtual ~EDBonIDBIterator() {
-        LOG(DEBUGL) << "EDBonIDBIterator: " << query.tostring() <<
-            " num rows queried " << ticks;
-    }
-};
-
-
-class EDBonIDBSortedIterator : public EDBIterator {
-protected:
-    const Literal query;
-    const std::vector<uint8_t> &fields;
-    EDBLayer *layer;
-    const PredId_t predid;
-    bool ownsTable;
-    EDBTable *inmemoryTable;
-    EDBIterator *itr;
-    size_t ticks = 0;
-
-public:
-    EDBonIDBSortedIterator(const Literal &query,
-                           const std::vector<uint8_t> &fields,
-                           const std::shared_ptr<SemiNaiver> SN,
-                           EDBLayer *layer) :
-            query(EDBonIDBTable::edb2idb(query)), fields(fields), layer(layer),
-            predid(query.getPredicate().getId()), ownsTable(true) {
-        LOG(DEBUGL) << "EDBonIDBSortedIterator, query " <<
-            this->query.tostring() << ", fields.size() " << fields.size();
-        inmemoryTable = createSortedTable(this->query, fields, SN, layer);
-        if (inmemoryTable != NULL) {
-            itr = inmemoryTable->getSortedIterator(query, fields);
-        }
-    }
-
-    EDBonIDBSortedIterator(const Literal &query,
-                           const std::vector<uint8_t> &fields,
-                           EDBLayer *layer,
-                           EDBTable *table) :
-            query(query), fields(fields), layer(layer),
-            predid(query.getPredicate().getId()), ownsTable(false) {
-        LOG(DEBUGL) << "cached EDBonIDBSortedIterator";
-        inmemoryTable = table;
-        itr = inmemoryTable->getSortedIterator(query, fields);
-    }
-
-    static EDBTable *createSortedTable(const Literal &query,
-                                       const std::vector<uint8_t> &fields,
-                                       const std::shared_ptr<SemiNaiver> SN,
-                                       EDBLayer *layer) {
-        PredId_t predid = query.getPredicate().getId();
-        EDBonIDBIterator between(query, SN);
-        // Collect matching data. Will be stored in an InmemoryTable.
-        std::vector<std::vector<Term_t>> rows;
-        std::vector<Term_t> term(query.getTupleSize());
-        // need to store all variables, then afterwards sort by fields
-        std::vector<bool> isVariable(query.getTupleSize());
-        VTuple tuple = query.getTuple();
-        for (size_t i = 0; i < query.getTupleSize(); ++i) {
-            VTerm vt = tuple.get(i);
-            isVariable[i] = vt.isVariable();
-            if (! isVariable[i]) {
-                // fill out the constants
-                term[i] = vt.getValue();
-            }
-        }
-        while (between.hasNext()) {
-            between.next();
-            size_t nVars = 0;
-            for (size_t i = 0; i < query.getTupleSize(); ++i) {
-                if (isVariable[i]) {
-                    term[i] = between.getElementAt(nVars);
-                    ++nVars;
-                }
-            }
-            rows.push_back(term);
-        }
-
-        if (false && rows.size() == 0) {
-            return NULL;
-        } else {
-            return new InmemoryTable(predid, rows, layer);
-        }
-    }
-
-    virtual bool hasNext() {
-        LOG(TRACEL) << "         hasNext() on " << query.tostring();
-        if (inmemoryTable == NULL) {
-            return false;
-        }
-
-        return itr->hasNext();
-    }
-
-    virtual void next() {
-        LOG(TRACEL) << "         next() on " << query.tostring();
-        ticks++;
-        return itr->next();
-    }
-
-    virtual Term_t getElementAt(const uint8_t p) {
-        if (fields.size() == 1) {
-            LOG(DEBUGL) << "get element[" << (int)p << "] of " << query.tostring() << " = " << itr->getElementAt(p);
-        }
-        return itr->getElementAt(p);
-    }
-
-    virtual PredId_t getPredicateID() {
-        return predid;
-    }
-
-    virtual void moveTo(const uint8_t field, const Term_t t) {
-        throw 10;
-    }
-
-    virtual void skipDuplicatedFirstColumn() {
-        LOG(ERRORL) << "FIXME: implement " << typeid(*this).name() << "::" <<
-            __func__;
-    }
-
-    virtual void clear() {
-        LOG(ERRORL) << "FIXME: implement " << typeid(*this).name() << "::" <<
-            __func__;
-    }
-
-    virtual const char *getUnderlyingArray(uint8_t column) {
-        return NULL;
-    }
-
-    /*
-    No need to override
-    virtual std::pair<uint8_t, std::pair<uint8_t, uint8_t>> getSizeElemUnderlyingArray(uint8_t column) {
-        return std::make_pair(0, make_pair(0, 0));
-    }
-    */
-
-    virtual ~EDBonIDBSortedIterator() {
-        if (inmemoryTable != NULL) {
-            inmemoryTable->releaseIterator(itr);
-            if (ownsTable) {
-                LOG(ERRORL) << "Need to cache inmemoryTable for " << query.tostring(NULL, layer) << " fields size " << fields.size();
-                delete inmemoryTable;
-            }
-        }
-        LOG(DEBUGL) << "EDBonIDBSortedIterator: layer=" << layer->getName() <<
-            " " << query.tostring() << " num rows queried " << ticks;
-    }
-};
 
 
 bool EDBonIDBTable::isEmpty(const Literal &query,
@@ -274,26 +41,11 @@ bool EDBonIDBTable::isEmpty(const Literal &query,
     return empty;
 }
 
+
 /**
  * Transfer an IDB predicate of the previous SemiNaiver to be
  * a new 'EDB' predicate.
  */
-bool EDBonIDBTable::isNatural(const Literal &query, const std::vector<uint8_t> fields) {
-    // Considered 'natural' if all query arguments are variables, and all
-    // variables occur in order
-    if (query.getTupleSize() != fields.size()) {
-        return false;
-    }
-
-    for (::size_t i = 0; i < fields.size(); ++i) {
-        if (fields[i] != static_cast<uint8_t>(fields[i])) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 
 EDBonIDBTable::EDBonIDBTable(PredId_t predid, EDBLayer *layer,
               const std::shared_ptr<SemiNaiver> prevSN) :
@@ -307,6 +59,65 @@ EDBonIDBTable::EDBonIDBTable(PredId_t predid, EDBLayer *layer,
 
 EDBonIDBTable::~EDBonIDBTable() {
     delete naturalTable;
+}
+
+bool EDBonIDBTable::isNatural(const Literal &query, const std::vector<uint8_t> fields) {
+    // Considered 'natural' if all query arguments are variables, and all
+    // variables occur in order
+    if (query.getTupleSize() != fields.size()) {
+        return false;
+    }
+
+    for (::size_t i = 0; i < fields.size(); ++i) {
+        if (fields[i] != static_cast<uint8_t>(fields[i])) {
+            return false;
+        }
+    }
+
+    if (true) {
+        LOG(INFOL) << "For now, disable isNatural query attribute, query " << query.tostring() << " fields " << fields2str(fields);
+        return false;
+    }
+
+    return true;
+}
+
+bool EDBonIDBTable::isNatural(const Literal &query) {
+    // Considered as an upper bound for 'natural' if all query arguments are
+    // variables
+    const VTuple &tuple = query.getTuple();
+    for (int i = 0; i < tuple.getSize(); ++i) {
+        if (! tuple.get(i).isVariable()) {
+            return false;
+        }
+    }
+
+    if (true) {
+        LOG(INFOL) << "For now, disable isNatural query attribute, query " << query.tostring() << " fields " << "<undefined>";
+        return false;
+    }
+
+    return true;
+}
+
+InmemoryTable *EDBonIDBTable::createSortedTable(
+                                 const Literal &query,
+                                 const std::vector<uint8_t> &fields,
+                                 const std::shared_ptr<SemiNaiver> SN,
+                                 EDBLayer *layer) const {
+    LOG(INFOL) << "Create sorted InmemoryTable, query " << query.tostring() << " fields " << fields2str(fields);
+    HiResTimer t_sorter("Sorter " + query.tostring() + fields2str(fields));
+    t_sorter.start();
+
+    PredId_t predid = query.getPredicate().getId();
+
+    EDBonIDBIterator between(query, SN);
+    InmemoryTable *t = new InmemoryTable(predid, query, &between, layer);
+
+    t_sorter.stop();
+    LOG(INFOL) << t_sorter.tostring();
+
+    return t;
 }
 
 void EDBonIDBTable::query(QSQQuery *query, TupleTable *outputTable,
@@ -337,6 +148,8 @@ void EDBonIDBTable::query(QSQQuery *query, TupleTable *outputTable,
 }
 
 size_t EDBonIDBTable::countCardinality(const Literal &query) {
+    HiResTimer t_count_card("Count Card query " + query.tostring());
+    t_count_card.start();
     size_t card = 0;
     // Go through the layer to get a Removals-aware iterator
     EDBIterator *iter = layer->getIterator(query);
@@ -345,24 +158,45 @@ size_t EDBonIDBTable::countCardinality(const Literal &query) {
         ++card;
     }
     layer->releaseIterator(iter);
+    t_count_card.stop();
+    LOG(INFOL) << t_count_card.tostring();
 
     return card;
 }
 
 size_t EDBonIDBTable::getCardinality(const Literal &query) {
-    LOG(INFOL) << "Need to consider possible Removals";
     PredId_t pred = query.getPredicate().getId();
     if (! layer->hasRemoveLiterals(pred)) {
-        uint8_t nVars = query.getNVars();
-        LOG(ERRORL) << "Derive cardinality (vars " << (int)nVars << ") without considering query " << query.tostring() << "???";
-        if (prevSemiNaiver->getProgram()->getPredicateCard(predid) != countCardinality(query)) {
-            LOG(ERRORL) << "getProgram card " << prevSemiNaiver->getProgram()->getPredicateCard(predid) << " counted " << countCardinality(query);
-            return countCardinality(query);
-        }
-        return prevSemiNaiver->getProgram()->getPredicateCard(predid);
+        return prevSemiNaiver->estimateCardinality(query, 0, prevSemiNaiver->getCurrentIteration());
     }
 
-    return countCardinality(query);
+    size_t card;
+
+    LOG(INFOL) << "Need to consider possible Removals";
+    if (isNatural(query)) {
+        if (naturalTable == NULL) {
+            std::vector<uint8_t> fields;
+            for (int i = 0; i < query.getTupleSize(); ++i) {
+                fields.push_back(i);
+            }
+            LOG(INFOL) << __func__ << ":create new naturalTable";
+            naturalTable = createSortedTable(
+                                query, fields, prevSemiNaiver, layer);
+        } else {
+            LOG(INFOL) << __func__ << "Use cached naturalTable";
+        }
+
+        HiResTimer t_get_card("Get Card query " + query.tostring());
+        t_get_card.start();
+        card = naturalTable->getCardinality(query);
+        t_get_card.stop();
+        LOG(INFOL) << t_get_card.tostring();
+
+    } else {
+        card = countCardinality(query);
+    }
+
+    return card;
 }
 
 EDBIterator *EDBonIDBTable::getIterator(const Literal &q) {
@@ -375,24 +209,26 @@ EDBIterator *EDBonIDBTable::getSortedIterator(const Literal &query,
     if (isNatural(query, fields)) {
         LOG(DEBUGL) << "'Natural' sorted query " << query.tostring(NULL, layer);
         if (naturalTable == NULL) {
-            LOG(DEBUGL) << "create new naturalTable";
-            naturalTable = EDBonIDBSortedIterator::createSortedTable(
+            LOG(DEBUGL) << __func__ << ": create new naturalTable";
+            naturalTable = createSortedTable(
                                 query, fields, prevSemiNaiver, layer);
         } else {
-            LOG(DEBUGL) << "Use cached naturalTable";
+            LOG(INFOL) << __func__ << ": Use cached naturalTable";
         }
-        return new EDBonIDBSortedIterator(query, fields, layer,
+        return new EDBonIDBSortedIterator(query, fields, *this, layer,
                                           naturalTable);
     }
 
     LOG(DEBUGL) << "Get SortedIterator for query " <<
-        query.tostring(NULL, layer) << " fields " << fields.size();
+        query.tostring(NULL, layer) << " fields " << fields2str(fields);
     LOG(INFOL) << "FIXME: implement cache for sorted query";
 
-    return new EDBonIDBSortedIterator(query, fields, prevSemiNaiver, layer);
+    return new EDBonIDBSortedIterator(query, fields, prevSemiNaiver, *this,
+                                      layer);
 }
 
 void EDBonIDBTable::releaseIterator(EDBIterator *itr) {
+
     delete itr;
 }
 

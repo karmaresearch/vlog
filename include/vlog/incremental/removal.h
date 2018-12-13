@@ -9,6 +9,8 @@
 #include <vlog/edbtable.h>
 #include <vlog/edbiterator.h>
 
+#include <vlog/hi-res-timer.h>
+
 class EDBLayer;
 
 class EDBRemoveItem {
@@ -76,6 +78,8 @@ class EDBRemovalIterator : public EDBIterator {
 
         size_t ticks = 0;
 
+        mutable HiResTimer *t_iterate;
+
     public:
         // Around a non-sorted Iterator
         EDBRemovalIterator(const Literal &query,
@@ -128,6 +132,9 @@ class EDBRemovalIterator : public EDBIterator {
         }
 
         virtual ~EDBRemovalIterator() {
+            t_iterate->stop();
+            LOG(INFOL) << t_iterate->tostring();
+            delete t_iterate;
             LOG(DEBUGL) << "EDBRemovalIterator: " << query.tostring() <<
                 " num rows queried " << ticks;
         }

@@ -1,13 +1,13 @@
 #include <vlog/incremental/removal.h>
 
+// #include <climits>
+
 #include <vlog/edb.h>
 #if 0
 #include <vlog/concepts.h>
 #include <vlog/idxtupletable.h>
 #include <vlog/column.h>
 #endif
-
-#include <climits>
 
 // Around a non-sorted Iterator
 EDBRemovalIterator::EDBRemovalIterator(const Literal &query,
@@ -16,6 +16,8 @@ EDBRemovalIterator::EDBRemovalIterator(const Literal &query,
         query(query), fields(std::vector<uint8_t>()),
         removeTuples(removeTuples), itr(itr),
         expectNext(false) {
+    t_iterate = new HiResTimer("RemovalIterator " + query.tostring());
+    t_iterate->start();
     // arity = query.getTuple().getSize();
     adornment = 0;
     current_term.resize(query.getTuple().getSize());
@@ -29,6 +31,8 @@ EDBRemovalIterator::EDBRemovalIterator(const Literal &query,
                                        EDBIterator *itr) :
                 query(query), fields(fields), removeTuples(removeTuples),
                 itr(itr), expectNext(false) {
+    t_iterate = new HiResTimer("RemovalIterator/Sorted " + query.tostring());
+    t_iterate->start();
     Predicate pred = query.getPredicate();
     VTuple tuple = query.getTuple();
     adornment = pred.calculateAdornment(tuple);
@@ -66,7 +70,7 @@ bool EDBRemovalIterator::hasNext() {
             for (int i = 0; i < term_ahead.size(); ++i) {
                 if (! (adornment & (0x1 << i))) {
                     term_ahead[i] = itr->getElementAt(i);
-                    LOG(DEBUGL) << "removal: set elt[" << i << "] to " << term_ahead[i];
+                    LOG(TRACEL) << "removal: set elt[" << i << "] to " << term_ahead[i];
                 }
             }
         }
