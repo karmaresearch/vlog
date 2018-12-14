@@ -318,6 +318,13 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     if (chaseMgmt->isRestricted()) {
         std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
         uint8_t count = 0;
+	std::vector<bool> blocked;
+	size_t blockedCount = 0;
+	if (chaseMgmt->isCheckCyclicMode()) {
+	    for (size_t i = 0; i < sizecolumns; i++) {
+		blocked.push_back(false);
+	    }
+	}
         for(const auto &at : atomTables) {
             const auto &h = at->getLiteral();
             if (chaseMgmt->isCheckCyclicMode()) {
@@ -359,6 +366,9 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                 }
 
                 for(size_t i = 0; i < sizecolumns; ++i) {
+		    if (blocked[i]) {
+			continue;
+		    }
                     //Fill the row
                     for(uint8_t j = 0; j < c.size(); ++j) {
                         if (!columnReaders[j]->hasNext()) {
@@ -372,7 +382,9 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     }
                     if (RMFA_check(tmprow.get(), h, headrow.get(), posToCheck)) {
                         //It is blocked
-                        filterRows.push_back(i);
+                        blocked[i] = true;
+			LOG(DEBUGL) << "Blocking row " << i;
+			blockedCount++;
                     }
                 }
             } else {
@@ -383,6 +395,19 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                 count += h.getTupleSize();
             }
         }
+
+	if (chaseMgmt->isCheckCyclicMode()) {
+	    if (blockedCount == sizecolumns) {
+		return;
+	    }
+	    for (size_t i = 0; i < sizecolumns; i++) {
+		if (blocked[i]) {
+		    for (int j = 0; j < atomTables.size(); j++) {
+			filterRows.push_back(i);
+		    }
+		}
+	    }
+	}
 
         if (filterRows.size() == sizecolumns * atomTables.size()) {
             return; //every substitution already exists in the database. Nothing
@@ -527,6 +552,13 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     if (chaseMgmt->isRestricted()) {
         std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
         uint8_t count = 0;
+	std::vector<bool> blocked;
+	size_t blockedCount = 0;
+	if (chaseMgmt->isCheckCyclicMode()) {
+	    for (size_t i = 0; i < sizecolumns; i++) {
+		blocked.push_back(false);
+	    }
+	}
         for(const auto &at : atomTables) {
             const auto &h = at->getLiteral();
 
@@ -558,6 +590,9 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     }
                 }
                 for(size_t i = 0; i < sizecolumns; ++i) {
+		    if (blocked[i]) {
+			continue;
+		    }
                     //Fill the row
                     for(uint8_t j = 0; j < c.size(); ++j) {
                         if (!columnReaders[j]->hasNext()) {
@@ -570,7 +605,9 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     }
                     if (RMFA_check(tmprow.get(), h, headrow.get(),
                                 columnsToCheck)) { //Is blocked
-                        filterRows.push_back(i);
+                        blocked[i] = true;
+			LOG(DEBUGL) << "Blocking row " << i;
+			blockedCount++;
                     }
                 }
             } else {
@@ -581,6 +618,19 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
             }
             count += h.getTupleSize();
         }
+
+	if (chaseMgmt->isCheckCyclicMode()) {
+	    if (blockedCount == sizecolumns) {
+		return;
+	    }
+	    for (size_t i = 0; i < sizecolumns; i++) {
+		if (blocked[i]) {
+		    for (int j = 0; j < atomTables.size(); j++) {
+			filterRows.push_back(i);
+		    }
+		}
+	    }
+	}
 
         if (filterRows.size() == sizecolumns * atomTables.size()) {
             return; //every substitution already exists in the database. Nothing
@@ -820,6 +870,7 @@ void ExistentialRuleProcessor::RMFA_enhanceFunctionTerms(
     size_t oldsize = output.size();
     //Check every fact until oldsize. If there is a function term, get also
     //all related facts
+    LOG(DEBUGL) << "RMFA_enhanceFuntionTerms, startOutput = " << startOutput << ", oldsize = " << oldsize;
     for(size_t i = startOutput; i < oldsize; ++i) {
         const auto literal = output[i];
         for(uint8_t j = 0; j < literal.getTupleSize(); ++j) {
@@ -901,6 +952,7 @@ void ExistentialRuleProcessor::RMFA_enhanceFunctionTerms(
 bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
         const Literal &headLiteral,
         uint64_t *headrow, std::vector<uint8_t> &columnsToCheck) {
+    LOG(DEBUGL) << "RMFA_check";
     //Get a starting value for the fresh IDs
     uint64_t freshIDs = 1; //0 is star
 
@@ -965,6 +1017,13 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
         if (chaseMgmt->isRestricted()) {
             std::vector<uint64_t> filterRows;
             uint8_t count = 0;
+	    std::vector<bool> blocked;
+	    size_t blockedCount = 0;
+	    if (chaseMgmt->isCheckCyclicMode()) {
+		for (size_t i = 0; i < nrows; i++) {
+		    blocked.push_back(false);
+		}
+	    }
             for(const auto &at : atomTables) {
                 const auto &h = at->getLiteral();
                 std::vector<std::shared_ptr<Column>> tobeRetained;
@@ -1004,6 +1063,9 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                     }
                     //Check the rows, one by one
                     for(size_t i = 0; i < nrows; ++i) {
+			if (blocked[i]) {
+			    continue;
+			}
                         //Fill the row
                         for(uint8_t j = 0; j < segmentSize; ++j) {
                             if (!segmentReaders[j]->hasNext()) {
@@ -1020,7 +1082,9 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                         }
                         if (RMFA_check(tmprow.get(), h, headrow.get(),
                                     columnsToCheck)) { //Is it blocked?
-                            filterRows.push_back(i);
+                            blocked[i] = true;
+			    LOG(DEBUGL) << "Blocking row " << i;
+			    blockedCount++;
                         }
                     }
                 } else {
@@ -1032,6 +1096,20 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                 }
                 count += h.getTupleSize();
             }
+
+	    if (chaseMgmt->isCheckCyclicMode()) {
+		if (blockedCount == nrows) {
+		    tmpRelation = std::unique_ptr<SegmentInserter>();
+		    return;
+		}
+		for (size_t i = 0; i < nrows; i++) {
+		    if (blocked[i]) {
+			for (int j = 0; j < atomTables.size(); j++) {
+			    filterRows.push_back(i);
+			}
+		    }
+		}
+	    }
 
             if (filterRows.size() == nrows * atomTables.size()) {
                 tmpRelation = std::unique_ptr<SegmentInserter>();
