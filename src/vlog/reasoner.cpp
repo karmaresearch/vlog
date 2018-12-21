@@ -831,7 +831,6 @@ void Reasoner::getMetrics(Literal &query, std::vector<uint8_t> *posBindings, std
     memset(&metrics, 0, sizeof(Metrics));
     std::vector<Rule> uniqueRules;
     evaluator->estimateQuery(metrics, maxDepth, query, uniqueRules);
-    metrics.countIDBPredicates = this->getNumberOfIDBPredicates(query, program);
     metrics.countUniqueRules = uniqueRules.size();
 }
 

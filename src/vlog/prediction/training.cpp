@@ -952,7 +952,6 @@ void parseQueriesLog(vector<string>& testQueriesLog,
         metrics.countRules = stoi(features[2]);
         metrics.countUniqueRules = stoi(features[3]);
         metrics.countIntermediateQueries = stoi(features[4]);
-        metrics.countIDBPredicates = stoi(features[5]);
         PredId_t featurePredicate = stoi(features[6]);
         testFeaturesVector.push_back(metrics);
         expectedDecisions.push_back(stoi(tokens[4]));
@@ -1122,7 +1121,6 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         features.push_back((*ptrFeatures)[i].countRules);
         features.push_back((*ptrFeatures)[i].countUniqueRules);
         features.push_back((*ptrFeatures)[i].countIntermediateQueries);
-        features.push_back((*ptrFeatures)[i].countIDBPredicates);
         int label = (*ptrDecisions)[i];
         if (label == 0) {
             trainingQsqr++;
@@ -1164,7 +1162,6 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         features.push_back(testMetrics[i].countRules);
         features.push_back(testMetrics[i].countUniqueRules);
         features.push_back(testMetrics[i].countIntermediateQueries);
-        features.push_back(testMetrics[i].countIDBPredicates);
 
         int heurLabel = foundSubsumingQuery(testQueries[i], trainingQueriesAndResult, p, edb);
         heuristicDecisions.push_back(heurLabel);
@@ -1301,8 +1298,7 @@ void Training::execLiteralQuery(string& literalquery,
         << std::to_string(metrics.estimate) << ","
         << std::to_string(metrics.countRules) << ","
         << std::to_string(metrics.countUniqueRules) << ","
-        << std::to_string(metrics.countIntermediateQueries) << ","
-        << std::to_string(metrics.countIDBPredicates);
+        << std::to_string(metrics.countIntermediateQueries);
     strFeatures += strMetrics.str();
 
     string algo="";
