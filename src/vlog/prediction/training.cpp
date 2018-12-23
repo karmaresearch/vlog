@@ -187,14 +187,16 @@ string printSubstitutions(vector<Substitution>& subs, EDBLayer& db) {
     return result;
 }
 
-void getAllPaths(uint16_t source, vector<Edge>& path, vector<vector<Edge>>& paths, int& maxDepth, Graph& graph) {
-    if (path.size() >= maxDepth) {
+void getAllPaths(uint16_t source, vector<Edge>& path, vector<vector<Edge>>& paths, int& maxDepth, Graph& graph, Program& p) {
+    if (!p.isPredicateIDB(source)) {
         paths.push_back(path);
+    } else if (paths.size() >= maxDepth) {
+        return;
     } else {
         for (auto e : graph[source]) {
             vector<Edge> newPath (path);
             newPath.push_back(e);
-            getAllPaths(source, newPath, paths, maxDepth, graph);
+            getAllPaths(e.endpoint.first, newPath, paths, maxDepth, graph, p);
         }
     }
 }
@@ -249,7 +251,7 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueriesAllPat
     for (int i = 0; i < ids.size(); ++i) {
         vector<Edge> pathTemp;
         vector<vector<Edge>> paths;
-        getAllPaths(ids[i], pathTemp, paths, depth, graph);
+        getAllPaths(ids[i], pathTemp, paths, depth, graph, p);
 
         int neighbours = graph[ids[i]].size();
         LOG(DEBUGL) << i+1 << ") " <<p.getPredicateName(ids[i]) << " is IDB  with " << neighbours << " neighbours";
@@ -259,7 +261,7 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueriesAllPat
             stringstream pathString;
             pathString.str("");
             for (auto node: ap) {
-                pathString << node.endpoint.first << "=> ";
+                pathString << p.getPredicateName(node.endpoint.first) << "=> ";
             }
             LOG(DEBUGL) << pathString.str();
         }
