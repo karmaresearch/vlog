@@ -608,7 +608,7 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
         std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
         LOG(INFOL) << "Query = " << literal.tostring(&p, &edb) << "Vector: " << \
         m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
-        <<m.countIntermediateQueries;
+        << ", " << m.countIntermediateQueries;
         LOG(INFOL) << "Time taken : " << durationMetrics.count() * 1000 << "ms";
         return;
     }

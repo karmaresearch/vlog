@@ -954,7 +954,6 @@ void parseQueriesLog(vector<string>& testQueriesLog,
         metrics.countRules = stoi(features[2]);
         metrics.countUniqueRules = stoi(features[3]);
         metrics.countIntermediateQueries = stoi(features[4]);
-        PredId_t featurePredicate = stoi(features[6]);
         testFeaturesVector.push_back(metrics);
         expectedDecisions.push_back(stoi(tokens[4]));
     }
@@ -1295,7 +1294,6 @@ void Training::execLiteralQuery(string& literalquery,
     reasoner.getMetrics(literal, NULL, NULL, edb, p, metrics, 5);
     featuresVector.push_back(metrics);
     stringstream strMetrics;
-    PredId_t featurePredicate = literal.getPredicate().getId();
     strMetrics  << std::to_string(metrics.cost) << ","
         << std::to_string(metrics.estimate) << ","
         << std::to_string(metrics.countRules) << ","

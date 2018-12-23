@@ -212,7 +212,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             vt.push_back(vt4);
             LOG(INFOL) << "Generating training queries: ";
             std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-            std::vector<std::pair<std::string,int>> trainingQueries = Training::generateNewTrainingQueries(conf,
+            std::vector<std::pair<std::string,int>> trainingQueries = Training::generateTrainingQueriesAllPaths(conf,
                     *edb.get(),
                     *program.get(),
                     depth,
