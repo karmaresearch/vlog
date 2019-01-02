@@ -9,6 +9,7 @@
 #include <vlog/exporter.h>
 #include <vlog/training.h>
 #include <vlog/utils.h>
+#include <vlog/helper.h>
 
 //Used to load a Trident KB
 #include <vlog/trident/tridenttable.h>
@@ -52,6 +53,7 @@ void printHelp(const char *programName, ProgramArgs &desc) {
     cout << "server\t\t starts in server mode." << endl;
     cout << "load\t\t load a Trident KB." << endl;
     cout << "gentq\t\t generate training queries from rules file." << endl;
+    cout << "tat\t\t generate training queries and test them with a model." << endl;
     cout << "lookup\t\t lookup for values in the dictionary." << endl << endl;
 
     cout << desc.tostring() << endl;
@@ -74,7 +76,8 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
     }
 
     if (cmd != "help" && cmd != "query" && cmd != "lookup" && cmd != "load" && cmd != "queryLiteral"
-            && cmd != "mat" && cmd != "rulesgraph" && cmd != "server" && cmd != "gentq") {
+            && cmd != "mat" && cmd != "rulesgraph" && cmd != "server" && cmd != "gentq"
+            && cmd != "tat") {
         printErrorMsg(
                 (string("The command \"") + cmd + string("\" is unknown.")).c_str());
         return false;
@@ -172,6 +175,21 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
                 string path = vm["rules"].as<string>();
                 if (!Utils::exists(path)) {
                     printErrorMsg((string("The rule file ") + path + string(" doe not exists")).c_str());
+                    return false;
+                }
+            }
+        } else if (cmd == "tat") {
+            if (vm["rules"].as<string>().compare("") != 0) {
+                string path = vm["rules"].as<string>();
+                if (!Utils::exists(path)) {
+                    printErrorMsg((string("The rule file ") + path + string(" doe not exists")).c_str());
+                    return false;
+                }
+            }
+            if (vm["testqueries"].as<string>().compare("") != 0) {
+                string path = vm["testqueries"].as<string>();
+                if (!Utils::exists(path)) {
+                    printErrorMsg((string("The test queries file ") + path + string(" doe not exists")).c_str());
                     return false;
                 }
             }
@@ -279,6 +297,10 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     ProgramArgs::GroupArgs& generateTraining_options = *vm.newGroup("Options for command <gentq>");
     generateTraining_options.add<int>("", "maxTuples", 50, "Number of EDB tuples per IDB predicate to consider for training", false);
     generateTraining_options.add<int>("", "depth", 5, "Recursion level of training generation procedure", false);
+
+    ProgramArgs::GroupArgs& trainAndTest_options = *vm.newGroup("Options for command <tat>");
+    trainAndTest_options.add<string>("tq", "testqueries", "",
+            "The path of the file with a log of test queries", false);
 
     ProgramArgs::GroupArgs& cmdline_options = *vm.newGroup("Parameters");
     cmdline_options.add<string>("l","logLevel", "info",
@@ -937,13 +959,17 @@ int main(int argc, const char** argv) {
             loader->load(p);
         }
         delete loader;
-    } else if (cmd == "gentq") {
+    } else if (cmd == "gentq" || cmd == "tat") {
         EDBConf conf(edbFile);
         string rulesFile = vm["rules"].as<string>();
         uint64_t maxTuples = vm["maxTuples"].as<unsigned int>();
+        string testQueriesLogFileName;
+        if (cmd == "tat") {
+            testQueriesLogFileName = vm["testqueries"].as<string>();
+        }
         int depth = vm["depth"].as<unsigned int>();
         EDBLayer *layer = new EDBLayer(conf, false);
-        Program p(layer);
+        Program program(layer);
         uint8_t vt1 = 1;
         uint8_t vt2 = 2;
         uint8_t vt3 = 3;
@@ -953,12 +979,12 @@ int main(int argc, const char** argv) {
         vt.push_back(vt2);
         vt.push_back(vt3);
         vt.push_back(vt4);
-        p.readFromFile(rulesFile);
+        program.readFromFile(rulesFile);
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         //std::vector<std::pair<std::string,int>> trainingQueries = Training::generateNewTrainingQueries(conf,
         std::vector<std::pair<std::string,int>> trainingQueries = Training::generateTrainingQueriesAllPaths(conf,
                 *layer,
-                p,
+                program,
                 depth,
                 maxTuples,
                 vt);
@@ -975,6 +1001,44 @@ int main(int argc, const char** argv) {
             LOG(INFOL) << "Error writing to the log file";
         }
         logFile.close();
+        if (cmd == "tat") {
+            vector<string> trainingQueriesVector;
+            int nMaxTrainingQueries = 500; // can be an optional argument
+            if (nMaxTrainingQueries < 0) {
+                nMaxTrainingQueries = nQueries;
+            }
+            LOG(INFOL) << "Max training queries : " << nMaxTrainingQueries;
+            int i = 0;
+            vector<int> queryIndexes(nMaxTrainingQueries);
+            getRandomTupleIndexes(nMaxTrainingQueries, nQueries, queryIndexes);
+            LOG(INFOL) << "query indexes received : " << queryIndexes.size();
+            for (auto qi: queryIndexes) {
+                trainingQueriesVector.push_back(trainingQueries[qi].first);
+            }
+            // 2. test the model against test queries
+
+            uint64_t timeout = 10000; // milliseconds
+            uint8_t repeatQuery = 3;
+            vector<string> testQueriesLog;
+            ifstream ifs(testQueriesLogFileName);
+            string logLine;
+
+            while (ifs && std::getline(ifs, logLine)) {
+                if (logLine.size() == 0) {
+                    continue;
+                }
+                testQueriesLog.push_back(logLine);
+            }
+            LOG(INFOL) << "test Queries at web interface = " << testQueriesLog.size();
+            double accuracy = 0.0;
+            Training::trainAndTestModel(trainingQueriesVector,
+                    testQueriesLog,
+                    *layer,
+                    program,
+                    accuracy,
+                    timeout,
+                    repeatQuery);
+        }
     } else if (cmd == "server") {
 #ifdef WEBINTERFACE
         startServer(argc, argv, full_path, vm);

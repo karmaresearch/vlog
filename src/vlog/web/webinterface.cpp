@@ -386,7 +386,6 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                     srules.begin(), srules.end(), e2, "$1\n");
             srules = replacedString;
 
-            LOG(INFOL) << "# of rules = "<< srules.size();
             spremat = HttpClient::unescape(spremat);
             replacedString = "";
             std::regex_replace(std::back_inserter(replacedString),
