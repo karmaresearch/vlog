@@ -301,6 +301,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     ProgramArgs::GroupArgs& trainAndTest_options = *vm.newGroup("Options for command <tat>");
     trainAndTest_options.add<string>("tq", "testqueries", "",
             "The path of the file with a log of test queries", false);
+    trainAndTest_options.add<int>("mtq", "maxTrainingQueries", 500, "Number of training queries to train on to train on", false);
 
     ProgramArgs::GroupArgs& cmdline_options = *vm.newGroup("Parameters");
     cmdline_options.add<string>("l","logLevel", "info",
@@ -1003,8 +1004,8 @@ int main(int argc, const char** argv) {
         logFile.close();
         if (cmd == "tat") {
             vector<string> trainingQueriesVector;
-            int nMaxTrainingQueries = 500; // can be an optional argument
-            if (nMaxTrainingQueries < 0) {
+            int nMaxTrainingQueries = vm["maxTrainingQueries"].as<unsigned int>(); // can be an optional argument
+            if (nQueries < nMaxTrainingQueries || nMaxTrainingQueries < 0) {
                 nMaxTrainingQueries = nQueries;
             }
             LOG(INFOL) << "Max training queries : " << nMaxTrainingQueries;
