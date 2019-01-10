@@ -844,7 +844,34 @@ int main(int argc, const char** argv) {
         if (cmd == "query") {
             execSPARQLQuery(*layer, vm);
         } else {
-            execLiteralQuery(*layer, vm);
+            string queryFile = vm["query"].as<string>();
+            if (!Utils::exists(queryFile)) {
+                execLiteralQuery(*layer, vm);
+            } else {
+                string rulesFile = vm["rules"].as<string>();
+                Program program(layer);
+                program.readFromFile(rulesFile);
+                vector<string> trainingQueriesVector;
+                // read the file and make the vector of queries
+                ifstream file(queryFile);
+                string line;
+                while (file && getline(file, line)) {
+                    if (line.size() == 0) {
+                        continue;
+                    }
+                    trainingQueriesVector.push_back(line);
+                }
+                //get logfile name from rules file
+                size_t dotIndex = rulesFile.find_last_of(".");
+                string logFileName = rulesFile.substr(0, dotIndex);
+                logFileName += "-training.log";
+                // Run the queries with threshold 10s and repeat queries 3 times
+                // to take average of the running time
+                vector<Metrics> featuresVector;
+                vector<int> decisionVector;
+                int nMagicQueries = 0;
+                Training::runQueries(trainingQueriesVector, *layer, program, 10000, 3, featuresVector, decisionVector,nMagicQueries, logFileName);
+            }
         }
         delete layer;
     } else if (cmd == "lookup") {
@@ -1018,8 +1045,6 @@ int main(int argc, const char** argv) {
             }
             // 2. test the model against test queries
 
-            uint64_t timeout = 10000; // milliseconds
-            uint8_t repeatQuery = 3;
             vector<string> testQueriesLog;
             ifstream ifs(testQueriesLogFileName);
             string logLine;
@@ -1031,14 +1056,20 @@ int main(int argc, const char** argv) {
                 testQueriesLog.push_back(logLine);
             }
             LOG(INFOL) << "test Queries at web interface = " << testQueriesLog.size();
+            size_t dotIndex = rulesFile.find_last_of(".");
+            string logFileName = rulesFile.substr(0, dotIndex);
+            logFileName += "-training.log";
             double accuracy = 0.0;
+            uint64_t timeout = 10000; // milliseconds
+            uint8_t repeatQuery = 3;
             Training::trainAndTestModel(trainingQueriesVector,
                     testQueriesLog,
                     *layer,
                     program,
                     accuracy,
                     timeout,
-                    repeatQuery);
+                    repeatQuery,
+                    logFileName);
         }
     } else if (cmd == "server") {
 #ifdef WEBINTERFACE

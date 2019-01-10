@@ -282,6 +282,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             }
             LOG(INFOL) << "test Queries at web interface = " << testQueriesLog.size();
             double accuracy = 0.0;
+            string logFileName = "training-queries.datalog";
             if (program) {
                 Training::trainAndTestModel(trainingQueriesVector,
                         testQueriesLog,
@@ -289,7 +290,8 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                         *program.get(),
                         accuracy,
                         timeout,
-                        repeatQuery);
+                        repeatQuery,
+                        logFileName);
             }
             // 3. Set the output in json
             JSON node;

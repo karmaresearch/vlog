@@ -1012,22 +1012,21 @@ double computeAccuracy(vector<Instance>& testInst, LogisticRegression& lr, doubl
     return accuracy;
 }
 
-void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
-        vector<string>& testQueriesLog,
+void Training::runQueries(vector<string>& trainingQueriesVector,
         EDBLayer& edb,
         Program& p,
-        double& accuracy,
         uint64_t timeout,
-        uint8_t repeatQuery) {
+        uint8_t repeatQuery,
+        vector<Metrics>& featuresVector,
+        vector<int>& decisionVector,
+        int& nMagicQueries,
+        string& logFileName) {
 
-    vector<Metrics> featuresVector;
-    vector<int> decisionVector;
     vector<string> strResults;
     vector<string> strFeatures;
     vector<string> strQsqrTime;
     vector<string> strMagicTime;
-    ofstream logTraining("training-queries.log");
-    int nMagicQueries = 0;
+    ofstream logTraining(logFileName);
     int i = 1;
     vector<string> workingQueries = trainingQueriesVector;
     vector<uint64_t> timeouts = {10000,60000,300000};
@@ -1072,6 +1071,21 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         LOG(ERRORL) << "Error writing to file";
     }
     logTraining.close();
+}
+
+void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
+        vector<string>& testQueriesLog,
+        EDBLayer& edb,
+        Program& p,
+        double& accuracy,
+        uint64_t timeout,
+        uint8_t repeatQuery,
+        string& logFileName) {
+
+    vector<Metrics> featuresVector;
+    vector<int> decisionVector;
+    int nMagicQueries = 0;
+    Training::runQueries(trainingQueriesVector, edb, p, timeout, repeatQuery, featuresVector, decisionVector,nMagicQueries, logFileName);
 
     vector<Metrics> balancedFeaturesVector;
     vector<int> balancedDecisionVector;
@@ -1141,11 +1155,10 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         instances[i].x[2] = std::log1p(instances[i].x[2]);
         instances[i].x[3] = std::log1p(instances[i].x[3]);
         instances[i].x[4] = std::log1p(instances[i].x[4]);
-        instances[i].x[5] = std::log1p(instances[i].x[5]);
     }
     int totalTraining = instances.size();
     double qsqrPercent = ((double)trainingQsqr / (double)totalTraining);//*100;
-    LogisticRegression lr(6);
+    LogisticRegression lr(5);
     lr.train(instances);
 
     //ofstream logCorrectlyGuessedMagic("correctly-guessed-magic.log");
@@ -1177,7 +1190,6 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         testInst[i].x[2] = std::log1p(testInst[i].x[2]);
         testInst[i].x[3] = std::log1p(testInst[i].x[3]);
         testInst[i].x[4] = std::log1p(testInst[i].x[4]);
-        testInst[i].x[5] = std::log1p(testInst[i].x[5]);
     }
 
     vector<double> probabilities = {0.1, 0.2, 0.3, 0.4, 0.45, 0.5, 0.55, 0.6, 0.7, 0.8, 0.9, qsqrPercent};

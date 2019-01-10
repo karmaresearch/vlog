@@ -85,13 +85,24 @@ class Training {
         uint64_t timeout,
         uint8_t repeatQuery);
 
+    static void runQueries(vector<string>& trainingQueriesVector,
+        EDBLayer& edb,
+        Program& p,
+        uint64_t timeout,
+        uint8_t repeatQuery,
+        vector<Metrics>& featuresVector,
+        vector<int>& decisionVector,
+        int& nMagicQueries,
+        string& logFileName);
+
     static void trainAndTestModel(vector<string>& trainingQueriesVector,
         vector<string>& testQueriesLog,
         EDBLayer& edb,
         Program& p,
         double& accuracy,
         uint64_t timeout,
-        uint8_t repeatQuery);
+        uint8_t repeatQuery,
+        string& logFileName);
 };
 
 #endif
