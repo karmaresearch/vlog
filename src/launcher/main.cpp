@@ -302,6 +302,8 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     trainAndTest_options.add<string>("tq", "testqueries", "",
             "The path of the file with a log of test queries", false);
     trainAndTest_options.add<int>("mtq", "maxTrainingQueries", 500, "Number of training queries to train on to train on", false);
+    trainAndTest_options.add<int>("", "timeout", 10000, "Number milliseconds the query should time out after", false);
+    trainAndTest_options.add<int>("", "repeatQuery", 3, "Number of times the query should be executed repeatedly to take the average of its runtime", false);
 
     ProgramArgs::GroupArgs& cmdline_options = *vm.newGroup("Parameters");
     cmdline_options.add<string>("l","logLevel", "info",
@@ -1055,13 +1057,13 @@ int main(int argc, const char** argv) {
                 }
                 testQueriesLog.push_back(logLine);
             }
-            LOG(INFOL) << "test Queries at web interface = " << testQueriesLog.size();
+            LOG(INFOL) << "test Queries in the file = " << testQueriesLog.size();
             size_t dotIndex = rulesFile.find_last_of(".");
             string logFileName = rulesFile.substr(0, dotIndex);
             logFileName += "-training.log";
             double accuracy = 0.0;
-            uint64_t timeout = 10000; // milliseconds
-            uint8_t repeatQuery = 3;
+            uint64_t timeout = vm["timeout"].as<unsigned int>();
+            uint8_t repeatQuery = vm["repeatQuery"].as<unsigned int>();
             Training::trainAndTestModel(trainingQueriesVector,
                     testQueriesLog,
                     *layer,
