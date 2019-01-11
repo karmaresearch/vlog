@@ -221,7 +221,7 @@ void SingleHeadFinalRuleProcessor::addColumns(const int blockid,
             utmpt[blockid] = new SegmentInserter(rowsize);
         }
 
-        uint8_t columns[128];
+        uint8_t columns[256];
         for (uint32_t i = 0; i < nCopyFromSecond; ++i) {
             columns[i] = posFromSecond[i].second;
         }
@@ -282,7 +282,7 @@ void SingleHeadFinalRuleProcessor::addColumns(const int blockid,
             tmpt[blockid] = new SegmentInserter(rowsize);
         }
 
-        uint8_t columns[128];
+        uint8_t columns[256];
         for (uint32_t i = 0; i < nCopyFromSecond; ++i) {
             columns[i] = posFromSecond[i].second;
         }

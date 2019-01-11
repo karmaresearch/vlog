@@ -7,7 +7,7 @@
 
 #include <vector>
 
-#define MAX_MAPPINGS 8
+#define MAX_MAPPINGS 256
 
 #define TMPT_THRESHOLD  (32*1024*1024)
 
