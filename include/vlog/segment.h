@@ -10,6 +10,7 @@
 #include <memory>
 #include <vector>
 #include <assert.h>
+#include <set>
 
 struct GetVectors {
     const std::vector<std::shared_ptr<Column>> &cols;
@@ -172,6 +173,8 @@ class Segment {
         bool areAllColumnsPartOftheSameQuery(EDBLayer **layer, const Literal **lit,
                 std::vector<uint8_t> *posInLiteral)
             const;
+
+        size_t getRepresentationSize(std::set<uint64_t> &IDs) const;
 
 #if DEBUG
         void checkSizes() const;

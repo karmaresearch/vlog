@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <string>
 #include <unordered_map>
+#include <set>
 
 class FCInternalTableItr {
     public:
@@ -136,6 +137,8 @@ class FCInternalTable {
         size_t estimateNRows() const {
             return estimateNRows(0, NULL, NULL);
         }
+
+        virtual size_t getRepresentationSize(std::set<uint64_t> &IDs) const = 0;
 
         virtual std::shared_ptr<const FCInternalTable> filter(
                 const uint8_t nPosToCopy, const uint8_t *posVarsToCopy,
@@ -520,6 +523,9 @@ class InmemoryFCInternalTable : public FCInternalTable {
 
         size_t getNRows() const;
 
+
+        size_t getRepresentationSize(std::set<uint64_t> &IDs) const;
+
         bool isEmpty() const;
 
         bool supportsDirectAccess() const {
@@ -610,6 +616,8 @@ class EDBFCInternalTable : public FCInternalTable {
         }
 
         size_t getNRows() const;
+
+        size_t getRepresentationSize(std::set<uint64_t> &IDs) const;
 
         bool isEmpty() const;
 
@@ -738,6 +746,10 @@ class SingletonTable : public FCInternalTable {
 
         bool supportsDirectAccess() const {
             return true;
+        }
+
+        size_t getRepresentationSize(std::set<uint64_t> &IDs) const {
+            return 0;
         }
 
         FCInternalTableItr *getIterator() const {
