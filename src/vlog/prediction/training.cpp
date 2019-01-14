@@ -1339,7 +1339,7 @@ void Training::execLiteralQuery(string& literalquery,
     LOG(INFOL) << "Qsqr time : " << avgQsqrTime;
     LOG(INFOL) << "magic time: " << avgMagicTime;
     int winner = 0; // 0 is for QSQR
-    if (avgMagicTime < avgQsqrTime) {
+    if (avgMagicTime <= avgQsqrTime) {
         winner = 1;
     }
     decisionVector.push_back(winner);

@@ -303,7 +303,6 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "The path of the file with a log of test queries", false);
     trainAndTest_options.add<int>("mtq", "maxTrainingQueries", 500, "Number of training queries to train on to train on", false);
     trainAndTest_options.add<int>("", "timeout", 10000, "Number milliseconds the query should time out after", false);
-    trainAndTest_options.add<int>("", "repeatQuery", 3, "Number of times the query should be executed repeatedly to take the average of its runtime", false);
 
     ProgramArgs::GroupArgs& cmdline_options = *vm.newGroup("Parameters");
     cmdline_options.add<string>("l","logLevel", "info",

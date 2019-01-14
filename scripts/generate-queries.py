@@ -196,7 +196,7 @@ def runQueries(queries):
             vector_str = runQueryWithAlgo(q, "onlyMetrics", STR_vector, "\\n", ARG_TIMEOUT)
             vector = vector_str.split(',')
 
-            if float(avgMagicTime) < float(avgQsqrTime):
+            if float(avgMagicTime) <= float(avgQsqrTime):
                 winnerAlgorithm = "MAGIC"
 
             allFeatures = []
