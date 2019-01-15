@@ -868,10 +868,29 @@ int main(int argc, const char** argv) {
                 logFileName += "-training.log";
                 // Run the queries with threshold 10s and repeat queries 3 times
                 // to take average of the running time
-                vector<Metrics> featuresVector;
-                vector<int> decisionVector;
-                int nMagicQueries = 0;
-                Training::runQueries(trainingQueriesVector, *layer, program, 10000, 3, featuresVector, decisionVector,nMagicQueries, logFileName);
+                uint64_t timeout = vm["timeout"].as<unsigned int>();
+                uint8_t repeatQuery = vm["repeatQuery"].as<unsigned int>();
+                string algo = vm["reasoningAlgo"].as<string>();
+                if (algo == "onlyMetrics") {
+                    for (auto query : trainingQueriesVector) {
+                        Dictionary dictVariables;
+                        Literal literal = program.parseLiteral(query, dictVariables);
+                        Reasoner reasoner(vm["reasoningThreshold"].as<int64_t>());
+                        Metrics m;
+                        std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
+                        reasoner.getMetrics(literal, NULL, NULL, *layer, program, m, 5);
+                        std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
+                        LOG(INFOL) << "Query = " << query << "Vector: " << \
+                        m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
+                        << ", " << m.countIntermediateQueries;
+                        LOG(INFOL) << "Time taken : " << durationMetrics.count() * 1000 << "ms";
+                    }
+                } else {
+                    vector<Metrics> featuresVector;
+                    vector<int> decisionVector;
+                    int nMagicQueries = 0;
+                    Training::runQueries(trainingQueriesVector, *layer, program, timeout, repeatQuery, featuresVector, decisionVector,nMagicQueries, logFileName);
+                }
             }
         }
         delete layer;
