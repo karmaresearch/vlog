@@ -14,6 +14,9 @@ void TriggerSemiNaiver::run(std::string trigger_paths) {
         allrules.push_back(RuleExecutionDetails(*itr, ruleid++));
     }
 
+    //Do not check for duplicates anymore
+    setIgnoreDuplicatesElimination();
+
     LOG(DEBUGL) << "First load the trigger_path file";
     TGPaths paths(trigger_paths);
     LOG(DEBUGL) << "There are " << paths.getNPaths() << " paths to execute";

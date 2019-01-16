@@ -88,6 +88,7 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
     nthreads(nthreads),
     checkCyclicTerms(false) {
 
+        ignoreDuplicatesElimination = false;
         TableFilterer::setOptIntersect(opt_intersect);
         memset(predicatesTables, 0, sizeof(TupleTable*)*MAX_NPREDS);
 
@@ -1088,7 +1089,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                             finalResultContainer == NULL,
                             !multithreaded ? -1 : nthreads,
                             this,
-                            chaseMgmt);
+                            chaseMgmt,
+                            ignoreDuplicatesElimination);
                 } else {
                     if (heads.size() == 1) {
                         FCTable *table = getTable(heads[0].getPredicate().getId(),
@@ -1104,7 +1106,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                                 (uint8_t) orderExecution,
                                 iteration,
                                 finalResultContainer == NULL,
-                                !multithreaded ? -1 : nthreads);
+                                !multithreaded ? -1 : nthreads,
+                                ignoreDuplicatesElimination);
                     } else {
                         joinOutput = new FinalRuleProcessor(
                                 plan.posFromFirst[optimalOrderIdx],
@@ -1113,7 +1116,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                                 heads, &ruleDetails,
                                 (uint8_t) orderExecution, iteration,
                                 finalResultContainer == NULL,
-                                !multithreaded ? -1 : nthreads, this);
+                                !multithreaded ? -1 : nthreads, this,
+                                ignoreDuplicatesElimination);
                     }
                 }
             }

@@ -19,8 +19,8 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
         std::unique_ptr<SegmentInserter> tmpRelation;
         //In the above case, I store the data in a temporary segment, and assign
         //existential IDs when I consolidate
-	std::vector<uint8_t> varsUsedForExt;
-	std::vector<int> colsForExt;
+        std::vector<uint8_t> varsUsedForExt;
+        std::vector<int> colsForExt;
 
         static void filterDerivations(FCTable *t,
                 std::vector<std::shared_ptr<Column>> &tobeRetained,
@@ -56,7 +56,8 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 const bool addToEndTable,
                 const int nthreads,
                 SemiNaiver *sn,
-                std::shared_ptr<ChaseMgmt> chaseMgmt);
+                std::shared_ptr<ChaseMgmt> chaseMgmt,
+                const bool ignoreDupElimin);
 
         void addColumns(const int blockid, FCInternalTableItr *itr,
                 const bool unique, const bool sorted,
@@ -79,7 +80,7 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 const bool unique);
 
         void processResults(std::vector<int> &blockid, Term_t *p,
-		std::vector<bool> &unique, std::mutex *m);
+                std::vector<bool> &unique, std::mutex *m);
 
         void processResults(const int blockid, FCInternalTableItr *first,
                 FCInternalTableItr* second, const bool unique);

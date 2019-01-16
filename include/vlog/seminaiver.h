@@ -59,6 +59,8 @@ class SemiNaiver {
         std::vector<FCBlock> listDerivations;
         std::vector<StatsRule> statsRuleExecution;
 
+        bool ignoreDuplicatesElimination;
+
 
 #ifdef WEBINTERFACE
         long statsLastIteration;
@@ -145,6 +147,10 @@ class SemiNaiver {
 
         void prepare(std::vector<RuleExecutionDetails> &allrules,
                 size_t lastExecution = 0);
+
+        void setIgnoreDuplicatesElimination() {
+            ignoreDuplicatesElimination = true;
+        }
 
     public:
         VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
