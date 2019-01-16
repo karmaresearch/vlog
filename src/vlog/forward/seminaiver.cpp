@@ -211,13 +211,13 @@ bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
     bool newDer = false;
     for (size_t i = 0; i < edbRuleset.size(); ++i) {
         newDer |= executeRule(edbRuleset[i], iteration, limitView, NULL);
-	if (timeout != NULL && *timeout != 0) {
-	    std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
-	    if (s.count() > *timeout) {
-		*timeout = 0;	// To indicate materialization was stopped because of timeout.
-		return newDer;
-	    }
-	}
+        if (timeout != NULL && *timeout != 0) {
+            std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
+            if (s.count() > *timeout) {
+                *timeout = 0;   // To indicate materialization was stopped because of timeout.
+                return newDer;
+            }
+        }
         iteration++;
     }
 #if DEBUG
@@ -231,18 +231,7 @@ bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
     return newDer;
 }
 
-void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
-        bool checkCyclicTerms) {
-    this->checkCyclicTerms = checkCyclicTerms;
-    this->foundCyclicTerms = false;
-    running = true;
-    iteration = it;
-    startTime = std::chrono::system_clock::now();
-#ifdef WEBINTERFACE
-    statsLastIteration = -1;
-#endif
-    listDerivations.clear();
-
+void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules, size_t lastExecution) {
     //Prepare for the execution
 #if DEBUG
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
@@ -274,7 +263,6 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
         LOG(DEBUGL) << el.rule.tostring(program, &layer);
 
     //Setup the datastructures to handle the chase
-    std::vector<RuleExecutionDetails> allrules;
     std::copy(allEDBRules.begin(), allEDBRules.end(), std::back_inserter(allrules));
     std::copy(allIDBRules.begin(), allIDBRules.end(), std::back_inserter(allrules));
     chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt(allrules,
@@ -283,6 +271,22 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(DEBUGL) << "Runtime ruleset optimization ms = " << sec.count() * 1000;
 #endif
+}
+
+void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
+        bool checkCyclicTerms) {
+    this->checkCyclicTerms = checkCyclicTerms;
+    this->foundCyclicTerms = false;
+    running = true;
+    iteration = it;
+    startTime = std::chrono::system_clock::now();
+#ifdef WEBINTERFACE
+    statsLastIteration = -1;
+#endif
+    listDerivations.clear();
+
+    std::vector<RuleExecutionDetails> allrules;
+    prepare(allrules, lastExecution);
 
     //Used for statistics
     std::vector<StatIteration> costRules;
@@ -321,7 +325,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
         }
         int loopNr = 0;
         std::vector<RuleExecutionDetails> emptyRuleset;
-	bool mayHaveTimeout = timeout != NULL && *timeout != 0;
+        bool mayHaveTimeout = timeout != NULL && *timeout != 0;
         while (true) {
             bool resp1;
             if (loopNr == 0)
@@ -337,9 +341,9 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
                 break; //Fix-point
             }
             loopNr++;
-	    if (mayHaveTimeout && *timeout == 0) {
-		break;
-	    }
+            if (mayHaveTimeout && *timeout == 0) {
+                break;
+            }
         }
     } else {
         executeRules(allEDBRules, allIDBRules, costRules, 0, true, timeout);

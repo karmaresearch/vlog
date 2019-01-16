@@ -26,6 +26,8 @@ struct RuleExecutionDetails {
 
     void createExecutionPlans();
 
+    void createExecutionPlans(std::vector<std::pair<size_t, size_t>> &ranges);
+
     void calculateNVarsInHeadFromEDB();
 
     //static void checkWhetherEDBsRedundantHead(RuleExecutionPlan &plan,
@@ -35,6 +37,9 @@ struct RuleExecutionDetails {
             const Literal &head, RuleExecutionPlan &hv);
 
     private:
+
+    void calculateDependencies(const Rule &rule,
+        std::map<uint8_t, std::vector<uint8_t>> &dependenciesExtVars);
 
     void rearrangeLiterals(std::vector<const Literal*> &vector, const size_t idx);
 

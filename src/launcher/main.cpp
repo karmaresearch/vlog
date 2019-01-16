@@ -50,6 +50,7 @@ void printHelp(const char *programName, ProgramArgs &desc) {
     cout << "Possible commands:" << endl;
     cout << "help\t\t produce help message." << endl;
     cout << "mat\t\t perform a full materialization." << endl;
+    cout << "mat_tg\t\t perform a full materialization guided by a trigger graph." << endl;
     cout << "query\t\t execute a SPARQL query." << endl;
     cout << "queryLiteral\t\t execute a Literal query." << endl;
     cout << "server\t\t starts in server mode." << endl;
@@ -79,7 +80,7 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
     }
 
     if (cmd != "help" && cmd != "query" && cmd != "lookup" && cmd != "load" && cmd != "queryLiteral"
-            && cmd != "mat" && cmd != "rulesgraph" && cmd != "server" && cmd != "gentq" &&
+            && cmd != "mat" && cmd != "mat_tg" && cmd != "rulesgraph" && cmd != "server" && cmd != "gentq" &&
             cmd != "cycles" && cmd !="deps") {
         printErrorMsg(
                 (string("The command \"") + cmd + string("\" is unknown.")).c_str());
@@ -191,6 +192,17 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
                             path + string("' does not exists")).c_str());
                 return false;
             }
+        } else if (cmd == "mat_tg") {
+            string path = vm["trigger_paths"].as<string>();
+            if (path == "") {
+                printErrorMsg(string("You must indicate the file that contains trigger paths with '--trigger_paths'").c_str());
+            }
+            if (path != "" && !Utils::exists(path)) {
+                printErrorMsg((string("The file '") +
+                            path + string("' does not exists")).c_str());
+                return false;
+            }
+
         } else if (cmd == "cycles") {
             string path = vm["rules"].as<string>();
             if (path == "") {
@@ -219,7 +231,7 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
 
 bool initParams(int argc, const char** argv, ProgramArgs &vm) {
 
-    ProgramArgs::GroupArgs& query_options = *vm.newGroup("Options for <query>, <queryLiteral> or <mat>");
+    ProgramArgs::GroupArgs& query_options = *vm.newGroup("Options for <query>, <queryLiteral> or <mat> (or <mat_tg>)");
     query_options.add<string>("q", "query", "",
             "The path of the file with a query. It is REQUIRED with <query> or <queryLiteral>", false);
     query_options.add<string>("","rules", "",
@@ -230,6 +242,9 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "This parameter sets a threshold to estimate the reasoning cost of a pattern. This cost can be broadly associated to the cardinality of the pattern. It is used to choose either TopDown or Magic evalution. Default is 1000000 (1M).", false);
     query_options.add<string>("", "reasoningAlgo", "",
             "Determines the reasoning algo (only for <queryLiteral>). Possible values are \"qsqr\", \"magic\", \"auto\".", false);
+    query_options.add<string>("", "trigger_paths", "",
+            "Path to the file that contains trigger graph execution paths",
+            false);
     query_options.add<string>("", "selectionStrategy", "",
             "Determines the selection strategy (only for <queryLiteral>, when \"auto\" is specified for the reasoningAlgorithm). Possible values are \"cardEst\", ... (to be extended) .", false);
     query_options.add<int64_t>("", "matThreshold", 10000000,
@@ -355,8 +370,8 @@ void writeRuleDependencyGraph(EDBLayer &db, string pathRules, string filegraph) 
     Program p(&db);
     std::string s = p.readFromFile(pathRules, false);
     if (s != "") {
-	LOG(ERRORL) << s;
-	return;
+        LOG(ERRORL) << s;
+        return;
     }
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(db,
             &p, true, true, false, false, 1, 1, false);
@@ -394,6 +409,110 @@ void startServer(int argc,
 }
 #endif
 
+void launchTriggeredMat(int argc,
+        const char** argv,
+        string pathExec,
+        EDBLayer &db,
+        ProgramArgs &vm,
+        std::string pathRules,
+        std::string pathTriggers) {
+    //Load a program with all the rules
+    Program p(&db);
+    std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+    if (s != "") {
+        LOG(ERRORL) << s;
+        return;
+    }
+
+    int nthreads = vm["nthreads"].as<int>();
+    if (vm["multithreaded"].empty()) {
+        nthreads = -1;
+    }
+    int interRuleThreads = vm["interRuleThreads"].as<int>();
+    if (vm["multithreaded"].empty()) {
+        interRuleThreads = 0;
+    }
+
+    //Prepare the materialization
+    std::shared_ptr<TriggerSemiNaiver> sn = Reasoner::getTriggeredSemiNaiver(db,
+            &p,
+            vm["restrictedChase"].as<bool>());
+
+#ifdef WEBINTERFACE
+    //Start the web interface if requested
+    std::unique_ptr<WebInterface> webint;
+    if (vm["webinterface"].as<bool>()) {
+        webint = std::unique_ptr<WebInterface>(
+                new WebInterface(vm, sn, pathExec + "/webinterface",
+                    flattenAllArgs(argc, argv),
+                    vm["edb"].as<string>()));
+        int port = vm["port"].as<int>();
+        webint->start(port);
+    }
+#endif
+    //Starting monitoring thread
+#if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
+    std::thread monitor;
+    std::mutex mtx;
+    std::condition_variable cv;
+    bool isFinished = false;
+    if (vm["monitorThread"].as<bool>()) {
+        //Activate it only for Linux systems
+        monitor = std::thread(
+                std::bind(TridentUtils::monitorPerformance,
+                    1, &cv, &mtx, &isFinished));
+    }
+#endif
+
+    LOG(INFOL) << "Starting full materialization guided by trigger graphs";
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+    sn->run(vm["trigger_paths"].as<std::string>());
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
+    sn->printCountAllIDBs("");
+
+#if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
+    if (vm["monitorThread"].as<bool>()) {
+        isFinished = true;
+        LOG(INFOL) << "Waiting until logging thread is finished ...";
+        monitor.join(); //Wait until the monitor thread is finished
+    }
+#endif
+
+    if (vm["storemat_path"].as<string>() != "") {
+        std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+
+        Exporter exp(sn);
+
+        string storemat_format = vm["storemat_format"].as<string>();
+
+        if (storemat_format == "files" || storemat_format == "csv") {
+            sn->storeOnFiles(vm["storemat_path"].as<string>(),
+                    vm["decompressmat"].as<bool>(), 0, storemat_format == "csv");
+        } else if (storemat_format == "db") {
+            //I will store the details on a Trident index
+            exp.generateTridentDiffIndex(vm["storemat_path"].as<string>());
+        } else if (storemat_format == "nt") {
+            exp.generateNTTriples(vm["storemat_path"].as<string>(), vm["decompressmat"].as<bool>());
+        } else {
+            LOG(ERRORL) << "Option 'storemat_format' not recognized";
+            throw 10;
+        }
+
+        std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+        LOG(INFOL) << "Time to index and store the materialization on disk = " << sec.count() << " seconds";
+    }
+#ifdef WEBINTERFACE
+    if (webint) {
+        //Sleep for max 1 second, to allow the fetching of the last statistics
+        LOG(INFOL) << "Sleeping for one second to allow the web interface to get the last stats ...";
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        LOG(INFOL) << "Done.";
+        webint->stop();
+    }
+#endif
+}
+
 void launchFullMat(int argc,
         const char** argv,
         string pathExec,
@@ -404,8 +523,8 @@ void launchFullMat(int argc,
     Program p(&db);
     std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
     if (s != "") {
-	LOG(ERRORL) << s;
-	return;
+        LOG(ERRORL) << s;
+        return;
     }
 
     //Existential check
@@ -538,11 +657,11 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     Program p(&edb);
     string pathRules = vm["rules"].as<string>();
     if (pathRules != "") {
-	std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
-	if (s != "") {
-	    LOG(ERRORL) << s;
-	    return;
-	}
+        std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+        if (s != "") {
+            LOG(ERRORL) << s;
+            return;
+        }
         p.sortRulesByIDBPredicates();
     }
 
@@ -589,11 +708,11 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     if (db == NULL) {
         if (pathRules == "") {
             // Use default rule
-	    std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
-	    if (s != "") {
-		LOG(ERRORL) << s;
-		return;
-	    }
+            std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+            if (s != "") {
+                LOG(ERRORL) << s;
+                return;
+            }
             p.sortRulesByIDBPredicates();
         }
         db = new VLogLayer(edb, p, vm["reasoningThreshold"].as<int64_t>(), "TI", "TE");
@@ -732,11 +851,11 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     Program p(&edb);
     string pathRules = vm["rules"].as<string>();
     if (pathRules != "") {
-	std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
-	if (s != "") {
-	    LOG(ERRORL) << s;
-	    return;
-	}
+        std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+        if (s != "") {
+            LOG(ERRORL) << s;
+            return;
+        }
         p.sortRulesByIDBPredicates();
     }
 
@@ -883,6 +1002,12 @@ int main(int argc, const char** argv) {
         launchFullMat(argc, argv, full_path, *layer, vm,
                 vm["rules"].as<string>());
         delete layer;
+    } else if (cmd == "mat_tg") {
+        EDBConf conf(edbFile);
+        EDBLayer *layer = new EDBLayer(conf, ! vm["multithreaded"].empty());
+        launchTriggeredMat(argc, argv, full_path, *layer, vm,
+                vm["rules"].as<string>(), vm["trigger_paths"].as<string>());
+        delete layer;
     } else if (cmd == "rulesgraph") {
         EDBConf conf(edbFile);
         EDBLayer *layer = new EDBLayer(conf, false);
@@ -1002,11 +1127,11 @@ int main(int argc, const char** argv) {
         vt.push_back(vt2);
         vt.push_back(vt3);
         vt.push_back(vt4);
-	std::string s = p.readFromFile(rulesFile);
-	if (s != "") {
-	    cerr << s << endl;
-	    return 1;
-	}
+        std::string s = p.readFromFile(rulesFile);
+        if (s != "") {
+            cerr << s << endl;
+            return 1;
+        }
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         std::vector<std::pair<std::string,int>> trainingQueries = ML::generateTrainingQueries(*layer, p, vt, vm);
         std::chrono::duration<double> sec = std::chrono::system_clock::now()- start;

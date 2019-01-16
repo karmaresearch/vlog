@@ -1,5 +1,6 @@
 #include <vlog/seminaiver.h>
 #include <vlog/seminaiver_threaded.h>
+#include <vlog/seminaiver_trigger.h>
 #include <vlog/wizard.h>
 #include <vlog/reasoner.h>
 #include <vlog/concepts.h>
@@ -931,6 +932,14 @@ std::shared_ptr<SemiNaiver> Reasoner::getSemiNaiver(EDBLayer &layer,
                     opt_threaded, restrictedChase, nthreads, shuffleRules));
         return sn;
     }
+}
+
+std::shared_ptr<TriggerSemiNaiver> Reasoner::getTriggeredSemiNaiver(EDBLayer &layer,
+        Program *p,
+        bool restrictedChase) {
+    std::shared_ptr<TriggerSemiNaiver> sn(new TriggerSemiNaiver(p->getAllRules(),
+                layer, p, restrictedChase));
+    return sn;
 }
 
 std::shared_ptr<SemiNaiver> Reasoner::fullMaterialization(EDBLayer &layer,
