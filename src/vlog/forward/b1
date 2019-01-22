@@ -1,0 +1,7 @@
++	std::vector<bool> blocked;
++	size_t blockedCount = 0;
++	if (chaseMgmt->isCheckCyclicMode()) {
++	    for (size_t i = 0; i < sizecolumns; i++) {
++		blocked.push_back(false);
++	    }
++	}

@@ -832,7 +832,8 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
         //Define a generic query
         VTuple tuple(card);
         for(uint8_t i = 0; i < card; ++i) {
-            tuple.set(VTerm(i, 0), i);
+            // tuple.set(VTerm(i, 0), i);
+            tuple.set(VTerm(i+1, 0), i);	// I suppose these should all be variables ... --Ceriel
         }
         Literal query(pred, tuple);
         FCBlock block(0, ltable, query, 0, NULL, 0, true);
@@ -952,7 +953,13 @@ void ExistentialRuleProcessor::RMFA_enhanceFunctionTerms(
 bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
         const Literal &headLiteral,
         uint64_t *headrow, std::vector<uint8_t> &columnsToCheck) {
-    LOG(DEBUGL) << "RMFA_check";
+    LOG(DEBUGL) << "RMFA_check, headLiteral = " << headLiteral.tostring(NULL, NULL);
+#if DEBUG
+    for (int i = 0; i < columnsToCheck.size(); i++) {
+	LOG(TRACEL) << "columnsToCheck[" << i << "] = " << (int) columnsToCheck[i];
+	LOG(TRACEL) << "headrow[" << (int) columnsToCheck[i] << "] = " << headrow[columnsToCheck[i]];
+    }
+#endif
     //Get a starting value for the fresh IDs
     uint64_t freshIDs = 1; //0 is star
 
@@ -960,6 +967,12 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
     std::vector<Literal> input; //"input" corresponds to B_\rho,\sigma in the paper
     //First I need to add to body atoms
     RMFA_computeBodyAtoms(input, row);
+
+#if DEBUG
+    for (int i = 0; i < input.size(); i++) {
+	LOG(TRACEL) << "input[" << i << "] = " << input[i].tostring(NULL, NULL);
+    }
+#endif
 
     //Then I need to add all facts relevant to produce the function terms
     RMFA_enhanceFunctionTerms(input, freshIDs);
@@ -979,6 +992,9 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
             found = true;
             for(uint8_t j = 0; j < columnsToCheck.size(); ++j) {
                 auto cId = columnsToCheck[j];
+#if DEBUG
+		LOG(TRACEL) << "cId = " << (int) cId << ", currentValue = " << tbItr->getCurrentValue(cId);
+#endif
                 if (tbItr->getCurrentValue(cId) != headrow[cId]) {
                     found = false;
                     break;
