@@ -470,6 +470,8 @@ class Program {
 
         VLIBEXP int64_t getOrAddPredicate(std::string &p, uint8_t cardinality);
 
+        VLIBEXP bool doesPredicateExist(const PredId_t id) const;
+
         std::vector<Rule> getAllRulesByPredicate(PredId_t predid) const;
 
         const std::vector<uint32_t> &getRulesIDsByPredicate(PredId_t predid) const;

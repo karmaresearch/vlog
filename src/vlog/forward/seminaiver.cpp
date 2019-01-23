@@ -461,11 +461,13 @@ bool SemiNaiver::executeUntilSaturation(
                             return newDer;
                         }
                     }
+
                     if (checkCyclicTerms) {
                         foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
                         if (foundCyclicTerms)
                             return newDer;
                     }
+
                 } while (response);
                     LOG(DEBUGL) << "Rules " <<
                         ruleset[currentRule].rule.tostring(program, &layer) <<

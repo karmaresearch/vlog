@@ -253,6 +253,8 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "Print the answers of a literal query.", false);
     query_options.add<bool>("", "automat", false,
             "Automatically premateralialize some atoms.", false);
+    query_options.add<bool>("", "printRepresentationSize", false,
+            "Print the representation size of the materialization.", false);
     query_options.add<int>("", "timeoutPremat", 1000000,
             "Timeout used during automatic prematerialization (in microseconds). Default is 1000000 (i.e. one second per query)", false);
     query_options.add<string>("", "premat", "",
@@ -513,6 +515,26 @@ void launchTriggeredMat(int argc,
 #endif
 }
 
+void printRepresentationSize(std::shared_ptr<SemiNaiver> sn) {
+    size_t size = 0;
+    std::set<uint64_t> columnsIDs;
+    for(size_t i = 0; i < MAX_NPREDS; ++i) {
+        if (!sn->getProgram()->doesPredicateExist(i)) {
+            continue;
+        }
+        FCIterator itr = sn->getTable(i);
+        while (!itr.isEmpty()) {
+            auto table = itr.getCurrentTable();
+            //Get predicate name
+            std::string predName = sn->getProgram()->getPredicateName(i);
+            LOG(DEBUGL) << "Adding the representation size for " << i << " " << predName << " current size: " << size;
+            size += table->getRepresentationSize(columnsIDs);
+            itr.moveNextCount();
+        }
+    }
+    LOG(INFOL) << "Representation size: " << size;
+}
+
 void launchFullMat(int argc,
         const char** argv,
         string pathExec,
@@ -615,6 +637,10 @@ void launchFullMat(int argc,
             monitor.join(); //Wait until the monitor thread is finished
         }
 #endif
+
+        if (vm["printRepresentationSize"].as<bool>()) {
+            printRepresentationSize(sn);
+        }
 
 
         if (vm["storemat_path"].as<string>() != "") {

@@ -29,7 +29,7 @@ class ColumnReader {
 
         virtual std::vector<Term_t> asVector() = 0;
 
-	virtual ~ColumnReader() { }
+        virtual ~ColumnReader() { }
 };
 
 class ColumnWriter;
@@ -45,6 +45,8 @@ class Column {
         }
 
         virtual size_t size() const = 0;
+
+        virtual size_t getRepresentationSize() const = 0;
 
         virtual size_t estimateSize() const = 0;
 
@@ -127,9 +129,9 @@ class CompressedColumn: public Column {
     public:
         CompressedColumn(const Term_t v, const uint32_t size) : Column() {
             _size = size;
-	    if (size > 0) {
-		blocks.push_back(CompressedColumnBlock(v, 0, size - 1));
-	    }
+            if (size > 0) {
+                blocks.push_back(CompressedColumnBlock(v, 0, size - 1));
+            }
         }
 
         CompressedColumn(std::vector<CompressedColumnBlock> &blocks,
@@ -139,6 +141,10 @@ class CompressedColumn: public Column {
 
         size_t size() const {
             return _size;
+        }
+
+        size_t getRepresentationSize() const {
+            return blocks.size();
         }
 
         size_t estimateSize() const {
@@ -293,7 +299,7 @@ class ColumnReaderImpl : public ColumnReader {
 class InmemColumnReader : public ColumnReader {
     private:
         const std::vector<Term_t> &col;
-	size_t start;
+        size_t start;
         size_t currentPos;
         size_t end;
 
@@ -316,11 +322,11 @@ class InmemColumnReader : public ColumnReader {
         }
 
         std::vector<Term_t> asVector() {
-	    if (start == 0 && end == col.size()) {
-		return col;
-	    }
-	    std::vector<Term_t> sub(&col[start],&col[end]);
-	    return sub;
+            if (start == 0 && end == col.size()) {
+                return col;
+            }
+            std::vector<Term_t> sub(&col[start],&col[end]);
+            return sub;
         }
 
         bool hasNext() {
@@ -351,6 +357,10 @@ class InmemoryColumn : public Column {
         }
 
         size_t size() const {
+            return values.size();
+        }
+
+        size_t getRepresentationSize() const {
             return values.size();
         }
 
@@ -476,10 +486,14 @@ class SubColumn : public Column {
                 uint64_t start, uint64_t len) : parentColumn(parentColumn),
         values(parentColumn->getVectorRef()),
         start(start), len(len) {
-	    assert(start + len <= values.size());
+            assert(start + len <= values.size());
         }
 
         size_t size() const {
+            return len;
+        }
+
+        size_t getRepresentationSize() const {
             return len;
         }
 
@@ -673,6 +687,10 @@ class EDBColumn : public Column {
 
         size_t size() const;
 
+        size_t getRepresentationSize() const {
+            return 0;
+        }
+
         size_t estimateSize() const;
 
         bool isEmpty() const {
@@ -751,6 +769,8 @@ class FunctionalColumn : public Column {
         bool isEmpty() const;
 
         bool isEDB() const;
+
+        size_t getRepresentationSize() const;
 
         size_t size() const;
 

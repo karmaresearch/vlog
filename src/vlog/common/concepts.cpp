@@ -697,6 +697,10 @@ bool Program::areExistentialRules() {
     return false;
 }
 
+bool Program::doesPredicateExist(const PredId_t id) const {
+    return cardPredicates.count(id);
+}
+
 const Rule &Program::getRule(uint32_t ruleid) const {
     return allrules[ruleid];
 }
