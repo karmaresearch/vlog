@@ -11,6 +11,7 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
 
         //If the data is added row by row, then I set the following flag to true
         bool replaceExtColumns;
+        bool filterRecursive;
         uint8_t nConstantColumns;
         uint8_t posConstantColumns[256];
         uint8_t nKnownColumns;
@@ -44,6 +45,23 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 uint64_t &sizecolumns,
                 std::vector<std::shared_ptr<Column>> &c);
 
+        void retainNonRecursive(
+                uint64_t &sizecolumns,
+                std::vector<std::shared_ptr<Column>> &c);
+
+        bool RMFA_check(uint64_t *row, const Literal &headLiteral,
+                uint64_t *headrow, std::vector<uint8_t> &columnsToCheck);
+
+        void RMFA_computeBodyAtoms(std::vector<Literal> &output,
+                uint64_t *row);
+
+        void RMFA_enhanceFunctionTerms(std::vector<Literal> &output,
+                uint64_t &startFreshIDs,
+                size_t startOutput = 0);
+
+        std::unique_ptr<SemiNaiver> RMFA_saturateInput(
+                std::vector<Literal> &input);
+
     public:
         ExistentialRuleProcessor(
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
@@ -57,6 +75,7 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 const int nthreads,
                 SemiNaiver *sn,
                 std::shared_ptr<ChaseMgmt> chaseMgmt,
+                bool filterRecursive,
                 const bool ignoreDupElimin);
 
         void addColumns(const int blockid, FCInternalTableItr *itr,

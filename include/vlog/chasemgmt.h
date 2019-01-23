@@ -10,6 +10,16 @@
 
 #define SIZE_BLOCK 1000
 
+#define RULE_MASK INT64_C(0xffffff0000000000)
+#define RULE_SHIFT(x) (((uint64_t) ((x) + 1)) << 40)
+#define GET_RULE(x) (((x) >> 40) - 1)
+#define VAR_MASK INT64_C(0x0ff00000000)
+#define VAR_SHIFT(v) ((uint64_t) (v) << 32)
+#define GET_VAR(v) (((v) & VAR_MASK) >> 32)
+#define RULEVARMASK (RULE_MASK|VAR_MASK)
+#define COUNTER(v) (v & 0xFFFFFFFF)
+
+
 struct ChaseRow {
     uint8_t sz;
     uint64_t *row;
@@ -44,16 +54,19 @@ class ChaseMgmt {
             private:
                 const uint64_t startCounter;
                 const uint8_t sizerow;
+                std::vector<uint8_t> nameArgVars;
                 uint64_t currentcounter;
-                std::vector<std::unique_ptr<uint64_t>> blocks;
+                std::vector<std::unique_ptr<uint64_t[]>> blocks;
                 uint32_t blockCounter;
                 uint64_t *currentblock;
                 std::unordered_map<ChaseRow, uint64_t, hash_ChaseRow> rows;
                 bool cyclicTerms;
 
             public:
-                Rows(uint64_t startCounter, uint8_t sizerow) :
-                    startCounter(startCounter), sizerow(sizerow) {
+                Rows(uint64_t startCounter, uint8_t sizerow,
+                        std::vector<uint8_t> nameArgVars) :
+                    startCounter(startCounter), sizerow(sizerow),
+                    nameArgVars(nameArgVars) {
                         blockCounter = 0;
                         currentblock = NULL;
                         currentcounter = startCounter;
@@ -67,11 +80,18 @@ class ChaseMgmt {
                     return cyclicTerms;
                 }
 
+                uint64_t *getRow(size_t id);
+
+                const std::vector<uint8_t> &getNameArgVars() {
+                    return nameArgVars;
+                }
+
                 uint64_t addRow(uint64_t* row);
 
                 bool existingRow(uint64_t *row, uint64_t &value);
 
-                bool checkRecursive(uint64_t target, std::vector<uint64_t> &toCheck);
+                bool checkRecursive(uint64_t target, uint64_t value,
+                        std::vector<uint64_t> &toCheck);
         };
 
         class RuleContainer {
@@ -79,14 +99,21 @@ class ChaseMgmt {
                 std::map<uint8_t, std::vector<uint8_t>> dependencies;
                 std::map<uint8_t, ChaseMgmt::Rows> vars2rows;
                 uint64_t ruleBaseCounter;
+                Rule const * rule;
             public:
                 RuleContainer(uint64_t ruleBaseCounter,
-                        std::map<uint8_t, std::vector<uint8_t>> dep) {
+                        std::map<uint8_t, std::vector<uint8_t>> dep,
+                        Rule const * rule) {
                     this->ruleBaseCounter = ruleBaseCounter;
                     dependencies = dep;
+                    this->rule = rule;
                 }
 
                 bool containsCyclicTerms();
+
+                Rule const *getRule() {
+                    return rule;
+                }
 
                 ChaseMgmt::Rows *getRows(uint8_t var);
         };
@@ -94,13 +121,18 @@ class ChaseMgmt {
         std::vector<std::unique_ptr<ChaseMgmt::RuleContainer>> rules;
         const bool restricted;
         const bool checkCyclic;
+
+        const int ruleToCheck;
         bool cyclic;
 
-        bool checkRecursive(uint64_t target, uint64_t rv, std::vector<uint64_t> &checked, int level);
+        bool checkRecursive(uint64_t target, uint64_t rv, int level);
+
+        bool checkNestedRecursive(uint64_t target, uint64_t rv, int level);
 
     public:
         ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
-                const bool restricted, const bool checkCyclic);
+                const bool restricted, const bool checkCyclic,
+                const int ruleToCheck = -1);
 
         std::shared_ptr<Column> getNewOrExistingIDs(
                 uint32_t ruleid,
@@ -110,8 +142,26 @@ class ChaseMgmt {
 
         bool checkCyclicTerms(uint32_t ruleid);
 
+        bool checkRecursive(uint64_t rv);
+
+        RuleContainer *getRuleContainer(size_t id) const {
+            if (id < rules.size()) {
+                return rules[id].get();
+            } else {
+                return NULL;
+            }
+        }
+
         bool isRestricted() {
             return restricted;
+        }
+
+        bool hasRuleToCheck() {
+            return ruleToCheck >= 0;
+        }
+
+        bool isCheckCyclicMode() {
+            return checkCyclic;
         }
 };
 

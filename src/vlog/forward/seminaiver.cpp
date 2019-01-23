@@ -77,7 +77,8 @@ string set_to_string(std::unordered_set<int> s) {
 
 SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
         Program *program, bool opt_intersect, bool opt_filtering,
-        bool multithreaded, bool restrictedChase, int nthreads, bool shuffle) :
+        bool multithreaded, bool restrictedChase, int nthreads, bool shuffle,
+        bool ignoreExistentialRules) :
     opt_intersect(opt_intersect),
     opt_filtering(opt_filtering),
     multithreaded(multithreaded),
@@ -86,7 +87,8 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
     layer(layer),
     program(program),
     nthreads(nthreads),
-    checkCyclicTerms(false) {
+    checkCyclicTerms(false),
+    ignoreExistentialRules(ignoreExistentialRules) {
 
         ignoreDuplicatesElimination = false;
         TableFilterer::setOptIntersect(opt_intersect);
@@ -94,7 +96,7 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
 
         LOG(DEBUGL) << "Running SemiNaiver, opt_intersect = " << opt_intersect << ", opt_filtering = " << opt_filtering << ", multithreading = " << multithreaded << ", shuffle = " << shuffle;
 
-        int ruleid = 0;
+        uint32_t ruleid = 0;
         for (std::vector<Rule>::iterator itr = ruleset.begin(); itr != ruleset.end();
                 ++itr) {
             RuleExecutionDetails *d = new RuleExecutionDetails(*itr, ruleid++);
@@ -242,7 +244,7 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules, size_t las
             itr != allIDBRules.end();
             ++itr) {
         LOG(DEBUGL) << "Optimizing rule " << itr->rule.tostring(NULL, NULL);
-        itr->createExecutionPlans();
+        itr->createExecutionPlans(checkCyclicTerms);
         itr->calculateNVarsInHeadFromEDB();
         itr->lastExecution = lastExecution;
 
@@ -258,7 +260,7 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules, size_t las
     for (std::vector<RuleExecutionDetails>::iterator itr = allEDBRules.begin();
             itr != allEDBRules.end();
             ++itr) {
-        itr->createExecutionPlans();
+        itr->createExecutionPlans(checkCyclicTerms);
     }
     for (auto el : allIDBRules)
         LOG(DEBUGL) << el.rule.tostring(program, &layer);
@@ -267,7 +269,7 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules, size_t las
     std::copy(allEDBRules.begin(), allEDBRules.end(), std::back_inserter(allrules));
     std::copy(allIDBRules.begin(), allIDBRules.end(), std::back_inserter(allrules));
     chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt(allrules,
-                restrictedChase, checkCyclicTerms));
+                restrictedChase, checkCyclicTerms, singleRuleToCheck));
 #if DEBUG
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(DEBUGL) << "Runtime ruleset optimization ms = " << sec.count() * 1000;
@@ -335,9 +337,11 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
                 resp1 = executeRules(emptyRuleset, tmpIDBRules, costRules, 0, true, timeout);
             bool resp2;
             if (loopNr == 0)
-                resp2 = executeRules(tmpExtEDBRules, tmpExtIDBRules, costRules, iteration == 0 ? 1 : iteration, false, timeout);
+                resp2 = executeRules(tmpExtEDBRules, tmpExtIDBRules,
+                        costRules, iteration == 0 ? 1 : iteration, false, timeout);
             else
-                resp2 = executeRules(emptyRuleset, tmpExtIDBRules, costRules, iteration == 0 ? 1 : iteration, false, timeout);
+                resp2 = executeRules(emptyRuleset, tmpExtIDBRules, costRules,
+                        iteration == 0 ? 1 : iteration, false, timeout);
             if (!resp1 && !resp2) {
                 break; //Fix-point
             }
@@ -430,8 +434,10 @@ bool SemiNaiver::executeUntilSaturation(
         if (response) {
             if (checkCyclicTerms) {
                 foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
-                if (foundCyclicTerms)
+                if (foundCyclicTerms) {
+                    LOG(DEBUGL) << "Found a cyclic term";
                     return newDer;
+                }
             }
 
             if (ruleset[currentRule].rule.isRecursive() && limitView == 0) {
@@ -877,7 +883,8 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
 
 void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
         const std::vector<size_t> &cards,
-        const std::vector<Literal> &heads) {
+        const std::vector<Literal> &heads,
+        bool copyAllVars) {
     //Reorder the atoms in terms of cardinality.
     std::vector<std::pair<uint8_t, size_t>> positionCards;
     for (uint8_t i = 0; i < cards.size(); ++i) {
@@ -937,7 +944,7 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
             LOG(DEBUGL) << "Reordered plan is " << (int)adaptedPosCards[i].first;
             orderLiterals.push_back(adaptedPosCards[i].first);
         }
-        plan = plan.reorder(orderLiterals, heads);
+        plan = plan.reorder(orderLiterals, heads, copyAllVars);
     }
 }
 
@@ -983,6 +990,11 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     // Cannot run multithreaded in this case.
     currentRule = rule.tostring(program, &layer);
 #endif
+
+    if (ignoreExistentialRules && rule.isExistential()) {
+        return false; //Skip the execution of existential rules if the flag is
+        //set (should be only during the execution of RMFA
+    }
 
     LOG(DEBUGL) << "Iteration: " << iteration <<
         " Rule: " << rule.tostring(program, &layer);
@@ -1036,7 +1048,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         }
 
         //Reorder the list of atoms depending on the observed cardinalities
-        reorderPlan(plan, cards, heads);
+        reorderPlan(plan, cards, heads, checkCyclicTerms);
 
 #ifdef DEBUG
         std::string listLiterals = "EXEC COMB: ";
@@ -1092,6 +1104,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                             !multithreaded ? -1 : nthreads,
                             this,
                             chaseMgmt,
+                            chaseMgmt->hasRuleToCheck(),
                             ignoreDuplicatesElimination);
                 } else {
                     if (heads.size() == 1) {
@@ -1133,8 +1146,10 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             if (max == 1)
                 max = ruleDetails.lastExecution - 1;
             if (limitView != 0) {
-                // For execution of the restricted chase, we must limit the view: we may not include data from the current round.
-                // We use a parameter "limitView", which in this case indicates the iteration number after the last round.
+                // For execution of the restricted chase, we must limit the
+                // view: we may not include data from the current round.
+                // We use a parameter "limitView", which in this case indicates
+                // the iteration number after the last round.
                 if (max >= limitView) {
                     max = limitView - 1;
                 }
@@ -1188,7 +1203,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             }
 
             //Prepare for the processing of the next atom (if any)
-            if (!lastLiteral && ! first) {
+            if (!lastLiteral && !first) {
                 currentResults = ((InterTableJoinProcessor*)joinOutput)->getTable();
             }
             if (lastLiteral && finalResultContainer) {

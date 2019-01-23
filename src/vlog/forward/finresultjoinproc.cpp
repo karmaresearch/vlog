@@ -751,10 +751,10 @@ FinalRuleProcessor::FinalRuleProcessor(
             posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads,
             ignoreDuplicatesElimination),
     listDerivations(listDerivations),
-    ruleExecOrder(ruleExecOrder),
     iteration(iteration),
     newDerivation(false),
     ruleDetails(ruleDetails),
+    ruleExecOrder(ruleExecOrder),
     addToEndTable(addToEndTable),
     heads(heads)
 {

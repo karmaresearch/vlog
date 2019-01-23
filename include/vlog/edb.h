@@ -254,9 +254,16 @@ class EDBLayer {
         void releaseIterator(EDBIterator *itr);
 
         // For JNI interface ...
-        VLIBEXP void addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows);
+        VLIBEXP void addInmemoryTable(std::string predicate,
+                std::vector<std::vector<std::string>> &rows);
 
-        VLIBEXP void addInmemoryTable(std::string predicate, PredId_t id, std::vector<std::vector<std::string>> &rows);
+        VLIBEXP void addInmemoryTable(std::string predicate,
+                PredId_t id, std::vector<std::vector<std::string>> &rows);
+
+        //For RMFA check
+        VLIBEXP void addInmemoryTable(PredId_t predicate,
+                uint8_t arity,
+                std::vector<uint64_t> &rows);
 
         ~EDBLayer() {
             for (int i = 0; i < MAX_NPREDS; ++i) {

@@ -24,7 +24,7 @@ struct RuleExecutionDetails {
 
     RuleExecutionDetails(Rule rule, size_t ruleid) : rule(rule), ruleid(ruleid) {}
 
-    void createExecutionPlans();
+    void createExecutionPlans(bool copyAllVars);
 
     void createExecutionPlans(std::vector<std::pair<size_t, size_t>> &ranges);
 

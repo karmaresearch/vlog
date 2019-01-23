@@ -1,20 +1,12 @@
 #include <vlog/chasemgmt.h>
 
-#define RULE_MASK INT64_C(0xffffff0000000000)
-#define RULE_SHIFT(x) (((uint64_t) ((x) + 1)) << 40)
-#define GET_RULE(x) (((x) >> 40) - 1)
-#define VAR_MASK INT64_C(0x0ff00000000)
-#define VAR_SHIFT(v) ((uint64_t) (v) << 32)
-#define GET_VAR(v) (((v) & VAR_MASK) >> 32)
-#define RULEVARMASK (RULE_MASK|VAR_MASK)
-
 //************** ROWS ***************
 uint64_t ChaseMgmt::Rows::addRow(uint64_t* row) {
     LOG(TRACEL) << "Addrow: " << row[0];
     if (!currentblock || blockCounter >= SIZE_BLOCK) {
         //Create a new block
-        std::unique_ptr<uint64_t> n =
-            std::unique_ptr<uint64_t>(
+        std::unique_ptr<uint64_t[]> n =
+            std::unique_ptr<uint64_t[]>(
                     new uint64_t[sizerow * SIZE_BLOCK]);
         currentblock = n.get();
         blocks.push_back(std::move(n));
@@ -43,6 +35,14 @@ bool ChaseMgmt::Rows::existingRow(uint64_t *row, uint64_t &value) {
     }
     return false;
 }
+
+uint64_t *ChaseMgmt::Rows::getRow(size_t id) {
+    uint64_t blocknr = id / SIZE_BLOCK;
+    uint64_t offset = id % SIZE_BLOCK;
+    auto &block_content = blocks[blocknr];
+    return block_content.get() + offset * sizerow;
+}
+
 //************** END ROWS *************
 
 //************** RULE CONTAINER ***************
@@ -53,7 +53,8 @@ ChaseMgmt::Rows *ChaseMgmt::RuleContainer::getRows(uint8_t var) {
         // The variable is encoded in the space between the rule ID and the
         // counter ID.
         startCounter += VAR_SHIFT(var);
-        vars2rows.insert(std::make_pair(var, Rows(startCounter, sizerow)));
+        vars2rows.insert(std::make_pair(var, Rows(startCounter, sizerow,
+                        dependencies[var])));
     }
     return &vars2rows.find(var)->second;
 }
@@ -69,7 +70,7 @@ bool ChaseMgmt::RuleContainer::containsCyclicTerms() {
 
 //************** CHASE MGMT ***************
 ChaseMgmt::ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
-        const bool restricted, const bool checkCyclic) : restricted(restricted), checkCyclic(checkCyclic), cyclic(false) {
+        const bool restricted, const bool checkCyclic, const int ruleToCheck) : restricted(restricted), checkCyclic(checkCyclic), ruleToCheck(ruleToCheck), cyclic(false) {
     this->rules.resize(rules.size());
     for(const auto &r : rules) {
         if (r.rule.getId() >= rules.size()) {
@@ -79,13 +80,14 @@ ChaseMgmt::ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
         uint64_t ruleBaseCounter = RULE_SHIFT(r.rule.getId());
         this->rules[r.rule.getId()] = std::unique_ptr<ChaseMgmt::RuleContainer>(
                 new ChaseMgmt::RuleContainer(ruleBaseCounter,
-                    r.orderExecutions[0].dependenciesExtVars));
+                    r.orderExecutions[0].dependenciesExtVars,
+                    &r.rule));
     }
 }
 
 static bool checkValue(uint64_t target, uint64_t v, std::vector<uint64_t> &toCheck) {
     LOG(TRACEL) << "checkValue: target = " << target << ", v = " << v;
-    if (v == target) {
+    if ((v & RULEVARMASK) == target) {
         return true;
     }
     if (v != 0) {
@@ -103,70 +105,66 @@ static bool checkValue(uint64_t target, uint64_t v, std::vector<uint64_t> &toChe
     return false;
 }
 
-bool ChaseMgmt::Rows::checkRecursive(uint64_t target, std::vector<uint64_t> &toCheck) {
-
-    const uint8_t sizerow = getSizeRow();
-
-    // Potentially expensive operation: we need to check all rows of this container.
-    // Let's do this breadth-first
-    // First check the complete blocks
-    // But keep track of nested terms to investigate.
-
-    for (int i = 0; i < blocks.size() - 1; i++) {
-        auto block = blocks[i].get();
-        for (size_t j = 0; j < SIZE_BLOCK * sizerow; j++) {
-            if (checkValue(target, block[j] & RULEVARMASK, toCheck)) {
-                return true;
-            }
-        }
-    }
-    // Now check the last block
-    auto block = blocks[blocks.size() - 1].get();
-    while (block < currentblock) {
-        if (checkValue(target, *block & RULEVARMASK, toCheck)) {
+bool ChaseMgmt::Rows::checkRecursive(uint64_t target, uint64_t value, std::vector<uint64_t> &toCheck) {
+    // Find the right block to check
+    size_t blockNo = value / SIZE_BLOCK;
+    size_t offset = (value % SIZE_BLOCK) * sizerow;
+    auto block = blocks[blockNo].get();
+    for (size_t i = offset; i < offset + sizerow; i++) {
+        if (checkValue(target, block[i], toCheck)) {
             return true;
         }
-        block++;
     }
+
     return false;
 
 }
 
-bool ChaseMgmt::checkRecursive(uint64_t target, uint64_t rv, std::vector<uint64_t> &checked, int level) {
-    if (rv == target) {
+bool ChaseMgmt::checkRecursive(uint64_t target, uint64_t rv, int level) {
+    uint64_t mask = rv & RULEVARMASK;
+    if (mask == target) {
         LOG(DEBUGL) << "Found an immediate cycle at level " << level;
         return true;
     }
-    uint64_t mask = rv & RULEVARMASK;
-    for (auto const& value: checked) {
-        if (value == mask) {
-            // already checked or being checked
-            return false;
-        }
+    if (mask == 0) {
+        return false;
     }
-    checked.push_back(rv);
+    return checkNestedRecursive(target, rv, level);
+}
+
+bool ChaseMgmt::checkNestedRecursive(uint64_t target, uint64_t rv, int level) {
 
     //Recursive check required.
     auto &ruleContainer = rules[GET_RULE(rv)];
     uint8_t var = GET_VAR(rv);
+    uint64_t value = rv & ~RULEVARMASK;
+
     // Enter values
     auto rows = ruleContainer->getRows(var);
     std::vector<uint64_t> toCheck;
 
-    if (rows->checkRecursive(target, toCheck)) {
+    if (rows->checkRecursive(target, value, toCheck)) {
         LOG(DEBUGL) << "Found a direct cycle at level " << level;
         return true;
     }
 
     // Investigate nested terms.
     for (uint64_t v : toCheck) {
-        if (checkRecursive(target, v, checked, level + 1)) {
+        if (checkRecursive(target, v, level + 1)) {
             LOG(DEBUGL) << "Found an indirect cycle at level " << level;
             return true;
         }
     }
     return false;
+}
 
+// Check if rv is recursive.
+bool ChaseMgmt::checkRecursive(uint64_t rv) {
+    uint64_t mask = rv & RULEVARMASK;
+    if (mask == 0) {
+        return false;
+    }
+    return checkNestedRecursive(mask, rv, 0);
 }
 
 std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
@@ -180,7 +178,6 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
     const uint8_t sizerow = rows->getSizeRow();
     assert(sizerow == columns.size());
     std::vector<Term_t> functerms;
-    std::vector<uint64_t> checked;
     uint64_t row[256];
 
     std::vector<std::unique_ptr<ColumnReader>> readers;
@@ -195,11 +192,13 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
                 throw 10;
             }
             row[j] = readers[j]->next();
-            if (checkCyclic && ! cyclic) {
-                uint64_t rv = (row[j] & RULEVARMASK);
-                LOG(TRACEL) << "to check: " << rulevar << ", read value " << rv;
-                if (rv != 0) {
-                    cyclic = checkRecursive(rulevar, rv, checked, 0);
+            if (checkCyclic) {
+                if ((ruleToCheck < 0 || ruleToCheck == ruleid) && ! cyclic) {
+                    // Check if we are about to introduce a cyclic term ...
+                    if ((row[j] & RULEVARMASK) != 0) {
+                        LOG(TRACEL) << "to check: " << rulevar << ", read value " << row[j];
+                        cyclic = checkRecursive(rulevar, row[j], 0);
+                    }
                 }
             }
         }

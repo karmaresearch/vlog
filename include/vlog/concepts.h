@@ -304,7 +304,7 @@ class Literal {
 
         std::string tostring(Program *program, EDBLayer *db) const;
 
-        std::string toprettystring(Program *program, EDBLayer *db) const;
+        std::string toprettystring(Program *program, EDBLayer *db, bool replaceConstants = false) const;
 
         std::string tostring() const;
 
@@ -338,6 +338,11 @@ class Rule {
             existential(!getVarsNotInBody().empty()) {
                 checkRule();
             }
+
+        Rule(uint32_t ruleId, Rule &r) : ruleId(ruleId),
+            heads(r.heads), body(r.body), _isRecursive(r._isRecursive),
+            existential(r.existential) {
+        }
 
         Rule createAdornment(uint8_t headAdornment) const;
 
@@ -410,7 +415,7 @@ class Rule {
 
         std::string tostring(Program *program, EDBLayer *db) const;
 
-        std::string toprettystring(Program * program, EDBLayer *db) const;
+        std::string toprettystring(Program * program, EDBLayer *db, bool replaceConstants = false) const;
 
         std::string tostring() const;
 

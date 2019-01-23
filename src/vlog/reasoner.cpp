@@ -594,7 +594,7 @@ TupleIterator *Reasoner::getMagicIterator(Literal &query,
 #endif
 
     SemiNaiver *naiver = new SemiNaiver(magicProgram->getAllRules(),
-            edb, magicProgram.get(), true, true, false, -1, false) ;
+            edb, magicProgram.get(), true, true, false, -1, false, false) ;
 
     //Add all the input tuples in the input relation
     Predicate pred = magicProgram->getPredicate(inputOutputRelIDs.first);
@@ -704,7 +704,7 @@ TupleIterator *Reasoner::getMaterializationIterator(Literal &query,
     // Run materialization
     SemiNaiver *sn = new SemiNaiver(program.getAllRules(),
             edb, &program, true, true,
-            false, -1, false);
+            false, -1, false, false);
 
     sn->run();
 
@@ -929,7 +929,7 @@ std::shared_ptr<SemiNaiver> Reasoner::getSemiNaiver(EDBLayer &layer,
     } else {
         std::shared_ptr<SemiNaiver> sn(new SemiNaiver(p->getAllRules(),
                     layer, p, opt_intersect, opt_filtering,
-                    opt_threaded, restrictedChase, nthreads, shuffleRules));
+                    opt_threaded, restrictedChase, nthreads, shuffleRules, false));
         return sn;
     }
 }

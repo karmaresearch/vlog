@@ -135,6 +135,22 @@ void EDBLayer::addInmemoryTable(std::string predicate, PredId_t id, std::vector<
     LOG(DEBUGL) << "Added table for " << predicate << ":" << infot.id;
 }
 
+
+void EDBLayer::addInmemoryTable(PredId_t id,
+        uint8_t arity,
+        std::vector<uint64_t> &rows) {
+    EDBInfoTable infot;
+    infot.id = id;
+    if (doesPredExists(infot.id)) {
+        dbPredicates.erase(infot.id);
+    }
+    infot.type = "INMEMORY";
+    InmemoryTable *table = new InmemoryTable(infot.id, arity, rows, this);
+    infot.arity = table->getArity();
+    infot.manager = std::shared_ptr<EDBTable>(table);
+    dbPredicates.insert(make_pair(infot.id, infot));
+}
+
 #ifdef SPARQL
 void EDBLayer::addSparqlTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
@@ -555,6 +571,9 @@ bool EDBLayer::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
         return p->second.manager->isEmpty(query, posToFilter, valuesToFilter);
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
+        if (!rel) {
+            return true;
+        }
         assert(literal->getTupleSize() <= 2);
 
         std::unique_ptr<Literal> rewrittenLiteral;
@@ -1285,10 +1304,10 @@ std::shared_ptr<Column> EDBTable::checkIn(
     std::vector<uint8_t> posVars = l.getPosVars();
     std::vector<uint8_t> fieldsToSort;
     for (int i = 0; i < posVars.size(); i++) {
-	if (i == posInL) {
-	    fieldsToSort.push_back(i);
-	    break;
-	}
+        if (i == posInL) {
+            fieldsToSort.push_back(i);
+            break;
+        }
     }
     EDBIterator *iter = getSortedIterator(l, fieldsToSort);
 

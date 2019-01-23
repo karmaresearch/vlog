@@ -441,7 +441,7 @@ void RuleExecutionDetails::createExecutionPlans() {
             //RuleExecutionDetails::checkWhetherEDBsRedundantHead(p, h);
 
             //Calculate all join coordinates
-            p.calculateJoinsCoordinates(heads);
+            p.calculateJoinsCoordinates(heads, copyAllVars);
 
             //New version. Should be able to catch everything
             for (int i = 0; i < p.plan.size(); ++i) {
@@ -481,7 +481,7 @@ void RuleExecutionDetails::createExecutionPlans() {
             RuleExecutionDetails::checkFilteringStrategy(
                     bodyLiterals[bodyLiterals.size() - 1], heads[0], p);
         }
-        p.calculateJoinsCoordinates(heads);
+        p.calculateJoinsCoordinates(heads, copyAllVars);
         orderExecutions.push_back(p);
     }
 }

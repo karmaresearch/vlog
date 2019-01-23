@@ -80,7 +80,7 @@ class SemiNaiverThreaded: public SemiNaiver {
                 const int nthreads,
                 const int interRuleThreads) : SemiNaiver(ruleset, layer,
                     program, opt_intersect, opt_filtering, true,
-                    nthreads, shuffleRules),
+                    nthreads, shuffleRules, false),
                 interRuleThreads(interRuleThreads) {
 
                     // Marks for parallel version
@@ -110,7 +110,7 @@ class SemiNaiverThreaded: public SemiNaiver {
         bool executeUntilSaturation(
                 std::vector<RuleExecutionDetails> &ruleset,
                 std::vector<StatIteration> &costRules,
-		uint32_t limitView,
+                uint32_t limitView,
                 bool fixpoint);
 };
 
