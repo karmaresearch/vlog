@@ -1,4 +1,4 @@
-#include <vlog/deps/mapping.h>
+#include <vlog/trigger/mapping.h>
 
 bool Mapping::unify(const Literal from, const Literal to) {
     //returns true if the literal in "front" can be mapped to "to"

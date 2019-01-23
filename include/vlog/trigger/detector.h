@@ -1,8 +1,8 @@
 #ifndef _DETECTOR_H
 #define _DETECTOR_H
 
-#include <vlog/deps/equivalence.h>
-#include <vlog/deps/mapping.h>
+#include <vlog/trigger/equivalence.h>
+#include <vlog/trigger/mapping.h>
 
 #include <vlog/edb.h>
 #include <vlog/concepts.h>

@@ -9,7 +9,8 @@
 #include <vlog/exporter.h>
 #include <vlog/utils.h>
 #include <vlog/ml/ml.h>
-#include <vlog/deps/detector.h>
+#include <vlog/trigger/detector.h>
+#include <vlog/trigger/tg.h>
 
 #include <vlog/cycles/checker.h>
 
@@ -51,6 +52,7 @@ void printHelp(const char *programName, ProgramArgs &desc) {
     cout << "help\t\t produce help message." << endl;
     cout << "mat\t\t perform a full materialization." << endl;
     cout << "mat_tg\t\t perform a full materialization guided by a trigger graph." << endl;
+    cout << "trigger\t\t create a trigger graph from a given program." << endl;
     cout << "query\t\t execute a SPARQL query." << endl;
     cout << "queryLiteral\t\t execute a Literal query." << endl;
     cout << "server\t\t starts in server mode." << endl;
@@ -64,13 +66,12 @@ void printHelp(const char *programName, ProgramArgs &desc) {
 }
 
 inline void printErrorMsg(const char *msg) {
-    cout << endl << "*** ERROR: " << msg << "***" << endl << endl
+    cout << endl << "*** ERROR: " << msg << " ***" << endl << endl
         << "Please type the subcommand \"help\" for instructions (e.g. Vlog help)."
         << endl;
 }
 
 bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
-
     string cmd;
     if (argc < 2) {
         printErrorMsg("Command is missing!");
@@ -81,7 +82,7 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
 
     if (cmd != "help" && cmd != "query" && cmd != "lookup" && cmd != "load" && cmd != "queryLiteral"
             && cmd != "mat" && cmd != "mat_tg" && cmd != "rulesgraph" && cmd != "server" && cmd != "gentq" &&
-            cmd != "cycles" && cmd !="deps") {
+            cmd != "cycles" && cmd !="deps" && cmd != "trigger") {
         printErrorMsg(
                 (string("The command \"") + cmd + string("\" is unknown.")).c_str());
         return false;
@@ -107,6 +108,15 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
                     printErrorMsg((string("The rule file ") + path + string(" doe not exists")).c_str());
                     return false;
                 }
+            }
+        } else if (cmd == "trigger") {
+            if (!vm.count("trigger_algo")) {
+                printErrorMsg("You need to specify an algorithm to use with --trigger_algo");
+                return false;
+            }
+            if (!vm.count("trigger_paths") || vm["trigger_paths"].as<string>().compare("") == 0) {
+                printErrorMsg("You must specify the path of a file to store the result of the trigger graph with --trigger_paths");
+                return false;
             }
         } else if (cmd == "lookup") {
             if (!vm.count("text") && !vm.count("number")) {
@@ -242,6 +252,9 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "This parameter sets a threshold to estimate the reasoning cost of a pattern. This cost can be broadly associated to the cardinality of the pattern. It is used to choose either TopDown or Magic evalution. Default is 1000000 (1M).", false);
     query_options.add<string>("", "reasoningAlgo", "",
             "Determines the reasoning algo (only for <queryLiteral>). Possible values are \"qsqr\", \"magic\", \"auto\".", false);
+    query_options.add<string>("", "trigger_algo", "",
+            "Algorithm to use to create a trigger graph. For now only 'linear' or 'kbound'",
+            false);
     query_options.add<string>("", "trigger_paths", "",
             "Path to the file that contains trigger graph execution paths",
             false);
@@ -410,6 +423,31 @@ void startServer(int argc,
     webint->join();
 }
 #endif
+
+
+void computeTriggerGraph(EDBLayer &db,
+        std::string rulefile, std::string algo,
+        std::string fileout_path) {
+    std::cout << "A" << fileout_path << "B" << std::endl;
+    //Load the program
+    Program p(&db);
+    p.readFromFile(rulefile, false);
+
+    TriggerGraph tg;
+    if (algo == "linear") {
+        tg.createLinear(db, p);
+    } else if (algo == "kbound") {
+        tg.createKBound(db, p);
+    } else {
+        LOG(ERRORL) << "The algorithm " << algo << " is not recognized. "
+            "Specify a valid one with --trigger_algo";
+        throw 10;
+    }
+    //Save the graph on a file
+    ofstream fout(fileout_path);
+    tg.saveAllPaths(fout);
+    fout.close();
+}
 
 void launchTriggeredMat(int argc,
         const char** argv,
@@ -1034,6 +1072,12 @@ int main(int argc, const char** argv) {
         launchTriggeredMat(argc, argv, full_path, *layer, vm,
                 vm["rules"].as<string>(), vm["trigger_paths"].as<string>());
         delete layer;
+    } else if (cmd == "trigger") {
+        EDBConf conf(edbFile);
+        EDBLayer *layer = new EDBLayer(conf, false);
+        computeTriggerGraph(*layer, vm["rules"].as<string>(),
+                vm["trigger_algo"].as<string>(),
+                vm["trigger_paths"].as<string>());
     } else if (cmd == "rulesgraph") {
         EDBConf conf(edbFile);
         EDBLayer *layer = new EDBLayer(conf, false);

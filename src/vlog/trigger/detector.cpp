@@ -1,4 +1,4 @@
-#include <vlog/deps/detector.h>
+#include <vlog/trigger/detector.h>
 
 std::vector<Equivalence> Detector::getDatabaseDependencies(Program &prog, EDBLayer &layer) {
     std::vector<Equivalence> out;

@@ -1,5 +1,5 @@
 #include <vlog/seminaiver_trigger.h>
-#include <vlog/tgpath.h>
+#include <vlog/trigger/tgpath.h>
 
 #include <unordered_map>
 
