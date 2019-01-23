@@ -344,7 +344,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
             else
                 resp2 = executeRules(emptyRuleset, tmpExtIDBRules, costRules,
                         iteration == 0 ? 1 : iteration, false, timeout);
-            if (!resp1 && !resp2) {
+            if ((!resp1 && !resp2) || foundCyclicTerms) {
                 break; //Fix-point
             }
             loopNr++;
