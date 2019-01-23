@@ -48,7 +48,7 @@ void TriggerSemiNaiver::run(std::string trigger_paths) {
             }
         }
 
-        ruleDetails.createExecutionPlans(ranges);
+        ruleDetails.createExecutionPlans(ranges, false);
 
         //Invoke the execution of the rule using the inputs specified
         executeRule(ruleDetails, iteration, 0, NULL);

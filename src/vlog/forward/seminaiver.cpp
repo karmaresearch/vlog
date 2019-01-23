@@ -234,7 +234,9 @@ bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
     return newDer;
 }
 
-void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules, size_t lastExecution) {
+void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
+        size_t lastExecution,
+        int singleRuleToCheck) {
     //Prepare for the execution
 #if DEBUG
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
@@ -277,7 +279,7 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules, size_t las
 }
 
 void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
-        bool checkCyclicTerms) {
+        bool checkCyclicTerms, int singleRuleToCheck) {
     this->checkCyclicTerms = checkCyclicTerms;
     this->foundCyclicTerms = false;
     running = true;
@@ -289,7 +291,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
     listDerivations.clear();
 
     std::vector<RuleExecutionDetails> allrules;
-    prepare(allrules, lastExecution);
+    prepare(allrules, lastExecution, singleRuleToCheck);
 
     //Used for statistics
     std::vector<StatIteration> costRules;

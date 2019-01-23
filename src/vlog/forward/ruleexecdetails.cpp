@@ -336,7 +336,8 @@ void RuleExecutionDetails::calculateDependencies(const Rule &rule,
 }
 
 void RuleExecutionDetails::createExecutionPlans(
-        std::vector<std::pair<size_t, size_t>> &ranges) {
+        std::vector<std::pair<size_t, size_t>> &ranges,
+        bool copyAllVars) {
     std::vector<Literal> bl = rule.getBody();
     orderExecutions.clear();
     bodyLiterals.clear();
@@ -364,11 +365,11 @@ void RuleExecutionDetails::createExecutionPlans(
     }
 
     auto &heads = rule.getHeads();
-    p.calculateJoinsCoordinates(heads);
+    p.calculateJoinsCoordinates(heads, copyAllVars);
     orderExecutions.push_back(p);
 }
 
-void RuleExecutionDetails::createExecutionPlans() {
+void RuleExecutionDetails::createExecutionPlans(bool copyAllVars) {
     //Init
     std::vector<Literal> bl = rule.getBody();
     bodyLiterals.clear();

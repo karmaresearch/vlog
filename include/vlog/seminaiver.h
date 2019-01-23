@@ -148,7 +148,8 @@ class SemiNaiver {
                 bool fixpoint, unsigned long *timeout = NULL);
 
         void prepare(std::vector<RuleExecutionDetails> &allrules,
-                size_t lastExecution = 0);
+                size_t lastExecution,
+                int singleRuleToCheck);
 
         void setIgnoreDuplicatesElimination() {
             ignoreDuplicatesElimination = true;

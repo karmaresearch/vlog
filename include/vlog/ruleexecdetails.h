@@ -26,7 +26,8 @@ struct RuleExecutionDetails {
 
     void createExecutionPlans(bool copyAllVars);
 
-    void createExecutionPlans(std::vector<std::pair<size_t, size_t>> &ranges);
+    void createExecutionPlans(std::vector<std::pair<size_t, size_t>> &ranges,
+            bool copyAllVars);
 
     void calculateNVarsInHeadFromEDB();
 
