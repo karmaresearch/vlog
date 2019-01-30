@@ -32,6 +32,14 @@ EDBLayer::EDBLayer(EDBLayer &db) {
     }
 }
 
+std::vector<PredId_t> EDBLayer::getAllEDBPredicates() {
+    std::vector<PredId_t> out;
+    for(const auto &pair : dbPredicates) {
+        out.push_back(pair.first);
+    }
+    return out;
+}
+
 void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithreaded) {
     EDBInfoTable infot;
     const string pn = tableConf.predname;

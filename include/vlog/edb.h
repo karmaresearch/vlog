@@ -143,6 +143,8 @@ class EDBLayer {
 
         std::vector<PredId_t> getAllPredicateIDs();
 
+        std::vector<PredId_t> getAllEDBPredicates();
+
         uint64_t getPredSize(PredId_t id);
 
         string getPredType(PredId_t id);

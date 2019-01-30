@@ -148,9 +148,9 @@ std::string Literal::toprettystring(Program *program, EDBLayer *db, bool replace
         if (tuple.get(i).isVariable()) {
             out += std::string("A") + std::to_string(tuple.get(i).getId());
         } else {
-	    if (replaceConstants) {
-		out += "*";
-	    } else if (db == NULL) {
+            if (replaceConstants) {
+                out += "*";
+            } else if (db == NULL) {
                 out += std::to_string(tuple.get(i).getValue());
             } else {
                 uint64_t id = tuple.get(i).getValue();
@@ -246,7 +246,8 @@ bool Literal::sameVarSequenceAs(const Literal &l) const {
     return false;
 }
 
-int Literal::subsumes(std::vector<Substitution> &substitutions, const Literal &l, const Literal &m) {
+int Literal::subsumes(std::vector<Substitution> &substitutions,
+        const Literal &l, const Literal &m) {
     substitutions.clear();
     if (l.getPredicate().getId() != m.getPredicate().getId()) {
         return -1;
@@ -678,19 +679,19 @@ std::string Rule::toprettystring(Program * program, EDBLayer *db, bool replaceCo
     std::string output = "";
     bool first = true;
     for(const auto& head : heads) {
-	if (! first) {
-	    output += ",";
-	}
+        if (! first) {
+            output += ",";
+        }
         output += head.toprettystring(program, db, replaceConstants);
-	first = false;
+        first = false;
     }
     output += " :- ";
     first = true;
     for (int i = 0; i < body.size(); ++i) {
-	if (! first) {
-	    output += ",";
-	}
-	first = false;
+        if (! first) {
+            output += ",";
+        }
+        first = false;
         output += body[i].toprettystring(program, db, replaceConstants);
     }
     return output;
