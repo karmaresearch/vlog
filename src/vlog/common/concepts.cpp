@@ -142,7 +142,10 @@ std::string Literal::toprettystring(Program *program, EDBLayer *db) const {
     else
         predName = std::to_string(pred.getId());
 
-    std::string out = predName + std::string("(");
+    std::string out = "";
+    if (isNegated())
+        out = "~";
+    out += predName + std::string("(");
 
     for (int i = 0; i < tuple.getSize(); ++i) {
         if (tuple.get(i).isVariable()) {
@@ -435,6 +438,8 @@ bool Literal::operator==(const Literal & other) const {
         if (tuple.get(i) != other.tuple.get(i))
             return false;
     }
+    if (negated != other.isNegated())
+        return false;
     return true;
 }
 
@@ -929,6 +934,13 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
         t1.set(*itr, pos++);
     }
 
+    //Check if predicate starts with "neg_".
+    bool negated = false;
+    if (predicate.substr(0,4) == "neg_") {
+        negated = true;
+        predicate = predicate.substr(4);
+    }
+
     //Determine predicate
     PredId_t predid = (PredId_t) dictPredicates.getOrAdd(predicate);
     if (cardPredicates.find(predid) == cardPredicates.end()) {
@@ -940,7 +952,7 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     }
     Predicate pred(predid, Predicate::calculateAdornment(t1), kb->doesPredExists(predid) ? EDB : IDB, (uint8_t) t.size());
 
-    Literal literal(pred, t1);
+    Literal literal(pred, t1, negated);
     return literal;
 }
 
