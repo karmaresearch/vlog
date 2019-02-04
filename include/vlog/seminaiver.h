@@ -98,6 +98,9 @@ class SemiNaiver {
                 const std::vector<size_t> &cards,
                 const std::vector<Literal> &headLiteral);
 
+        void reorderPlanForNegatedLiterals(RuleExecutionPlan &plan,
+                const std::vector<Literal> &heads);
+
         bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
                 std::vector<RuleExecutionDetails> &allIDBRules,
                 std::vector<StatIteration> &costRules,
