@@ -258,3 +258,11 @@ bool RuleExecutionPlan::hasCartesian() {
     }
     return false;
 }
+
+std::string RuleExecutionPlan::toString() {
+    std::string result;
+    for (auto ele : plan) {
+        result += std::to_string(ele->getPredicate().getId()) + " ";
+    }
+    return result;
+}

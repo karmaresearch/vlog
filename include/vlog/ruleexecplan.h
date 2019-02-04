@@ -57,6 +57,8 @@ struct RuleExecutionPlan {
             const std::vector<Literal> &heads) const;
 
     bool hasCartesian();
+
+    std::string toString();
 };
 
 #endif
