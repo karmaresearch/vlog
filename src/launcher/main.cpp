@@ -424,11 +424,9 @@ void startServer(int argc,
 }
 #endif
 
-
 void computeTriggerGraph(EDBLayer &db,
         std::string rulefile, std::string algo,
         std::string fileout_path) {
-    std::cout << "A" << fileout_path << "B" << std::endl;
     //Load the program
     Program p(&db);
     p.readFromFile(rulefile, false);
@@ -1011,12 +1009,13 @@ int main(int argc, const char** argv) {
 
     string cmd = string(argv[1]);
 
+    string execFile = string(argv[0]);
+    string dirExecFile = Utils::parentDir(execFile);
+
     //Get the path to the EDB layer
     string edbFile = vm["edb"].as<string>();
     if (edbFile == "default") {
         //Get current directory
-        string execFile = string(argv[0]);
-        string dirExecFile = Utils::parentDir(execFile);
         edbFile = dirExecFile + DIR_SEP + string("edb.conf");
     }
 
@@ -1045,6 +1044,7 @@ int main(int argc, const char** argv) {
 
     if (cmd == "query" || cmd == "queryLiteral") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, false);
 
         //Execute the query
@@ -1056,11 +1056,13 @@ int main(int argc, const char** argv) {
         delete layer;
     } else if (cmd == "lookup") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, false);
         lookup(*layer, vm);
         delete layer;
     } else if (cmd == "mat") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, ! vm["multithreaded"].empty());
         // EDBLayer layer(conf, false);
         launchFullMat(argc, argv, full_path, *layer, vm,
@@ -1068,18 +1070,21 @@ int main(int argc, const char** argv) {
         delete layer;
     } else if (cmd == "mat_tg") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, ! vm["multithreaded"].empty());
         launchTriggeredMat(argc, argv, full_path, *layer, vm,
                 vm["rules"].as<string>(), vm["trigger_paths"].as<string>());
         delete layer;
     } else if (cmd == "trigger") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, false);
         computeTriggerGraph(*layer, vm["rules"].as<string>(),
                 vm["trigger_algo"].as<string>(),
                 vm["trigger_paths"].as<string>());
     } else if (cmd == "rulesgraph") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, false);
         writeRuleDependencyGraph(*layer, vm["rules"].as<string>(),
                 vm["graphfile"].as<string>());
@@ -1181,6 +1186,7 @@ int main(int argc, const char** argv) {
         delete loader;
     } else if (cmd == "gentq") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         string rulesFile = vm["rules"].as<string>();
         EDBLayer *layer = new EDBLayer(conf, false);
         Program p(layer);
@@ -1226,12 +1232,14 @@ int main(int argc, const char** argv) {
 #endif
     } else if (cmd == "cycles") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, false);
         string rulesFile = vm["rules"].as<string>();
         string alg = vm["alg"].as<string>();
         checkAcyclicity(rulesFile, alg, *layer);
     } else if (cmd == "deps") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, false);
         string rulesFile = vm["rules"].as<string>();
         detectDeps(rulesFile, *layer);

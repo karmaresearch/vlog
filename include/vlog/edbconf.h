@@ -22,6 +22,7 @@ public:
 
 private:
     std::vector<Table> tables;
+    std::string rootPath;
 
     void parse(string f);
 
@@ -29,6 +30,10 @@ public:
     VLIBEXP EDBConf(string rawcontent, bool isFile);
 
     EDBConf(string rawcontent) : EDBConf(rawcontent, true) {}
+
+    void setRootPath(std::string path);
+
+    std::string getRootPath();
 
     const std::vector<Table> &getTables() {
         return tables;

@@ -79,6 +79,7 @@ class EDBLayer {
         IndexedTupleTable *tmpRelations[MAX_NPREDS];
 
         std::unique_ptr<Dictionary> termsDictionary;
+        std::string rootPath;
 
         VLIBEXP void addTridentTable(const EDBConf::Table &tableConf, bool multithreaded);
 
@@ -102,6 +103,7 @@ class EDBLayer {
 
         EDBLayer(EDBConf &conf, bool multithreaded) {
             const std::vector<EDBConf::Table> tables = conf.getTables();
+            rootPath = conf.getRootPath();
 
             predDictionary = std::shared_ptr<Dictionary>(new Dictionary());
 

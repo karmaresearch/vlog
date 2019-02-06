@@ -35,7 +35,7 @@ void TriggerSemiNaiver::run(std::string trigger_paths) {
         //Create range vector corresponding to the inputs
         std::vector<std::pair<size_t, size_t>> ranges;
         for(auto &input : path.inputs) {
-            if (input == "INPUT") {
+            if (input == "INPUT" || input.find("EDB") == 0) {
                 ranges.push_back(std::make_pair(0, (size_t) - 1));
             } else {
                 //Get the range from the map

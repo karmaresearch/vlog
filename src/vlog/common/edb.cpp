@@ -116,7 +116,12 @@ void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
     const string pn = tableConf.predname;
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.type = tableConf.type;
-    InmemoryTable *table = new InmemoryTable(tableConf.params[0],
+    string repository = tableConf.params[0];
+    if (repository.size() > 0 && repository[0] != '/') {
+        //Relative path. Add the root path
+        repository = rootPath + "/" + repository;
+    }
+    InmemoryTable *table = new InmemoryTable(repository,
             tableConf.params[1], infot.id, this);
     infot.manager = std::shared_ptr<EDBTable>(table);
     infot.arity = table->getArity();

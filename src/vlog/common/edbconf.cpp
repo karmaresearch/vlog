@@ -11,7 +11,7 @@
 
 EDBConf::EDBConf(string rawcontent, bool isFile) {
     if (isFile) {
-	LOG(INFOL) << "Parsing EDB configuration " << rawcontent;
+        LOG(INFOL) << "Parsing EDB configuration " << rawcontent;
         //Read the input file line by line
         string f = rawcontent;
         std::ifstream file(f);
@@ -22,6 +22,14 @@ EDBConf::EDBConf(string rawcontent, bool isFile) {
         }
     }
     parse(rawcontent);
+}
+
+void EDBConf::setRootPath(std::string path) {
+    this->rootPath = path;
+}
+
+std::string EDBConf::getRootPath() {
+    return rootPath;
 }
 
 void EDBConf::parse(string f) {
@@ -69,8 +77,8 @@ void EDBConf::parse(string f) {
                 throw ("Malformed line: " + line);
             }
         } else {
-	    throw ("Malformed line: " + line);
-	}
+            throw ("Malformed line: " + line);
+        }
     }
 
 #ifdef DEBUG
