@@ -69,7 +69,7 @@ void TriggerGraph::computeNonIsomorphisms(std::vector<VTuple> &out,
     }
 }
 
-std::vector<VTuple> TriggerGraph::linearGetNonIsomorphicTuples(int arity) {
+std::vector<VTuple> TriggerGraph::linearGetNonIsomorphicTuples(int start, int arity) {
     //Need to compute all non isomorphic tuples
     std::vector<VTuple> out;
     std::vector<uint64_t> tuple(arity);
@@ -77,16 +77,16 @@ std::vector<VTuple> TriggerGraph::linearGetNonIsomorphicTuples(int arity) {
     //computeNonIsomorphisms(out, tuple, mask, arity, 0);
     if (arity == 1) {
         VTuple t(1);
-        t.set(VTerm(0, 0), 0);
+        t.set(VTerm(0, start), 0);
         out.push_back(t);
     } else if (arity == 2) {
         VTuple t1(2);
-        t1.set(VTerm(0, 0), 0);
-        t1.set(VTerm(0, 1), 1);
+        t1.set(VTerm(0, start), 0);
+        t1.set(VTerm(0, start + 1), 1);
         out.push_back(t1);
         VTuple t2(2);
-        t2.set(VTerm(0, 2), 0);
-        t2.set(VTerm(0, 2), 1);
+        t2.set(VTerm(0, start + 2), 0);
+        t2.set(VTerm(0, start + 2), 1);
         out.push_back(t2);
     } else {
         LOG(ERRORL) << "arity not supported";
@@ -443,10 +443,12 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
 
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
+    int startCounter = 0;
     for(const PredId_t p : db.getAllEDBPredicates()) {
         //Get arity
         int arity = db.getPredArity(p);
-        const auto tuples = linearGetNonIsomorphicTuples(arity);
+        const auto tuples = linearGetNonIsomorphicTuples(startCounter, arity);
+        startCounter += 10; //number large enough to make sure there are no conflicts
         for (const VTuple &t : tuples) {
             std::shared_ptr<Node> n = std::shared_ptr<Node>(new Node(nodecounter));
             nodecounter += 1;

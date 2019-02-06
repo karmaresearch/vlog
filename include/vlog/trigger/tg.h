@@ -51,7 +51,7 @@ class TriggerGraph {
                 int sizeLeft,
                 uint64_t freshID);
 
-        std::vector<VTuple> linearGetNonIsomorphicTuples(int arity);
+        std::vector<VTuple> linearGetNonIsomorphicTuples(int start = 0, int arity = 1);
 
         uint64_t getNNodes(Node *n = NULL, std::set<string> *cache = NULL);
 
