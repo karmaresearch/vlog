@@ -58,6 +58,7 @@ class ResultJoinProcessor {
         size_t rowCount;
 #endif
         const bool ignoreDupElimin;
+        uint64_t triggers;
 
     protected:
         virtual void processResults(const int blockid,
@@ -95,7 +96,8 @@ class ResultJoinProcessor {
             nCopyFromFirst(nCopyFromFirst),
             nCopyFromSecond(nCopyFromSecond),
             nthreads(nthreads),
-            ignoreDupElimin(ignoreDupElimin) {
+            ignoreDupElimin(ignoreDupElimin),
+            triggers(0) {
                 for (uint8_t i = 0; i < nCopyFromFirst; ++i) {
                     this->posFromFirst[i] = posFromFirst[i];
                 }
@@ -157,6 +159,10 @@ class ResultJoinProcessor {
 
         Term_t *getRawRow() {
             return row;
+        }
+
+        uint64_t getTriggers() {
+            return triggers;
         }
 
         uint8_t getNCopyFromSecond() const {

@@ -88,7 +88,8 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
     program(program),
     nthreads(nthreads),
     checkCyclicTerms(false),
-    ignoreExistentialRules(ignoreExistentialRules) {
+    ignoreExistentialRules(ignoreExistentialRules),
+    triggers(0) {
 
         ignoreDuplicatesElimination = false;
         TableFilterer::setOptIntersect(opt_intersect);
@@ -358,6 +359,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
 
     running = false;
     LOG(INFOL) << "Finished process. Iterations=" << iteration;
+    LOG(INFOL) << "Triggers: " << triggers;
 
     //DEBUGGING CODE -- needed to see which rules cost the most
     //Sort the iteration costs
@@ -481,6 +483,8 @@ bool SemiNaiver::executeUntilSaturation(
                         ruleset[currentRule].rule.tostring(program, &layer) <<
                         "  required " << recursiveIterations << " to saturate";
             }
+            //printCountAllIDBs("After step " + to_string(iteration) + ": ");
+            //LOG(INFOL) << "Triggers: " << triggers;
             rulesWithoutDerivation = 0;
             nRulesOnePass++;
         } else {
@@ -497,7 +501,7 @@ bool SemiNaiver::executeUntilSaturation(
             //CODE FOR Statistics
             LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". RulesWithDerivation=" <<
                 nRulesOnePass << " out of " << ruleset.size() << " Derivations so far " << countAllIDBs();
-            printCountAllIDBs("After step " + to_string(iteration) + ": ");
+            printCountAllIDBs("After step " + to_string(iteration) + ": ");            
             nRulesOnePass = 0;
 
             //Get the top 10 rules in the last iteration
@@ -752,6 +756,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
                         firstHeadLiteral, *bodyLiteral,
                         literalItr.getCurrentBlock())) {
 
+                triggers += table->getNRows();
                 firstEndTable->add(table->cloneWithIteration(iteration),
                         firstHeadLiteral, 0, &ruleDetails,
                         orderExecution, iteration, true, nthreads);
@@ -762,7 +767,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
         }
     } else if (nBodyLiterals == 1) {
         const bool uniqueResults =
-            ! ruleDetails.rule.isExistential()
+            !ruleDetails.rule.isExistential() && opt_filtering
             && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
             && literalItr.getNTables() == 1 && heads.size() == 1;
         while (!literalItr.isEmpty()) {
@@ -1202,6 +1207,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 std::chrono::duration<double> d =
                     std::chrono::system_clock::now() - startC;
                 durationConsolidation += d;
+                auto t = joinOutput->getTriggers();
+                triggers += t;
             }
 
             //Prepare for the processing of the next atom (if any)

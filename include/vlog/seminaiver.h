@@ -127,6 +127,7 @@ class SemiNaiver {
         std::vector<RuleExecutionDetails> allIDBRules;
         size_t iteration;
         int nthreads;
+        uint64_t triggers;
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
                 const uint32_t iteration,

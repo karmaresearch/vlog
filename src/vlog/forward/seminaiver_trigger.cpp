@@ -15,7 +15,7 @@ void TriggerSemiNaiver::run(std::string trigger_paths) {
     }
 
     //Do not check for duplicates anymore
-    setIgnoreDuplicatesElimination();
+    //setIgnoreDuplicatesElimination();
 
     LOG(DEBUGL) << "First load the trigger_path file";
     TGPaths paths(trigger_paths);
@@ -56,4 +56,5 @@ void TriggerSemiNaiver::run(std::string trigger_paths) {
         iterations.insert(std::make_pair(path.output, iteration));
         iteration += 1;
     }
+    LOG(INFOL) << "Triggers: " << triggers;
 }
