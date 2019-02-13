@@ -501,7 +501,7 @@ bool SemiNaiver::executeUntilSaturation(
             //CODE FOR Statistics
             LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". RulesWithDerivation=" <<
                 nRulesOnePass << " out of " << ruleset.size() << " Derivations so far " << countAllIDBs();
-            printCountAllIDBs("After step " + to_string(iteration) + ": ");            
+            printCountAllIDBs("After step " + to_string(iteration) + ": ");
             nRulesOnePass = 0;
 
             //Get the top 10 rules in the last iteration

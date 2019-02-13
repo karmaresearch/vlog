@@ -72,6 +72,9 @@ class TriggerGraph {
         void linearRecursiveConstruction(Program &p, const Literal &l,
                 std::shared_ptr<Node> parentNode);
 
+        void sortByCardinalities(
+                std::vector<std::shared_ptr<Node>> &atoms);
+
     public:
         TriggerGraph();
 

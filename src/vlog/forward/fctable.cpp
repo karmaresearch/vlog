@@ -258,13 +258,13 @@ std::shared_ptr<const Segment> FCTable::retainFrom(
             ++itr) {
         sz += itr->table->getNRows();
     }
-    //    LOG(TRACEL) << "retainFrom: t.size() = " << t->getNRows() << ", blocks.size() = " << blocks.size() << ", sz = " << sz;
+    LOG(DEBUGL) << "retainFrom: t.size() = " << t->getNRows() << ", blocks.size() = " << blocks.size() << ", sz = " << sz;
 #endif
     for (std::vector<FCBlock>::const_iterator itr = blocks.cbegin();
             itr != blocks.cend();
             ++itr) {
         t = SegmentInserter::retain(t, itr->table, dupl, nthreads);
-        //        LOG(TRACEL) << "after retain: t.size() = " << t->getNRows() << ", table size was " << itr->table->getNRows();
+        LOG(DEBUGL) << "after retain: t.size() = " << t->getNRows() << ", table size was " << itr->table->getNRows();
         passed = true;
     }
 
@@ -273,7 +273,7 @@ std::shared_ptr<const Segment> FCTable::retainFrom(
         t = SegmentInserter::retain(t, NULL, dupl, nthreads);
     }
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    LOG(TRACEL) << "Time retainFrom = " << sec.count() * 1000;
+    LOG(DEBUGL) << "Time retainFrom = " << sec.count() * 1000;
 
     return t;
 }

@@ -171,44 +171,6 @@ void TriggerGraph::linearChase(Program &program,
     }
 }
 
-/*void TriggerGraph::linearChase(Program &program,
-  Node *node, const std::vector<Literal> &db,
-  std::unordered_set<std::string> &out) {
-  std::vector<Literal> outNode;
-//Apply the rule on db and get all fact in outNode
-const auto &rule = program.getRule(node->ruleID);
-const auto &body = rule.getBody();
-const auto &bodyAtom = body[0];
-const auto &heads = rule.getHeads();
-assert(heads.size() == 1);
-Literal head = heads[0];
-std::vector<Substitution> subs;
-
-for(const auto &inputLinear : db) {
-int nsubs = Literal::getSubstitutionsA2B(subs, bodyAtom, inputLinear);
-if (nsubs != -1) {
-Literal groundHead = head.substitutes(subs);
-outNode.push_back(groundHead);
-}
-}
-
-//Add these facts to out
-for(const auto &l : outNode) {
-out.insert(l.tostring(NULL, NULL));
-}
-//Recursive call
-for(const auto &child : node->outgoing) {
-linearChase(program, child.get(), outNode, out);
-}
-}*/
-
-
-/*void TriggerGraph::linearComputeNodeOutput(Program &program,
-  Node *node, const std::vector<Literal> &db,
-  std::unordered_set<std::string> &out) {
-//TODO
-}*/
-
 void TriggerGraph::linearRecursiveConstruction(Program &program,
         const Literal &literal,
         std::shared_ptr<Node> parentNode) {
@@ -292,8 +254,14 @@ void TriggerGraph::linearGetAllGraphNodes(
     }
 }
 
+void TriggerGraph::sortByCardinalities(
+        std::vector<std::shared_ptr<Node>> &atoms) {
+    //TODO
+}
+
 void TriggerGraph::dumpGraphToFile(std::ofstream &fedges, std::ofstream &fnodes,
         EDBLayer &edb, Program &p) {
+
     std::vector<std::shared_ptr<Node>> toprocess;
     for(const auto &n : nodes) {
         toprocess.push_back(n);
@@ -544,9 +512,6 @@ void TriggerGraph::createKBound(EDBLayer &db, Program &p) {
 }
 
 void TriggerGraph::processNode(const Node &n, std::ostream &out) {
-    for (const auto child : n.incoming) {
-        processNode(*child, out);
-    }
     //Write a line
     if (n.ruleID != -1) {
         out << std::to_string(n.ruleID) << "\t";
@@ -555,16 +520,24 @@ void TriggerGraph::processNode(const Node &n, std::ostream &out) {
         }
         out << n.label << std::endl;
     }
+    for (const auto child : n.incoming) {
+        processNode(*child, out);
+    }
 }
 
 void TriggerGraph::saveAllPaths(std::ostream &out) {
     std::vector<std::shared_ptr<Node>> nns;
-    linearGetAllGraphNodes(nns);
-    for(const auto &n : nns) {
-        if (n->outgoing.size() == 0) {
-            if (n->incoming.size() != 0) {
-                processNode(*n.get(), out);
-            }
+
+    std::vector<std::shared_ptr<Node>> toprocess;
+    for(const auto &n : nodes) {
+        toprocess.push_back(n);
+    }
+    //Sort the nodes by cardinalities
+    sortByCardinalities(toprocess);
+
+    for(const auto &n : toprocess) {
+        if (n->outgoing.size() != 0) {
+            processNode(*n.get(), out);
         }
     }
 }

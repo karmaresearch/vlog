@@ -23,6 +23,7 @@ void TriggerSemiNaiver::run(std::string trigger_paths) {
 
     size_t iteration = 0;
     std::unordered_map<std::string, size_t> iterations;
+    std::vector<StatIteration> costRules;
 
     for(size_t i = 0; i < paths.getNPaths(); ++i) {
         LOG(DEBUGL) << "Executing path " << i;
@@ -51,10 +52,41 @@ void TriggerSemiNaiver::run(std::string trigger_paths) {
         ruleDetails.createExecutionPlans(ranges, false);
 
         //Invoke the execution of the rule using the inputs specified
+        std::chrono::system_clock::time_point start =
+            std::chrono::system_clock::now();
         executeRule(ruleDetails, iteration, 0, NULL);
+        std::chrono::duration<double> sec = std::chrono::system_clock::now()
+            - start;
+        StatIteration stat;
+        stat.iteration = i;
+        stat.rule = &ruleDetails.rule;
+        stat.time = sec.count() * 1000;
+        stat.derived = false;
+        costRules.push_back(stat);
 
         iterations.insert(std::make_pair(path.output, iteration));
         iteration += 1;
     }
     LOG(INFOL) << "Triggers: " << triggers;
+
+#ifdef DEBUG
+    std::sort(costRules.begin(), costRules.end());
+    int i = 0;
+    double sum = 0;
+    double sum10 = 0;
+    for (auto &el : costRules) {
+        LOG(DEBUGL) << "Cost iteration " << el.iteration << " " <<
+            el.time;
+        i++;
+        if (i >= 20)
+            break;
+
+        sum += el.time;
+        if (i <= 10)
+            sum10 += el.time;
+    }
+    LOG(DEBUGL) << "Sum first 20 rules: " << sum
+        << " first 10:" << sum10;
+#endif
+
 }
