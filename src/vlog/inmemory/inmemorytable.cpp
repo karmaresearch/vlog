@@ -10,7 +10,7 @@
 void dump() {
 }
 
-std::vector<std::string> readRow(istream &ifs) {
+std::vector<std::string> readRow(istream &ifs, char separator) {
     char buffer[65536];
     bool insideEscaped = false;
     char *p = &buffer[0];
@@ -47,7 +47,7 @@ std::vector<std::string> readRow(istream &ifs) {
         } else {
             quoteCount = 0;
         }
-        if (eof || (! insideEscaped && (c == '\n' || c == ','))) {
+        if (eof || (! insideEscaped && (c == '\n' || c == separator))) {
             if (justSeenQuote) {
                 *(p-1) = '\0';
             } else {
@@ -71,7 +71,7 @@ std::vector<std::string> readRow(istream &ifs) {
 }
 
 InmemoryTable::InmemoryTable(string repository, string tablename,
-        PredId_t predid, EDBLayer *layer) {
+        PredId_t predid, EDBLayer *layer, char sep) {
     this->layer = layer;
     arity = 0;
     this->predid = predid;
@@ -92,7 +92,7 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
         }
         LOG(DEBUGL) << "Reading " << tablefile;
         while (! ifs->eof()) {
-            std::vector<std::string> row = readRow(*ifs);
+            std::vector<std::string> row = readRow(*ifs, sep);
             Term_t rowc[256];
             if (arity == 0) {
                 arity = row.size();
