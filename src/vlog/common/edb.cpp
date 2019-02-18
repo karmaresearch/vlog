@@ -122,11 +122,13 @@ void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
         repository = rootPath + "/" + repository;
     }
     InmemoryTable *table;
-    if (tableConf.params.size() == 3) {
+    if (tableConf.params.size() == 2) {
         table = new InmemoryTable(repository,
                 tableConf.params[1], infot.id, this);
     } else {
         char sep = tableConf.params[2][0];
+        if (sep == 't')
+            sep = '\t';
         table = new InmemoryTable(repository,
                 tableConf.params[1], infot.id, this, sep);
     }

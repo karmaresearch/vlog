@@ -254,9 +254,21 @@ void TriggerGraph::linearGetAllGraphNodes(
     }
 }
 
+bool TriggerGraph::CardSorter::operator  ()(const std::shared_ptr<TriggerGraph::Node> &a,
+        const std::shared_ptr<TriggerGraph::Node> &b) const {
+    auto id_a = a->literal->getPredicate().getId();
+    auto id_b = b->literal->getPredicate().getId();
+    size_t card_a = e.getPredSize(id_a);
+    size_t card_b = e.getPredSize(id_b);
+    //std::cout << "pred " << id_a << " " << id_b << " card " << card_a << " " << card_b << std::endl;
+    return card_a > card_b;
+}
+
 void TriggerGraph::sortByCardinalities(
-        std::vector<std::shared_ptr<Node>> &atoms) {
-    //TODO
+        std::vector<std::shared_ptr<Node>> &atoms,
+        EDBLayer &edb) {
+    CardSorter c(edb);
+    std::sort(atoms.begin(), atoms.end(), c);
 }
 
 void TriggerGraph::dumpGraphToFile(std::ofstream &fedges, std::ofstream &fnodes,
@@ -452,8 +464,11 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
     //*** Prune the graph ***
     start = std::chrono::system_clock::now();
     auto nodesToProcess = nodes;
+    int idx = 0;
     for (auto n : nodesToProcess) {
+        std::cout << "Pruning node " << idx << " of " << nodesToProcess.size() << std::endl;
         prune(db, program, database, n);
+        idx++;
     }
     sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Time pruning (msec): " << sec.count() * 1000;
@@ -520,12 +535,14 @@ void TriggerGraph::processNode(const Node &n, std::ostream &out) {
         }
         out << n.label << std::endl;
     }
-    for (const auto child : n.incoming) {
+
+    for (const auto child : n.outgoing) {
         processNode(*child, out);
     }
 }
 
-void TriggerGraph::saveAllPaths(std::ostream &out) {
+void TriggerGraph::saveAllPaths(EDBLayer &edb, std::ostream &out) {
+    LOG(INFOL) << "Saving all paths ...";
     std::vector<std::shared_ptr<Node>> nns;
 
     std::vector<std::shared_ptr<Node>> toprocess;
@@ -533,7 +550,7 @@ void TriggerGraph::saveAllPaths(std::ostream &out) {
         toprocess.push_back(n);
     }
     //Sort the nodes by cardinalities
-    sortByCardinalities(toprocess);
+    sortByCardinalities(toprocess, edb);
 
     for(const auto &n : toprocess) {
         if (n->outgoing.size() != 0) {

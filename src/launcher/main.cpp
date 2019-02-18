@@ -443,7 +443,7 @@ void computeTriggerGraph(EDBLayer &db,
     }
     //Save the graph on a file
     ofstream fout(fileout_path);
-    tg.saveAllPaths(fout);
+    tg.saveAllPaths(db, fout);
     fout.close();
 }
 

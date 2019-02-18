@@ -31,6 +31,18 @@ class TriggerGraph {
                 std::vector<NodeFactSet> facts;
                 uint64_t getID() { return id; }
         };
+
+        struct CardSorter {
+            EDBLayer &e;
+
+            CardSorter(EDBLayer &edb) : e(edb) {}
+
+            bool operator ()(const std::shared_ptr<TriggerGraph::Node> &a,
+                    const std::shared_ptr<TriggerGraph::Node> &b) const;
+        };
+
+
+
         std::vector<std::shared_ptr<Node>> nodes;
         uint64_t nodecounter;
 
@@ -73,7 +85,8 @@ class TriggerGraph {
                 std::shared_ptr<Node> parentNode);
 
         void sortByCardinalities(
-                std::vector<std::shared_ptr<Node>> &atoms);
+                std::vector<std::shared_ptr<Node>> &atoms,
+                EDBLayer &edb);
 
     public:
         TriggerGraph();
@@ -82,7 +95,7 @@ class TriggerGraph {
 
         void createKBound(EDBLayer &db, Program &p);
 
-        void saveAllPaths(std::ostream &out);
+        void saveAllPaths(EDBLayer &db, std::ostream &out);
 };
 
 #endif
