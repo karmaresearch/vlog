@@ -419,7 +419,8 @@ bool SemiNaiver::executeUntilSaturation(
         }
 
         if (response) {
-            if (ruleset[currentRule].rule.isRecursive() && limitView == 0) {
+            //I disable this...
+            if (false && ruleset[currentRule].rule.isRecursive() && limitView == 0) {
                 //Is the rule recursive? Go until saturation...
                 int recursiveIterations = 0;
                 do {
