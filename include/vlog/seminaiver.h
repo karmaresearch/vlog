@@ -210,6 +210,8 @@ class SemiNaiver {
 
         size_t getSizeTable(const PredId_t predid) const;
 
+        bool isEmpty(const PredId_t predid) const;
+
         std::vector<FCBlock> &getDerivationsSoFar() {
             return listDerivations;
         }

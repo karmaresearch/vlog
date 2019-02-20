@@ -103,6 +103,14 @@ class InmemoryTable : public EDBTable {
 
         EDBIterator *getIterator(const Literal &query);
 
+        bool useSegments() {
+            return true;
+        }
+
+        std::shared_ptr<const Segment> getSegment() {
+            return segment;
+        }
+
         // This version has fields corresponding to the VARIABLES IN THE QUERY!!!!!
         EDBIterator *getSortedIterator(const Literal &query,
                 const std::vector<uint8_t> &fields);

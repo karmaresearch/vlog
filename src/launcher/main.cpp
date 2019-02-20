@@ -505,8 +505,17 @@ void launchTriggeredMat(int argc,
     LOG(INFOL) << "Starting full materialization guided by trigger graphs";
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     sn->run(vm["trigger_paths"].as<std::string>());
-    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
+    std::chrono::duration<double> secMat = std::chrono::system_clock::now() - start;
+    LOG(INFOL) << "Runtime materialization = " << secMat.count() * 1000 << " milliseconds";
+
+    //Remove all duplicates
+    std::chrono::system_clock::time_point startDel = std::chrono::system_clock::now();
+    size_t removedElements = sn->unique();
+    std::chrono::duration<double> secDel = std::chrono::system_clock::now()
+        - startDel;
+    LOG(INFOL) << "Runtime removing duplicates = " << secDel.count() * 1000
+        << " milliseconds. Removed elements = " << removedElements;
+
     sn->printCountAllIDBs("");
 
 #if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
