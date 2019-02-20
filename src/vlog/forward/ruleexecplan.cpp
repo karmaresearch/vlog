@@ -152,8 +152,16 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                 }
 
                 if (found) {
-                    jc.push_back(std::make_pair(j, litVars));
-                    v2p.push_back(std::make_pair(x, j));
+                    //Maybe I join with a repeated variable. In this case, I don't add it
+                    bool repeatedFound = false;
+                    for(auto &c : jc) {
+                        if (c.first == j) {
+                            repeatedFound = true;
+                            break;
+                        }
+                    }
+                    if (!repeatedFound)
+                        jc.push_back(std::make_pair(j, litVars));
                 } else {
                     // Check if we still need this variable. We need it if it occurs
                     // in any of the next literals in the pattern, or if it occurs
@@ -205,66 +213,66 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
 
                         if (isNew) {
                             ps.push_back(make_pair(newExistingVariables.size(), litVars));
-                            v2p.push_back(std::make_pair(x, newExistingVariables.size()));
                             newExistingVariables.push_back(t.getId());
                             LOG(TRACEL) << "New variable: " << (int) t.getId();
                         }
                     }
                 }
-                litVars++;
             }
-            vars2pos.push_back(v2p);
+            litVars++;
         }
+        vars2pos.push_back(v2p);
+    }
 
-        if (i == plan.size() - 1) {
-            //output.sizeOutputRelation.push_back((uint8_t) headLiteral.getTupleSize());
-            sizeOutputRelation.push_back(~0);
+    if (i == plan.size() - 1) {
+        //output.sizeOutputRelation.push_back((uint8_t) headLiteral.getTupleSize());
+        sizeOutputRelation.push_back(~0);
 
-            //Calculate the positions of the dependencies for the chase
-            std::map<uint8_t, std::vector<uint8_t>> extvars2pos;
-            for(const auto &pair : dependenciesExtVars) {
-                for(auto v : pair.second) {
-                    //Search first the existingVariables
-                    bool found = false;
-                    LOG(TRACEL) << "v = " << (int) v;
-                    for(int j = 0; j < existingVariables.size(); ++j) {
-                        LOG(TRACEL) << "existingvars[" << j << "] = " << (int) existingVariables[j];
-                        if (existingVariables[j] == v) {
-                            extvars2pos[pair.first].push_back(j);
-                            LOG(TRACEL) << "Position = " << j;
-                            found = true;
-                            break;
-                        }
+        //Calculate the positions of the dependencies for the chase
+        std::map<uint8_t, std::vector<uint8_t>> extvars2pos;
+        for(const auto &pair : dependenciesExtVars) {
+            for(auto v : pair.second) {
+                //Search first the existingVariables
+                bool found = false;
+                LOG(TRACEL) << "v = " << (int) v;
+                for(int j = 0; j < existingVariables.size(); ++j) {
+                    LOG(TRACEL) << "existingvars[" << j << "] = " << (int) existingVariables[j];
+                    if (existingVariables[j] == v) {
+                        extvars2pos[pair.first].push_back(j);
+                        LOG(TRACEL) << "Position = " << j;
+                        found = true;
+                        break;
                     }
+                }
 
-                    //Then search among the last literal
-                    if (!found) {
-                        int litVars = 0;
-                        for (int x = 0; x < currentLiteral->getTupleSize(); ++x) {
-                            const VTerm t = currentLiteral->getTermAtPos(x);
-                            if (t.isVariable()) {
-                                if (t.getId() == v) {
-                                    extvars2pos[pair.first].push_back(
-                                            existingVariables.size() + litVars);
-                                    LOG(TRACEL) << "Position = " << (int) (existingVariables.size() + litVars);
-                                    found = true;
-                                    break;
-                                }
-                                litVars++;
+                //Then search among the last literal
+                if (!found) {
+                    int litVars = 0;
+                    for (int x = 0; x < currentLiteral->getTupleSize(); ++x) {
+                        const VTerm t = currentLiteral->getTermAtPos(x);
+                        if (t.isVariable()) {
+                            if (t.getId() == v) {
+                                extvars2pos[pair.first].push_back(
+                                        existingVariables.size() + litVars);
+                                LOG(TRACEL) << "Position = " << (int) (existingVariables.size() + litVars);
+                                found = true;
+                                break;
                             }
+                            litVars++;
                         }
                     }
                 }
             }
-            extvars2posFromSecond = extvars2pos;
-        } else {
-            existingVariables = newExistingVariables;
-            sizeOutputRelation.push_back((uint8_t) existingVariables.size());
         }
-        joinCoordinates.push_back(jc);
-        posFromFirst.push_back(pf);
-        posFromSecond.push_back(ps);
+        extvars2posFromSecond = extvars2pos;
+    } else {
+        existingVariables = newExistingVariables;
+        sizeOutputRelation.push_back((uint8_t) existingVariables.size());
     }
+    joinCoordinates.push_back(jc);
+    posFromFirst.push_back(pf);
+    posFromSecond.push_back(ps);
+}
 
 }
 

@@ -436,15 +436,8 @@ bool SemiNaiver::executeUntilSaturation(
         }
 
         if (response) {
-            if (checkCyclicTerms) {
-                foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
-                if (foundCyclicTerms) {
-                    LOG(DEBUGL) << "Found a cyclic term";
-                    return newDer;
-                }
-            }
-
-            if (ruleset[currentRule].rule.isRecursive() && limitView == 0) {
+            //I disable this...
+            if (false && ruleset[currentRule].rule.isRecursive() && limitView == 0) {
                 //Is the rule recursive? Go until saturation...
                 int recursiveIterations = 0;
                 do {
@@ -998,12 +991,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     currentRule = rule.tostring(program, &layer);
 #endif
 
-    if (ignoreExistentialRules && rule.isExistential()) {
-        return false; //Skip the execution of existential rules if the flag is
-        //set (should be only during the execution of RMFA
-    }
 
-    LOG(DEBUGL) << "Iteration: " << iteration <<
+    LOG(INFOL) << "Iteration: " << iteration <<
         " Rule: " << rule.tostring(program, &layer);
 
     //Set up timers

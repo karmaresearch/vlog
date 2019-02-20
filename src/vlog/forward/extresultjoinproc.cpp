@@ -274,6 +274,13 @@ void ExistentialRuleProcessor::retainNonExisting(
                 } else {
                     nextid = ~0lu; //highest value -- copy the rest
                 }
+                for(uint8_t j = 0; j < c.size(); ++j) {
+                    if (!readers[j]->hasNext()) {
+                        throw 10;
+                    }
+                    readers[j]->next();
+                }
+
             }
         }
         //Copy back the retricted columns
@@ -415,19 +422,16 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
             //new can be derived.
         }
 
+        if (filterRows.size() == sizecolumns * atomTables.size()) {
+            return; //every substitution already exists in the database. Nothing
+            //new can be derived.
+        }
+
         //Filter out the potential values for the derivation
         //(only restricted chase can do it)
         if (!filterRows.empty()) {
             retainNonExisting(filterRows, sizecolumns, c);
         }
-    }
-
-    if (filterRecursive) {
-        retainNonRecursive(sizecolumns, c);
-    }
-
-    if (sizecolumns == 0) {
-        return;
     }
 
     std::vector<std::shared_ptr<Column>> knownColumns;
@@ -620,19 +624,6 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
             count += h.getTupleSize();
         }
 
-        if (chaseMgmt->isCheckCyclicMode()) {
-            if (blockedCount == sizecolumns) {
-                return;
-            }
-            for (size_t i = 0; i < sizecolumns; i++) {
-                if (blocked[i]) {
-                    for (int j = 0; j < atomTables.size(); j++) {
-                        filterRows.push_back(i);
-                    }
-                }
-            }
-        }
-
         if (filterRows.size() == sizecolumns * atomTables.size()) {
             return; //every substitution already exists in the database. Nothing
             //new can be derived.
@@ -643,14 +634,6 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         if (!filterRows.empty()) {
             retainNonExisting(filterRows, sizecolumns, c);
         }
-    }
-
-    if (filterRecursive) {
-        retainNonRecursive(sizecolumns, c);
-    }
-
-    if (sizecolumns == 0) {
-        return;
     }
 
     //Create existential columns store them in a vector with the corresponding
