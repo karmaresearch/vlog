@@ -992,7 +992,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 #endif
 
 
-    LOG(INFOL) << "Iteration: " << iteration <<
+    LOG(DEBUGL) << "Iteration: " << iteration <<
         " Rule: " << rule.tostring(program, &layer);
 
     //Set up timers
