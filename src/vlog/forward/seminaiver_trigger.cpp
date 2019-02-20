@@ -163,7 +163,7 @@ size_t TriggerSemiNaiver::unique_unary(std::vector<Term_t> &unaryBuffer, std::ve
     return unaryBuffer.end() - last;
 }
 
-typedef std::pair<std::vector<const Term_t>::iterator, std::vector<const Term_t>::iterator> UniqueVector;
+typedef std::pair<std::vector<Term_t>::const_iterator, std::vector<Term_t>::const_iterator> UniqueVector;
 bool _customPairSorter(const std::pair<UniqueVector, UniqueVector> &a, const std::pair<UniqueVector, UniqueVector> &b) {
     size_t carda = a.first.second - a.first.first;
     size_t cardb = b.first.second - b.first.first;
@@ -197,7 +197,7 @@ size_t TriggerSemiNaiver::unique_binary(std::vector<std::pair<Term_t, Term_t>>  
                     auto column = segment->getColumn(pos);
                     if (column->isBackedByVector()) {
                         const auto &vec = column->getVectorRef();
-                        rawColumns.push_back(std::make_pair(vec.begin(), vec.end()));
+                        rawColumns.push_back(std::make_pair(vec.cbegin(), vec.cend()));
                     } else {
                         LOG(ERRORL) << "Problem";
                     }
@@ -301,10 +301,10 @@ size_t TriggerSemiNaiver::unique_binary(std::vector<std::pair<Term_t, Term_t>>  
             auto zb2 = z.second.first;
             auto ze2 = z.second.second;
 
-            std::vector<const Term_t>::iterator vb1;
-            std::vector<const Term_t>::iterator ve1;
-            std::vector<const Term_t>::iterator vb2;
-            std::vector<const Term_t>::iterator ve2;
+            std::vector<Term_t>::const_iterator vb1;
+            std::vector<Term_t>::const_iterator ve1;
+            std::vector<Term_t>::const_iterator vb2;
+            std::vector<Term_t>::const_iterator ve2;
             if (firstIteration) {
                 vb1 = v.first.first;
                 ve1 = v.first.second;
