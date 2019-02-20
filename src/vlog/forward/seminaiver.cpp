@@ -342,7 +342,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout) {
     }
 
     running = false;
-    LOG(INFOL) << "Finished process. Iterations=" << iteration;
+    LOG(DEBUGL) << "Finished process. Iterations=" << iteration;
 
     //DEBUGGING CODE -- needed to see which rules cost the most
     //Sort the iteration costs
@@ -963,7 +963,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     currentRule = rule.tostring(program, &layer);
 #endif
 
-    LOG(DEBUGL) << "Iteration: " << iteration <<
+    LOG(INFOL) << "Iteration: " << iteration <<
         " Rule: " << rule.tostring(program, &layer);
 
     //Set up timers
