@@ -216,7 +216,6 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                             newExistingVariables.push_back(t.getId());
                             LOG(TRACEL) << "New variable: " << (int) t.getId();
                         }
-                    }
                 }
             }
             litVars++;
