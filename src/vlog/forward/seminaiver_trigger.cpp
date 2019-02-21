@@ -163,7 +163,16 @@ size_t TriggerSemiNaiver::unique_unary(std::vector<Term_t> &unaryBuffer, std::ve
                 LOG(WARNL) << "Problem";
             }
         } else {
-            LOG(WARNL) << "Problem";
+            //Maybe it is still backed by a vector
+            if (c->isBackedByVector()) {
+                const auto &vec = c->getVectorRef();
+                memcpy((char*)unaryBuffer.data() + sizeof(Term_t) * idx,
+                        (char*)vec.data(), sizeof(Term_t) * vec.size());
+                fastCopy = true;
+                idx += vec.size();
+            } else {
+                LOG(WARNL) << "Problem";
+            }
         }
         t->releaseIterator(itr);
     }
@@ -215,7 +224,12 @@ size_t TriggerSemiNaiver::unique_binary(std::vector<std::pair<Term_t, Term_t>>  
                 }
 
             } else {
-                LOG(ERRORL) << "FIXME";
+                if (c->isBackedByVector()) {
+                    const auto &vec = c->getVectorRef();
+                    rawColumns.push_back(std::make_pair(vec.cbegin(), vec.cend()));
+                } else {
+                    LOG(ERRORL) << "Problem";
+                }
             }
         }
         ctable->releaseIterator(itr);
@@ -333,9 +347,6 @@ size_t TriggerSemiNaiver::unique_binary(std::vector<std::pair<Term_t, Term_t>>  
                 Term_t value_z1 = *zb1;
                 Term_t value_v2 = *vb2;
                 Term_t value_z2 = *zb2;
-                if (value_v1 > 10000000 || value_z1 > 10000000 || value_v2 > 10000000 || value_z2 > 10000000) {
-                    throw 10;
-                }
 
                 if (value_z1 < value_v1 || (value_z1 == value_v1 && value_z2 < value_v2)) {
                     //Advance z
@@ -386,22 +397,22 @@ size_t TriggerSemiNaiver::unique_binary(std::vector<std::pair<Term_t, Term_t>>  
 
     //DEBUG
     /*size_t out2 = 0;
-    size_t idx = 0;
-    for (auto ctable : tables) {
-        auto itrtable = ctable->getIterator();
-        while (itrtable->hasNext()) {
-            itrtable->next();
-            uint64_t value1 = itrtable->getCurrentValue(0);
-            uint64_t value2 = itrtable->getCurrentValue(1);
-            binaryBuffer[idx++] = std::make_pair(value1, value2);
-        }
-        ctable->releaseIterator(itrtable);
-    }
-    std::sort(binaryBuffer.begin(), binaryBuffer.end());
-    auto last = std::unique(binaryBuffer.begin(), binaryBuffer.end());
-    out2 += binaryBuffer.end() - last;
+      size_t idx = 0;
+      for (auto ctable : tables) {
+      auto itrtable = ctable->getIterator();
+      while (itrtable->hasNext()) {
+      itrtable->next();
+      uint64_t value1 = itrtable->getCurrentValue(0);
+      uint64_t value2 = itrtable->getCurrentValue(1);
+      binaryBuffer[idx++] = std::make_pair(value1, value2);
+      }
+      ctable->releaseIterator(itrtable);
+      }
+      std::sort(binaryBuffer.begin(), binaryBuffer.end());
+      auto last = std::unique(binaryBuffer.begin(), binaryBuffer.end());
+      out2 += binaryBuffer.end() - last;
 
-    LOG(INFOL) << "OUT2=" << out2 << " OUT=" << out;*/
+      LOG(INFOL) << "OUT2=" << out2 << " OUT=" << out;*/
 
     return out;
 }
