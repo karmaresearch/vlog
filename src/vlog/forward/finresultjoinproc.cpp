@@ -504,7 +504,6 @@ void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
         const bool forceCheck) {
     if (!addToEndTable) {
         //do nothing. We'll consolidate later on.
-        LOG(WARNL) << "TODO counting";
         return;
     }
 
@@ -512,7 +511,6 @@ void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
         for (int i = 0; i < nbuffers; ++i) {
             if (utmpt[i] != NULL && !utmpt[i]->isEmpty()) {
                 if (forceCheck) {
-                    LOG(WARNL) << "TODO counting";
                     //Even though this data should be original,
                     //I still check to make sure there are no duplicates
                     std::shared_ptr<const Segment> seg;
@@ -521,6 +519,7 @@ void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
                     } else {
                         seg = utmpt[i]->getSegment();
                     }
+                    triggers += utmpt[i]->getNRows();
                     seg = t->retainFrom(seg, false, nthreads);
                     if (!seg->isEmpty()) {
                         std::shared_ptr<const FCInternalTable> ptrTable(
