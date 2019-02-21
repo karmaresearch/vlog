@@ -48,11 +48,6 @@ class SemiNaiver {
         bool opt_intersect;
         bool opt_filtering;
         bool multithreaded;
-        bool restrictedChase;
-        bool checkCyclicTerms;
-        bool foundCyclicTerms;
-        bool ignoreExistentialRules;
-        std::shared_ptr<ChaseMgmt> chaseMgmt;
 
         std::chrono::system_clock::time_point startTime;
         bool running;
@@ -121,6 +116,12 @@ class SemiNaiver {
                 const size_t maxIteration);
 
     protected:
+        std::shared_ptr<ChaseMgmt> chaseMgmt;
+        bool restrictedChase;
+        bool checkCyclicTerms;
+        bool foundCyclicTerms;
+        bool ignoreExistentialRules;
+
         FCTable *predicatesTables[MAX_NPREDS];
         EDBLayer &layer;
         Program *program;

@@ -5,15 +5,24 @@
 #include <queue>
 
 void TriggerSemiNaiver::run(std::string trigger_paths) {
-
     //Create all the execution plans, etc.
     std::vector<Rule> ruleset = program->getAllRules();
     std::vector<RuleExecutionDetails> allrules;
     int ruleid = 0;
     for (std::vector<Rule>::iterator itr = ruleset.begin(); itr != ruleset.end();
             ++itr) {
-        allrules.push_back(RuleExecutionDetails(*itr, ruleid++));
+        auto a = RuleExecutionDetails(*itr, ruleid++);
+        allrules.push_back(a);
     }
+
+    for(auto &r : allrules) {
+        r.createExecutionPlans(checkCyclicTerms);
+        r.calculateNVarsInHeadFromEDB();
+    }
+
+    //Set up chase data structure
+    chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt(allrules,
+                restrictedChase, checkCyclicTerms, -1));
 
     //Do not check for duplicates anymore
     setIgnoreDuplicatesElimination();
