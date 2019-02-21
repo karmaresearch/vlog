@@ -843,10 +843,10 @@ void FinalRuleProcessor::addColumns(const int blockid,
         const bool unique, const bool sorted) {
     size_t offset = 0;
     for(auto &t : atomTables) {
-	size_t newOffset = offset + t->getRowSize();
-	std::vector<std::shared_ptr<Column>> c(columns.begin() + offset, columns.begin() + newOffset);
+        size_t newOffset = offset + t->getRowSize();
+        std::vector<std::shared_ptr<Column>> c(columns.begin() + offset, columns.begin() + newOffset);
         t->addColumns(blockid, c, unique, sorted);
-	offset = newOffset;
+        offset = newOffset;
     }
 }
 
