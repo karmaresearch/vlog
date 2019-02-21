@@ -45,6 +45,9 @@ class TriggerGraph {
 
         std::vector<std::shared_ptr<Node>> nodes;
         uint64_t nodecounter;
+        std::map<PredId_t, std::vector<size_t>> pred2bodyrules;
+        std::vector<std::shared_ptr<Node>> allnodes;
+        size_t freshIndividualCounter;
 
         void prune(EDBLayer &db, Program &program, std::vector<Literal> &database,
                 std::shared_ptr<Node> u);
@@ -81,7 +84,12 @@ class TriggerGraph {
                 Node *node, const std::vector<Literal> &db,
                 std::unordered_set<std::string> &out);
 
-        void linearRecursiveConstruction(Program &p, const Literal &l,
+        void linearBuild_process(Program &program,
+                std::shared_ptr<Node> node,
+                std::vector<Literal> &chase,
+                std::vector<std::shared_ptr<Node>> &children);
+
+        void linearBuild(Program &p, const Literal &l,
                 std::shared_ptr<Node> parentNode);
 
         void sortByCardinalities(

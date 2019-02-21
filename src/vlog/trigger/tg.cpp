@@ -6,6 +6,7 @@
 #include <chrono>
 
 TriggerGraph::TriggerGraph() {
+    freshIndividualCounter = (uint64_t)1 << 32;
 }
 
 void computeAllPermutations(std::vector<std::vector<int>> &out,
@@ -171,63 +172,104 @@ void TriggerGraph::linearChase(Program &program,
     }
 }
 
-void TriggerGraph::linearRecursiveConstruction(Program &program,
-        const Literal &literal,
-        std::shared_ptr<Node> parentNode) {
+void TriggerGraph::linearBuild_process(Program &program,
+        std::shared_ptr<Node> node,
+        std::vector<Literal> &chase,
+        std::vector<std::shared_ptr<Node>> &children) {
     //If there is a rule with body compatible with the literal,
     //then create a node
     const auto &rules = program.getAllRules();
     std::vector<Substitution> subs;
+    PredId_t litp = node->literal->getPredicate().getId();
+    if (!pred2bodyrules.count(litp)) {
+        return;
+    }
 
-    for(const auto &rule : rules) {
+    for(const auto &ruleidx : pred2bodyrules[litp]) {
+        const auto &rule = rules[ruleidx];
         const auto &body = rule.getBody();
         assert(body.size() == 1);
         const auto &bodyAtom = body[0];
-        int nsubs = Literal::getSubstitutionsA2B(subs, bodyAtom, literal);
-        if (nsubs != -1) {
-            const auto &heads = rule.getHeads();
-            assert(heads.size() == 1);
-            Literal head = heads[0];
-            Literal groundHead = head.substitutes(subs);
-            bool found = false;
-            assert(parentNode != NULL);
-
-            //Check if the head exists in the previous nodes
-            std::vector<Node*> toCheck;
-            toCheck.push_back(parentNode.get());
-            while (!toCheck.empty()) {
-                Node *n = toCheck.back();
-                toCheck.pop_back();
-                std::vector<Substitution> s;
-                int nsubs = Literal::subsumes(s, *n->literal.get(), groundHead);
-                if (nsubs != -1) {
-                    found = true;
-                    break;
-                }
-                //Explore the incoming nodes
-                for(const auto &child : n->incoming) {
-                    toCheck.push_back(child.get());
+        int nsubs = Literal::getSubstitutionsA2B(subs, bodyAtom,
+                *(node->literal.get()));
+        assert(nsubs != -1);
+        const auto &heads = rule.getHeads();
+        assert(heads.size() == 1);
+        Literal head = heads[0];
+        std::unique_ptr<Literal> groundHead;
+        groundHead = std::unique_ptr<Literal>(new Literal(head.substitutes(subs)));
+        //Add existentially quantified IDs if necessary
+        if (rule.isExistential()) {
+            const auto &varsNotInBody = rule.getVarsNotInBody();
+            VTuple tuple = groundHead->getTuple();
+            for(int i = 0; i < head.getTupleSize(); ++i) {
+                const auto &t = head.getTermAtPos(i);
+                if (t.isVariable()) {
+                    bool found = false;
+                    for(const auto &vnb : varsNotInBody) {
+                        if (vnb == t.getId()) {
+                            found = true;
+                        }
+                    }
+                    if (found) {
+                        //The var is existential
+                        tuple.set(VTerm(0, freshIndividualCounter++), i);
+                    }
                 }
             }
+            groundHead = std::unique_ptr<Literal>(
+                    new Literal(groundHead->getPredicate(), tuple));
+        }
 
-            //Add a new node
-            if (!found) {
-                std::shared_ptr<Node> n = std::shared_ptr<Node>(new Node(nodecounter));
-                nodecounter += 1;
-                n->ruleID = rule.getId();
-                assert(n->ruleID != -1);
-                n->label = "node-" + std::to_string(n->getID());
-                n->literal = std::unique_ptr<Literal>(new Literal(groundHead));
-                n->incoming.push_back(parentNode);
-                //Add the node to the parent
-                parentNode->outgoing.push_back(n);
-                //std::cout << "Node with rule " << rule.getId() << " and id " << n->getID() << " has parent " << parentNode->getID() << std::endl;
-
-                //Recursive call
-                linearRecursiveConstruction(program, groundHead, n);
+        //Check if the head exists in the chase constructed so far
+        bool found = false;
+        for(const auto &existingFact : chase) {
+            std::vector<Substitution> s;
+            int nsubs = Literal::subsumes(s, existingFact, *groundHead.get());
+            if (nsubs != -1) {
+                found = true;
+                break;
             }
-        } else {
-            continue;
+        }
+
+        //Add a new node
+        if (!found) {
+            //Add to the database
+            chase.push_back(Literal(*(groundHead.get())));
+
+            //(removed because unnecessary) Witness check
+            //
+            //I also don't need to check whether r is extensional because I do have fake nodes for the EDB predicates
+
+            std::shared_ptr<Node> n = std::shared_ptr<Node>(new Node(nodecounter));
+            nodecounter += 1;
+            n->ruleID = rule.getId();
+            assert(n->ruleID != -1);
+            n->label = "node-" + std::to_string(n->getID());
+            n->literal = std::move(groundHead);
+            n->incoming.push_back(node);
+            //Add the node to the parent
+            node->outgoing.push_back(n);
+            //Add the new node to be processed
+            children.push_back(n);
+            //Add the node also to the list of all nodes
+            allnodes.push_back(n);
+        }
+    }
+}
+
+void TriggerGraph::linearBuild(Program &program,
+        const Literal &literal,
+        std::shared_ptr<Node> root) {
+
+    std::vector<std::shared_ptr<Node>> newNodes;
+    std::vector<Literal> chase;
+    newNodes.push_back(root);
+    while (!newNodes.empty()) {
+        std::vector<std::shared_ptr<Node>> nodesToProcess;
+        nodesToProcess.swap(newNodes);
+        for(auto n : nodesToProcess) {
+            linearBuild_process(program, n, chase, newNodes);
         }
     }
 }
@@ -421,8 +463,24 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
     fnodes.open("graph.before.nodes");
 #endif
 
+    //Create a map that associates predicates to rules
+    const auto &rules = program.getAllRules();
+    int idxp = 0;
+    for (const auto &rule : rules) {
+        const auto &body = rule.getBody();
+        assert(body.size() == 1);
+        const auto &bodyAtom = body[0];
+        PredId_t pred = bodyAtom.getPredicate().getId();
+        if (!pred2bodyrules.count(pred)) {
+            pred2bodyrules.insert(make_pair(pred, std::vector<size_t>()));
+        }
+        pred2bodyrules[pred].push_back(idxp);
+        idxp++;
+    }
+
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
+    //Create some fake EDB nodes from the canonical instance.
     int startCounter = 0;
     for(const PredId_t p : db.getAllEDBPredicates()) {
         //Get arity
@@ -437,9 +495,11 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
             Literal l(program.getPredicate(p), t);
             database.push_back(l);
             n->literal = std::unique_ptr<Literal>(new Literal(l));
-            linearRecursiveConstruction(program, l, n);
+            //The following is the function build() lines 9--24
+            linearBuild(program, l, n);
             if (!n->outgoing.empty()) {
                 nodes.push_back(n);
+                allnodes.push_back(n);
             }
         }
     }
@@ -466,7 +526,7 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
     auto nodesToProcess = nodes;
     int idx = 0;
     for (auto n : nodesToProcess) {
-        std::cout << "Pruning node " << idx << " of " << nodesToProcess.size() << std::endl;
+        //std::cout << "Pruning node " << idx << " of " << nodesToProcess.size() << std::endl;
         prune(db, program, database, n);
         idx++;
     }
