@@ -49,7 +49,7 @@ class TriggerGraph {
         std::vector<std::shared_ptr<Node>> allnodes;
         size_t freshIndividualCounter;
 
-        void prune(EDBLayer &db, Program &program, std::vector<Literal> &database,
+        void remove(EDBLayer &db, Program &program, std::vector<Literal> &database,
                 std::shared_ptr<Node> u);
 
         void removeNode(std::shared_ptr<Node> n);
@@ -58,7 +58,7 @@ class TriggerGraph {
 
         void processNode(const Node &n, std::ostream &out);
 
-        void linearAux2(std::shared_ptr<Node> u, std::shared_ptr<Node> v);
+        void prune(std::shared_ptr<Node> u, std::shared_ptr<Node> v);
 
         void computeNonIsomorphisms(std::vector<VTuple> &out,
                 std::vector<uint64_t> &tuple,

@@ -376,13 +376,13 @@ uint64_t TriggerGraph::getNNodes(Node *n, std::set<string> *cache) {
     return out;
 }
 
-void TriggerGraph::prune(EDBLayer &db, Program &program,
+void TriggerGraph::remove(EDBLayer &db, Program &program,
         std::vector<Literal> &database,
         std::shared_ptr<Node> u) {
     //First process the children of u
     auto children = u->outgoing;
     for (auto child : children) {
-        prune(db, program, database, child);
+        remove(db, program, database, child);
     }
 
     bool toBeRemoved = false;
@@ -399,46 +399,32 @@ void TriggerGraph::prune(EDBLayer &db, Program &program,
     std::unordered_set<std::string> dbToU;
     linearChase(program, u.get(), database, dbToU);
 
-    std::vector<std::shared_ptr<Node>> allNodes;
-    linearGetAllGraphNodes(allNodes);
+    //std::vector<std::shared_ptr<Node>> allNodes;
+    //linearGetAllGraphNodes(allNodes);
 
-    for(const auto v : allNodes) {
+    for(const auto v : allnodes) {
         if (v.get() == u.get()) {
             continue;
         }
 
         if (!pointersChildrenU.count((uint64_t)v.get())) {
-            //Check whether v is redundant to u w.r.t. the database
+            //Check whether u is redundant to v w.r.t. the database
             std::unordered_set<std::string> dbToV;
             linearChase(program, v.get(), database, dbToV);
             //If every fact in dbFromU is in dbFromV, then we can remove u
             bool subsumed = true;
 
-
-            /*std::cout << "*** BEGIN ***" << std::endl;
-              std::cout << "Checking u " << u->literal->toprettystring(&program, &db, true) << " vs. v " << v->literal->toprettystring(&program, &db, true) << std::endl;
-              std::cout << "Rule u " << u->ruleID << " v " << v->ruleID << std::endl;
-              std::cout << "DB_V " << std::endl;
-              for (const auto &el : dbToV) {
-              std::cout << "  " << el << std::endl;
-              }
-              std::cout << "DB_U " << std::endl;
-              for (const auto &el : dbToU) {
-              std::cout << "  " << el << std::endl;
-              }*/
             for(const auto &f : dbToU) {
                 if (!dbToV.count(f)) {
                     subsumed = false;
                     break;
                 }
             }
-            /*std::cout << "subsumed=" << subsumed << std::endl;
-              std::cout << "*** END ***" << std::endl;*/
 
             //if subsumed = true, then u is redundant w.r.t. v
             if (subsumed) {
                 //aux2 on v. This procedure will move away all good children of u
-                linearAux2(u, v);
+                prune(u, v);
                 toBeRemoved = true;
                 break;
             }
@@ -446,6 +432,7 @@ void TriggerGraph::prune(EDBLayer &db, Program &program,
     }
 
     if (toBeRemoved) {
+        //FIXME: remove it also from allnodes
         removeNode(u);
     }
 
@@ -527,7 +514,7 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
     int idx = 0;
     for (auto n : nodesToProcess) {
         //std::cout << "Pruning node " << idx << " of " << nodesToProcess.size() << std::endl;
-        prune(db, program, database, n);
+        remove(db, program, database, n);
         idx++;
     }
     sec = std::chrono::system_clock::now() - start;
@@ -543,8 +530,9 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
     LOG(INFOL) << "After pruning the graph contains nodes " << allnodes;
 }
 
-void TriggerGraph::linearAux2(std::shared_ptr<Node> u, std::shared_ptr<Node> v) {
+void TriggerGraph::prune(std::shared_ptr<Node> u, std::shared_ptr<Node> v) {
     //TODO: Do not check for witness
+    //TODO: Process the children
     for(const auto &u_prime : u->outgoing) {
         //Move u_prime under v and remove it from u
         u_prime->incoming.clear();

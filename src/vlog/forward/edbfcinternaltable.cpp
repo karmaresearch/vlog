@@ -57,7 +57,7 @@ bool EDBFCInternalTable::isSorted() const {
 }
 
 size_t EDBFCInternalTable::getRepresentationSize(std::set<uint64_t> &IDs) const {
-    return 0;
+    return nfields;
 }
 
 size_t EDBFCInternalTable::estimateNRows(const uint8_t nconstantsToFilter,
