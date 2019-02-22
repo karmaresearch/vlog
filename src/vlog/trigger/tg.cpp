@@ -587,14 +587,14 @@ void TriggerGraph::applyRule(const Rule &rule,
     for(const Literal &bodyAtom : bodyAtoms) {
         VTuple t = bodyAtom.getTuple();
         for(auto &s : subs) {
-            t.set(bodyAtom.getTermAtPos(s.first), s.second);
+            headTuple.set(bodyAtom.getTermAtPos(s.first), s.second);
         }
         for(auto &positions : extpos) {
             for(auto position : positions)
                 t.set(VTerm(0, freshIndividualCounter), position);
             freshIndividualCounter++;
         }
-        out.push_back(Literal(head.getPredicate(), t));
+        out.push_back(Literal(head.getPredicate(), headTuple));
     }
 }
 
