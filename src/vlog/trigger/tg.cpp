@@ -633,7 +633,7 @@ void TriggerGraph::prune(Program &program,
         std::vector<Literal> &database) {
     for(const auto &u_prime : u->outgoing) {
         //Check whether u' is a witness of v
-        if (isWitness(program, u_prime, v, database)) {
+        if (true) { //isWitness(program, u_prime, v, database)) {
             //Move u_prime under v and remove it from u
             u_prime->incoming.clear();
             u_prime->incoming.push_back(v);
