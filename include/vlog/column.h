@@ -144,7 +144,7 @@ class CompressedColumn: public Column {
         }
 
         size_t getRepresentationSize() const {
-            return blocks.size();
+            return blocks.size() * 2;
         }
 
         size_t estimateSize() const {

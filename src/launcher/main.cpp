@@ -667,6 +667,9 @@ void launchFullMat(int argc,
                         1, &cv, &mtx, &isFinished));
         }
 #endif
+        if (vm["printRepresentationSize"].as<bool>()) {
+            printRepresentationSize(sn);
+        }
 
         LOG(INFOL) << "Starting full materialization";
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
