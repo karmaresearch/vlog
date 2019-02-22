@@ -661,7 +661,23 @@ void TriggerGraph::prune(Program &program,
         u->outgoing.erase(u->outgoing.begin() + i);
     }
 
-    //TODO: Process the children of u and v
+    //Process the children of u and v
+    std::vector<std::shared_ptr<Node>> children_v;
+    linearGetAllNodesRootedAt(v, children_v);
+    std::vector<std::shared_ptr<Node>> children_u;
+    linearGetAllNodesRootedAt(v, children_u);
+    for(auto &child_u : children_u) {
+        if (child_u.get() != u.get()) {
+           for (auto &child_v : children_v) {
+               if (child_v.get() != v.get()) {
+                   if (child_u->ruleID == child_v->ruleID && child_u.get() != child_v.get()) {
+                       prune(program, child_u, child_v, database);
+                   }
+               }
+           }
+        }
+    }
+
 }
 
 void TriggerGraph::removeNode(std::shared_ptr<Node> n) {
