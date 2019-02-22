@@ -253,7 +253,7 @@ void TriggerGraph::linearBuild_process(Program &program,
             //Add the new node to be processed
             children.push_back(n);
             //Add the node also to the list of all nodes
-            allnodes.push_back(n);
+            allnodes.insert(std::make_pair(nodecounter - 1, n));
         }
     }
 }
@@ -402,7 +402,8 @@ void TriggerGraph::remove(EDBLayer &db, Program &program,
     //std::vector<std::shared_ptr<Node>> allNodes;
     //linearGetAllGraphNodes(allNodes);
 
-    for(const auto v : allnodes) {
+    for(const auto pair : allnodes) {
+        auto &v = pair.second;
         if (v.get() == u.get()) {
             continue;
         }
@@ -486,7 +487,7 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
             linearBuild(program, l, n);
             if (!n->outgoing.empty()) {
                 nodes.push_back(n);
-                allnodes.push_back(n);
+                allnodes.insert(std::make_pair(nodecounter - 1, n));
             }
         }
     }

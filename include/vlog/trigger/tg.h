@@ -46,7 +46,7 @@ class TriggerGraph {
         std::vector<std::shared_ptr<Node>> nodes;
         uint64_t nodecounter;
         std::map<PredId_t, std::vector<size_t>> pred2bodyrules;
-        std::vector<std::shared_ptr<Node>> allnodes;
+        std::map<uint64_t, std::shared_ptr<Node>> allnodes;
         size_t freshIndividualCounter;
 
         void remove(EDBLayer &db, Program &program, std::vector<Literal> &database,
