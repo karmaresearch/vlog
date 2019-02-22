@@ -205,12 +205,12 @@ void TriggerGraph::linearBuild_process(Program &program,
         const auto &heads = rule.getHeads();
         assert(heads.size() == 1);
         Literal head = heads[0];
-
-        std::unique_ptr<Literal> groundHead;
-        groundHead = std::unique_ptr<Literal>(new Literal(head.substitutes(subs)));
         int nsubs = Literal::getSubstitutionsA2B(subs, bodyAtom,
                 *(node->literal.get()));
         assert(nsubs != -1);
+
+        std::unique_ptr<Literal> groundHead;
+        groundHead = std::unique_ptr<Literal>(new Literal(head.substitutes(subs)));
         //Add existentially quantified IDs if necessary
         if (rule.isExistential()) {
             const auto &varsNotInBody = rule.getVarsNotInBody();
