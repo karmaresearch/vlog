@@ -631,16 +631,35 @@ bool TriggerGraph::isWitness(Program &program,
 void TriggerGraph::prune(Program &program,
         std::shared_ptr<Node> u, std::shared_ptr<Node> v,
         std::vector<Literal> &database) {
+    int idx = 0;
+    std::vector<int> childrenToRemove;
     for(const auto &u_prime : u->outgoing) {
         //Check whether u' is a witness of v
-        if (true) { //isWitness(program, u_prime, v, database)) {
-            //Move u_prime under v and remove it from u
-            u_prime->incoming.clear();
-            u_prime->incoming.push_back(v);
-            v->outgoing.push_back(u_prime);
+        if (isWitness(program, u_prime, v, database)) {
+            //If there are no other witnesses among the children of v
+            bool foundWitness = false;
+            std::vector<std::shared_ptr<Node>> children_v;
+            linearGetAllNodesRootedAt(v, children_v);
+            for(auto &child_v : children_v) {
+                if (child_v->ruleID == u_prime->ruleID &&
+                        isWitness(program, child_v, v, database)) {
+                    foundWitness = true;
+                    break;
+                }
+            }
+            if (!foundWitness) {
+                //Move u_prime under v and remove it from u
+                u_prime->incoming.clear();
+                u_prime->incoming.push_back(v);
+                v->outgoing.push_back(u_prime);
+                childrenToRemove.push_back(idx);
+            }
         }
+        idx++;
     }
-    u->outgoing.clear();
+    for(int i = childrenToRemove.size() - 1; i >= 0; i--) {
+        u->outgoing.erase(u->outgoing.begin() + i);
+    }
 
     //TODO: Process the children of u and v
 }
