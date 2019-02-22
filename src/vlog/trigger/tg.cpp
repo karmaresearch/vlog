@@ -433,7 +433,6 @@ void TriggerGraph::remove(EDBLayer &db, Program &program,
     }
 
     if (toBeRemoved) {
-        //FIXME: remove it also from allnodes
         removeNode(u);
     }
 
@@ -569,6 +568,9 @@ void TriggerGraph::removeNode(std::shared_ptr<Node> n) {
     if (idx < nodes.size()) {
         nodes.erase(nodes.begin() + idx);
     }
+    auto el = allnodes.find(n->getID());
+    assert(el != allnodes.end());
+    allnodes.erase(el);
 }
 
 void TriggerGraph::createKBound(EDBLayer &db, Program &p) {
