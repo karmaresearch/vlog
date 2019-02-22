@@ -95,9 +95,21 @@ std::vector<VTuple> TriggerGraph::linearGetNonIsomorphicTuples(int start, int ar
     return out;
 }
 
+
 void TriggerGraph::linearChase(Program &program,
         Node *node, const std::vector<Literal> &db,
         std::unordered_set<std::string> &out) {
+    std::vector<Literal> lit;
+    linearChase(program, node, db, lit);
+    out.clear();
+    for (const auto &l : lit) {
+        out.insert(l.tostring(NULL, NULL));
+    }
+}
+
+void TriggerGraph::linearChase(Program &program,
+        Node *node, const std::vector<Literal> &db,
+        std::vector<Literal> &out) {
 
     std::string strPointer = std::to_string((uint64_t)&db);
 
@@ -156,7 +168,8 @@ void TriggerGraph::linearChase(Program &program,
             outNode = &(localDerivations.facts);
         } else {
             for(const auto &inputLinear : *pointer) {
-                if (inputLinear.getPredicate().getId() == node->literal->getPredicate().getId()) {
+                if (inputLinear.getPredicate().getId()
+                        == node->literal->getPredicate().getId()) {
                     localDerivations.facts.push_back(inputLinear);
                 }
             }
@@ -166,10 +179,9 @@ void TriggerGraph::linearChase(Program &program,
         }
     }
 
+    assert(outNode != NULL);
     out.clear();
-    for (const auto &l : *outNode) {
-        out.insert(l.tostring(NULL, NULL));
-    }
+    std::copy(outNode->begin(), outNode->end(), std::back_inserter(out));
 }
 
 void TriggerGraph::linearBuild_process(Program &program,
@@ -190,14 +202,15 @@ void TriggerGraph::linearBuild_process(Program &program,
         const auto &body = rule.getBody();
         assert(body.size() == 1);
         const auto &bodyAtom = body[0];
-        int nsubs = Literal::getSubstitutionsA2B(subs, bodyAtom,
-                *(node->literal.get()));
-        assert(nsubs != -1);
         const auto &heads = rule.getHeads();
         assert(heads.size() == 1);
         Literal head = heads[0];
+
         std::unique_ptr<Literal> groundHead;
         groundHead = std::unique_ptr<Literal>(new Literal(head.substitutes(subs)));
+        int nsubs = Literal::getSubstitutionsA2B(subs, bodyAtom,
+                *(node->literal.get()));
+        assert(nsubs != -1);
         //Add existentially quantified IDs if necessary
         if (rule.isExistential()) {
             const auto &varsNotInBody = rule.getVarsNotInBody();
@@ -263,15 +276,15 @@ void TriggerGraph::linearBuild(Program &program,
         std::shared_ptr<Node> root) {
 
     std::vector<std::shared_ptr<Node>> newNodes;
-    std::vector<Literal> chase;
-    newNodes.push_back(root);
-    while (!newNodes.empty()) {
-        std::vector<std::shared_ptr<Node>> nodesToProcess;
-        nodesToProcess.swap(newNodes);
-        for(auto n : nodesToProcess) {
-            linearBuild_process(program, n, chase, newNodes);
-        }
+    std::vector<Literal> chase; //All data from {F}
+newNodes.push_back(root);
+while (!newNodes.empty()) {
+    std::vector<std::shared_ptr<Node>> nodesToProcess;
+    nodesToProcess.swap(newNodes);
+    for(auto n : nodesToProcess) {
+        linearBuild_process(program, n, chase, newNodes);
     }
+}
 }
 
 void TriggerGraph::linearGetAllNodesRootedAt(std::shared_ptr<Node> n,
@@ -425,7 +438,7 @@ void TriggerGraph::remove(EDBLayer &db, Program &program,
             //if subsumed = true, then u is redundant w.r.t. v
             if (subsumed) {
                 //aux2 on v. This procedure will move away all good children of u
-                prune(u, v);
+                prune(program, u, v, database);
                 toBeRemoved = true;
                 break;
             }
@@ -482,6 +495,7 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
             Literal l(program.getPredicate(p), t);
             database.push_back(l);
             n->literal = std::unique_ptr<Literal>(new Literal(l));
+
             //The following is the function build() lines 9--24
             linearBuild(program, l, n);
             if (!n->outgoing.empty()) {
@@ -530,16 +544,105 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
     LOG(INFOL) << "After pruning the graph contains nodes " << allnodes;
 }
 
-void TriggerGraph::prune(std::shared_ptr<Node> u, std::shared_ptr<Node> v) {
-    //TODO: Do not check for witness
-    //TODO: Process the children
+void TriggerGraph::applyRule(const Rule &rule,
+        std::vector<Literal> &out,
+        const std::vector<Literal> &bodyAtoms) {
+
+    const auto &body = rule.getBody();
+    assert(body.size() == 1);
+    const auto &bodyAtom = body[0];
+    const auto &heads = rule.getHeads();
+    assert(heads.size() == 1);
+    Literal head = heads[0];
+
+    std::vector<std::pair<uint8_t, uint8_t>> subs;
+    std::vector<int> processedVars;
+    for(int i = 0; i < bodyAtom.getTupleSize(); ++i) {
+        VTerm term = bodyAtom.getTermAtPos(i);
+        bool found = false;
+        for(auto &var : processedVars) {
+            if (term.getId() == var) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            //Check where I should add it in the head
+            for(int j = 0; j < head.getTupleSize(); ++j) {
+                VTerm headTerm = head.getTermAtPos(j);
+                if (headTerm.getId() == term.getId()) {
+                    subs.push_back(make_pair(i, j));
+                }
+            }
+            processedVars.push_back(term.getId());
+        }
+    }
+    bool isExistential = rule.isExistential();
+    std::vector<std::vector<uint8_t>> extpos;
+    if (isExistential) {
+        auto vars = rule.getVarsNotInBody();
+    }
+
+    VTuple headTuple(head.getTupleSize());
+    for(const Literal &bodyAtom : bodyAtoms) {
+        VTuple t = bodyAtom.getTuple();
+        for(auto &s : subs) {
+            t.set(bodyAtom.getTermAtPos(s.first), s.second);
+        }
+        for(auto &positions : extpos) {
+            for(auto position : positions)
+                t.set(VTerm(0, freshIndividualCounter), position);
+            freshIndividualCounter++;
+        }
+        out.push_back(Literal(head.getPredicate(), t));
+    }
+}
+
+bool TriggerGraph::isWitness(Program &program,
+        std::shared_ptr<Node> u,
+        std::shared_ptr<Node> v,
+        std::vector<Literal> &database) {
+    //I apply rule rule(u) on v. If all conclusions are already in u,
+    //then u is witness of v
+    std::unordered_set<std::string> v_of_u;
+    linearChase(program, u.get(), database, v_of_u);
+
+    std::vector<Literal> v_of_v;
+    linearChase(program, v.get(), database, v_of_v);
+
+    //Apply the rule
+    const auto &rule = program.getRule(u->ruleID);
+    std::vector<Literal> ruleOutput;
+    applyRule(rule, ruleOutput, v_of_v);
+
+    //Check whether there is an homomorphism
+    bool hom = true;
+    for(const auto &l : ruleOutput) {
+        std::string sl = l.tostring(NULL, NULL);
+        if (!v_of_u.count(sl)) {
+            hom = false;
+            break;
+        }
+    }
+
+    return hom;
+}
+
+void TriggerGraph::prune(Program &program,
+        std::shared_ptr<Node> u, std::shared_ptr<Node> v,
+        std::vector<Literal> &database) {
     for(const auto &u_prime : u->outgoing) {
-        //Move u_prime under v and remove it from u
-        u_prime->incoming.clear();
-        u_prime->incoming.push_back(v);
-        v->outgoing.push_back(u_prime);
+        //Check whether u' is a witness of v
+        if (isWitness(program, u_prime, v, database)) {
+            //Move u_prime under v and remove it from u
+            u_prime->incoming.clear();
+            u_prime->incoming.push_back(v);
+            v->outgoing.push_back(u_prime);
+        }
     }
     u->outgoing.clear();
+
+    //TODO: Process the children of u and v
 }
 
 void TriggerGraph::removeNode(std::shared_ptr<Node> n) {
