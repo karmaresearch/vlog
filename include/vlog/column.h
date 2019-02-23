@@ -688,7 +688,7 @@ class EDBColumn : public Column {
         size_t size() const;
 
         size_t getRepresentationSize() const {
-            return size();
+            return 0;
         }
 
         size_t estimateSize() const;
