@@ -547,7 +547,7 @@ void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
                                 ruleDetails, ruleExecOrder, iteration, isFinished,
                                 nthreads);
                     } else {
-                        LOG(WARNL) << "TODO counting";
+                        triggers += utmpt[i]->getNRows();
                         std::shared_ptr<const FCInternalTable> ptrTable(
                                 new InmemoryFCInternalTable(rowsize,
                                     iteration, true, utmpt[i]->getSegment()));
