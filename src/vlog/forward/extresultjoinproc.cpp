@@ -274,6 +274,13 @@ void ExistentialRuleProcessor::retainNonExisting(
                 } else {
                     nextid = ~0lu; //highest value -- copy the rest
                 }
+                for(uint8_t j = 0; j < c.size(); ++j) {
+                    if (!readers[j]->hasNext()) {
+                        throw 10;
+                    }
+                    readers[j]->next();
+                }
+
             }
         }
         //Copy back the retricted columns

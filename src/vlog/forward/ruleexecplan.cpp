@@ -152,8 +152,18 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                 }
 
                 if (found) {
-                    jc.push_back(std::make_pair(j, litVars));
-                    v2p.push_back(std::make_pair(x, j));
+                    //Maybe I join with a repeated variable. In this case, I don't add it
+                    bool repeatedFound = false;
+                    for(auto &c : jc) {
+                        if (c.first == j) {
+                            repeatedFound = true;
+                            break;
+                        }
+                    }
+                    if (!repeatedFound) {
+                        jc.push_back(std::make_pair(j, litVars));
+			v2p.push_back(std::make_pair(x, j));
+		    }
                 } else {
                     // Check if we still need this variable. We need it if it occurs
                     // in any of the next literals in the pattern, or if it occurs
@@ -203,18 +213,18 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                             idx2 += 1;
                         }
 
-                        if (isNew) {
-                            ps.push_back(make_pair(newExistingVariables.size(), litVars));
-                            v2p.push_back(std::make_pair(x, newExistingVariables.size()));
-                            newExistingVariables.push_back(t.getId());
-                            LOG(TRACEL) << "New variable: " << (int) t.getId();
+                            if (isNew) {
+                                ps.push_back(make_pair(newExistingVariables.size(), litVars));
+				v2p.push_back(std::make_pair(x, newExistingVariables.size()));
+                                newExistingVariables.push_back(t.getId());
+                                LOG(TRACEL) << "New variable: " << (int) t.getId();
+                            }
                         }
                     }
                 }
                 litVars++;
             }
             vars2pos.push_back(v2p);
-        }
 
         if (i == plan.size() - 1) {
             //output.sizeOutputRelation.push_back((uint8_t) headLiteral.getTupleSize());

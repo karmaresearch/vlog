@@ -879,8 +879,12 @@ void FinalRuleProcessor::processResultsAtPos(const int blockid, const uint8_t po
 void FinalRuleProcessor::addColumns(const int blockid,
         std::vector<std::shared_ptr<Column>> &columns,
         const bool unique, const bool sorted) {
+    size_t offset = 0;
     for(auto &t : atomTables) {
-        t->addColumns(blockid, columns, unique, sorted);
+	size_t newOffset = offset + t->getRowSize();
+	std::vector<std::shared_ptr<Column>> c(columns.begin() + offset, columns.begin() + newOffset);
+        t->addColumns(blockid, c, unique, sorted);
+	offset = newOffset;
     }
 }
 

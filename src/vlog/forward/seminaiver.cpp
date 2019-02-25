@@ -357,7 +357,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
     }
 
     running = false;
-    LOG(INFOL) << "Finished process. Iterations=" << iteration;
+    LOG(DEBUGL) << "Finished process. Iterations=" << iteration;
 
     //DEBUGGING CODE -- needed to see which rules cost the most
     //Sort the iteration costs
@@ -442,7 +442,8 @@ bool SemiNaiver::executeUntilSaturation(
                 }
             }
 
-            if (ruleset[currentRule].rule.isRecursive() && limitView == 0) {
+            //I disable this...
+            if (false && ruleset[currentRule].rule.isRecursive() && limitView == 0) {
                 //Is the rule recursive? Go until saturation...
                 int recursiveIterations = 0;
                 do {
@@ -998,7 +999,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         //set (should be only during the execution of RMFA
     }
 
-    LOG(DEBUGL) << "Iteration: " << iteration <<
+    LOG(INFOL) << "Iteration: " << iteration <<
         " Rule: " << rule.tostring(program, &layer);
 
     //Set up timers
