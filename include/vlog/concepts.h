@@ -15,10 +15,9 @@
 /*** PREDICATES ***/
 #define EDB 0
 #define IDB 1
-#define MAX_NPREDS 32768
-#define OUT_OF_PREDICATES   32768
+#define MAX_NPREDS (2048*1024)
 
-typedef uint16_t PredId_t;
+typedef uint32_t PredId_t;
 
 class EDBLayer;
 
@@ -429,7 +428,7 @@ class Program {
     private:
         //const uint64_t assignedIds;
         EDBLayer *kb;
-        std::vector<uint32_t> rules[MAX_NPREDS];
+        std::vector<std::vector<uint32_t>> rules;
         std::vector<Rule> allrules;
 
         Dictionary dictPredicates;
@@ -521,6 +520,10 @@ class Program {
         int getNEDBPredicates();
 
         int getNIDBPredicates();
+
+        int getNPredicates() {
+            return rules.size();
+        }
 
         std::string tostring();
 

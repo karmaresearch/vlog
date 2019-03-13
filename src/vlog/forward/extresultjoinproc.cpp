@@ -787,9 +787,11 @@ void ExistentialRuleProcessor::RMFA_computeBodyAtoms(
 std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
         std::vector<Literal> &input) {
     //Populate the EDB layer
-    EDBLayer layer(sn->getEDBLayer());
+    EDBLayer *layer = new EDBLayer(sn->getEDBLayer(), true);
+
     std::map<PredId_t, std::vector<uint64_t>> edbPredicates;
     std::map<PredId_t, std::vector<uint64_t>> idbPredicates;
+
     for(const auto &literal : input) {
         auto predid = literal.getPredicate().getId();
         if (literal.getPredicate().getType() != EDB) {
@@ -812,13 +814,13 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
     }
     for(auto &pair : edbPredicates) {
         uint8_t arity = sn->getEDBLayer().getPredArity(pair.first);
-        layer.addInmemoryTable(pair.first, arity, pair.second);
+        layer->addInmemoryTable(pair.first, arity, pair.second);
     }
 
     //Launch the semi-naive evaluation
     Program *program = sn->getProgram();
     std::unique_ptr<SemiNaiver> lsn(new SemiNaiver(program->getAllRules(),
-                layer, program, true, true, false, 1, false, true));
+                *layer, program, true, true, false, 1, false, true));
 
     //Populate the IDB layer
     for(auto &pair : idbPredicates) {
@@ -1016,6 +1018,8 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
             break;
         itr.moveNextCount();
     }
+    EDBLayer &l = n->getEDBLayer();
+    delete &l;
     return found;
 }
 

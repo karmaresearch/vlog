@@ -81,6 +81,8 @@ class SemiNaiver {
 
         size_t countAllIDBs();
 
+        bool bodyChangedSince(Rule &rule, uint32_t iteration);
+
         bool checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
                 const RuleExecutionPlan &plan,
                 uint32_t limitView,
@@ -121,7 +123,7 @@ class SemiNaiver {
                 const size_t maxIteration);
 
     protected:
-        FCTable *predicatesTables[MAX_NPREDS];
+        std::vector<FCTable *>predicatesTables;
         EDBLayer &layer;
         Program *program;
         std::vector<RuleExecutionDetails> allIDBRules;

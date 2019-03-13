@@ -42,7 +42,7 @@ BindingsTable *QSQR::getAnswerTable(const Predicate pred, uint8_t adornment) {
 }
 
 QSQR::~QSQR() {
-    for (PredId_t i = 0; i < MAX_NPREDS; ++i) {
+    for (PredId_t i = 0; i < inputs.size(); ++i) {
         if (inputs[i] != NULL) {
             for (uint32_t j = 0; j < sizePreds[i]; ++j)
                 delete inputs[i][j];
@@ -68,7 +68,7 @@ QSQR::~QSQR() {
 }
 
 void QSQR::deallocateAllRules() {
-    for (PredId_t i = 0; i < MAX_NPREDS; ++i) {
+    for (PredId_t i = 0; i < rules.size(); ++i) {
         if (rules[i] != NULL) {
             for (int j = 0; j < sizePreds[i]; ++j) {
                 if (rules[i][j] != NULL) {
@@ -86,7 +86,7 @@ void QSQR::deallocateAllRules() {
 
 size_t QSQR::calculateAllAnswers() {
     size_t total = 0;
-    for (int i = 0; i < MAX_NPREDS; ++i) {
+    for (int i = 0; i < answers.size(); ++i) {
         if (answers[i] != NULL) {
             for (uint32_t j = 0; j < sizePreds[i]; ++j) {
                 if (answers[i][j] != NULL) {
@@ -99,7 +99,7 @@ size_t QSQR::calculateAllAnswers() {
 }
 
 void QSQR::cleanAllInputs() {
-    for (int i = 0; i < MAX_NPREDS; ++i) {
+    for (int i = 0; i < inputs.size(); ++i) {
         if (inputs[i] != NULL) {
             for (uint32_t j = 0; j < sizePreds[i]; ++j) {
                 if (inputs[i][j] != NULL) {

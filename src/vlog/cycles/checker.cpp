@@ -11,7 +11,10 @@ int Checker::check(std::string ruleFile, std::string alg, EDBLayer &db) {
     //Parse the rules into a program
     Program p(&db);
     p.readFromFile(ruleFile, false); //we do not rewrite the heads
-
+    if (! p.areExistentialRules()) {
+        LOG(INFOL) << "No existential rules, termination detection not run";
+        return 1;
+    }
     if (alg == "MFA") {
         // Model Faithful Acyclic
         return MFA(p) ? 1 : 0;
@@ -55,6 +58,7 @@ static void addIDBCritical(Program &p, EDBLayer *db) {
                 }
                 facts.push_back(fact);
                 db->addInmemoryTable(edbName, predId, facts);
+                hasNewEDB[cardinality] = true;
             }
             std::string rule = p.getPredicateName(v) + "(";
             std::string paramList = "";

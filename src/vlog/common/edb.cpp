@@ -25,10 +25,10 @@
 #include <climits>
 
 
-EDBLayer::EDBLayer(EDBLayer &db) {
+EDBLayer::EDBLayer(EDBLayer &db, bool copyTables) {
     this->predDictionary = db.predDictionary;
-    for (int i = 0; i < MAX_NPREDS; ++i) {
-        tmpRelations[i] = NULL;
+    if (copyTables) {
+        this->dbPredicates = db.dbPredicates;
     }
 }
 
@@ -126,6 +126,7 @@ void EDBLayer::addInmemoryTable(std::string predicate, PredId_t id, std::vector<
     if (doesPredExists(infot.id)) {
         LOG(WARNL) << "Rewriting table for predicate " << predicate;
         dbPredicates.erase(infot.id);
+        abort();
     }
     infot.type = "INMEMORY";
     InmemoryTable *table = new InmemoryTable(infot.id, rows, this);
@@ -641,13 +642,16 @@ bool EDBLayer::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
 
 // Only used in prematerialization
 void EDBLayer::addTmpRelation(Predicate & pred, IndexedTupleTable * table) {
+    if (pred.getId() >= tmpRelations.size()) {
+        tmpRelations.resize(2*pred.getId()+1);
+    }
     tmpRelations[pred.getId()] = table;
 }
 
 // Only used in prematerialization
 bool EDBLayer::checkValueInTmpRelation(const uint8_t relId, const uint8_t posInRelation,
         const Term_t value) const {
-    if (tmpRelations[relId] != NULL) {
+    if (relId < tmpRelations.size() && tmpRelations[relId] != NULL) {
         return tmpRelations[relId]->exists(posInRelation, value);
     } else {
         return true;

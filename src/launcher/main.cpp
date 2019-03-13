@@ -518,7 +518,7 @@ void launchTriggeredMat(int argc,
 void printRepresentationSize(std::shared_ptr<SemiNaiver> sn) {
     size_t size = 0;
     std::set<uint64_t> columnsIDs;
-    for(size_t i = 0; i < MAX_NPREDS; ++i) {
+    for(size_t i = 0; i < sn->getProgram()->getNPredicates(); ++i) {
         if (!sn->getProgram()->doesPredicateExist(i)) {
             continue;
         }

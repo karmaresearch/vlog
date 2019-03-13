@@ -76,7 +76,7 @@ class EDBLayer {
         std::map<PredId_t, EDBInfoTable> dbPredicates;
 
         Factory<EDBMemIterator> memItrFactory;
-        IndexedTupleTable *tmpRelations[MAX_NPREDS];
+        std::vector<IndexedTupleTable *>tmpRelations;
 
         std::unique_ptr<Dictionary> termsDictionary;
 
@@ -98,7 +98,7 @@ class EDBLayer {
         VLIBEXP void addSparqlTable(const EDBConf::Table &tableConf);
 
     public:
-        EDBLayer(EDBLayer &db);
+        EDBLayer(EDBLayer &db, bool copyTables = false);
 
         EDBLayer(EDBConf &conf, bool multithreaded) {
             const std::vector<EDBConf::Table> tables = conf.getTables();
@@ -135,10 +135,6 @@ class EDBLayer {
                     throw 10;
                 }
             }
-
-            for (int i = 0; i < MAX_NPREDS; ++i) {
-                tmpRelations[i] = NULL;
-            }
         }
 
         std::vector<PredId_t> getAllPredicateIDs();
@@ -154,6 +150,9 @@ class EDBLayer {
         void addTmpRelation(Predicate &pred, IndexedTupleTable *table);
 
         bool isTmpRelationEmpty(Predicate &pred) {
+            if (pred.getId() >= tmpRelations.size()) {
+                return false;
+            }
             return tmpRelations[pred.getId()] == NULL ||
                 tmpRelations[pred.getId()]->getNTuples() == 0;
         }
@@ -180,6 +179,9 @@ class EDBLayer {
                 const Term_t value) const;
 
         size_t getSizeTmpRelation(Predicate &pred) {
+            if (pred.getId() >= tmpRelations.size()) {
+                return 0;
+            }
             return tmpRelations[pred.getId()]->getNTuples();
         }
 
@@ -266,7 +268,7 @@ class EDBLayer {
                 std::vector<uint64_t> &rows);
 
         ~EDBLayer() {
-            for (int i = 0; i < MAX_NPREDS; ++i) {
+            for (int i = 0; i < tmpRelations.size(); ++i) {
                 if (tmpRelations[i] != NULL) {
                     delete tmpRelations[i];
                 }
