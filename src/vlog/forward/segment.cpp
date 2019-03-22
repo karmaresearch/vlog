@@ -49,6 +49,22 @@ void Segment::checkSizes() const {
 }
 #endif
 
+size_t Segment::getRepresentationSize(std::set<uint64_t> &IDs) const {
+    size_t size = 0;
+    for (int i = 0; i < nfields; ++i) {
+        assert(columns[i]);
+        if (!columns[i]->isEDB()) {
+            //Check if I already considered the column before
+            size_t memLocation = (size_t)columns[i].get();
+            if (!IDs.count(memLocation)) {
+                size += columns[i]->getRepresentationSize();
+                IDs.insert(memLocation);
+            }
+        }
+    }
+    return size;
+}
+
 Segment& Segment::operator =(const std::shared_ptr<Column> *v) {
     for (uint8_t i = 0; i < nfields; ++i) {
         columns[i] = v[i];
@@ -147,7 +163,7 @@ bool Segment::areAllColumnsPartOftheSameQuery(EDBLayer **edb, const Literal **l,
             } else {
                 //Check the literal is the same
                 const Literal *newlit = &(edbC->getLiteral());
-		std::vector<Substitution> subs;
+                std::vector<Substitution> subs;
                 if (Literal::subsumes(subs, *newlit, *lit) != -1
                         && Literal::subsumes(subs, *lit, *newlit) != -1) {
                     posInLiteral.push_back(edbC->posColumnInLiteral());
@@ -754,7 +770,7 @@ void SegmentInserter::addRow(const Term_t *row) {
 
 bool SegmentInserter::isEmpty() const {
     if (nfields == 0) {
-	return true;
+        return true;
     }
     if (copyColumns[0] != std::shared_ptr<Column>()) {
         if (!copyColumns[0]->isEmpty())
@@ -1182,7 +1198,7 @@ std::shared_ptr<const Segment> SegmentInserter::retainEDB(
             ->posColumnInLiteral();
         //Chech the two literals are equivalent and that the rel. are
         //different positions. ??? What if the head is, say pred(?A,?A)? --Ceriel
-	std::vector<Substitution> subs;
+        std::vector<Substitution> subs;
         if (!l1.sameVarSequenceAs(l12) || l1.subsumes(subs, l1, l12) == -1
                 // || pos1 == pos12 // Commented out --Ceriel
            ) {

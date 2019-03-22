@@ -272,7 +272,7 @@ int Literal::subsumes(std::vector<Substitution> &substitutions, const Literal &l
             }
             if (!found) {
                 substitutions.push_back(Substitution(tl.getId(), tm));
-	    }
+            }
         } else {
             if (tm.isVariable())
                 return -1;
@@ -442,7 +442,7 @@ bool Literal::operator==(const Literal & other) const {
 bool Rule::checkRecursion(const std::vector<Literal> &heads,
         const std::vector<Literal> &body) {
     for (const auto bodyLit : body) {
-	std::vector<Substitution> subs;
+        std::vector<Substitution> subs;
         for(const auto& head : heads) {
             if (Literal::getSubstitutionsA2B(subs, bodyLit, head) != -1)
                 return true;
@@ -689,6 +689,10 @@ bool Program::areExistentialRules() const {
     return false;
 }
 
+bool Program::doesPredicateExist(const PredId_t id) const {
+    return cardPredicates.count(id);
+}
+
 const Rule &Program::getRule(uint32_t ruleid) const {
     return allrules[ruleid];
 }
@@ -706,7 +710,7 @@ Program::Program(EDBLayer *kb) : kb(kb),
     }
 
 std::string trim(const std::string& str,
-                 const std::string& whitespace = "\r \t")
+        const std::string& whitespace = "\r \t")
 {
     const auto strBegin = str.find_first_not_of(whitespace);
     if (strBegin == std::string::npos)
@@ -727,13 +731,13 @@ std::string Program::readFromFile(std::string pathFile, bool rewriteMultihead) {
         std::ifstream file(pathFile);
         std::string line;
         while (std::getline(file, line)) {
-	    line = trim(line);
+            line = trim(line);
             if (line != "" && line.substr(0, 2) != "//") {
                 LOG(DEBUGL) << "Parsing rule \"" << line << "\"";
-		std::string s = parseRule(line, rewriteMultihead);
-		if (s != "") {
-		    return s;
-		}
+                std::string s = parseRule(line, rewriteMultihead);
+                if (s != "") {
+                    return s;
+                }
             }
         }
         //LOG(INFOL) << "New assigned constants: " << additionalConstants.size();
@@ -745,13 +749,13 @@ std::string Program::readFromString(std::string rules, bool rewriteMultihead) {
     stringstream ss(rules);
     string rule;
     while (getline(ss, rule)) {
-	rule = trim(rule);
+        rule = trim(rule);
         if (rule != "" && rule .substr(0, 2) != "//") {
             LOG(DEBUGL) << "Parsing rule " << rule;
-	    std::string s = parseRule(rule, rewriteMultihead);
-	    if (s != "") {
-		return s;
-	    }
+            std::string s = parseRule(rule, rewriteMultihead);
+            if (s != "") {
+                return s;
+            }
         }
     }
     return "";
@@ -810,7 +814,7 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     std::string predicate = trim(l.substr(0, posBeginTuple));
     std::string tuple = l.substr(posBeginTuple + 1, std::string::npos);
     if (tuple[tuple.size() - 1] != ')') {
-	throw "Missing ')' in literal";
+        throw "Missing ')' in literal";
     }
     tuple = trim(tuple.substr(0, tuple.size() - 1));
 
@@ -893,14 +897,14 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
             tuple = "";
         }
 
-	LOG(DEBUGL) << "Found term \"" << term << "\"";
+        LOG(DEBUGL) << "Found term \"" << term << "\"";
 
-	    //Parse the term
+        //Parse the term
         if (std::isupper(term.at(0))) {
-	    uint64_t v = dictVariables.getOrAdd(term);
-	    if (v != (uint8_t) v) {
-		throw "Too many variables in rule (> 255)";
-	    }
+            uint64_t v = dictVariables.getOrAdd(term);
+            if (v != (uint8_t) v) {
+                throw "Too many variables in rule (> 255)";
+            }
             t.push_back(VTerm((uint8_t) v, 0));
         } else {
             //Constant
@@ -917,7 +921,7 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     }
 
     if (t.size() != (uint8_t) t.size()) {
-	throw "Arity of predicate " + predicate + " is too high (" + std::to_string(t.size()) + " > 255)";
+        throw "Arity of predicate " + predicate + " is too high (" + std::to_string(t.size()) + " > 255)";
     }
 
     VTuple t1((uint8_t) t.size());
@@ -1037,19 +1041,19 @@ size_t findEndLiteral(std::string s) {
     size_t pos = s.find("),");
     size_t oldpos = 0;
     while (pos != std::string::npos) {
-	LOG(DEBUGL) << "string: " << s << ",found pos " << pos;
-	int count = 0;
-	for (int i = oldpos; i < pos; i++) {
-	    if (s[i] == '"') {
-		count++;
-	    }
-	}
-	LOG(DEBUGL) << "quote count = " << count;
-	if (count % 2 == 0) {
-	    return pos;
-	}
-	oldpos = pos;
-	pos = s.find("),", oldpos+2);
+        LOG(DEBUGL) << "string: " << s << ",found pos " << pos;
+        int count = 0;
+        for (int i = oldpos; i < pos; i++) {
+            if (s[i] == '"') {
+                count++;
+            }
+        }
+        LOG(DEBUGL) << "quote count = " << count;
+        if (count % 2 == 0) {
+            return pos;
+        }
+        oldpos = pos;
+        pos = s.find("),", oldpos+2);
     }
     return pos;
 }
@@ -1065,7 +1069,7 @@ std::string Program::parseRule(std::string rule, bool rewriteMultihead) {
         //process the head(s)
         std::string head = trim(rule.substr(0, posEndHead));
         std::vector<Literal> lHeads;
-	LOG(DEBUGL) << "head = \"" << head << "\"";
+        LOG(DEBUGL) << "head = \"" << head << "\"";
         while (head.size() > 0) {
             std::string headLiteral;
             size_t posEndLiteral = findEndLiteral(head);
@@ -1076,14 +1080,14 @@ std::string Program::parseRule(std::string rule, bool rewriteMultihead) {
                 headLiteral = head;
                 head = "";
             }
-	    LOG(DEBUGL) << "headliteral = \"" << headLiteral << "\"";
+            LOG(DEBUGL) << "headliteral = \"" << headLiteral << "\"";
             Literal h = parseLiteral(headLiteral, dictVariables);
             lHeads.push_back(h);
         }
 
         //process the body
         std::string body = trim(rule.substr(posEndHead+2, std::string::npos));
-	LOG(DEBUGL) << "body = \"" << body << "\"";
+        LOG(DEBUGL) << "body = \"" << body << "\"";
         std::vector<Literal> lBody;
         while (body.size() > 0) {
             std::string bodyLiteral;
@@ -1095,18 +1099,18 @@ std::string Program::parseRule(std::string rule, bool rewriteMultihead) {
                 bodyLiteral = body;
                 body = "";
             }
-	    LOG(DEBUGL) << "bodyliteral = \"" << bodyLiteral << "\"";
+            LOG(DEBUGL) << "bodyliteral = \"" << bodyLiteral << "\"";
             lBody.push_back(parseLiteral(bodyLiteral, dictVariables));
         }
 
         //Add the rule
         Rule r = Rule(allrules.size(), lHeads, lBody);
         addRule(r, rewriteMultihead);
-	return "";
+        return "";
     } catch (std::string e) {
-	return "Failed parsing rule '" + rule + "': " + e;
+        return "Failed parsing rule '" + rule + "': " + e;
     } catch(char const * e) {
-	return "Failed parsing rule '" + rule + "': " + std::string(e);
+        return "Failed parsing rule '" + rule + "': " + std::string(e);
     }
 }
 

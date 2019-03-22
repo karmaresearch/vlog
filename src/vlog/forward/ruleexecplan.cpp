@@ -140,7 +140,16 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                 }
 
                 if (found) {
-                    jc.push_back(std::make_pair(j, litVars));
+                    //Maybe I join with a repeated variable. In this case, I don't add it
+                    bool repeatedFound = false;
+                    for(auto &c : jc) {
+                        if (c.first == j) {
+                            repeatedFound = true;
+                            break;
+                        }
+                    }
+                    if (!repeatedFound)
+                        jc.push_back(std::make_pair(j, litVars));
                 } else {
                     // Check if we still need this variable. We need it if it occurs
                     // in any of the next literals in the pattern, or if it occurs
@@ -188,7 +197,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                             if (isNew) {
                                 ps.push_back(make_pair(newExistingVariables.size(), litVars));
                                 newExistingVariables.push_back(t.getId());
-				LOG(TRACEL) << "New variable: " << (int) t.getId();
+                                LOG(TRACEL) << "New variable: " << (int) t.getId();
                             }
                         }
                     }
@@ -207,12 +216,12 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                 for(auto v : pair.second) {
                     //Search first the existingVariables
                     bool found = false;
-		    LOG(TRACEL) << "v = " << (int) v;
+                    LOG(TRACEL) << "v = " << (int) v;
                     for(int j = 0; j < existingVariables.size(); ++j) {
-			LOG(TRACEL) << "existingvars[" << j << "] = " << (int) existingVariables[j];
+                        LOG(TRACEL) << "existingvars[" << j << "] = " << (int) existingVariables[j];
                         if (existingVariables[j] == v) {
                             extvars2pos[pair.first].push_back(j);
-			    LOG(TRACEL) << "Position = " << j;
+                            LOG(TRACEL) << "Position = " << j;
                             found = true;
                             break;
                         }
@@ -227,7 +236,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                                 if (t.getId() == v) {
                                     extvars2pos[pair.first].push_back(
                                             existingVariables.size() + litVars);
-				    LOG(TRACEL) << "Position = " << (int) (existingVariables.size() + litVars);
+                                    LOG(TRACEL) << "Position = " << (int) (existingVariables.size() + litVars);
                                     found = true;
                                     break;
                                 }

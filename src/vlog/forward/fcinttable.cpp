@@ -40,6 +40,16 @@ uint8_t InmemoryFCInternalTable::getRowSize() const {
     return nfields;
 }
 
+size_t InmemoryFCInternalTable::getRepresentationSize(std::set<uint64_t> &IDs) const {
+    if (this->unmergedSegments.size() > 0) {
+        LOG(ERRORL) << "All tables should not have any unmerged segment ...";
+        throw 10;
+    }
+    size_t size = nfields; //Every table can be seen as a meta-fact
+    size += values->getRepresentationSize(IDs);
+    return size;
+}
+
 FCInternalTableItr *InmemoryFCInternalTable::getIterator() const {
 
     assert(values == NULL || values->getNColumns() == nfields);
@@ -935,12 +945,12 @@ void MergerInternalTableItr::next() {
 
 bool MITISorter::operator ()(const uint8_t i1, const uint8_t i2) const {
     if (i1 == i2) {
-	return false;
+        return false;
     }
     for (uint8_t i = 0; i < tuplesize; ++i) {
         Term_t v1 = iterators[i1].first->getCurrentValue(sortPos[i]);
         Term_t v2 = iterators[i2].first->getCurrentValue(sortPos[i]);
-	// LOG(TRACEL) << "i = " << i << ", i1 = " << i1 << ", v1 = " << v1 << ", i2 = " << i2 << ", v2 = " << v2;
+        // LOG(TRACEL) << "i = " << i << ", i1 = " << i1 << ", v1 = " << v1 << ", i2 = " << i2 << ", v2 = " << v2;
         if (v1 > v2)
             return true;
         else if (v1 < v2)

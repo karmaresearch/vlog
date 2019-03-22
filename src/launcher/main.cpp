@@ -45,7 +45,7 @@
 #include <thread>
 #include <cmath>
 
-#include <valgrind/callgrind.h>
+// #include <valgrind/callgrind.h>
 
 using namespace std;
 
@@ -228,6 +228,8 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "Print the answers of a literal query.", false);
     query_options.add<bool>("", "automat", false,
             "Automatically premateralialize some atoms.", false);
+    query_options.add<bool>("", "printRepresentationSize", false,
+            "Print the representation size of the materialization.", false);
     query_options.add<int>("", "timeoutPremat", 1000000,
             "Timeout used during automatic prematerialization (in microseconds). Default is 1000000 (i.e. one second per query)", false);
     query_options.add<string>("", "premat", "",
@@ -350,8 +352,8 @@ void writeRuleDependencyGraph(EDBLayer &db, string pathRules, string filegraph) 
     Program p(&db);
     std::string s = p.readFromFile(pathRules, false);
     if (s != "") {
-	LOG(ERRORL) << s;
-	return;
+        LOG(ERRORL) << s;
+        return;
     }
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(db,
             &p, true, true, false, false, 1, 1, false);
@@ -389,7 +391,6 @@ void startServer(int argc,
 }
 #endif
 
-
 static void store_mat(const std::string &path, ProgramArgs &vm,
                       const std::shared_ptr<SemiNaiver> sn) {
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
@@ -415,6 +416,26 @@ static void store_mat(const std::string &path, ProgramArgs &vm,
     LOG(INFOL) << "Time to index and store the materialization on disk = " << sec.count() << " seconds";
 }
 
+void printRepresentationSize(std::shared_ptr<SemiNaiver> sn) {
+    size_t size = 0;
+    std::set<uint64_t> columnsIDs;
+    for(size_t i = 0; i < MAX_NPREDS; ++i) {
+        if (!sn->getProgram()->doesPredicateExist(i)) {
+            continue;
+        }
+        FCIterator itr = sn->getTable(i);
+        while (!itr.isEmpty()) {
+            auto table = itr.getCurrentTable();
+            //Get predicate name
+            std::string predName = sn->getProgram()->getPredicateName(i);
+            LOG(DEBUGL) << "Adding the representation size for " << i << " " << predName << " current size: " << size;
+            size += table->getRepresentationSize(columnsIDs);
+            itr.moveNextCount();
+        }
+    }
+    LOG(INFOL) << "Representation size: " << size;
+}
+
 void launchFullMat(int argc,
         const char** argv,
         string pathExec,
@@ -425,8 +446,8 @@ void launchFullMat(int argc,
     Program p(&db);
     std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
     if (s != "") {
-	LOG(ERRORL) << s;
-	return;
+        LOG(ERRORL) << s;
+        return;
     }
 
     //Existential check
@@ -504,7 +525,7 @@ void launchFullMat(int argc,
 #endif
 
         if (vm["dred"].empty()) {
-            CALLGRIND_START_INSTRUMENTATION;
+            // CALLGRIND_START_INSTRUMENTATION;
         }
 
         LOG(INFOL) << "Starting full materialization";
@@ -537,7 +558,7 @@ void launchFullMat(int argc,
 
             IncrOverdelete overdelete(vm, sn, remove_pred_names);
 
-            CALLGRIND_START_INSTRUMENTATION;
+            // CALLGRIND_START_INSTRUMENTATION;
 
             LOG(INFOL) << "Starting overdeletion materialization";
             start = std::chrono::system_clock::now();
@@ -602,6 +623,11 @@ void launchFullMat(int argc,
         }
 #endif
 
+        if (vm["printRepresentationSize"].as<bool>()) {
+            printRepresentationSize(sn);
+        }
+
+
         if (vm["storemat_path"].as<string>() != "") {
             store_mat(vm["storemat_path"].as<string>(), vm, sn);
         }
@@ -622,11 +648,11 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     Program p(&edb);
     string pathRules = vm["rules"].as<string>();
     if (pathRules != "") {
-	std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
-	if (s != "") {
-	    LOG(ERRORL) << s;
-	    return;
-	}
+        std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+        if (s != "") {
+            LOG(ERRORL) << s;
+            return;
+        }
         p.sortRulesByIDBPredicates();
     }
 
@@ -673,11 +699,11 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     if (db == NULL) {
         if (pathRules == "") {
             // Use default rule
-	    std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
-	    if (s != "") {
-		LOG(ERRORL) << s;
-		return;
-	    }
+            std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+            if (s != "") {
+                LOG(ERRORL) << s;
+                return;
+            }
             p.sortRulesByIDBPredicates();
         }
         db = new VLogLayer(edb, p, vm["reasoningThreshold"].as<int64_t>(), "TI", "TE");
@@ -816,11 +842,11 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     Program p(&edb);
     string pathRules = vm["rules"].as<string>();
     if (pathRules != "") {
-	std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
-	if (s != "") {
-	    LOG(ERRORL) << s;
-	    return;
-	}
+        std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+        if (s != "") {
+            LOG(ERRORL) << s;
+            return;
+        }
         p.sortRulesByIDBPredicates();
     }
 
@@ -1083,11 +1109,11 @@ int main(int argc, const char** argv) {
         vt.push_back(vt2);
         vt.push_back(vt3);
         vt.push_back(vt4);
-	std::string s = p.readFromFile(rulesFile);
-	if (s != "") {
-	    cerr << s << endl;
-	    return 1;
-	}
+        std::string s = p.readFromFile(rulesFile);
+        if (s != "") {
+            cerr << s << endl;
+            return 1;
+        }
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         std::vector<std::pair<std::string,int>> trainingQueries = ML::generateTrainingQueries(*layer, p, vt, vm);
         std::chrono::duration<double> sec = std::chrono::system_clock::now()- start;

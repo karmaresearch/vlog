@@ -80,7 +80,7 @@ class SemiNaiver {
 
         bool checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
                 const RuleExecutionPlan &plan,
-		uint32_t limitView,
+                uint32_t limitView,
                 std::vector<size_t> &cards);
 
         void processRuleFirstAtom(const uint8_t nBodyLiterals,
@@ -103,13 +103,13 @@ class SemiNaiver {
         bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
                 std::vector<RuleExecutionDetails> &allIDBRules,
                 std::vector<StatIteration> &costRules,
-		const uint32_t limitView,
+                const uint32_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
                 std::vector<Literal> &heads,
                 const uint32_t iteration,
-		const uint32_t limitView,
+                const uint32_t limitView,
                 std::vector<ResultJoinProcessor*> *finalResultContainer);
 
         size_t estimateCardTable(const Literal &literal,
@@ -126,7 +126,7 @@ class SemiNaiver {
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
                 const uint32_t iteration,
-		const uint32_t limitView,
+                const uint32_t limitView,
                 std::vector<ResultJoinProcessor*> *finalResultContainer);
 
         virtual FCIterator getTableFromEDBLayer(const Literal & literal);
@@ -140,17 +140,17 @@ class SemiNaiver {
         virtual bool executeUntilSaturation(
                 std::vector<RuleExecutionDetails> &ruleset,
                 std::vector<StatIteration> &costRules,
-		uint32_t limitView,
+                uint32_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
 
     public:
-		VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
+        VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 bool restrictedChase, int nthreads, bool shuffleRules);
 
         //disable restricted chase
-		VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
+        VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 int nthreads, bool shuffleRules) :
@@ -177,7 +177,7 @@ class SemiNaiver {
         VLIBEXP void storeOnFile(std::string path, const PredId_t pred, const bool decompress,
                 const int minLevel, const bool csv);
 
-		VLIBEXP void storeOnFiles(std::string path, const bool decompress,
+        VLIBEXP void storeOnFiles(std::string path, const bool decompress,
                 const int minLevel, const bool csv);
 
         std::ostream& dumpTables(std::ostream &os) {

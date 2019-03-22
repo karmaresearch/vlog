@@ -73,15 +73,15 @@ class VTuple {
         VTerm *terms;
     public:
         VTuple(const uint8_t sizetuple) : sizetuple(sizetuple) {
-	    terms = new VTerm[sizetuple];
+            terms = new VTerm[sizetuple];
         }
 
-	VTuple(const VTuple &v) : sizetuple(v.sizetuple) {
-	    terms = new VTerm[sizetuple];
-	    for (int i = 0; i < sizetuple; i++) {
-		terms[i] = v.terms[i];
-	    }
-	}
+        VTuple(const VTuple &v) : sizetuple(v.sizetuple) {
+            terms = new VTerm[sizetuple];
+            for (int i = 0; i < sizetuple; i++) {
+                terms[i] = v.terms[i];
+            }
+        }
 
         size_t getSize() const {
             return sizetuple;
@@ -131,26 +131,26 @@ class VTuple {
             return false;
         }
 
-	/*
-	VTuple & operator=(const VTuple &v) {
-	    if (this == &v) {
-		return *this;
-	    }
-	    if (terms != NULL) {
-		delete[] terms;
-	    }
-	    sizetuple = v.sizetuple;
-	    terms = new VTerm[sizetuple];
-	    for (int i = 0; i < sizetuple; i++) {
-		terms[i] = v.terms[i];
-	    }
-	    return *this;
-	}
-	*/
+        /*
+           VTuple & operator=(const VTuple &v) {
+           if (this == &v) {
+           return *this;
+           }
+           if (terms != NULL) {
+           delete[] terms;
+           }
+           sizetuple = v.sizetuple;
+           terms = new VTerm[sizetuple];
+           for (int i = 0; i < sizetuple; i++) {
+           terms[i] = v.terms[i];
+           }
+           return *this;
+           }
+           */
 
-	~VTuple() {
-	    delete[] terms;
-	}
+        ~VTuple() {
+            delete[] terms;
+        }
 };
 
 struct hash_VTuple {
@@ -444,7 +444,7 @@ class Program {
         //Move them to the EDB layer ...
         //Dictionary additionalConstants;
 
-	std::string parseRule(std::string rule, bool rewriteMultihead);
+        std::string parseRule(std::string rule, bool rewriteMultihead);
 
         void rewriteRule(Rule &r);
 
@@ -475,6 +475,8 @@ class Program {
         VLIBEXP Predicate getPredicate(const PredId_t id) const;
 
         VLIBEXP int64_t getOrAddPredicate(const std::string &p, uint8_t cardinality);
+
+        VLIBEXP bool doesPredicateExist(const PredId_t id) const;
 
         std::vector<Rule> getAllRulesByPredicate(PredId_t predid) const;
 
