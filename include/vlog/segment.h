@@ -237,7 +237,7 @@ class Segment {
         }
 
         Term_t firstInColumn(const uint8_t columnid) const {
-            return columns[columnid]->getReader()->first();
+            return columns[columnid]->first();
         }
 
         Term_t lastInColumn(const uint8_t columnid) const {

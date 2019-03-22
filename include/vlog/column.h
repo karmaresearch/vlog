@@ -76,6 +76,10 @@ class Column {
             return this->sort()->unique();
         }
 
+        virtual Term_t first() const {
+            return getValue(0);
+        }
+
         virtual std::shared_ptr<Column> sort_and_unique(const int nthreads) const {
             return this->sort(nthreads)->unique();
         }
@@ -182,6 +186,11 @@ class CompressedColumn: public Column {
         bool isConstant() const {
             assert(_size > 0);
             return blocks.size() == 1 && blocks.back().delta == 0;
+        }
+
+        Term_t first() const {
+            assert(_size > 0);
+            return blocks[0].value;
         }
 };
 //----- END COMPRESSED COLUMN ----------
@@ -459,6 +468,11 @@ class InmemoryColumn : public Column {
             return values.size() < 2;
         }
 
+        Term_t first() const {
+            assert(values.size() > 0);
+            return values[0];
+        }
+
         bool isIn(const Term_t t) const {
             /*
                if (values.size() > 100) {
@@ -598,6 +612,11 @@ class SubColumn : public Column {
 
         bool isConstant() const {
             return len < 2;
+        }
+
+        Term_t first() const {
+            assert(len > 0);
+            return values[start];
         }
 
         bool isIn(const Term_t t) const {
