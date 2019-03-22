@@ -57,6 +57,7 @@ public:
 
     size_t getCardinalityColumn(const Literal &query, uint8_t posColumn) {
         LOG(ERRORL) << "FIXME: implement " << __func__;
+        throw 10;
     }
 
     bool isEmpty(const Literal &query,

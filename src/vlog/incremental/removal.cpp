@@ -9,11 +9,13 @@
 #include <vlog/column.h>
 #endif
 
+std::vector<uint8_t> dummy;
+
 // Around a non-sorted Iterator
 EDBRemovalIterator::EDBRemovalIterator(const Literal &query,
                                        const EDBRemoveLiterals &removeTuples,
                                        EDBIterator *itr) :
-        query(query), fields(std::vector<uint8_t>()),
+        query(query), fields(dummy),
         removeTuples(removeTuples), itr(itr),
         expectNext(false) {
     t_iterate = new HiResTimer("RemovalIterator " + query.tostring());
