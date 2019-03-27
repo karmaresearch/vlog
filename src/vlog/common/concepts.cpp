@@ -705,7 +705,8 @@ const std::vector<uint32_t> &Program::getRulesIDsByPredicate(PredId_t predid) co
 }
 
 Program::Program(EDBLayer *kb) : kb(kb),
-    dictPredicates(kb->getPredDictionary()) {
+    dictPredicates(kb->getPredDictionary()),
+    cardPredicates(kb->getPredicateCardUnorderedMap()) {
     }
 
 std::string trim(const std::string& str,
@@ -935,7 +936,7 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
         cardPredicates.insert(make_pair(predid, t.size()));
     } else {
         if (cardPredicates.find(predid)->second != t.size()) {
-            throw ("Wrong arity in predicate: should be " +  std::to_string((int) cardPredicates.find(predid)->second));
+            throw ("Wrong arity in predicate \""+ predicate + "\". It should be " + std::to_string((int) cardPredicates.find(predid)->second) +".");
         }
     }
     Predicate pred(predid, Predicate::calculateAdornment(t1), kb->doesPredExists(predid) ? EDB : IDB, (uint8_t) t.size());

@@ -161,6 +161,13 @@ class EDBLayer {
             return *(predDictionary.get());
         }
 
+        std::unordered_map< PredId_t, uint8_t> getPredicateCardUnorderedMap () {
+            std::unordered_map< PredId_t, uint8_t> ret;
+            for (auto item : dbPredicates)
+                ret.insert(make_pair(item.first, item.second.arity));
+            return ret;
+        }
+
         VLIBEXP bool doesPredExists(PredId_t id) const;
 
         PredId_t getFirstEDBPredicate() {
