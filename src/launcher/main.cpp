@@ -571,7 +571,7 @@ void launchFullMat(int argc,
                 store_mat(vm["storemat_path"].as<string>() + ".overdelete", vm, overdelete.getSN());
             }
 
-            if (false) {
+            if (true) {
                 // Continue same with Rederive
                 // Create a Program, create a SemiNaiver, run...
                 LOG(INFOL) << "***************** Create Rederive";
@@ -589,7 +589,7 @@ void launchFullMat(int argc,
                     store_mat(vm["storemat_path"].as<string>() + ".rederive", vm, rederive.getSN());
                 }
 
-                if (false) {
+                if (true) {
                     // Continue same with Addition
                     // Create a Program, create a SemiNaiver, run...
                     LOG(INFOL) << "***************** Create Addition";
