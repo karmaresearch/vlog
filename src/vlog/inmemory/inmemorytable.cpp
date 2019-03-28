@@ -340,17 +340,13 @@ size_t InmemoryTable::getCardinality(const Literal &q) {
 
     HiResTimer t_card("InmemoryTable::getCardinality(" + q.tostring() + ")");
     t_card.start();
-    if (q.getTupleSize() != arity) {
+    if (q.getTupleSize() != arity || segment == NULL) {
         res = 0;
     } else if (q.getNUniqueVars() == q.getTupleSize()) {
-        if (segment == NULL) {
-            res = 0;
+        if (arity == 0) {
+            res = 1;
         } else {
-            if (arity == 0) {
-                res = 1;
-            } else {
-                res = segment->getNRows();
-            }
+            res = segment->getNRows();
         }
     } else {
 	EDBIterator *iter = getIterator(q);
@@ -371,6 +367,9 @@ size_t InmemoryTable::getCardinality(const Literal &q) {
 }
 
 size_t InmemoryTable::getCardinalityColumn(const Literal &q, uint8_t posColumn) {
+    if (segment == NULL) {
+        return 0;
+    }
     if (q.getNUniqueVars() == q.getTupleSize()) {
         std::shared_ptr<Column> col = segment->getColumn(posColumn);
         return col->sort_and_unique()->size();
@@ -395,7 +394,7 @@ size_t InmemoryTable::getCardinalityColumn(const Literal &q, uint8_t posColumn) 
 
 EDBIterator *InmemoryTable::getIterator(const Literal &q) {
     std::vector<uint8_t> sortFields;
-    if (q.getTupleSize() != arity) {
+    if (q.getTupleSize() != arity || segment == NULL) {
         return new InmemoryIterator(NULL, predid, sortFields);
     }
     if (q.getNUniqueVars() == q.getTupleSize()) {
@@ -547,7 +546,7 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
 
 EDBIterator *InmemoryTable::getSortedIterator2(const Literal &query,
         const std::vector<uint8_t> &fields) {
-    if (query.getTupleSize() != arity) {
+    if (query.getTupleSize() != arity || segment == NULL) {
         return new InmemoryIterator(NULL, predid, fields);
     }
 
@@ -742,7 +741,7 @@ uint8_t InmemoryTable::getArity() const {
 }
 
 uint64_t InmemoryTable::getSize() {
-    return segment->getNRows();
+    return segment == NULL ? 0 : segment->getNRows();
 }
 
 InmemoryTable::~InmemoryTable() {
