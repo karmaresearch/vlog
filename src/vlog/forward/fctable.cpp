@@ -99,7 +99,7 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal,
 
     if (shouldFilter) {
         if (blocks.size() == 0) {
-            return std::shared_ptr<FCTable>(this);;
+            return std::shared_ptr<FCTable>(new FCTable(mutex, sizeRow));
         }
         std::shared_ptr<FCTable> output;
         std::vector<FCBlock>::iterator itr = blocks.begin();
