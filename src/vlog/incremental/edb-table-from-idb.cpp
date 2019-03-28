@@ -167,7 +167,10 @@ size_t EDBonIDBTable::countCardinality(const Literal &query) {
 size_t EDBonIDBTable::getCardinality(const Literal &query) {
     PredId_t pred = query.getPredicate().getId();
     if (! layer->hasRemoveLiterals(pred)) {
-        return prevSemiNaiver->estimateCardinality(query, 0, prevSemiNaiver->getCurrentIteration());
+        // size_t v = prevSemiNaiver->estimateCardinality(query, 0, prevSemiNaiver->getCurrentIteration());
+        // We need the precise number here. --Ceriel
+        size_t v = countCardinality(query);
+        return v;
     }
 
     size_t card;
