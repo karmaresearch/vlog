@@ -931,7 +931,7 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
 }
 
 void checkAcyclicity(std::string ruleFile, std::string alg, EDBLayer &db) {
-    int response = Checker::check(ruleFile, alg, db);
+    int response = Checker::checkFromFile(ruleFile, alg, db);
     std::cout << "The response is: ";
     if (response == 0) {
         std::cout << "Unknown";

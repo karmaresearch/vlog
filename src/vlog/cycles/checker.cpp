@@ -7,10 +7,21 @@
 typedef std::pair<PredId_t, uint8_t> vpos;
 typedef std::pair<uint32_t, uint8_t> rpos;
 
-int Checker::check(std::string ruleFile, std::string alg, EDBLayer &db) {
+int Checker::checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db) {
     //Parse the rules into a program
     Program p(&db);
     p.readFromFile(ruleFile, false); //we do not rewrite the heads
+    return check(p, alg, db);
+}
+
+int Checker::checkFromString(std::string rulesString, std::string alg, EDBLayer &db) {
+    //Parse the rules into a program
+    Program p(&db);
+    p.readFromString(rulesString, false); //we do not rewrite the heads
+    return check(p, alg, db);
+}
+
+int Checker::check(Program &p, std::string alg, EDBLayer &db) {
     if (! p.areExistentialRules()) {
         LOG(INFOL) << "No existential rules, termination detection not run";
         return 1;
@@ -34,7 +45,8 @@ int Checker::check(std::string ruleFile, std::string alg, EDBLayer &db) {
     } else {
         // TODO: MSA, RMSA?
         LOG(ERRORL) << "Unknown algorithm: " << alg;
-        return 0;
+        throw 10;
+        // return 0;
     }
 }
 

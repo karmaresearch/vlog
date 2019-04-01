@@ -124,9 +124,8 @@ void EDBLayer::addInmemoryTable(std::string predicate, PredId_t id, std::vector<
     EDBInfoTable infot;
     infot.id = id;
     if (doesPredExists(infot.id)) {
-        LOG(WARNL) << "Rewriting table for predicate " << predicate;
+        LOG(INFOL) << "Rewriting table for predicate " << predicate;
         dbPredicates.erase(infot.id);
-        abort();
     }
     infot.type = "INMEMORY";
     InmemoryTable *table = new InmemoryTable(infot.id, rows, this);
