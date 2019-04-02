@@ -130,17 +130,35 @@ protected:
     std::shared_ptr<const FCInternalTable> idbInternalTable;
     FCInternalTableItr *idbInternalItr;
     size_t ticks = 0;
+    Term_t value[256];
+    int offsets[256];
 
 public:
     EDBonIDBIterator(const Literal &query, const std::shared_ptr<SemiNaiver> SN) :
             query(EDBonIDBTable::edb2idb(query)),
             predid(query.getPredicate().getId()),
             idbInternalItr(NULL) {
+        LOG(DEBUGL) << "EDBonIDBIterator on " << this->query.tostring();
         idbItr = SN->getTable(this->query, 0, SN->getCurrentIteration());
         if (! idbItr.isEmpty()) {
             idbInternalTable = idbItr.getCurrentTable();
             idbInternalItr = idbInternalTable->getIterator();
         }
+        int varNo = 0;
+        for (int i = 0; i < this->query.getTupleSize(); i++) {
+            if (! this->query.getTermAtPos(i).isVariable()) {
+                offsets[i] = -1;
+                value[i] = this->query.getTermAtPos(i).getValue();
+            } else {
+                offsets[i] = varNo;
+                varNo++;
+            }
+        }
+        /*
+        for (int i = 0; i < this->query.getTupleSize(); i++) {
+            LOG(DEBUGL) << "i = " << i << ", offsets[i] = " << offsets[i];
+        }
+        */
     }
 
     bool hasNext() {
@@ -176,8 +194,14 @@ public:
     }
 
     Term_t getElementAt(const uint8_t p) {
-        // LOG(TRACEL) << "get element[" << (int)p << "] of " << query.tostring() << " = " << idbInternalItr->getCurrentValue(p);
-        return idbInternalItr->getCurrentValue(p);
+        Term_t v;
+        if (offsets[p] == -1) {
+            v = value[p];
+        } else {
+            v = idbInternalItr->getCurrentValue(offsets[p]);
+        }
+        //LOG(TRACEL) << "get element[" << (int)p << "] of " << query.tostring() << " = " << v;
+        return v;
     }
 
     PredId_t getPredicateID() {

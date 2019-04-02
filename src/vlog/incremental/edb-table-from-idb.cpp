@@ -159,7 +159,7 @@ size_t EDBonIDBTable::countCardinality(const Literal &query) {
     }
     layer->releaseIterator(iter);
     t_count_card.stop();
-    LOG(INFOL) << t_count_card.tostring();
+    LOG(INFOL) << t_count_card.tostring() << ", result = " << card;
 
     return card;
 }

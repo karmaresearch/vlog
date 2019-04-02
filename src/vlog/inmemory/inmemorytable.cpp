@@ -210,36 +210,25 @@ InmemoryTable::InmemoryTable(PredId_t predid,
     // Collect matching data. Will be stored in an InmemoryTable.
     std::vector<Term_t> term(query.getTupleSize());
     // need to store all variables, then afterwards sort by fields
-    std::vector<bool> isVariable(query.getTupleSize());
-    VTuple tuple = query.getTuple();
-    for (size_t i = 0; i < query.getTupleSize(); ++i) {
-        VTerm vt = tuple.get(i);
-        isVariable[i] = vt.isVariable();
-        if (! isVariable[i]) {
-            // fill out the constants
-            term[i] = vt.getValue();
-        }
-    }
-
     arity = query.getTupleSize();
     this->predid = predid;
     this->layer = layer;
     //Load the table in the database
     SegmentInserter *inserter = NULL;
+    int count = 0;
     while (iter->hasNext()) {
         iter->next();
-        size_t nVars = 0;
-        for (size_t i = 0; i < query.getTupleSize(); ++i) {
-            if (isVariable[i]) {
-                term[i] = iter->getElementAt(nVars);
-                ++nVars;
-            }
+        for (size_t i = 0; i < term.size(); ++i) {
+            term[i] = iter->getElementAt(i);
         }
         if (inserter == NULL) {
             inserter = new SegmentInserter(arity);
         }
         inserter->addRow(term.data());
+        count++;
     }
+    LOG(DEBUGL) << "InmemoryTable constructor: " << count;
+
     if (inserter == NULL) {
         segment = NULL;
     } else {
