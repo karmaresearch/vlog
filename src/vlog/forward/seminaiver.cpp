@@ -980,7 +980,7 @@ void SemiNaiver::reorderPlanForNegatedLiterals(RuleExecutionPlan &plan, const st
         }
 
     if(toReorder)
-        plan = plan.reorder(new_order, heads);
+        plan = plan.reorder(new_order, heads, checkCyclicTerms);
 }
 
 void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
@@ -1154,7 +1154,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         }
 
         //Reorder the list of atoms depending on the observed cardinalities
-        reorderPlan(plan, cards, heads, checkCylicTerms);
+        reorderPlan(plan, cards, heads, checkCyclicTerms);
         //Reorder for input negation (can we merge these two?)
         reorderPlanForNegatedLiterals(plan, heads);
 
