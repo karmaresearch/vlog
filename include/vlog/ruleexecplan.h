@@ -67,6 +67,8 @@ struct RuleExecutionPlan {
             bool copyAllVars) const;
 
     bool hasCartesian();
+
+    std::string toString();
 };
 
 #endif

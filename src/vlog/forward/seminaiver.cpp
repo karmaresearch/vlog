@@ -913,6 +913,79 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
     }
 }
 
+/**
+ * SemiNaiver::reorderPlanForNegatedLiterals.
+ * @author Larry Gonz\'alez
+ * @note: based on SemiNaiver::reorderPlan
+ *
+ * To support input negation, we need to guarantee that the variables in the
+ * negated literal are bounded by other variables in previous literals. This
+ * function check if the RuleExecutionPlan satisfy that restriction, and if it
+ * doesn't, then it move back the negated literal until their variables are
+ * bounded. If it not possible, then it thows an error.
+ *
+ * @param plan:  &RuleExecutionPlan
+ * @param heads: vector < Literal >
+ * */
+void SemiNaiver::reorderPlanForNegatedLiterals(RuleExecutionPlan &plan, const std::vector<Literal> &heads){
+    std::set<uint8_t> bounded_vars;
+    std::vector<uint8_t> literal_indexes;
+    std::vector<uint8_t> new_order;
+    bounded_vars.clear();
+    literal_indexes.clear();
+    new_order.clear();
+
+    bool c1; // isnegated
+    bool c2; // are variables bounded?
+
+    for (uint8_t i=0; i < plan.plan.size(); ++i)
+        literal_indexes.push_back(i);
+
+    //LOG(TRACEL) << "literal_indexes.size: " << literal_indexes.size();
+    //LOG(TRACEL) << "start while";
+
+    while(!literal_indexes.empty()) {
+        int i;
+        const Literal *literal_i;
+        std::vector<uint8_t> vars_i;
+
+        //i: index of next literal
+        for (i=0; i < literal_indexes.size(); ++i){
+            //LOG(TRACEL) << i;
+
+            literal_i = plan.plan[i];
+            vars_i = literal_i->getAllVars(); // unique variables ordered by appearing order
+            std::set<uint8_t> s_vars_i(vars_i.begin(), vars_i.end()); //set
+
+            c1 = literal_i->isNegated();
+            c2 = std::includes(std::begin(bounded_vars), std::end(bounded_vars),
+                               std::begin(s_vars_i), std::end(s_vars_i));
+            if (!c1 || (c1 && c2))
+                break;
+        }
+        //if i is last, then check it again
+        if (i == plan.plan.size() -1)
+            if (c1 && !c2)
+                throw std::runtime_error("Input Negation Error. Impossible to bound variables in negated atom.");
+        //at this point I have the index i that will be the next literal
+        for (auto ele: vars_i)
+            bounded_vars.insert(ele);
+        new_order.push_back(literal_indexes[i]);
+        literal_indexes.erase(literal_indexes.begin() + i);
+    }
+    LOG(TRACEL) << "exit while";
+    bool toReorder = false;
+
+    for (int i=0; i< plan.plan.size(); ++i)
+        if (new_order[i] != i){
+            toReorder = true;
+            break;
+        }
+
+    if(toReorder)
+        plan = plan.reorder(new_order, heads, checkCyclicTerms);
+}
+
 void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
         const std::vector<size_t> &cards,
         const std::vector<Literal> &heads,
@@ -1087,6 +1160,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 
         //Reorder the list of atoms depending on the observed cardinalities
         reorderPlan(plan, cards, heads, checkCyclicTerms);
+        //Reorder for input negation (can we merge these two?)
+        reorderPlanForNegatedLiterals(plan, heads);
 
 #ifdef DEBUG
         std::string listLiterals = "EXEC COMB: ";

@@ -142,7 +142,10 @@ std::string Literal::toprettystring(const Program *program, const EDBLayer *db, 
     else
         predName = std::to_string(pred.getId());
 
-    std::string out = predName + std::string("(");
+    std::string out = "";
+    if (isNegated())
+        out = "~";
+    out += predName + std::string("(");
 
     for (int i = 0; i < tuple.getSize(); ++i) {
         if (tuple.get(i).isVariable()) {
@@ -435,6 +438,8 @@ bool Literal::operator==(const Literal & other) const {
         if (tuple.get(i) != other.tuple.get(i))
             return false;
     }
+    if (negated != other.isNegated())
+        return false;
     return true;
 }
 
@@ -730,7 +735,8 @@ const std::vector<uint32_t> &Program::getRulesIDsByPredicate(PredId_t predid) co
 }
 
 Program::Program(EDBLayer *kb) : kb(kb),
-    dictPredicates(kb->getPredDictionary()) {
+    dictPredicates(kb->getPredDictionary()),
+    cardPredicates(kb->getPredicateCardUnorderedMap()) {
     }
 
 std::string trim(const std::string& str,
@@ -954,19 +960,26 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
         t1.set(*itr, pos++);
     }
 
+    //Check if predicate starts with "neg_".
+    bool negated = false;
+    if (predicate.substr(0,4) == "neg_") {
+        negated = true;
+        predicate = predicate.substr(4);
+    }
+
     //Determine predicate
     PredId_t predid = (PredId_t) dictPredicates.getOrAdd(predicate);
     if (cardPredicates.find(predid) == cardPredicates.end()) {
         cardPredicates.insert(make_pair(predid, t.size()));
     } else {
         if (cardPredicates.find(predid)->second != t.size()) {
-            throw ("Wrong arity in predicate: should be " +  std::to_string((int) cardPredicates.find(predid)->second));
+            throw ("Wrong arity in predicate \""+ predicate + "\". It should be " + std::to_string((int) cardPredicates.find(predid)->second) +".");
         }
     }
     Predicate pred(predid, Predicate::calculateAdornment(t1), kb->doesPredExists(predid) ? EDB : IDB, (uint8_t) t.size());
     LOG(DEBUGL) << "Predicate : " << predicate << ", type = " << ((pred.getType() == EDB) ? "EDB" : "IDB");
 
-    Literal literal(pred, t1);
+    Literal literal(pred, t1, negated);
     return literal;
 }
 

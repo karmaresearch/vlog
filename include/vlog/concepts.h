@@ -256,8 +256,11 @@ class Literal {
     private:
         const Predicate pred;
         const VTuple tuple;
+        const bool negated;
     public:
-        Literal(const Predicate pred, const VTuple tuple) : pred(pred), tuple(tuple) {}
+        Literal(const Predicate pred, const VTuple tuple) : pred(pred), tuple(tuple), negated(false) {}
+
+        Literal(const Predicate pred, const VTuple tuple, bool negated) : pred(pred), tuple(tuple), negated(negated) {}
 
         Predicate getPredicate() const {
             return pred;
@@ -281,6 +284,10 @@ class Literal {
 
         size_t getNBoundVariables() const {
             return pred.getNFields(pred.getAdorment());
+        }
+
+        bool isNegated() const {
+            return negated;
         }
 
         static int mgu(Substitution *substitutions, const Literal &l, const Literal &m);
@@ -419,6 +426,17 @@ class Rule {
                 }
             }
             return i;
+        }
+
+        uint8_t numberOfNegatedLiteralsInBody() {
+            uint8_t result = 0;
+            for (std::vector<Literal>::const_iterator itr = getBody().begin();
+                    itr != getBody().end(); ++itr) {
+                if (itr->isNegated()){
+                    ++result;
+                }
+            }
+            return result;
         }
 
         void checkRule() const;
