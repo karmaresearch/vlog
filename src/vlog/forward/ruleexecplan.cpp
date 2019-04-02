@@ -40,7 +40,7 @@ void RuleExecutionPlan::checkIfFilteringHashMapIsPossible(const Literal &head) {
 }
 
 RuleExecutionPlan RuleExecutionPlan::reorder(std::vector<uint8_t> &order,
-        const std::vector<Literal> &heads) const {
+        const std::vector<Literal> &heads, bool copyAllVars) const {
     RuleExecutionPlan newPlan;
     newPlan.lastLiteralSharesWithHead = false;
     newPlan.filterLastHashMap = false;
@@ -55,12 +55,12 @@ RuleExecutionPlan RuleExecutionPlan::reorder(std::vector<uint8_t> &order,
                 heads[0], newPlan);
         newPlan.checkIfFilteringHashMapIsPossible(heads[0]);
     }
-    //RuleExecutionDetails::checkWhetherEDBsRedundantHead(newPlan, headLiteral, hv);
-    newPlan.calculateJoinsCoordinates(heads);
+    newPlan.calculateJoinsCoordinates(heads, copyAllVars);
     return newPlan;
 }
 
-void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &heads) {
+void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &heads,
+        bool copyAllVars) {
     std::vector<uint8_t> existingVariables;
 
     //Get all variables in the head, and dependencies if they are existential
@@ -85,7 +85,16 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
         std::vector<uint8_t> newExistingVariables;
 
         //Should I copy all the previous variables
-        if (i == plan.size() - 1) {
+        /*if (copyAllVars) {
+        //Update pf
+        newExistingVariables = existingVariables;
+        int idx = 0;
+        for(const auto &p : existingVariables) {
+        pf.push_back(std::make_pair(idx, idx));
+        idx += 1;
+        }
+        } else */
+        if (i == (plan.size() - 1)) {
             //No need to store any new variable. Just copy the old ones in the head
             for (uint8_t m = 0; m < existingVariables.size(); ++m) {
                 if (variablesNeededForHead.count(existingVariables[m])) {
@@ -114,7 +123,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                     isVarNeeded = variablesNeededForHead.count(existingVariables[j]);
                 }
 
-                if (isVarNeeded) {
+                if (isVarNeeded || copyAllVars) {
                     // Maps from the new position to the old.
                     pf.push_back(make_pair(newExistingVariables.size(), j));
                     newExistingVariables.push_back(existingVariables[j]);
@@ -122,12 +131,15 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
             }
         }
 
+        //Record whether the value of a variable should be retrieved from previous atoms
+        std::vector<std::pair<uint8_t,uint8_t>> v2p;
         //Put in join coordinates between the previous and the current literal
         uint8_t litVars = 0;
         std::set<uint8_t> varSoFar; //This set is used to avoid that repeated
         //variables in the literal produce multiple copies in the head
         for (uint8_t x = 0; x < currentLiteral->getTupleSize(); ++x) {
             const VTerm t = currentLiteral->getTermAtPos(x);
+
             if (t.isVariable()) {
                 //Is join?
                 bool found = false;
@@ -140,7 +152,18 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                 }
 
                 if (found) {
-                    jc.push_back(std::make_pair(j, litVars));
+                    //Maybe I join with a repeated variable. In this case, I don't add it
+                    bool repeatedFound = false;
+                    for(auto &c : jc) {
+                        if (c.first == j) {
+                            repeatedFound = true;
+                            break;
+                        }
+                    }
+                    if (!repeatedFound) {
+                        jc.push_back(std::make_pair(j, litVars));
+			v2p.push_back(std::make_pair(x, j));
+		    }
                 } else {
                     // Check if we still need this variable. We need it if it occurs
                     // in any of the next literals in the pattern, or if it occurs
@@ -163,8 +186,8 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                         isVariableNeeded = variablesNeededForHead.count(t.getId());
                     }
 
-                    if (isVariableNeeded) {
-                        if (i == plan.size() - 1) {
+                    if (i == (plan.size() - 1)) {
+                        if (isVariableNeeded) {
                             // Here, the variable can only be needed if it occurs in the head.
                             // The "ps" map in this case maps from the head position to
                             // the variable number in the pattern.
@@ -174,28 +197,34 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                                     ps.push_back(make_pair(el, litVars));
                             }
                             varSoFar.insert(t.getId());
-                        } else {
-                            //Add it to the next list of bindings if it is not already present
-                            bool isNew = true;
-                            for (std::vector<uint8_t>::iterator itr = newExistingVariables.begin();
-                                    itr != newExistingVariables.end() && isNew; ++itr) {
-                                if (*itr == t.getId()) {
-                                    isNew = false;
-                                    break;
-                                }
+                        }
+                        v2p.push_back(std::make_pair(x, newExistingVariables.size() + litVars));
+                    } else if (isVariableNeeded || copyAllVars) {
+                        //Add it to the next list of bindings if it is not already present
+                        bool isNew = true;
+                        int idx2 = 0;
+                        for (std::vector<uint8_t>::iterator itr = newExistingVariables.begin();
+                                itr != newExistingVariables.end() && isNew; ++itr) {
+                            if (*itr == t.getId()) {
+                                isNew = false;
+                                v2p.push_back(std::make_pair(x, idx2));
+                                break;
                             }
+                            idx2 += 1;
+                        }
 
                             if (isNew) {
                                 ps.push_back(make_pair(newExistingVariables.size(), litVars));
+				v2p.push_back(std::make_pair(x, newExistingVariables.size()));
                                 newExistingVariables.push_back(t.getId());
-				LOG(TRACEL) << "New variable: " << (int) t.getId();
+                                LOG(TRACEL) << "New variable: " << (int) t.getId();
                             }
                         }
                     }
                 }
                 litVars++;
             }
-        }
+            vars2pos.push_back(v2p);
 
         if (i == plan.size() - 1) {
             //output.sizeOutputRelation.push_back((uint8_t) headLiteral.getTupleSize());
@@ -207,12 +236,12 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                 for(auto v : pair.second) {
                     //Search first the existingVariables
                     bool found = false;
-		    LOG(TRACEL) << "v = " << (int) v;
+                    LOG(TRACEL) << "v = " << (int) v;
                     for(int j = 0; j < existingVariables.size(); ++j) {
-			LOG(TRACEL) << "existingvars[" << j << "] = " << (int) existingVariables[j];
+                        LOG(TRACEL) << "existingvars[" << j << "] = " << (int) existingVariables[j];
                         if (existingVariables[j] == v) {
                             extvars2pos[pair.first].push_back(j);
-			    LOG(TRACEL) << "Position = " << j;
+                            LOG(TRACEL) << "Position = " << j;
                             found = true;
                             break;
                         }
@@ -227,7 +256,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                                 if (t.getId() == v) {
                                     extvars2pos[pair.first].push_back(
                                             existingVariables.size() + litVars);
-				    LOG(TRACEL) << "Position = " << (int) (existingVariables.size() + litVars);
+                                    LOG(TRACEL) << "Position = " << (int) (existingVariables.size() + litVars);
                                     found = true;
                                     break;
                                 }

@@ -70,7 +70,7 @@ void RuleExecutionDetails::groupLiteralsBySharedVariables(std::vector<uint8_t> &
 
     for (std::vector<const Literal*>::iterator itr = set.begin(); itr != set.end();
             ++itr) {
-		const Literal *lit = *itr;
+        const Literal *lit = *itr;
         std::vector<uint8_t> sharedVars = lit->getSharedVars(startVars);
         if (sharedVars.size() > 0 || startVars.size() == 0) {
             //copy the remaining
@@ -306,15 +306,8 @@ break;
 }
 }*/
 
-void RuleExecutionDetails::createExecutionPlans() {
-    //Init
-    std::vector<Literal> bl = rule.getBody();
-    bodyLiterals.clear();
-    for (std::vector<Literal>::iterator itr = bl.begin(); itr != bl.end(); ++itr) {
-        bodyLiterals.push_back(*itr);
-    }
-    orderExecutions.clear();
-
+void RuleExecutionDetails::calculateDependencies(const Rule &rule,
+        std::map<uint8_t, std::vector<uint8_t>> &dependenciesExtVars) {
     //Calculate the dependencies of the existential variables to the variables in the body
     std::map<uint8_t, std::set<uint8_t>> dependenciesExtVars_tmp;
     auto extvars = rule.getVarsNotInBody();
@@ -335,12 +328,58 @@ void RuleExecutionDetails::createExecutionPlans() {
             }
         }
     }
-    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars;
     for(auto pair : dependenciesExtVars_tmp) {
         for(auto el : pair.second) {
             dependenciesExtVars[pair.first].push_back(el);
         }
     }
+}
+
+void RuleExecutionDetails::createExecutionPlans(
+        std::vector<std::pair<size_t, size_t>> &ranges,
+        bool copyAllVars) {
+    std::vector<Literal> bl = rule.getBody();
+    orderExecutions.clear();
+    bodyLiterals.clear();
+
+    //Init
+    for (std::vector<Literal>::iterator itr = bl.begin(); itr != bl.end(); ++itr) {
+        bodyLiterals.push_back(*itr);
+    }
+
+    //Calculate the dependencies of the existential variables to the variables in the body
+    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars;
+    calculateDependencies(rule, dependenciesExtVars);
+
+    //Create a single execution plan
+    RuleExecutionPlan p;
+    p.filterLastHashMap = false;
+    std::vector<const Literal*> v;
+    p.dependenciesExtVars = dependenciesExtVars;
+    int rangeid = 0;
+    for (std::vector<Literal>::const_iterator itr = bodyLiterals.begin();
+            itr != bodyLiterals.end();
+            ++itr) {
+        p.plan.push_back(&(*itr));
+        p.ranges.push_back(std::make_pair(ranges[rangeid].first, ranges[rangeid].second));
+    }
+
+    auto &heads = rule.getHeads();
+    p.calculateJoinsCoordinates(heads, copyAllVars);
+    orderExecutions.push_back(p);
+}
+
+void RuleExecutionDetails::createExecutionPlans(bool copyAllVars) {
+    //Init
+    std::vector<Literal> bl = rule.getBody();
+    bodyLiterals.clear();
+    for (std::vector<Literal>::iterator itr = bl.begin(); itr != bl.end(); ++itr) {
+        bodyLiterals.push_back(*itr);
+    }
+    orderExecutions.clear();
+
+    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars;
+    calculateDependencies(rule, dependenciesExtVars);
 
     if (nIDBs > 0) {
         //Collect the IDB predicates
@@ -403,7 +442,7 @@ void RuleExecutionDetails::createExecutionPlans() {
             //RuleExecutionDetails::checkWhetherEDBsRedundantHead(p, h);
 
             //Calculate all join coordinates
-            p.calculateJoinsCoordinates(heads);
+            p.calculateJoinsCoordinates(heads, copyAllVars);
 
             //New version. Should be able to catch everything
             for (int i = 0; i < p.plan.size(); ++i) {
@@ -443,7 +482,7 @@ void RuleExecutionDetails::createExecutionPlans() {
             RuleExecutionDetails::checkFilteringStrategy(
                     bodyLiterals[bodyLiterals.size() - 1], heads[0], p);
         }
-        p.calculateJoinsCoordinates(heads);
+        p.calculateJoinsCoordinates(heads, copyAllVars);
         orderExecutions.push_back(p);
     }
 }

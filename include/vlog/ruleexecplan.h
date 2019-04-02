@@ -23,6 +23,11 @@ struct RuleExecutionPlan {
     std::vector<std::vector<std::pair<uint8_t, uint8_t>>> posFromFirst;
     std::vector<std::vector<std::pair<uint8_t, uint8_t>>> posFromSecond;
 
+    //This data structure maps each variable in the body atoms to a field in
+    //the intermediate data structure computed so far. This mapping is needed
+    //for the computation of the RMFA
+    std::vector<std::vector<std::pair<uint8_t, uint8_t>>> vars2pos;
+
     //This variable tells whether the last literal shares some values with the
     //head. This allows us to group the input to avoid duplicates.
     bool lastLiteralSharesWithHead;
@@ -51,10 +56,15 @@ struct RuleExecutionPlan {
     //Check if we can apply filtering HashMap. See comment above
     void checkIfFilteringHashMapIsPossible(const Literal &head);
 
-    void calculateJoinsCoordinates(const std::vector<Literal> &heads);
+    //The second parameter is needed because there are cases when we need to
+    //remember all variables, even the ones not used in the head. One such case
+    //is the RMFA
+    void calculateJoinsCoordinates(const std::vector<Literal> &heads,
+            bool copyAllVars);
 
     RuleExecutionPlan reorder(std::vector<uint8_t> &order,
-            const std::vector<Literal> &heads) const;
+            const std::vector<Literal> &heads,
+            bool copyAllVars) const;
 
     bool hasCartesian();
 
