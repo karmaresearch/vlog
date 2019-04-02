@@ -1,6 +1,7 @@
 #include <vlog/tgpath.h>
 #include <fstream>
 #include <sstream>
+#include <iterator>
 
 TGPaths::TGPaths() {
 }
