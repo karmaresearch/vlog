@@ -15,10 +15,9 @@
 /*** PREDICATES ***/
 #define EDB 0
 #define IDB 1
-#define MAX_NPREDS 32768
-#define OUT_OF_PREDICATES   32768
+#define MAX_NPREDS (2048*1024)
 
-typedef uint16_t PredId_t;
+typedef uint32_t PredId_t;
 
 class EDBLayer;
 
@@ -315,7 +314,7 @@ class Literal {
 
         std::string tostring(const Program *program, const EDBLayer *db) const;
 
-        std::string toprettystring(const Program *program, const EDBLayer *db) const;
+        std::string toprettystring(const Program *program, const EDBLayer *db, bool replaceConstants = false) const;
 
         std::string tostring() const;
 
@@ -350,6 +349,11 @@ class Rule {
                 checkRule();
             }
 
+        Rule(uint32_t ruleId, Rule &r) : ruleId(ruleId),
+            heads(r.heads), body(r.body), _isRecursive(r._isRecursive),
+            existential(r.existential) {
+        }
+
         Rule createAdornment(uint8_t headAdornment) const;
 
         bool isRecursive() const {
@@ -365,8 +369,8 @@ class Rule {
         }
 
         Literal getFirstHead() const {
-            if (heads.size() > 1)
-                LOG(WARNL) << "This method should be called only if we handle multiple heads properly...";
+            // if (heads.size() > 1)
+            //     LOG(WARNL) << "This method should be called only if we handle multiple heads properly...";
             return heads[0];
         }
 
@@ -421,7 +425,7 @@ class Rule {
 
         std::string tostring(Program *program, EDBLayer *db) const;
 
-        std::string toprettystring(Program * program, EDBLayer *db) const;
+        std::string toprettystring(Program * program, EDBLayer *db, bool replaceConstants = false) const;
 
         std::string tostring() const;
 
@@ -435,7 +439,7 @@ class Program {
     private:
         //const uint64_t assignedIds;
         EDBLayer *kb;
-        std::vector<uint32_t> rules[MAX_NPREDS];
+        std::vector<std::vector<uint32_t>> rules;
         std::vector<Rule> allrules;
 
         Dictionary dictPredicates;
@@ -443,8 +447,6 @@ class Program {
 
         //Move them to the EDB layer ...
         //Dictionary additionalConstants;
-
-        std::string parseRule(std::string rule, bool rewriteMultihead);
 
         void rewriteRule(Rule &r);
 
@@ -454,6 +456,14 @@ class Program {
         EDBLayer *getKB() const {
             return kb;
         }
+
+        VLIBEXP void setKB(EDBLayer *e) {
+            kb = e;
+        }
+
+        std::string parseRule(std::string rule, bool rewriteMultihead);
+
+        VLIBEXP std::vector<PredId_t> getAllPredicateIDs() const;
 
         VLIBEXP Literal parseLiteral(std::string literal, Dictionary &dictVariables);
 
@@ -526,6 +536,10 @@ class Program {
         std::string tostring() const;
 
         VLIBEXP bool areExistentialRules() const;
+
+        int getNPredicates() {
+            return rules.size();
+        }
 
         static std::string rewriteRDFOWLConstants(std::string input);
 

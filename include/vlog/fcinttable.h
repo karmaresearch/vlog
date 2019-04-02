@@ -512,7 +512,7 @@ class InmemoryFCInternalTable : public FCInternalTable {
 
         bool isEDB() const {
             if (values != NULL) {
-                for (uint8_t i = 0; i < nfields; ++i) {
+                for (int i = 0; i < nfields; ++i) {
                     if (!values->getColumn(i)->isEDB()) {
                         return false;
                     }

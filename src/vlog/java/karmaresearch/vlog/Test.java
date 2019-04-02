@@ -167,6 +167,11 @@ class Test {
         vlog.setRules(rules.toArray(new Rule[rules.size()]),
                 RuleRewriteStrategy.AGGRESSIVE);
         vlog.materialize(false);
+
+        System.out.println("Running JNI interface of cyclic-check");
+        if (vlog.checkCyclic("JA") != VLog.CyclicCheckResult.NON_CYCLIC) {
+            throw new Error("Error in cyclic-check");
+        }
         try (TermQueryResultIterator e = vlog
                 .query(new Atom("B", new Term(Term.TermType.CONSTANT, "C")))) {
             if (e.hasNext()) {

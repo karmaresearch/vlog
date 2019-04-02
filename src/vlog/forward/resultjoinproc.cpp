@@ -45,7 +45,8 @@ InterTableJoinProcessor::InterTableJoinProcessor(const uint8_t rowsize,
         int nthreads) :
     ResultJoinProcessor(rowsize, (uint8_t) posFromFirst.size(), (uint8_t) posFromSecond.size(),
             (posFromFirst.size() > 0) ?  & (posFromFirst[0]) : NULL,
-            posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads) {
+            posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads,
+            false) {
         currentSegmentSize = MAX_NSEGMENTS;
         segments = new std::shared_ptr<SegmentInserter>[currentSegmentSize];
         for (uint32_t i = 0; i < currentSegmentSize; ++i) {

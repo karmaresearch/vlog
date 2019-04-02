@@ -134,8 +134,7 @@ std::string Literal::tostring(const Program *program, const EDBLayer *db) const 
     return out;
 }
 
-std::string Literal::toprettystring(const Program *program,
-                                    const EDBLayer *db) const {
+std::string Literal::toprettystring(const Program *program, const EDBLayer *db, bool replaceConstants) const {
 
     std::string predName;
     if (program != NULL)
@@ -147,17 +146,17 @@ std::string Literal::toprettystring(const Program *program,
 
     for (int i = 0; i < tuple.getSize(); ++i) {
         if (tuple.get(i).isVariable()) {
-            out += std::string("?") + std::to_string(tuple.get(i).getId());
+            out += std::string("A") + std::to_string(tuple.get(i).getId());
         } else {
-            if (db == NULL) {
+	    if (replaceConstants) {
+		out += "*";
+	    } else if (db == NULL) {
                 out += std::to_string(tuple.get(i).getValue());
             } else {
                 uint64_t id = tuple.get(i).getValue();
                 char text[MAX_TERM_SIZE];
                 if (db->getDictText(id, text)) {
                     string v = Program::compressRDFOWLConstants(std::string(text));
-                    if (v[0] == '<')
-                        v = v.substr(1, v.size() - 2);
                     out += v;
                 } else {
                     if (program == NULL) {
@@ -618,8 +617,17 @@ std::vector<uint8_t> Rule::getVarsNotInBody() const {
                 if (ok)
                     break;
             }
-            if (!ok)
-                out.push_back(var);
+            if (!ok) {
+                for (auto v : out) {
+                    if (v == var) {
+                        ok = true;
+                        break;
+                    }
+                }
+                if (! ok) {
+                    out.push_back(var);
+                }
+            }
         }
     }
     return out;
@@ -666,17 +674,25 @@ std::string Rule::tostring(Program * program, EDBLayer *db) const {
     return output;
 }
 
-std::string Rule::toprettystring(Program * program, EDBLayer *db) const {
+std::string Rule::toprettystring(Program * program, EDBLayer *db, bool replaceConstants) const {
     std::string output = "";
+    bool first = true;
     for(const auto& head : heads) {
-        output += head.toprettystring(program, db) + " AND ";
+	if (! first) {
+	    output += ",";
+	}
+        output += head.toprettystring(program, db, replaceConstants);
+	first = false;
     }
-    output = output.substr(0, output.length() - 5);
-    output += ":-";
+    output += " :- ";
+    first = true;
     for (int i = 0; i < body.size(); ++i) {
-        output += body[i].toprettystring(program, db) + std::string(",");
+	if (! first) {
+	    output += ",";
+	}
+	first = false;
+        output += body[i].toprettystring(program, db, replaceConstants);
     }
-    output = output.substr(0, output.size() - 1);
     return output;
 }
 
@@ -695,6 +711,14 @@ bool Program::doesPredicateExist(const PredId_t id) const {
 
 const Rule &Program::getRule(uint32_t ruleid) const {
     return allrules[ruleid];
+}
+
+std::vector<PredId_t> Program::getAllPredicateIDs() const {
+    std::vector<PredId_t> result;
+    for (auto iter: cardPredicates) {
+        result.push_back(iter.first);
+    }
+    return result;
 }
 
 size_t Program::getNRulesByPredicate(PredId_t predid) const {
@@ -940,6 +964,7 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
         }
     }
     Predicate pred(predid, Predicate::calculateAdornment(t1), kb->doesPredExists(predid) ? EDB : IDB, (uint8_t) t.size());
+    LOG(DEBUGL) << "Predicate : " << predicate << ", type = " << ((pred.getType() == EDB) ? "EDB" : "IDB");
 
     Literal literal(pred, t1);
     return literal;
@@ -947,10 +972,6 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
 
 PredId_t Program::getPredicateID(const std::string & p, const uint8_t card) {
     PredId_t predid = (PredId_t) dictPredicates.getOrAdd(p);
-    if (predid >= MAX_NPREDS) {
-        LOG(DEBUGL) << "Too many predicates";
-        throw OUT_OF_PREDICATES;
-    }
     //add the cardinality associated to this predicate
     if (cardPredicates.find(predid) == cardPredicates.end()) {
         //add it
@@ -971,7 +992,7 @@ Program Program::clone() const {
 
 int Program::getNRules() const {
     int size = 0;
-    for (int j = 0; j < MAX_NPREDS; ++j) {
+    for (int j = 0; j < rules.size(); ++j) {
         size += rules[j].size();
     }
     return size;
@@ -985,9 +1006,7 @@ std::shared_ptr<Program> Program::cloneNew() const {
 }
 
 void Program::cleanAllRules() {
-    for (int i = 0; i < MAX_NPREDS; ++i) {
-        rules[i].clear();
-    }
+    rules.clear();
     allrules.clear();
 }
 
@@ -996,6 +1015,9 @@ void Program::addRule(Rule &rule, bool rewriteMultihead) {
         rewriteRule(rule);
     } else {
         for (const auto &head : rule.getHeads()) {
+            if (rules.size() <= head.getPredicate().getId()) {
+                rules.resize(head.getPredicate().getId() + 1);
+            }
             rules[head.getPredicate().getId()].push_back(allrules.size());
         }
         allrules.push_back(rule);
@@ -1229,7 +1251,7 @@ struct RuleSorter {
 };
 
 void Program::sortRulesByIDBPredicates() {
-    for (int i = 0; i < MAX_NPREDS; ++i) {
+    for (int i = 0; i < rules.size(); ++i) {
         if (rules[i].size() > 0) {
             std::vector<uint32_t> tmpC = rules[i];
             std::stable_sort(tmpC.begin(), tmpC.end(), RuleSorter(allrules));
@@ -1275,6 +1297,9 @@ int64_t Program::getOrAddPredicate(const std::string & p, uint8_t cardinality) {
             return -1;
         }
     }
+    if (id >= rules.size()) {
+        rules.resize(id+1);
+    }
     return id;
 }
 
@@ -1300,12 +1325,6 @@ std::vector<PredId_t> Program::getAllEDBPredicateIds() {
 
 std::string Program::tostring() const {
     std::string output = "";
-    /*for (int i = 0; i < MAX_NPREDS; ++i) {
-      for (std::vector<Rule>::iterator itr = rules[i].begin(); itr != rules[i].end();
-      ++itr) {
-      output += itr->tostring() + std::string("\n");
-      }
-      }*/
     for(const auto &rule : allrules) {
         output += rule.tostring() + std::string("\n");
     }

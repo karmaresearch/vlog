@@ -283,8 +283,6 @@ public class VLog {
      * Queries the current, so possibly materialized, database, and returns an
      * iterator that delivers the answers, one by one.
      *
-     * TODO: is having variables as negative values OK?
-     *
      * @param predicate
      *            the predicate id of the query
      * @param terms
@@ -494,6 +492,32 @@ public class VLog {
      */
     public native void writePredicateToCsv(String predicateName,
             String fileName) throws NotStartedException, IOException;
+
+    /**
+     * Result of a cyclicity check.
+     */
+    public enum CyclicCheckResult {
+        NON_CYCLIC, INCONCLUSIVE, CYCLIC
+    };
+
+    /**
+     * Performs a cyclic-check on the specified rules.
+     *
+     * Note: a rule set with only non-existential rules will always return
+     * NON_CYCLIC.
+     *
+     * @param method
+     *            indicates the cyclic-check method to use: JA, RJA, MFA, RMFA,
+     *            MFC (other methods to be added).
+     *
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet.
+     * @exception IllegalArgumentException
+     *                is thrown when the cyclic-check method is not recognized.
+     * @return the result of the check
+     */
+    public native CyclicCheckResult checkCyclic(String method)
+            throws NotStartedException;
 
     @Override
     protected void finalize() {

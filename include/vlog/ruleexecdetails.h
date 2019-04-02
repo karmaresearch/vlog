@@ -24,7 +24,10 @@ struct RuleExecutionDetails {
 
     RuleExecutionDetails(Rule rule, size_t ruleid) : rule(rule), ruleid(ruleid) {}
 
-    void createExecutionPlans();
+    void createExecutionPlans(bool copyAllVars);
+
+    void createExecutionPlans(std::vector<std::pair<size_t, size_t>> &ranges,
+            bool copyAllVars);
 
     void calculateNVarsInHeadFromEDB();
 
@@ -35,6 +38,9 @@ struct RuleExecutionDetails {
             const Literal &head, RuleExecutionPlan &hv);
 
     private:
+
+    void calculateDependencies(const Rule &rule,
+        std::map<uint8_t, std::vector<uint8_t>> &dependenciesExtVars);
 
     void rearrangeLiterals(std::vector<const Literal*> &vector, const size_t idx);
 

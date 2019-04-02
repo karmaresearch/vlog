@@ -57,10 +57,10 @@ private:
     Program *program;
 
     //Store all the inputs used during the computation
-    uint8_t sizePreds[MAX_NPREDS];
-    BindingsTable **inputs[MAX_NPREDS];
-    BindingsTable **answers[MAX_NPREDS];
-    RuleExecutor ***rules[MAX_NPREDS];
+    std::vector<uint8_t> sizePreds;
+    std::vector<BindingsTable **>inputs;
+    std::vector<BindingsTable **>answers;
+    std::vector<RuleExecutor ***>rules;
 
     //const Timeout * timeout;
 
@@ -75,14 +75,12 @@ private:
     void createRules(Predicate &pred);
 
 public:
-    QSQR(EDBLayer &layer, Program *program) : layer(layer),
-        program(program) {
-        for (int i = 0; i < MAX_NPREDS; ++i) {
-            inputs[i] = NULL;
-            answers[i] = NULL;
-            rules[i] = NULL;
-        }
-        //timeout = NULL;
+    QSQR(EDBLayer &layer, Program *program) : layer(layer), program(program) {
+        int nPreds = program->getNPredicates();
+        sizePreds.resize(nPreds);
+        inputs.resize(nPreds);
+        answers.resize(nPreds);
+        rules.resize(nPreds);
     }
 
     /*void raiseIfExpired() {

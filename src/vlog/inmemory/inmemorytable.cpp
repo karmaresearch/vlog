@@ -164,10 +164,10 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
         segment = inserter->getSortedAndUniqueSegment();
         delete inserter;
     }
-    // dump();
 }
 
-InmemoryTable::InmemoryTable(PredId_t predid, std::vector<std::vector<std::string>> &entries,
+InmemoryTable::InmemoryTable(PredId_t predid,
+        std::vector<std::vector<std::string>> &entries,
         EDBLayer *layer) {
     arity = 0;
     this->predid = predid;
@@ -241,6 +241,29 @@ InmemoryTable::InmemoryTable(PredId_t predid,
         inserter->addRow(term.data());
     }
     if (inserter == NULL) {
+        segment = NULL;
+    } else {
+        segment = inserter->getSortedAndUniqueSegment();
+        delete inserter;
+    }
+}
+
+InmemoryTable::InmemoryTable(PredId_t predid,
+        uint8_t arity,
+        std::vector<uint64_t> &entries,
+        EDBLayer *layer) {
+    this->arity = arity;
+    this->predid = predid;
+    this->layer = layer;
+    SegmentInserter *inserter =  new SegmentInserter(arity);
+    for(uint64_t i = 0; i < entries.size(); i += arity) {
+        Term_t rowc[256];
+        for(uint8_t j = 0; j < arity; ++j) {
+            rowc[j] = entries[i + j];
+        }
+        inserter->addRow(rowc);
+    }
+    if (arity == 0) {
         segment = NULL;
     } else {
         segment = inserter->getSortedAndUniqueSegment();

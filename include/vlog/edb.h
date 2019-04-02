@@ -85,11 +85,11 @@ class EDBLayer {
 
         const EDBConf &conf;
 
-        std::unique_ptr<Dictionary> predDictionary;
+        std::shared_ptr<Dictionary> predDictionary;
         std::map<PredId_t, EDBInfoTable> dbPredicates;
 
         Factory<EDBMemIterator> memItrFactory;
-        IndexedTupleTable *tmpRelations[MAX_NPREDS];
+        std::vector<IndexedTupleTable *>tmpRelations;
 
         std::unique_ptr<Dictionary> termsDictionary;
 
@@ -126,12 +126,15 @@ class EDBLayer {
         std::string name;
 
     public:
+        EDBLayer(EDBLayer &db, bool copyTables = false);
+
         EDBLayer(const EDBConf &conf, bool multithreaded,
                  const NamedSemiNaiver &prevSemiNaiver) :
                 conf(conf), prevSemiNaiver(prevSemiNaiver) {
+
             const std::vector<EDBConf::Table> tables = conf.getTables();
 
-            predDictionary = std::unique_ptr<Dictionary>(new Dictionary());
+            predDictionary = std::shared_ptr<Dictionary>(new Dictionary());
 
             if (prevSemiNaiver.size() != 0) {
                 handlePrevSemiNaiver();
@@ -171,10 +174,6 @@ class EDBLayer {
                     throw 10;
                 }
             }
-
-            for (int i = 0; i < MAX_NPREDS; ++i) {
-                tmpRelations[i] = NULL;
-            }
         }
 
         EDBLayer(const EDBConf &conf, bool multithreaded) :
@@ -196,6 +195,9 @@ class EDBLayer {
         void addTmpRelation(Predicate &pred, IndexedTupleTable *table);
 
         bool isTmpRelationEmpty(Predicate &pred) {
+            if (pred.getId() >= tmpRelations.size()) {
+                return false;
+            }
             return tmpRelations[pred.getId()] == NULL ||
                 tmpRelations[pred.getId()]->getNTuples() == 0;
         }
@@ -222,6 +224,9 @@ class EDBLayer {
                 const Term_t value) const;
 
         size_t getSizeTmpRelation(Predicate &pred) {
+            if (pred.getId() >= tmpRelations.size()) {
+                return 0;
+            }
             return tmpRelations[pred.getId()]->getNTuples();
         }
 
@@ -314,7 +319,16 @@ class EDBLayer {
         }
 
         // For JNI interface ...
-        VLIBEXP void addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows);
+        VLIBEXP void addInmemoryTable(std::string predicate,
+                std::vector<std::vector<std::string>> &rows);
+
+        VLIBEXP void addInmemoryTable(std::string predicate,
+                PredId_t id, std::vector<std::vector<std::string>> &rows);
+
+        //For RMFA check
+        VLIBEXP void addInmemoryTable(PredId_t predicate,
+                uint8_t arity,
+                std::vector<uint64_t> &rows);
 
         const EDBConf &getConf() const {
             return conf;
@@ -329,7 +343,7 @@ class EDBLayer {
         }
 
         ~EDBLayer() {
-            for (int i = 0; i < MAX_NPREDS; ++i) {
+            for (int i = 0; i < tmpRelations.size(); ++i) {
                 if (tmpRelations[i] != NULL) {
                     delete tmpRelations[i];
                 }
