@@ -106,6 +106,9 @@ class SemiNaiver {
                 const std::vector<Literal> &headLiteral,
                 bool copyAllVars);
 
+        void reorderPlanForNegatedLiterals(RuleExecutionPlan &plan,
+                const std::vector<Literal> &heads);
+
         bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
                 std::vector<RuleExecutionDetails> &allIDBRules,
                 std::vector<StatIteration> &costRules,
