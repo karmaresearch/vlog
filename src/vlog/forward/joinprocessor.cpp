@@ -1979,7 +1979,8 @@ void JoinExecutor::do_mergejoin(const FCInternalTable * filteredT1,
            */
         secS = std::chrono::system_clock::now() - startS;
         FCInternalTableItr *itr2 = sortedItr2;
-        size_t t2Size = t2->getNRows();
+        size_t t2Size = vectors2[0]->size();
+        assert(t2->getNRows() == t2Size);
         if (faster) {
             sortedItr2 = new VectorFCInternalTableItr(vectors2, 0, t2Size);
             LOG(TRACEL) << "Faster algo";
