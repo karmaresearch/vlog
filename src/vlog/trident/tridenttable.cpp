@@ -89,19 +89,16 @@ std::vector<uint8_t> &pos2) {
     //Prepare the iterators
     VTuple t1 = l1.getTuple();
     std::vector<uint8_t> fieldToSort;
-    std::vector<int> varNums1 = l1.getVarnumInLiteral();
-    std::vector<int> varNums2 = l2.getVarnumInLiteral();
-
-    fieldToSort.push_back(varNums1[pos1[0]]);
+    fieldToSort.push_back(l1.getPosVars()[pos1[0]]);
     if (pos1.size() == 2) {
-        fieldToSort.push_back(varNums1[pos1[1]]);
+        fieldToSort.push_back(l1.getPosVars()[pos1[1]]);
     }
     itr1.init(q, &t1, &fieldToSort, true, multithreaded ? &mutex : NULL);
     VTuple t2 = l2.getTuple();
     fieldToSort.clear();
-    fieldToSort.push_back(varNums2[pos2[0]]);
+    fieldToSort.push_back(l2.getPosVars()[pos2[0]]);
     if (pos2.size() == 2)
-        fieldToSort.push_back(varNums2[pos2[1]]);
+        fieldToSort.push_back(l2.getPosVars()[pos2[1]]);
     itr2.init(q, &t2, &fieldToSort, true, multithreaded ? &mutex : NULL);
 
     //Output
@@ -156,10 +153,9 @@ std::vector<uint8_t> &pos) {
     VTuple t = l.getTuple();
     assert(l.getNVars() < l.getTupleSize());
     std::vector<uint8_t> fieldToSort;
-    std::vector<int> varNums = l.getVarnumInLiteral();
-    fieldToSort.push_back(varNums[pos[0]]);
+    fieldToSort.push_back(l.getPosVars()[pos[0]]);
     if (pos.size() == 2)
-        fieldToSort.push_back(varNums[pos[1]]);
+        fieldToSort.push_back(l.getPosVars()[pos[1]]);
     TridentTupleItr itr;
     itr.init(q, &t, &fieldToSort, true, multithreaded ? &mutex : NULL);
 
@@ -649,7 +645,7 @@ std::shared_ptr<Column> TridentTable::checkIn(
     //Prepare the iterators
     VTuple t = l.getTuple();
     std::vector<uint8_t> fieldToSort;
-    fieldToSort.push_back(l.getVarnumInLiteral()[posInL]);
+    fieldToSort.push_back(l.getPosVars()[posInL]);
     TridentTupleItr itr1;
     itr1.init(q, &t, &fieldToSort, true, multithreaded ? &mutex : NULL);
     PairItr *pitrO = itr1.getPhysicalIterator();

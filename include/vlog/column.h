@@ -635,6 +635,7 @@ class EDBColumnReader : public ColumnReader {
         const uint8_t posColumn;
         const std::vector<uint8_t> presortPos;
         const bool unq;
+        const uint8_t posInItr;
 
         EDBIterator *itr;
 

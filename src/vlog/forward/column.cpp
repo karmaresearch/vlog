@@ -276,7 +276,7 @@ size_t EDBColumn::size() const {
         }
     } else {
         if (l.getNVars() == 2) {
-            retval = layer.getCardinalityColumn(*query.getLiteral(), posColumn);
+            retval = layer.getCardinalityColumn(*query.getLiteral(), l.getPosVars()[posColumn]);
         } else {
             LOG(WARNL) << "Must go through all the column"
                 " to count the size";
@@ -369,6 +369,7 @@ EDBColumnReader::EDBColumnReader(const Literal &l, const uint8_t posColumn,
         const std::vector<uint8_t> presortPos,
         EDBLayer &layer, const bool unq)
     : l(l), layer(layer), posColumn(posColumn), presortPos(presortPos),
+    posInItr(l.getPosVars()[posColumn]),
     unq(unq),
     itr(NULL), firstCached((Term_t) - 1),
     lastCached((Term_t) - 1) {
@@ -376,14 +377,14 @@ EDBColumnReader::EDBColumnReader(const Literal &l, const uint8_t posColumn,
 
 const char *EDBColumnReader::getUnderlyingArray() {
     if (hasNext()) {
-        return itr->getUnderlyingArray(posColumn);
+        return itr->getUnderlyingArray(posInItr);
     }
     return NULL;
 }
 
 std::pair<uint8_t, std::pair<uint8_t, uint8_t>> EDBColumnReader::getSizeElemUnderlyingArray() {
     if (hasNext()) {
-        return itr->getSizeElemUnderlyingArray(posColumn);
+        return itr->getSizeElemUnderlyingArray(posInItr);
     } else {
         return std::make_pair(0, std::make_pair(0, 0));
     }
@@ -423,7 +424,10 @@ void getFieldsForSortedIterator(const Literal &l, const uint8_t posColumn,
 void EDBColumnReader::setupItr() {
     if (itr == NULL) {
         std::vector<uint8_t> fields;
-        getFieldsForSortedIterator(l, posColumn, presortPos, fields);
+        for (int i = 0; i < presortPos.size(); ++i) {
+            fields.push_back(presortPos[i]);
+        }
+        fields.push_back(posColumn);
         itr = layer.getSortedIterator(l, fields);
         if (unq) {
             itr->skipDuplicatedFirstColumn();
@@ -438,16 +442,19 @@ std::vector<Term_t> EDBColumnReader::load(const Literal &l,
 
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     std::vector<uint8_t> fields;
+    for (int i = 0; i < presortPos.size(); ++i) {
+        fields.push_back(presortPos[i]);
+    }
+    fields.push_back(posColumn);
     std::vector<Term_t> values;
 
-    getFieldsForSortedIterator(l, posColumn, presortPos, fields);
-
     EDBIterator *itr = layer.getSortedIterator(l, fields);
+    const uint8_t posInItr = l.getPosVars()[posColumn];
     Term_t prev = (Term_t) - 1;
-    const char *rawarray = itr->getUnderlyingArray(posColumn);
+    const char *rawarray = itr->getUnderlyingArray(posInItr);
     if (rawarray != NULL) {
         std::pair<uint8_t, std::pair<uint8_t, uint8_t>> sizeelements
-            = itr->getSizeElemUnderlyingArray(posColumn);
+            = itr->getSizeElemUnderlyingArray(posInItr);
         const int totalsize = sizeelements.first + sizeelements.second.first + sizeelements.second.second;
 
         size_t nrows = ((TridentIterator *) itr)->getCardinality();
@@ -489,7 +496,7 @@ std::vector<Term_t> EDBColumnReader::load(const Literal &l,
     } else {
         while (itr->hasNext()) {
             itr->next();
-            Term_t el = itr->getElementAt(posColumn);
+            Term_t el = itr->getElementAt(posInItr);
             if (!unq || el != prev) {
                 values.push_back(el);
                 prev = el;
@@ -505,7 +512,10 @@ std::vector<Term_t> EDBColumnReader::load(const Literal &l,
 
 size_t EDBColumnReader::size() {
     std::vector<uint8_t> fields;
-    getFieldsForSortedIterator(l, posColumn, presortPos, fields);
+    for (int i = 0; i < presortPos.size(); ++i) {
+        fields.push_back(presortPos[i]);
+    }
+    fields.push_back(posColumn);
 
     size_t sz = 0;
 
@@ -513,7 +523,7 @@ size_t EDBColumnReader::size() {
     Term_t prev = (Term_t) - 1;
     while (itr->hasNext()) {
         itr->next();
-        Term_t el = itr->getElementAt(posColumn);
+        Term_t el = itr->getElementAt(posInItr);
         if (!unq || el != prev) {
             sz++;
             prev = el;
@@ -533,11 +543,11 @@ Term_t EDBColumnReader::last() {
 Term_t EDBColumnReader::first() {
     if (firstCached == (Term_t) - 1) {
         std::vector<uint8_t> fields;
-        getFieldsForSortedIterator(l, posColumn, presortPos, fields);
+        fields.push_back(posColumn);
         EDBIterator *itr = layer.getSortedIterator(l, fields);
         if (itr->hasNext()) {
             itr->next();
-            firstCached = itr->getElementAt(posColumn);
+            firstCached = itr->getElementAt(posInItr);
         } else {
             throw 10; //I'm asking first to an empty iterator
         }
@@ -561,7 +571,7 @@ bool EDBColumnReader::hasNext() {
 
 Term_t EDBColumnReader::next() {
     itr->next();
-    return itr->getElementAt(posColumn);
+    return itr->getElementAt(posInItr);
 }
 
 std::vector<Term_t> EDBColumnReader::asVector() {
