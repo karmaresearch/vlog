@@ -240,6 +240,7 @@ EDBColumn::EDBColumn(EDBLayer &edb, const Literal &lit, uint8_t posColumn,
     unq(unq) {
         LOG(DEBUGL) << "EDBColumn: posColumn = " << (int) posColumn
             << ", literal = " << lit.tostring() << ", presortPos = " << fields2str(presortPos);
+        if (posColumn == 2) abort();
         assert(!unq || presortPos.empty());
         for (int i = 0; i < presortPos.size(); ++i) {
             assert(presortPos[i] < lit.getTupleSize());

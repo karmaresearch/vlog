@@ -34,6 +34,7 @@ inline std::string fields2str(const std::vector<uint8_t> &fields) {
     return os.str();
 }
 
+
 /*** TERMS ***/
 class VTerm {
     private:
