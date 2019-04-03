@@ -485,6 +485,10 @@ class Program {
             kb = e;
         }
 
+	uint64_t getMaxPredicateId() {
+	    return dictPredicates.getCounter();
+	}
+
         std::string parseRule(std::string rule, bool rewriteMultihead);
 
         VLIBEXP std::vector<PredId_t> getAllPredicateIDs() const;

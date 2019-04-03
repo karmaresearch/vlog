@@ -92,7 +92,7 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
     checkCyclicTerms(false),
     ignoreExistentialRules(ignoreExistentialRules) {
 
-        predicatesTables.resize(program->getNPredicates());
+        predicatesTables.resize(program->getMaxPredicateId());
         ignoreDuplicatesElimination = false;
         TableFilterer::setOptIntersect(opt_intersect);
 
