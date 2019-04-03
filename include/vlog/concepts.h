@@ -23,6 +23,18 @@ class EDBLayer;
 
 using namespace std;
 
+inline std::string fields2str(const std::vector<uint8_t> &fields) {
+    ostringstream os;
+    os << "[" << fields.size() << "]{";
+    for (auto f : fields) {
+       os << (int)f << ",";
+    }
+    os << "}";
+
+    return os.str();
+}
+
+
 /*** TERMS ***/
 class VTerm {
     private:
