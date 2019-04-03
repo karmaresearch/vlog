@@ -49,6 +49,20 @@ std::vector<uint8_t> Literal::getPosVars() const {
     return out;
 }
 
+std::vector<int> Literal::getVarnumInLiteral() const {
+    std::vector<int> out(tuple.getSize());
+    int varNum = 0;
+    for (uint8_t i = 0; i < tuple.getSize(); ++i) {
+        if (tuple.get(i).isVariable()) {
+            out[i] = varNum;
+            varNum++;
+        } else {
+            out[i] = -1;
+        }
+    }
+    return out;
+}
+
 uint8_t Literal::getNUniqueVars() const {
     std::vector<uint8_t> exVar;
     uint8_t n = 0;

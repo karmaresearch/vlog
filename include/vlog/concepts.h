@@ -309,7 +309,12 @@ class Literal {
 
         bool hasRepeatedVars() const;
 
+        // Returns for each variable the position in the tuple.
         std::vector<uint8_t> getPosVars() const;
+
+        // Returns for each position in the tuple the variable number. If the position in the tuple
+        // contains a constant, it gives -1.
+        std::vector<int> getVarnumInLiteral() const;
 
         std::vector<std::pair<uint8_t, uint8_t>> getRepeatedVars() const;
 
