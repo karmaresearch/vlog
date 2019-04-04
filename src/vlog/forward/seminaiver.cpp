@@ -1533,7 +1533,8 @@ size_t SemiNaiver::getSizeTable(const PredId_t predid) const {
 }
 
 SemiNaiver::~SemiNaiver() {
-    for (int i = 0; i < program->getNPredicates(); ++i) {
+    // Don't refer to program. It may already have been deallocated.
+    for (int i = 0; i < predicatesTables.size(); ++i) {
         if (predicatesTables[i] != NULL)
             delete predicatesTables[i];
     }
