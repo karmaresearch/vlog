@@ -144,8 +144,15 @@ std::vector<Literal> getVectorLiteral(JNIEnv *env, VLogInfo *f, jobjectArray h, 
         // Get the terms
         jmethodID getTermsMethod = env->GetMethodID(cls, "getTerms", "()[Lkarmaresearch/vlog/Term;");
         jobjectArray jterms = (jobjectArray) env->CallObjectMethod(atom, getTermsMethod);
-        jsize vtuplesz = env->GetArrayLength(jterms);
 
+        // Get negated
+        jmethodID isNegated = env->GetMethodID(cls, "isNegated", "()Z;");
+        jboolean jnegated = (jboolean) env->CallBooleanMethod(atom, isNegated);
+        if (! negated) {
+            negated = jnegated == JNI_TRUE;
+        }
+
+        jsize vtuplesz = env->GetArrayLength(jterms);
         // Collect conversions from terms
         if (vtuplesz != (uint8_t) vtuplesz) {
             throwIllegalArgumentException(env, ("Arity of predicate " + predicate + " too large (" + std::to_string(vtuplesz) + " > 255)").c_str());

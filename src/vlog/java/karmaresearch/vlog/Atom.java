@@ -8,6 +8,7 @@ import java.util.Arrays;
 public class Atom {
     private final String predicate;
     private final Term[] terms;
+    private final boolean negated;
 
     /**
      * Constructs an <code>Atom</code> from the specified parameters.
@@ -18,6 +19,21 @@ public class Atom {
      *            the terms
      */
     public Atom(String predicate, Term... terms) {
+        this(predicate, false, terms);
+    }
+
+    /**
+     * Constructs an <code>Atom</code> from the specified parameters.
+     *
+     * @param predicate
+     *            the predicate
+     * @param negated
+     *            mostly ignored, except in the body of rules, where it
+     *            indicates that the negated variant is intended
+     * @param terms
+     *            the terms
+     */
+    public Atom(String predicate, boolean negated, Term... terms) {
         if (predicate == null || terms == null) {
             throw new IllegalArgumentException(
                     "null argument to Atom constructor");
@@ -31,6 +47,7 @@ public class Atom {
 
         this.predicate = predicate;
         this.terms = terms.clone();
+        this.negated = negated;
     }
 
     /**
@@ -40,6 +57,15 @@ public class Atom {
      */
     public String getPredicate() {
         return predicate;
+    }
+
+    /**
+     * Returns whether this atom is negated.
+     * 
+     * @return whether this atom is negated.
+     */
+    public boolean isNegated() {
+        return negated;
     }
 
     /**
@@ -81,6 +107,7 @@ public class Atom {
         }
     }
 
+    @Override
     public String toString() {
         return predicate + Arrays.toString(terms);
     }
