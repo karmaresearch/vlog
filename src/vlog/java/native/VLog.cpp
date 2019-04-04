@@ -146,7 +146,7 @@ std::vector<Literal> getVectorLiteral(JNIEnv *env, VLogInfo *f, jobjectArray h, 
         jobjectArray jterms = (jobjectArray) env->CallObjectMethod(atom, getTermsMethod);
 
         // Get negated
-        jmethodID isNegated = env->GetMethodID(cls, "isNegated", "()Z;");
+        jmethodID isNegated = env->GetMethodID(cls, "isNegated", "()Z");
         jboolean jnegated = (jboolean) env->CallBooleanMethod(atom, isNegated);
         if (! negated) {
             negated = jnegated == JNI_TRUE;
