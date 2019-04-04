@@ -134,6 +134,12 @@ std::vector<Literal> getVectorLiteral(JNIEnv *env, VLogInfo *f, jobjectArray h, 
         jmethodID getPredicateMethod = env->GetMethodID(cls, "getPredicate", "()Ljava/lang/String;");
         jstring jpred = (jstring) env->CallObjectMethod(atom, getPredicateMethod);
         std::string predicate = jstring2string(env, jpred);
+        //Check if predicate starts with "neg_".
+        bool negated = false;
+        if (predicate.substr(0,4) == "neg_") {
+            negated = true;
+            predicate = predicate.substr(4);
+        }
 
         // Get the terms
         jmethodID getTermsMethod = env->GetMethodID(cls, "getTerms", "()[Lkarmaresearch/vlog/Term;");
@@ -194,7 +200,7 @@ std::vector<Literal> getVectorLiteral(JNIEnv *env, VLogInfo *f, jobjectArray h, 
 
         Predicate pred((PredId_t) predid, adornment, f->layer->doesPredExists((PredId_t) predid) ? EDB : IDB, (uint8_t) vtuplesz);
 
-        Literal literal(pred, tuple);
+        Literal literal(pred, tuple, negated);
         result.push_back(literal);
     }
     return result;
