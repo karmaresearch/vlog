@@ -258,6 +258,13 @@ class EDBLayer {
             }
         }
 
+        bool expensiveEDBPredicate(PredId_t id) {
+            if (dbPredicates.count(id)) {
+                return dbPredicates.find(id)->second.manager->expensiveLayer();
+            }
+            return false;
+        }
+
         VLIBEXP uint64_t getNTerms();
 
         void releaseIterator(EDBIterator *itr);

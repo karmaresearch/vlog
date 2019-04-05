@@ -536,6 +536,10 @@ void JoinExecutor::verificativeJoin(
     }
 }
 
+bool literalIsExpensive(const Literal &literal, EDBLayer &layer) {
+    return layer.expensiveEDBPredicate(literal.getPredicate().getId());
+}
+
 void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
         const std::vector<Literal> *outputLiterals, const Literal & literal,
         const size_t min, const size_t max,
@@ -568,9 +572,16 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
     } else {
         //This code is to execute more generic joins. We do hash join if
         //keys are few and there is no ordering. Otherwise, merge join.
-        if (t1->estimateNRows() <= THRESHOLD_HASHJOIN
+        int factor = literalIsExpensive(literal, naiver->getEDBLayer()) ? 50 : 1;
+#ifdef DEBUG
+        LOG(TRACEL) << "joinsCoordinates.size() = " << joinsCoordinates.size();
+        for (int i = 0; i < joinsCoordinates.size(); i++) {
+            LOG(TRACEL) << "i = " << i << ", first = " << (int) joinsCoordinates[i].first << ", second = " << (int) joinsCoordinates[i].second;
+        }
+#endif
+        if (t1->estimateNRows() <= factor * THRESHOLD_HASHJOIN
                 && joinsCoordinates.size() < 3 && joinsCoordinates.size() > 0
-                && (joinsCoordinates.size() > 1 ||
+                && (factor != 1 || joinsCoordinates.size() > 1 ||
                     joinsCoordinates[0].first != joinsCoordinates[0].second ||
                     joinsCoordinates[0].first != 0)) {
             LOG(TRACEL) << "Executing hashjoin. t1->getNRows()=" << t1->getNRows();
