@@ -129,7 +129,7 @@ public class VLog {
     };
 
     public enum LogLevel {
-        ERROR, WARNING, INFO, DEBUG
+        ERROR, WARNING, INFO, DEBUG, TRACE
     };
 
     /**

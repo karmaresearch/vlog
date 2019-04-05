@@ -236,8 +236,11 @@ extern "C" {
             case 2:
                 Logger::setMinLevel(INFOL);
                 break;
-            default:
+            case 3:
                 Logger::setMinLevel(DEBUGL);
+                break;
+            default:
+                Logger::setMinLevel(TRACEL);
                 break;
         }
         logLevelSet = true;
