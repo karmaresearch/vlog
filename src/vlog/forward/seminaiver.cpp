@@ -75,7 +75,7 @@ string set_to_string(std::unordered_set<int> s) {
     return oss.str();
 }
 
-SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
+SemiNaiver::SemiNaiver(EDBLayer &layer,
         Program *program, bool opt_intersect, bool opt_filtering,
         bool multithreaded, bool restrictedChase, int nthreads, bool shuffle,
         bool ignoreExistentialRules) :
@@ -90,6 +90,7 @@ SemiNaiver::SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
     checkCyclicTerms(false),
     ignoreExistentialRules(ignoreExistentialRules) {
 
+        std::vector<Rule> ruleset = program->getAllRules();
         predicatesTables.resize(program->getMaxPredicateId());
         ignoreDuplicatesElimination = false;
         TableFilterer::setOptIntersect(opt_intersect);

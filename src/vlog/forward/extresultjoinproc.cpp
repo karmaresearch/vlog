@@ -819,7 +819,7 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
 
     //Launch the semi-naive evaluation
     Program *program = sn->getProgram();
-    std::unique_ptr<SemiNaiver> lsn(new SemiNaiver(program->getAllRules(),
+    std::unique_ptr<SemiNaiver> lsn(new SemiNaiver(
                 *layer, program, true, true, false, 1, false, true));
 
     //Populate the IDB layer

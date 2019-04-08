@@ -692,7 +692,7 @@ extern "C" {
             delete f->sn;
         }
 
-        f->sn = new SemiNaiver(f->program->getAllRules(), *(f->layer), f->program, true, true, false, ! (bool) skolem, -1, false, false);
+        f->sn = new SemiNaiver(*(f->layer), f->program, true, true, false, ! (bool) skolem, -1, false, false);
         LOG(INFOL) << "Starting full materialization";
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         unsigned long *p = NULL;

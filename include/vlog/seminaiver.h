@@ -161,19 +161,19 @@ class SemiNaiver {
         }
 
     public:
-        VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
+        VLIBEXP SemiNaiver(EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 bool restrictedChase, int nthreads, bool shuffleRules,
                 bool ignoreExistentialRules);
 
         //disable restricted chase
-        VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
+        VLIBEXP SemiNaiver(EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 int nthreads, bool shuffleRules,
                 bool ignoreExistentialRules) :
-            SemiNaiver(ruleset, layer, program, opt_intersect, opt_filtering,
+            SemiNaiver(layer, program, opt_intersect, opt_filtering,
                     multithreaded, false, nthreads, shuffleRules,
                     ignoreExistentialRules) {
             }

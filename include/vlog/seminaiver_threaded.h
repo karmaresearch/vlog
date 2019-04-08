@@ -71,14 +71,13 @@ class SemiNaiverThreaded: public SemiNaiver {
         void unlock(std::vector<PredId_t> &predicates, PredId_t idHeadPredicate);
 
     public:
-        SemiNaiverThreaded(std::vector<Rule> ruleset,
-                EDBLayer &layer,
+        SemiNaiverThreaded(EDBLayer &layer,
                 Program *program,
                 bool opt_intersect,
                 bool opt_filtering,
                 bool shuffleRules,
                 const int nthreads,
-                const int interRuleThreads) : SemiNaiver(ruleset, layer,
+                const int interRuleThreads) : SemiNaiver(layer,
                     program, opt_intersect, opt_filtering, true,
                     nthreads, shuffleRules, false),
                 interRuleThreads(interRuleThreads) {
