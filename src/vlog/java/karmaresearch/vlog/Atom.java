@@ -79,20 +79,33 @@ public class Atom {
 
     @Override
     public int hashCode() {
-        return predicate.hashCode() + Arrays.hashCode(terms);
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + (negated ? 1231 : 1237);
+        result = prime * result + ((predicate == null) ? 0 : predicate.hashCode());
+        result = prime * result + Arrays.hashCode(terms);
+        return result;
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (o == null) {
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
             return false;
-        }
-        if (!(o instanceof Atom)) {
+        if (getClass() != obj.getClass())
             return false;
-        }
-        Atom atom = (Atom) o;
-        return predicate.equals(atom.predicate)
-                && Arrays.equals(terms, atom.terms);
+        Atom other = (Atom) obj;
+        if (negated != other.negated)
+            return false;
+        if (predicate == null) {
+            if (other.predicate != null)
+                return false;
+        } else if (!predicate.equals(other.predicate))
+            return false;
+        if (!Arrays.equals(terms, other.terms))
+            return false;
+        return true;
     }
 
     /**
@@ -109,6 +122,11 @@ public class Atom {
 
     @Override
     public String toString() {
-        return predicate + Arrays.toString(terms);
+        String ret = "";
+        if (negated)
+            ret += "neg_";
+        ret += predicate + Arrays.toString(terms);
+        return ret;
     }
+
 }
