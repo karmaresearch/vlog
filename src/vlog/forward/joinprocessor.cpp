@@ -2318,11 +2318,8 @@ void JoinExecutor::left_join(const FCInternalTable * filteredT1,
         return;
     }
 
-    FCInternalTableItr *sortedItr1 = NULL;
     std::chrono::system_clock::time_point startS;
     std::chrono::duration<double> secS;
-    startS = std::chrono::system_clock::now();
-
     size_t totalsize2 = 0;
     for (auto t2 : tables2) {
         size_t sz = t2->getNRows();
@@ -2330,63 +2327,50 @@ void JoinExecutor::left_join(const FCInternalTable * filteredT1,
         totalsize2 += sz;
     }
 
+    startS = std::chrono::system_clock::now();
+
     //Sort t1
-    sortedItr1 = (InmemoryFCInternalTableItr*)filteredT1->getIterator();
-
-    std::vector<const std::vector<Term_t> *> vectors;
-    vectors = sortedItr1->getAllVectors(nthreads);
-
-    size_t totalsize1 = filteredT1->getNRows();
-
-    // Possibility to parallelize, but also a possibility to create a faster
-    // iterator.
-    VectorFCInternalTableItr *itr1 = new VectorFCInternalTableItr(vectors, 0, totalsize1);
+    FCInternalTableItr *sortedItr1 = filteredT1->sortBy(fields1, nthreads);
+    std::vector<const std::vector<Term_t> *> vectors1 = sortedItr1->getAllVectors(nthreads);
 
     secS = std::chrono::system_clock::now() - startS;
 
 #if DEBUG
     LOG(TRACEL) << "left_join: time sorting the left relation: " << secS.count() * 1000;
-    LOG(TRACEL) << "filteredT1->size = " << totalsize1 << ", tables2.size() = " << tables2.size() << ", total t2 size = " << totalsize2;
+    LOG(TRACEL) << "filteredT1->size = " << filteredT1->getNRows() << ", tables2.size() = " << tables2.size() << ", total t2 size = " << totalsize2;
 #endif
 
     Output *out = new Output(output, NULL);
 
-    for (auto t2 : tables2) {
-        if (! first) {
-            itr1->reset();
-        }
-        first = false;
-        LOG(TRACEL) << "Main loop of do_left_join";
+    LOG(TRACEL) << "Main loop of left_join";
+    auto t2 = tables2[0];
+    processedTables++;
+    for (int i = 1; i < tables2.size(); i++) {
         processedTables++;
+        t2 = t2->merge(tables2[i], nthreads);
+    }
 
-        //Sort t2
-        startS = std::chrono::system_clock::now();
-        //Also in this case, there might be no join fields
-        FCInternalTableItr *sortedItr2 = NULL;
-        if (fields2.size() > 0) {
-            LOG(TRACEL) << "t2->sortBy";
-            sortedItr2 = t2->sortBy(fields2, nthreads);
-        } else {
-            sortedItr2 = t2->getIterator();
-        }
-        bool vector2Supported = true;
-        std::vector<const std::vector<Term_t> *> vectors2 = sortedItr2->getAllVectors(nthreads);
-        secS = std::chrono::system_clock::now() - startS;
-        FCInternalTableItr *itr2 = sortedItr2;
-        size_t t2Size = t2->getNRows();
+    //Sort t2
+    startS = std::chrono::system_clock::now();
+    //Also in this case, there might be no join fields
+    FCInternalTableItr *sortedItr2 = NULL;
+    if (fields2.size() > 0) {
+        LOG(TRACEL) << "t2->sortBy";
+        sortedItr2 = t2->sortBy(fields2, nthreads);
+    } else {
+        sortedItr2 = t2->getIterator();
+    }
+    std::vector<const std::vector<Term_t> *> vectors2 = sortedItr2->getAllVectors(nthreads);
+    secS = std::chrono::system_clock::now() - startS;
 
-        LOG(TRACEL) << "totalsize1 = " << totalsize1 << ", t2Size = " << t2Size;
-
-        JoinExecutor::do_left_join(vectors, vectors2, fields1, fields2, out);
+    JoinExecutor::do_left_join(vectors1, vectors2, fields1, fields2, out);
 #if DEBUG
-        output->checkSizes();
+    output->checkSizes();
 #endif
 
-        itr2->deleteAllVectors(vectors2);
-        t2->releaseIterator(itr2);
-    }
-    delete itr1;
-    sortedItr1->deleteAllVectors(vectors);
+    sortedItr2->deleteAllVectors(vectors2);
+    t2->releaseIterator(sortedItr2);
+    sortedItr1->deleteAllVectors(vectors1);
     filteredT1->releaseIterator(sortedItr1);
     delete out;
 #if DEBUG
@@ -2457,11 +2441,11 @@ void JoinExecutor::do_left_join(
     int res = 0;
     //LOG(TRACEL) << "  L. STARTING l1 < u1 || l2 < u2";
     while (l1 < u1 || l2 < u2) {
-        //LOG(TRACEL) << "    L. XXXXXX";
-        //LOG(TRACEL) << "    L. l1: "<< l1;
-        //LOG(TRACEL) << "    L. u1: "<< u1;
-        //LOG(TRACEL) << "    L. l2: "<< l1;
-        //LOG(TRACEL) << "    L. u2: "<< u2;
+        // LOG(TRACEL) << "    L. XXXXXX";
+        // LOG(TRACEL) << "    L. l1: "<< l1;
+        // LOG(TRACEL) << "    L. u1: "<< u1;
+        // LOG(TRACEL) << "    L. l2: "<< l1;
+        // LOG(TRACEL) << "    L. u2: "<< u2;
 
         if (l1 == u1)
             break;
@@ -2478,37 +2462,14 @@ void JoinExecutor::do_left_join(
 
         if (res == 0){
             LOG(TRACEL) << "  L. res = 0";
-            size_t aux = l1;
-            while (l1 < u1 && res == 0){
-                ++l1;
-                res = JoinExecutor::cmp(vectors1, aux, vectors1, l1, fields1, fields1);
-            }
-            res = 0;
-            while (l2 < u2 && res == 0){
-                ++l2;
-                res = JoinExecutor::cmp(vectors1, aux, vectors2, l2, fields1, fields2);
-            }
-            continue;
-        }
-
-        if (res > 0) {
+            l1++;
+        } else if (res > 0) {
             LOG(TRACEL) << "  L. res > 0";
-            while (l2 < u2 && res > 0){
-                ++l2;
-                res = JoinExecutor::cmp(vectors1, l1, vectors2, l2, fields1, fields2);
-            }
-            continue;
-        }
-
-        if (res < 0) {
+            l2++;
+        } else /* if (res < 0) */ {
             LOG(TRACEL) << "  L. res < 0";
-            int bi = l1;
-            while (l1 < u1 && res < 0) {
-                output->processResults(0, vectors1, l1, vectors2, u2, false);
-                ++l1;
-                res = JoinExecutor::cmp(vectors1, l1, vectors2, l2, fields1, fields2);
-            }
-            continue;
+            output->processResults(0, vectors1, l1, vectors2, u2, false);
+            ++l1;
         }
     }
 #if DEBUG
