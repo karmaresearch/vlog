@@ -3,6 +3,7 @@
 
 #include <vlog/support.h>
 #include <vlog/consts.h>
+#include <vlog/graph.h>
 
 #include <kognac/logs.h>
 
@@ -10,6 +11,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <vector>
+#include <set>
 #include <unordered_map>
 
 /*** PREDICATES ***/
@@ -471,6 +473,12 @@ class Program {
 
         std::string rewriteRDFOWLConstants(std::string input);
 
+        std::vector<uint64_t> topologicalSort(std::set<std::pair<uint64_t, uint64_t>> &usedNegated);
+
+        void topologicalSortUtil(Graph &g, size_t i, bool *visited, std::vector<uint64_t> &result);
+
+        void recursiveCollectStratification(uint64_t id, int64_t mark, std::vector<int> &marked);
+
     public:
         VLIBEXP Program(EDBLayer *kb);
 
@@ -566,6 +574,11 @@ class Program {
         static std::string compressRDFOWLConstants(std::string input);
 
         VLIBEXP std::vector<PredId_t> getAllEDBPredicateIds();
+
+        // Returns true if stratification succeeded, and then stores the stratification in the parameter.
+        // The result vector is indexed by predicate id, and then gives the stratification class.
+        // The number of stratification classes is also returned.
+        bool stratify(std::vector<int> &stratification, int &nStatificationClasses);
 
         ~Program() {
         }

@@ -95,9 +95,17 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
         ignoreDuplicatesElimination = false;
         TableFilterer::setOptIntersect(opt_intersect);
 
+        if (! program->stratify(stratification, nStratificationClasses)) {
+            LOG(ERRORL) << "Program could not be stratified";
+            throw 10;
+        }
+        LOG(INFOL) << "nStratificationClasses = " << nStratificationClasses;
+
         LOG(DEBUGL) << "Running SemiNaiver, opt_intersect = " << opt_intersect << ", opt_filtering = " << opt_filtering << ", multithreading = " << multithreaded << ", shuffle = " << shuffle;
 
+
         uint32_t ruleid = 0;
+        this->allIDBRules.resize(nStratificationClasses);
         for (std::vector<Rule>::iterator itr = ruleset.begin(); itr != ruleset.end();
                 ++itr) {
             RuleExecutionDetails *d = new RuleExecutionDetails(*itr, ruleid++);
@@ -107,9 +115,10 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
                 if (itr->getPredicate().getType() == IDB)
                     d->nIDBs++;
             }
-            if (d->nIDBs != 0)
-                this->allIDBRules.push_back(*d);
-            else
+            if (d->nIDBs != 0) {
+                PredId_t id = itr->getFirstHead().getPredicate().getId();
+                this->allIDBRules[stratification[id]].push_back(*d);
+            } else
                 this->allEDBRules.push_back(*d);
             delete d;
         }
@@ -205,7 +214,7 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
     }
 
 bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
-        std::vector<RuleExecutionDetails> &ruleset,
+        std::vector<std::vector<RuleExecutionDetails>> &ruleset,
         std::vector<StatIteration> &costRules,
         const uint32_t limitView,
         bool fixpoint, unsigned long *timeout) {
@@ -229,8 +238,10 @@ bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
     LOG(DEBUGL) << "Runtime EDB rules ms = " << sec.count() * 1000;
 #endif
 
-    if (ruleset.size() > 0) {
-        newDer |= executeUntilSaturation(ruleset, costRules, limitView,  fixpoint, timeout);
+    for (int i = 0; i < ruleset.size(); i++) {
+        if (ruleset[i].size() > 0) {
+            newDer |= executeUntilSaturation(ruleset[i], costRules, limitView,  fixpoint, timeout);
+        }
     }
     return newDer;
 }
@@ -243,21 +254,24 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     LOG(DEBUGL) << "Optimizing ruleset...";
 #endif
-    for (std::vector<RuleExecutionDetails>::iterator itr = allIDBRules.begin();
-            itr != allIDBRules.end();
-            ++itr) {
-        LOG(DEBUGL) << "Optimizing rule " << itr->rule.tostring(NULL, NULL);
-        itr->createExecutionPlans(checkCyclicTerms);
-        itr->calculateNVarsInHeadFromEDB();
-        itr->lastExecution = lastExecution;
+    for (int k = 0; k < allIDBRules.size(); k++) {
+        for (std::vector<RuleExecutionDetails>::iterator itr = allIDBRules[k].begin();
+                itr != allIDBRules[k].end();
+                ++itr) {
+            LOG(DEBUGL) << "Optimizing rule " << itr->rule.tostring(NULL, NULL);
+            itr->createExecutionPlans(checkCyclicTerms);
+            itr->calculateNVarsInHeadFromEDB();
+            itr->lastExecution = lastExecution;
 
-        for (int i = 0; i < itr->orderExecutions.size(); ++i) {
-            string plan = "";
-            for (int j = 0; j < itr->orderExecutions[i].plan.size(); ++j) {
-                plan += string(" ") +
-                    itr->orderExecutions[i].plan[j]->tostring(program, &layer);
+            for (int i = 0; i < itr->orderExecutions.size(); ++i) {
+                string plan = "";
+                for (int j = 0; j < itr->orderExecutions[i].plan.size(); ++j) {
+                    plan += string(" ") +
+                        itr->orderExecutions[i].plan[j]->tostring(program, &layer);
+                }
+                LOG(DEBUGL) << "-->" << plan;
             }
-            LOG(DEBUGL) << "-->" << plan;
+            LOG(DEBUGL) << itr->rule.tostring(program, &layer);
         }
     }
     for (std::vector<RuleExecutionDetails>::iterator itr = allEDBRules.begin();
@@ -265,12 +279,12 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
             ++itr) {
         itr->createExecutionPlans(checkCyclicTerms);
     }
-    for (auto el : allIDBRules)
-        LOG(DEBUGL) << el.rule.tostring(program, &layer);
 
     //Setup the datastructures to handle the chase
     std::copy(allEDBRules.begin(), allEDBRules.end(), std::back_inserter(allrules));
-    std::copy(allIDBRules.begin(), allIDBRules.end(), std::back_inserter(allrules));
+    for (int k = 0; k < allIDBRules.size(); k++) {
+        std::copy(allIDBRules[k].begin(), allIDBRules[k].end(), std::back_inserter(allrules));
+    }
     chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt(allrules,
                 restrictedChase, checkCyclicTerms, singleRuleToCheck));
 #if DEBUG
@@ -301,7 +315,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
         //Split the program: First execute the rules without existential
         //quantifiers, then all the others
         std::vector<RuleExecutionDetails> originalEDBruleset = allEDBRules;
-        std::vector<RuleExecutionDetails> originalRuleset = allIDBRules;
+        std::vector<std::vector<RuleExecutionDetails>> originalRuleset = allIDBRules;
 
         //Only non-existential rules
         std::vector<RuleExecutionDetails> tmpEDBRules;
@@ -310,23 +324,27 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
                 tmpEDBRules.push_back(r);
             }
         }
-        std::vector<RuleExecutionDetails> tmpIDBRules;
-        for(auto &r : originalRuleset) {
-            if (!r.rule.isExistential()) {
-                tmpIDBRules.push_back(r);
+        std::vector<std::vector<RuleExecutionDetails>> tmpIDBRules(nStratificationClasses);
+        for (int k = 0; k < originalRuleset.size(); k++) {
+            for(auto &r : originalRuleset[k]) {
+                if (!r.rule.isExistential()) {
+                    tmpIDBRules[k].push_back(r);
+                }
             }
         }
-        //Now execute the existential rules
+        //Only existential rules
         std::vector<RuleExecutionDetails> tmpExtEDBRules;
         for(auto &r : originalEDBruleset) {
             if (r.rule.isExistential())  {
                 tmpExtEDBRules.push_back(r);
             }
         }
-        std::vector<RuleExecutionDetails> tmpExtIDBRules;
-        for(auto &r : originalRuleset) {
-            if (r.rule.isExistential()) {
-                tmpExtIDBRules.push_back(r);
+        std::vector<std::vector<RuleExecutionDetails>> tmpExtIDBRules(nStratificationClasses);
+        for (int k = 0; k < originalRuleset.size(); k++) {
+            for(auto &r : originalRuleset[k]) {
+                if (r.rule.isExistential()) {
+                    tmpExtIDBRules[k].push_back(r);
+                }
             }
         }
         int loopNr = 0;
@@ -962,8 +980,8 @@ void SemiNaiver::reorderPlanForNegatedLiterals(RuleExecutionPlan &plan, const st
                 break;
         }
         //if i is last, then check it again
-        if (i == plan.plan.size() -1)
-            if (c1 && !c2)
+        if (i >= plan.plan.size() -1)
+            if (i >= plan.plan.size() || (c1 && !c2))
                 throw std::runtime_error("Input Negation Error. Impossible to bound variables in negated atom.");
         //at this point I have the index i that will be the next literal
         for (auto ele: vars_i)

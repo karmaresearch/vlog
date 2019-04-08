@@ -61,6 +61,8 @@ class SemiNaiver {
         std::vector<StatsRule> statsRuleExecution;
 
         bool ignoreDuplicatesElimination;
+        std::vector<int> stratification;
+        int nStratificationClasses;
 
 
 #ifdef WEBINTERFACE
@@ -110,7 +112,7 @@ class SemiNaiver {
                 const std::vector<Literal> &heads);
 
         bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
-                std::vector<RuleExecutionDetails> &allIDBRules,
+                std::vector<std::vector<RuleExecutionDetails>> &allIDBRules,    // one entry for each stratification class
                 std::vector<StatIteration> &costRules,
                 const uint32_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
@@ -129,7 +131,7 @@ class SemiNaiver {
         std::vector<FCTable *>predicatesTables;
         EDBLayer &layer;
         Program *program;
-        std::vector<RuleExecutionDetails> allIDBRules;
+        std::vector<std::vector<RuleExecutionDetails>> allIDBRules; // one entry for each stratification class
         size_t iteration;
         int nthreads;
 
