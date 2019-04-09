@@ -97,7 +97,7 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
 
         if (! program->stratify(stratification, nStratificationClasses)) {
             LOG(ERRORL) << "Program could not be stratified";
-            throw 10;
+            throw std::runtime_error("Program could not be stratified");
         }
         LOG(INFOL) << "nStratificationClasses = " << nStratificationClasses;
 

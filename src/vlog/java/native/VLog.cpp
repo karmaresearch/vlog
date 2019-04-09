@@ -104,6 +104,10 @@ void throwNotStartedException(JNIEnv *env, const char *message) {
     throwException(env, "karmaresearch/vlog/NotStartedException", message);
 }
 
+void throwMaterializationException(JNIEnv *env, const char *message) {
+    throwException(env, "karmaresearch/vlog/MaterializationException", message);
+}
+
 void throwIOException(JNIEnv *env, const char *message) {
     throwException(env, "java/io/IOException", message);
 }
@@ -692,20 +696,25 @@ extern "C" {
             delete f->sn;
         }
 
-        f->sn = new SemiNaiver(*(f->layer), f->program, true, true, false, ! (bool) skolem, -1, false, false);
         LOG(INFOL) << "Starting full materialization";
-        std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-        unsigned long *p = NULL;
-        unsigned long t = (unsigned long) jtimeout;
-        if (t > 0) {
-            p = &t;
+        try {
+            f->sn = new SemiNaiver(*(f->layer), f->program, true, true, false, ! (bool) skolem, -1, false, false);
+            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+            unsigned long *p = NULL;
+            unsigned long t = (unsigned long) jtimeout;
+            if (t > 0) {
+                p = &t;
+            }
+            f->sn->run(p);
+            if (p != NULL && *p == 0) {
+                return (jboolean) false;
+            }
+            std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+            LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
+        } catch(std::runtime_error e) {
+            throwMaterializationException(env, e.what());
+            return false;
         }
-        f->sn->run(p);
-        if (p != NULL && *p == 0) {
-            return (jboolean) false;
-        }
-        std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-        LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
         f->sn->printCountAllIDBs("");
         return (jboolean) true;
     }
