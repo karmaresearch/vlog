@@ -806,7 +806,7 @@ bool Program::stratify(std::vector<int> &stratification, int &nClasses) {
         }
     }
 
-    nClasses = markedCount;
+    nClasses = markedCount == 0 ? 1 : markedCount;
 
     // The as yet unmarked predicates can just be added to the first
     for (size_t i = 0; i < stratification.size(); i++) {
