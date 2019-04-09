@@ -473,12 +473,6 @@ class Program {
 
         std::string rewriteRDFOWLConstants(std::string input);
 
-        std::vector<uint64_t> topologicalSort(std::set<std::pair<uint64_t, uint64_t>> &usedNegated);
-
-        void topologicalSortUtil(Graph &g, size_t i, bool *visited, std::vector<uint64_t> &result);
-
-        void recursiveCollectStratification(uint64_t id, int64_t mark, std::vector<int> &marked);
-
     public:
         VLIBEXP Program(EDBLayer *kb);
 

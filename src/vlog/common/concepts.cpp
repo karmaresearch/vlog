@@ -705,64 +705,17 @@ std::string Rule::toprettystring(Program * program, EDBLayer *db, bool replaceCo
     return output;
 }
 
-void Program::topologicalSortUtil(Graph &g, size_t i, bool *visited, std::vector<uint64_t> &result) {
-    visited[i] = true;
-    std::set<uint64_t> *targets = g.getDestinations(i);
-    if (targets != NULL) {
-        for (auto it = targets->begin(); it != targets->end(); it++) {
-            if (! visited[*it]) {
-                topologicalSortUtil(g, *it, visited, result);
-            }
-        }
-    }
-    result.push_back(i);
-}
-
-std::vector<uint64_t> Program::topologicalSort(std::set<std::pair<uint64_t, uint64_t>> &usedNegated) {
-    uint64_t graphSize = getMaxPredicateId() + 1;
-    Graph g(graphSize);
-    std::vector<uint64_t> result;
-    bool visited[graphSize];
-
-    for (size_t i = 0; i < graphSize; i++) {
-        visited[i] = true;
-    }
-    for (auto it = usedNegated.begin(); it != usedNegated.end(); ++it) {
-        g.addEdge(it->second, it->first);
-        visited[it->second] = false;
-        visited[it->first] = false;
-    }
-    for (size_t i = 0; i < graphSize; i++) {
-        if (! visited[i]) {
-            topologicalSortUtil(g, i, visited, result);
-        }
-    }
-    return result;
-}
-
-void Program::recursiveCollectStratification(uint64_t id, int64_t mark, std::vector<int> &marked) {
-    std::vector<Rule> rules = getAllRulesByPredicate(id);
-    marked[id] = mark;
-    for (const Rule rule : rules) {
-        for (const auto &bodyLiteral : rule.getBody()) {
-            PredId_t bid = bodyLiteral.getPredicate().getId();
-            if (marked[bid] < 0) {
-                recursiveCollectStratification(bid, mark, marked);
-            }
-        }
-    }
-}
-
 bool Program::stratify(std::vector<int> &stratification, int &nClasses) {
     // First check if the rules can be stratified.
     std::set<std::pair<uint64_t, uint64_t>> usedNegated;
     uint64_t graphSize = getMaxPredicateId() + 1;
     Graph g(graphSize);
-    LOG(DEBUGL) << "Generating graph for stratification";
+    Graph depends(graphSize);
     for (const Rule rule : allrules) {
         for (const auto &head : rule.getHeads()) {
             for (const auto &bodyLiteral : rule.getBody()) {
                 g.addEdge(bodyLiteral.getPredicate().getId(), head.getPredicate().getId());
+                depends.addEdge(head.getPredicate().getId(), bodyLiteral.getPredicate().getId());
                 if (bodyLiteral.isNegated() && bodyLiteral.getPredicate().getType() == IDB) {
                     usedNegated.insert(std::make_pair(bodyLiteral.getPredicate().getId(), head.getPredicate().getId()));
                     LOG(DEBUGL) << "Adding usedNegated: " << bodyLiteral.getPredicate().getId() << ", " << head.getPredicate().getId();
@@ -770,51 +723,52 @@ bool Program::stratify(std::vector<int> &stratification, int &nClasses) {
             }
         }
     }
+
+    Graph negationsClosure(graphSize);
+
+    // Create a negationsClosure graph, one that has an edge from p to q iff there is a path from p to q in the dependency graph, containing a negative edge.
     for (auto it = usedNegated.begin(); it != usedNegated.end(); ++it) {
+        // usedNegated contains all negative edges.
+        std::set<uint64_t> deps;
+        std::set<uint64_t> reaches;
+        depends.getRecursiveDestinations(it->first, deps);
+        g.getRecursiveDestinations(it->second, reaches);
         // We know we have a negative edge from first to second.
         // Now, if we can reach first from second, we have a cycle
         // with a negative edge --> cannot be stratified.
-        if (g.reachable(it->first, it->second)) {
+        if (reaches.find(it->first) != reaches.end()) {
             return false;
+        }
+        for(auto it1 : reaches) {
+            for (auto it2 : deps) {
+                negationsClosure.addEdge(it1, it2);
+            }
         }
     }
 
-    // Determine ordering in the stratification
-    std::vector<uint64_t> order = topologicalSort(usedNegated);
-    for (int i = 0; i < order.size(); i++) {
-        LOG(DEBUGL) << "order[" << i << "] = " << order[i];
-    }
-
-    const std::vector<PredId_t> predicates = getAllPredicateIDs();
     stratification.resize(graphSize);
     for (size_t i = 0; i < graphSize; i++) {
         stratification[i] = -1;
     }
-    for (size_t i = 0; i < predicates.size(); i++) {
-        Predicate pred = getPredicate(predicates[i]);
-        if (pred.getType() == EDB) {
-            stratification[pred.getId()] = 0;
+
+    
+    int markedCount = 0;
+    int count = 0;
+    while (count < graphSize) {
+        std::set<uint64_t> toRemove;
+        for (int i = 0; i < graphSize; i++) {
+            if (stratification[i] < 0 && negationsClosure.getDestinations(i)->empty()) {
+                LOG(DEBUGL) << "Marking " << i << " with " << markedCount;
+                stratification[i] = markedCount;
+                count++;
+                toRemove.insert(i);
+            }
         }
+        negationsClosure.removeNodes(toRemove);
+        markedCount++;
     }
 
-    int64_t  markedCount = 0;
-    for (auto it = order.begin(); it != order.end(); it++) {
-        LOG(DEBUGL) << "stratification[" << *it << "] = " << stratification[*it];
-        if (stratification[*it] < 0) {
-            recursiveCollectStratification(*it, markedCount, stratification);
-            markedCount++;
-        }
-    }
-
-    nClasses = markedCount == 0 ? 1 : markedCount;
-
-    // The as yet unmarked predicates can just be added to the first
-    for (size_t i = 0; i < stratification.size(); i++) {
-        if (stratification[i] < 0) {
-            stratification[i] = 0;
-        }
-    }
-
+    nClasses = markedCount;
     return true;
 }
 

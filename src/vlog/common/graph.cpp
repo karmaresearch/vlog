@@ -9,8 +9,23 @@ Graph::Graph(size_t V)
 
 void Graph::addEdge(uint64_t v, uint64_t w)
 {
+    if (v >= V) {
+        throw 10;
+    }
     LOG(TRACEL) << "Adding edge from " << v << " to " << w;
     adj[v].insert(w); // Add w to v’s list.
+}
+
+void Graph::removeNodes(std::set<uint64_t> &toRemove) {
+    for (auto it : toRemove) {
+        if (it >= V) {
+            continue;
+        }
+        for (int i = 0; i < V; i++) {
+            adj[i].erase(it);
+        }
+        adj[it].clear();
+    }
 }
 
 // This function is a variation of DFSUytil() in https://www.geeksforgeeks.org/archives/18212
@@ -106,6 +121,18 @@ std::set<uint64_t> *Graph::getDestinations(uint64_t v) {
         return NULL;
     }
     return &adj[v];
+}
+
+void Graph::getRecursiveDestinations(uint64_t v, std::set<uint64_t> &result) {
+    if (v >= V) {
+        return;
+    }
+    result.insert(v);
+    for (auto it : adj[v]) {
+        if (result.find(it) == result.end()) {
+            getRecursiveDestinations(it, result);
+        }
+    }
 }
 
 Graph::~Graph() {
