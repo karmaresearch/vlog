@@ -86,7 +86,7 @@ std::string SparqlTable::generateQuery(const Literal &query) {
             if (val.find('<') == 0 || val.find('"') == 0) {
                 binds += " BIND (" + val + " AS ?" + fieldVars[i] + ") ";
             } else {
-                binds += " BIND \"" + val + "\" AS ?" + fieldVars[i] + ") ";
+                binds += " BIND (\"" + val + "\" AS ?" + fieldVars[i] + ") ";
             }
             select += " ?" + fieldVars[i];
             vars.push_back(-1);
