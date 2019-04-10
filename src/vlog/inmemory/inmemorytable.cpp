@@ -70,6 +70,17 @@ std::vector<std::string> readRow(istream &ifs) {
     }
 }
 
+const char *convertString(const char *s) {
+    int len = strlen(s);
+    if (s == NULL) {
+        return s;
+    }
+    if (len > 1 && s[0] == '"' && s[len-1] == '"') {
+        return (std::string(s) + "^^<http://www.w3.org/2001/XMLSchema#string>").c_str();
+    }
+    return s;
+}
+
 InmemoryTable::InmemoryTable(string repository, string tablename,
         PredId_t predid, EDBLayer *layer) {
     this->layer = layer;
@@ -136,9 +147,9 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
             if (reader.isTripleValid()) {
                 Term_t rowc[3];
                 int ls, lp, lo;
-                const char *s = reader.getCurrentS(ls);
-                const char *p = reader.getCurrentP(lp);
-                const char *o = reader.getCurrentO(lo);
+                const char *s = convertString(reader.getCurrentS(ls));
+                const char *p = convertString(reader.getCurrentP(lp));
+                const char *o = convertString(reader.getCurrentO(lo));
                 if (inserter == NULL) {
                     inserter = new SegmentInserter(3);
                 }
