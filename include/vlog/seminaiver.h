@@ -212,7 +212,7 @@ class SemiNaiver {
             return getTable(literal, minIteration, maxIteration, NULL);
         }
 
-        FCIterator getTable(const PredId_t predid);
+		VLIBEXP FCIterator getTable(const PredId_t predid);
 
         size_t getSizeTable(const PredId_t predid) const;
 

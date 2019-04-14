@@ -16,9 +16,9 @@ class Checker {
         static bool MFC(Program &p);
 
     public:
-        static int check(Program &p, std::string alg, EDBLayer &db);
+		VLIBEXP static int check(Program &p, std::string alg, EDBLayer &db);
 
-        static int checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db);
+		VLIBEXP static int checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db);
 
         static int checkFromString(std::string rulesString, std::string alg, EDBLayer &db);
 
