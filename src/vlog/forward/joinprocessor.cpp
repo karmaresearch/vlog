@@ -2290,11 +2290,9 @@ void JoinExecutor::leftjoin(const FCInternalTable * t1, SemiNaiver * naiver,
         it.moveNextCount();
     }
 
-    if (tablesToLeftJoin.size() > 0){
-        LOG(TRACEL) << "CALLING JoinExecutor::left_join";
-        JoinExecutor::left_join(t1, fields1, tablesToLeftJoin, fields1, NULL, NULL,
-                fields2, output, nthreads);
-    }
+    LOG(TRACEL) << "CALLING JoinExecutor::left_join";
+    JoinExecutor::left_join(t1, fields1, tablesToLeftJoin, fields1, NULL, NULL,
+            fields2, output, nthreads);
     LOG(TRACEL) << "ENDING JoinExecutor::leftjoin";
 }
 
@@ -2312,11 +2310,6 @@ void JoinExecutor::left_join(const FCInternalTable * filteredT1,
 
     int processedTables = 0;
     bool first = true;
-
-    //L. Check this
-    if (tables2.size() == 0) {
-        return;
-    }
 
     std::chrono::system_clock::time_point startS;
     std::chrono::duration<double> secS;
@@ -2341,6 +2334,16 @@ void JoinExecutor::left_join(const FCInternalTable * filteredT1,
 #endif
 
     Output *out = new Output(output, NULL);
+
+    if (tables2.size() == 0) {
+        std::vector<const std::vector<Term_t> *> vectors2;
+        std::vector<uint8_t> dummyFields;
+        JoinExecutor::do_left_join(vectors1, vectors2, dummyFields, dummyFields, out);
+        sortedItr1->deleteAllVectors(vectors1);
+        filteredT1->releaseIterator(sortedItr1);
+        delete out;
+        return;
+    }
 
     LOG(TRACEL) << "Main loop of left_join";
     auto t2 = tables2[0];
@@ -2416,7 +2419,7 @@ void JoinExecutor::do_left_join(
     size_t l1 = 0;
     size_t l2 = 0;
     size_t u1 = vectors1[0]->size();
-    size_t u2 = vectors2[0]->size();
+    size_t u2 = vectors2.size() > 0 ? vectors2[0]->size() : 0;
 
     //Special case. There is no left join
     if (fields1.size() == 0 && l1 < u1 && l2 < u2) {

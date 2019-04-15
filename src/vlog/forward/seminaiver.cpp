@@ -1424,6 +1424,9 @@ size_t SemiNaiver::estimateCardTable(const Literal &literal,
 
     PredId_t id = literal.getPredicate().getId();
     FCTable *table = predicatesTables[id];
+    if (literal.isNegated()) {
+        return 1;
+    }
     if (table == NULL || table->isEmpty() ||
             table->getMaxIteration() < minIteration ||
             table->getMinIteration() > maxIteration) {
