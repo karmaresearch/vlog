@@ -64,7 +64,7 @@ size_t EDBFCInternalTable::estimateNRows(const uint8_t nconstantsToFilter,
         const uint8_t *posConstantsToFilter,
         const Term_t *valuesConstantsToFilter) const {
     if (nconstantsToFilter == 0)
-        return layer->getCardinality(*(query.getLiteral()));
+        return layer->estimateCardinality(*(query.getLiteral()));
 
     //Create a new literal adding the constants
     VTuple t = query.getLiteral()->getTuple();

@@ -129,7 +129,7 @@ public class VLog {
     };
 
     public enum LogLevel {
-        ERROR, WARNING, INFO, DEBUG
+        ERROR, WARNING, INFO, DEBUG, TRACE
     };
 
     /**
@@ -453,6 +453,8 @@ public class VLog {
      * @return <code>true</code> if success.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
+     * @exception MaterializationException
+     *                is thrown when the materialization fails for some reason.
      */
     public boolean materialize(boolean skolem) throws NotStartedException {
         return materialize(skolem, 0);
@@ -471,6 +473,8 @@ public class VLog {
      *         if success.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
+     * @exception MaterializationException
+     *                is thrown when the materialization fails for some reason.
      */
     public native boolean materialize(boolean skolem, int timeout)
             throws NotStartedException;

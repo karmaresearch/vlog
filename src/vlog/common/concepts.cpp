@@ -1,4 +1,5 @@
 #include <vlog/concepts.h>
+#include <vlog/graph.h>
 #include <vlog/optimizer.h>
 #include <vlog/edb.h>
 #include <vlog/fcinttable.h>
@@ -109,6 +110,9 @@ std::string Literal::tostring(const Program *program, const EDBLayer *db) const 
         predName = program->getPredicateName(pred.getId());
     else
         predName = std::to_string(pred.getId());
+    if (isNegated()) {
+        predName = "neg_" + predName;
+    }
 
     std::string out = predName + std::string("[") +
         std::to_string(pred.getType()) + std::string("]") +
@@ -715,7 +719,74 @@ std::string Rule::toprettystring(Program * program, EDBLayer *db, bool replaceCo
     return output;
 }
 
-bool Program::areExistentialRules() const {
+bool Program::stratify(std::vector<int> &stratification, int &nClasses) {
+    // First check if the rules can be stratified.
+    std::set<std::pair<uint64_t, uint64_t>> usedNegated;
+    uint64_t graphSize = getMaxPredicateId() + 1;
+    Graph g(graphSize);
+    Graph depends(graphSize);
+    for (const Rule rule : allrules) {
+        for (const auto &head : rule.getHeads()) {
+            for (const auto &bodyLiteral : rule.getBody()) {
+                g.addEdge(bodyLiteral.getPredicate().getId(), head.getPredicate().getId());
+                depends.addEdge(head.getPredicate().getId(), bodyLiteral.getPredicate().getId());
+                if (bodyLiteral.isNegated() && bodyLiteral.getPredicate().getType() == IDB) {
+                    usedNegated.insert(std::make_pair(bodyLiteral.getPredicate().getId(), head.getPredicate().getId()));
+                    LOG(DEBUGL) << "Adding usedNegated: " << bodyLiteral.getPredicate().getId() << ", " << head.getPredicate().getId();
+                }
+            }
+        }
+    }
+
+    Graph negationsClosure(graphSize);
+
+    // Create a negationsClosure graph, one that has an edge from p to q iff there is a path from p to q in the dependency graph, containing a negative edge.
+    for (auto it = usedNegated.begin(); it != usedNegated.end(); ++it) {
+        // usedNegated contains all negative edges.
+        std::set<uint64_t> deps;
+        std::set<uint64_t> reaches;
+        depends.getRecursiveDestinations(it->first, deps);
+        g.getRecursiveDestinations(it->second, reaches);
+        // We know we have a negative edge from first to second.
+        // Now, if we can reach first from second, we have a cycle
+        // with a negative edge --> cannot be stratified.
+        if (reaches.find(it->first) != reaches.end()) {
+            return false;
+        }
+        for(auto it1 : reaches) {
+            for (auto it2 : deps) {
+                negationsClosure.addEdge(it1, it2);
+            }
+        }
+    }
+
+    stratification.resize(graphSize);
+    for (size_t i = 0; i < graphSize; i++) {
+        stratification[i] = -1;
+    }
+
+    
+    int markedCount = 0;
+    int count = 0;
+    while (count < graphSize) {
+        std::set<uint64_t> toRemove;
+        for (int i = 0; i < graphSize; i++) {
+            if (stratification[i] < 0 && negationsClosure.getDestinations(i)->empty()) {
+                LOG(DEBUGL) << "Marking " << i << " with " << markedCount;
+                stratification[i] = markedCount;
+                count++;
+                toRemove.insert(i);
+            }
+        }
+        negationsClosure.removeNodes(toRemove);
+        markedCount++;
+    }
+
+    nClasses = markedCount;
+    return true;
+}
+
+bool Program::areExistentialRules() {
     for(auto& rule : allrules) {
         if (rule.isExistential()) {
             return true;

@@ -305,6 +305,13 @@ class EDBLayer {
 
         VLIBEXP uint64_t getNTerms() const;
 
+        bool expensiveEDBPredicate(PredId_t id) {
+            if (dbPredicates.count(id)) {
+                return dbPredicates.find(id)->second.manager->expensiveLayer();
+            }
+            return false;
+        }
+
         void releaseIterator(EDBIterator *itr);
 
         VLIBEXP void addRemoveLiterals(const RemoveLiteralOf &rm) {

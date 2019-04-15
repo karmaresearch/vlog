@@ -70,6 +70,19 @@ std::vector<std::string> readRow(istream &ifs) {
     }
 }
 
+std::string convertString(const char *s, int len) {
+    if (s == NULL || len == 0) {
+        return "";
+    }
+
+    std::string ss = std::string(s, s+len);
+
+    if (len > 1 && s[0] == '"' && s[len-1] == '"') {
+        return (ss + "^^<http://www.w3.org/2001/XMLSchema#string>").c_str();
+    }
+    return ss;
+}
+
 InmemoryTable::InmemoryTable(string repository, string tablename,
         PredId_t predid, EDBLayer *layer) {
     this->layer = layer;
@@ -141,17 +154,20 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
                 Term_t rowc[3];
                 int ls, lp, lo;
                 const char *s = reader.getCurrentS(ls);
+                std::string ss = convertString(s, ls);
                 const char *p = reader.getCurrentP(lp);
+                std::string sp = convertString(p, lp);
                 const char *o = reader.getCurrentO(lo);
+                std::string so = convertString(o, lo);
                 if (inserter == NULL) {
                     inserter = new SegmentInserter(3);
                 }
                 uint64_t val;
-                layer->getOrAddDictNumber(s, ls, val);
+                layer->getOrAddDictNumber(ss.c_str(), ss.size(), val);
                 rowc[0] = val;
-                layer->getOrAddDictNumber(p, lp, val);
+                layer->getOrAddDictNumber(sp.c_str(), sp.size(), val);
                 rowc[1] = val;
-                layer->getOrAddDictNumber(o, lo, val);
+                layer->getOrAddDictNumber(so.c_str(), so.size(), val);
                 rowc[2] = val;
                 inserter->addRow(rowc);
             }

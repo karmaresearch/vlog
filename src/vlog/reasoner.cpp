@@ -593,7 +593,7 @@ TupleIterator *Reasoner::getMagicIterator(Literal &query,
     }
 #endif
 
-    SemiNaiver *naiver = new SemiNaiver(magicProgram->getAllRules(),
+    SemiNaiver *naiver = new SemiNaiver(
             edb, magicProgram.get(), true, true, false, -1, false, false) ;
 
     //Add all the input tuples in the input relation
@@ -702,7 +702,7 @@ TupleIterator *Reasoner::getMaterializationIterator(Literal &query,
     }
 
     // Run materialization
-    SemiNaiver *sn = new SemiNaiver(program.getAllRules(),
+    SemiNaiver *sn = new SemiNaiver(
             edb, &program, true, true,
             false, -1, false, false);
 
@@ -922,12 +922,12 @@ std::shared_ptr<SemiNaiver> Reasoner::getSemiNaiver(EDBLayer &layer,
         int nthreads, int interRuleThreads, bool shuffleRules) {
     LOG(DEBUGL) << "interRuleThreads = " << interRuleThreads << ", shuffleRules = " << shuffleRules;
     if (interRuleThreads > 0) {
-        std::shared_ptr<SemiNaiver> sn(new SemiNaiverThreaded(p->getAllRules(),
+        std::shared_ptr<SemiNaiver> sn(new SemiNaiverThreaded(
                     layer, p, opt_intersect, opt_filtering,
                     shuffleRules, nthreads, interRuleThreads));
         return sn;
     } else {
-        std::shared_ptr<SemiNaiver> sn(new SemiNaiver(p->getAllRules(),
+        std::shared_ptr<SemiNaiver> sn(new SemiNaiver(
                     layer, p, opt_intersect, opt_filtering,
                     opt_threaded, restrictedChase, nthreads, shuffleRules, false));
         return sn;
@@ -937,7 +937,7 @@ std::shared_ptr<SemiNaiver> Reasoner::getSemiNaiver(EDBLayer &layer,
 std::shared_ptr<TriggerSemiNaiver> Reasoner::getTriggeredSemiNaiver(EDBLayer &layer,
         Program *p,
         bool restrictedChase) {
-    std::shared_ptr<TriggerSemiNaiver> sn(new TriggerSemiNaiver(p->getAllRules(),
+    std::shared_ptr<TriggerSemiNaiver> sn(new TriggerSemiNaiver(
                 layer, p, restrictedChase));
     return sn;
 }

@@ -59,6 +59,10 @@ public:
 
     virtual uint64_t getSize() = 0;
 
+    virtual bool expensiveLayer() {
+        return false;
+    }
+
     virtual bool areTermsEncoded() {
         return true;
     }

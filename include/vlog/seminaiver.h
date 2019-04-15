@@ -61,6 +61,8 @@ class SemiNaiver {
         std::vector<StatsRule> statsRuleExecution;
 
         bool ignoreDuplicatesElimination;
+        std::vector<int> stratification;
+        int nStratificationClasses;
 
 
 #ifdef WEBINTERFACE
@@ -112,7 +114,7 @@ class SemiNaiver {
                 const std::vector<Literal> &heads);
 
         bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
-                std::vector<RuleExecutionDetails> &allIDBRules,
+                std::vector<std::vector<RuleExecutionDetails>> &allIDBRules,    // one entry for each stratification class
                 std::vector<StatIteration> &costRules,
                 const uint32_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
@@ -131,7 +133,7 @@ class SemiNaiver {
         std::vector<FCTable *>predicatesTables;
         EDBLayer &layer;
         Program *program;
-        std::vector<RuleExecutionDetails> allIDBRules;
+        std::vector<std::vector<RuleExecutionDetails>> allIDBRules; // one entry for each stratification class
         size_t iteration;
         int nthreads;
 
@@ -163,19 +165,19 @@ class SemiNaiver {
         }
 
     public:
-        VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
+        VLIBEXP SemiNaiver(EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 bool restrictedChase, int nthreads, bool shuffleRules,
                 bool ignoreExistentialRules);
 
         //disable restricted chase
-        VLIBEXP SemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
+        VLIBEXP SemiNaiver(EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 int nthreads, bool shuffleRules,
                 bool ignoreExistentialRules) :
-            SemiNaiver(ruleset, layer, program, opt_intersect, opt_filtering,
+            SemiNaiver(layer, program, opt_intersect, opt_filtering,
                     multithreaded, false, nthreads, shuffleRules,
                     ignoreExistentialRules) {
             }
@@ -242,7 +244,7 @@ class SemiNaiver {
             return getTable(literal, minIteration, maxIteration, NULL);
         }
 
-        FCIterator getTable(const PredId_t predid);
+		VLIBEXP FCIterator getTable(const PredId_t predid);
 
         size_t getSizeTable(const PredId_t predid) const;
 

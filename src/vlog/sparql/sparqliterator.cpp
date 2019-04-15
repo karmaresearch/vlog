@@ -11,6 +11,14 @@ std::string getString(json &jref) {
     if (type == "uri") {
 	val = "<" + val + ">";
     }
+    else if (type == "literal") {
+        if (jref.count("datatype") > 0) {
+            std::string datatype = jref["datatype"];
+            val = "\"" + val + "\"^^<" + datatype +">";
+        } else {
+            val = "\"" + val + "\"^^<http://www.w3.org/2001/XMLSchema#string>";
+        }
+    }
     return val;
 }
 

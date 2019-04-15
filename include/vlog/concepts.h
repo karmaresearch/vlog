@@ -3,6 +3,7 @@
 
 #include <vlog/support.h>
 #include <vlog/consts.h>
+#include <vlog/graph.h>
 
 #include <kognac/logs.h>
 
@@ -10,6 +11,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <vector>
+#include <set>
 #include <unordered_map>
 
 /*** PREDICATES ***/
@@ -579,6 +581,11 @@ class Program {
         uint8_t getPredicateCard(PredId_t pred) {
             return cardPredicates[pred];
         }
+
+        // Returns true if stratification succeeded, and then stores the stratification in the parameter.
+        // The result vector is indexed by predicate id, and then gives the stratification class.
+        // The number of stratification classes is also returned.
+        bool stratify(std::vector<int> &stratification, int &nStatificationClasses);
 
         ~Program() {
         }
