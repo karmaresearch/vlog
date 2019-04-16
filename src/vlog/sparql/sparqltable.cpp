@@ -6,6 +6,7 @@
 using json = nlohmann::json;
 
 static bool curl_initialized = false;
+static int  numTables = 0;
 
 SparqlTable::SparqlTable(PredId_t predid, string repository, EDBLayer *layer, string f, string whereBody) :
     predid(predid), repository(repository), layer(layer), whereBody(whereBody) {
@@ -31,6 +32,7 @@ SparqlTable::SparqlTable(PredId_t predid, string repository, EDBLayer *layer, st
             }
             this->fieldVars.push_back(item);
         }
+	numTables++;
     }
 
 
@@ -412,4 +414,9 @@ uint64_t SparqlTable::getSize() {
 
 SparqlTable::~SparqlTable() {
     curl_easy_cleanup(curl);
+    numTables--;
+    if (numTables == 0) {
+	curl_initialized = false;
+	curl_global_cleanup();
+    }
 }
