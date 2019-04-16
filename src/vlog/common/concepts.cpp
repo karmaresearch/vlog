@@ -96,11 +96,8 @@ std::string Literal::tostring(Program *program, EDBLayer *db) const {
         predName = program->getPredicateName(pred.getId());
     else
         predName = std::to_string(pred.getId());
-    if (isNegated()) {
-        predName = "neg_" + predName;
-    }
 
-    std::string out = predName + std::string("[") +
+    std::string out = (isNegated() ? "~" : "") + predName + std::string("[") +
         std::to_string(pred.getType()) + std::string("]") +
         adornmentToString(pred.getAdorment(), tuple.getSize()) + std::string("(");
 
@@ -909,10 +906,15 @@ std::string Program::rewriteRDFOWLConstants(std::string input) {
 
 Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     size_t posBeginTuple = l.find("(");
+    bool negated = false;
     if (posBeginTuple == std::string::npos) {
         throw "Missing '(' in literal";
     }
     std::string predicate = trim(l.substr(0, posBeginTuple));
+    if (predicate.substr(0,1) == "~") {
+	negated = true;
+	predicate = trim(l.substr(1));
+    }
     std::string tuple = l.substr(posBeginTuple + 1, std::string::npos);
     if (tuple[tuple.size() - 1] != ')') {
         throw "Missing ')' in literal";
@@ -1029,13 +1031,6 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     int pos = 0;
     for (std::vector<VTerm>::iterator itr = t.begin(); itr != t.end(); ++itr) {
         t1.set(*itr, pos++);
-    }
-
-    //Check if predicate starts with "neg_".
-    bool negated = false;
-    if (predicate.substr(0,4) == "neg_") {
-        negated = true;
-        predicate = predicate.substr(4);
     }
 
     //Determine predicate

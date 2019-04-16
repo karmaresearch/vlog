@@ -123,8 +123,9 @@ public class Atom {
     @Override
     public String toString() {
         String ret = "";
-        if (negated)
-            ret += "neg_";
+        if (negated) {
+            ret = "~";
+        }
         ret += predicate + Arrays.toString(terms);
         return ret;
     }
