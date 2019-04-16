@@ -171,6 +171,8 @@ void ExistentialRuleProcessor::filterDerivations(FCTable *t,
                 idx++;
             }
         }
+	table->releaseIterator(itr2);
+	itr1->clear();
         tableItr.moveNextCount();
     }
 

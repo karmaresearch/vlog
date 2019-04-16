@@ -203,6 +203,7 @@ json SparqlTable::launchQuery(std::string sparqlQuery) {
         std::string em(errorBuffer);
         LOG(WARNL) << "Launching query failed: " << em;
     }
+    curl_slist_free_all(headers);
     return output;
 }
 
@@ -336,6 +337,7 @@ EDBIterator *SparqlTable::getSortedIterator(const Literal &query,
             writers[i]->add(it->getElementAt(i));
         }
     }
+    delete it;
 
     std::vector<std::shared_ptr<Column>> columns;
     for (uint8_t i = 0; i < sz; ++i) {
@@ -393,6 +395,7 @@ uint64_t SparqlTable::getNTerms() {
 }
 
 void SparqlTable::releaseIterator(EDBIterator *itr) {
+    delete itr;
 }
 
 uint64_t SparqlTable::getSize() {
