@@ -1024,7 +1024,7 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
     delete &l;
     return found;
 }
-
+ 
 void ExistentialRuleProcessor::consolidate(const bool isFinished) {
     if (replaceExtColumns && tmpRelation != NULL) {
         //Populate the allColumns vector with known columns and constants
@@ -1089,7 +1089,11 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                     }
                     std::vector<std::unique_ptr<ColumnReader>> headReaders;
                     for(uint8_t i = 0; i < allColumns.size(); ++i) {
-                        headReaders.push_back(allColumns[i]->getReader());
+                        if (allColumns[i] != NULL) {
+                            headReaders.push_back(allColumns[i]->getReader());
+                        } else {
+                            headReaders.push_back(NULL);
+                        }
                     }
                     //Check the rows, one by one
                     for(size_t i = 0; i < nrows; ++i) {
@@ -1105,6 +1109,9 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                         }
                         //Fill the potential head
                         for(uint8_t j = 0; j < allColumns.size(); ++j) {
+                            if (headReaders[j] == NULL) {
+                                continue;
+                            }
                             if (!headReaders[j]->hasNext()) {
                                 LOG(ERRORL) << "This should not happen";
                             }
