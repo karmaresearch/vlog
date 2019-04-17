@@ -640,7 +640,8 @@ void SemiNaiver::addDataToIDBRelation(const Predicate pred,
 }
 
 bool SemiNaiver::bodyChangedSince(Rule &rule, uint32_t iteration) {
-    LOG(DEBUGL) << "bodyChangedSince, iteration = " << iteration;
+    LOG(DEBUGL) << "bodyChangedSince, iteration = " << iteration <<
+        " Rule: " << rule.tostring(program, &layer);
     const std::vector<Literal> &body = rule.getBody();
     const int nBodyLiterals = body.size();
     for (int i = 0; i < nBodyLiterals; ++i) {

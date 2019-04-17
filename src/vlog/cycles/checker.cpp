@@ -302,6 +302,7 @@ static void generateConstants(Program &p, std::map<PredId_t, std::vector<std::ve
             } else {
                 value.push_back(p.getKB()->getDictText(t.getValue()));
             }
+            LOG(TRACEL) << "i = " << i << ", value = " << value[value.size()-1];
         }
         edbSet[predid].push_back(value);
     }
@@ -350,6 +351,7 @@ static bool rja_check(Program &p, const Rule &rulev, const Rule &rulew, uint8_t 
         }
         rule = rule + paramList + ") :- " + edbName + "(" + paramList + ")";
         LOG(DEBUGL) << "Adding rule: \"" << rule << "\"";
+        nonGeneratingRules.push_back(rule);
     }
 
     // Add another rule to the ruleset, to determine if what we are looking for is materialized.
@@ -421,7 +423,7 @@ bool Checker::JA(Program &p, bool restricted) {
             // and add all <pred, varpos> there to a list.
             // These are the values used to compute a value for the existential variable.
             const Rule &rule = p.getRule(it.first.first);
-            LOG(DEBUGL) << "Src = " << src << ", rule " << rule.tostring(&p, p.getKB());
+            LOG(TRACEL) << "Src = " << src << ", rule " << rule.tostring(&p, p.getKB());
             auto body = rule.getBody();
             std::vector<vpos> dependencies;
             // Collect <PredId_t, tuplepos> values on which the existential variables of this rule depend.
@@ -455,13 +457,13 @@ bool Checker::JA(Program &p, bool restricted) {
             const Rule &rulev = p.getRule(it.first.first);
             std::vector<uint8_t> extVars = rulev.getVarsNotInBody();
             uint8_t v = extVars[it.first.second];
-            LOG(DEBUGL) << "Src = " << src << ", rule " << rulev.tostring(&p, p.getKB());
+            LOG(TRACEL) << "Src = " << src << ", rule " << rulev.tostring(&p, p.getKB());
             for (auto &it2: allExtVarsPos) {
                 const Rule &rulew = p.getRule(it2.first.first);
                 auto body = rulew.getBody();
                 extVars = rulew.getVarsNotInBody();
                 uint8_t w = extVars[it2.first.second];
-                LOG(DEBUGL) << "Trying " << dest << ", rule " << rulew.tostring(&p, p.getKB());
+                LOG(TRACEL) << "Trying " << dest << ", rule " << rulew.tostring(&p, p.getKB());
                 std::map<uint8_t, std::vector<vpos>> positions;
                 for (auto lit: body) {
                     for (int i = 0; i < lit.getTupleSize(); i++) {
@@ -479,7 +481,7 @@ bool Checker::JA(Program &p, bool restricted) {
                     if (ipos - intersect.begin() == pair.second.size()) {
                         // For this variable, all positions in the right-hand-side occur in the propagations of the existential variable.
                         uint8_t x = pair.first;
-                        LOG(DEBUGL) << "We have a match for variable " << (int) x;
+                        LOG(TRACEL) << "We have a match for variable " << (int) x;
                         // Now try the materialization and the test.
                         // First compute the EDB set to materialize on.
                         // See Definition 4 of the paper
