@@ -55,8 +55,10 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
         void RMFA_computeBodyAtoms(std::vector<Literal> &output,
                 uint64_t *row);
 
-        void RMFA_enhanceFunctionTerms(std::vector<Literal> &output,
+        // enhanceFunctionTerms is used for RMFA as well as RMFC.
+        void enhanceFunctionTerms(std::vector<Literal> &output,
                 uint64_t &startFreshIDs,
+                bool rmfa,
                 size_t startOutput = 0);
 
         std::unique_ptr<SemiNaiver> RMFA_saturateInput(

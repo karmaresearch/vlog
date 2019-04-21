@@ -584,3 +584,96 @@ bool Checker::MFC(Program &p) {
     }
     return false;
 }
+
+
+Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
+    // Create  the critical instance (cdb)
+    EDBLayer *db = p.getKB();
+    EDBConf conf("", false);
+    EDBLayer *layer = new EDBLayer(conf, false);
+
+    //Populate the critical instance with new facts
+    for(auto p : db->getAllPredicateIDs()) {
+        std::vector<std::vector<string>> facts;
+        std::vector<string> fact;
+        for (int i = 0; i < db->getPredArity(p); ++i) {
+            fact.push_back("*");
+        }
+        facts.push_back(fact);
+        layer->addInmemoryTable(db->getPredName(p), facts);
+    }
+
+    // Rewrite rules: all existential variables must be replaced with "*".
+    std::vector<std::string> newRules;
+    std::vector<Rule> rules = p.getAllRules();
+    for (auto rule : rules) {
+        std::string output = "";
+        std::vector<uint8_t> existentials = rule.getVarsNotInBody();
+        bool first = true;
+        for(const auto& head : rule.getHeads()) {
+            if (! first) {
+                output += ",";
+            }
+            output += p.getPredicateName(head.getPredicate().getId()) + "(";
+            VTuple tuple = head.getTuple();
+            for (int i = 0; i < tuple.getSize(); ++i) {
+                VTerm term = tuple.get(i);
+                if (term.isVariable()) {
+                    bool present = false;
+                    for (int i = 0; i < existentials.size(); i++) {
+                        if (term.getId() == existentials[i]) {
+                            present = true;
+                            break;
+                        }
+                    }
+                    if (present) {
+                        output += "*";
+                    } else {
+                        output += std::string("A") + std::to_string(tuple.get(i).getId());
+                    }
+                } else {
+                    uint64_t id = tuple.get(i).getValue();
+                    char text[MAX_TERM_SIZE];
+                    if (db->getDictText(id, text)) {
+                        string v = Program::compressRDFOWLConstants(std::string(text));
+                        output += v;
+                    } else {
+                        std::string t = db->getDictText(id);
+                        if (t == std::string("")) {
+                            output += std::to_string(id);
+                        } else {
+                            output += Program::compressRDFOWLConstants(t);
+                        }
+                    }
+                }
+                if (i < tuple.getSize() - 1) {
+                    output += std::string(",");
+                }
+            }
+            output += ")";
+            first = false;
+        }
+        output += " :- ";
+        first = true;
+        for(const auto& bodyAtom : rule.getBody()) {
+            if (! first) {
+                output += ",";
+            }
+            first = false;
+            output += bodyAtom.toprettystring(&p, db, false);
+        }
+
+        LOG(DEBUGL) << "Adding rule: " << output;
+        newRules.push_back(output);
+    }
+
+    Program *newProgram = new Program(layer);
+    for (auto rule : newRules) {
+        newProgram->parseRule(rule, false);
+    }
+
+    // The critical instance should have initial values for ALL predicates,
+    // not just the EDB ones ... --Ceriel
+    addIDBCritical(*newProgram, layer);
+    return newProgram;
+}

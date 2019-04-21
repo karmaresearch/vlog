@@ -15,6 +15,8 @@ class Checker {
 
         static bool MFC(Program &p);
 
+        Program *getProgramForBlockingCheckRMFC(Program &p);
+
     public:
 		VLIBEXP static int check(Program &p, std::string alg, EDBLayer &db);
 

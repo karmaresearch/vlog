@@ -789,7 +789,7 @@ void ExistentialRuleProcessor::RMFA_computeBodyAtoms(
 std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
         std::vector<Literal> &input) {
     //Populate the EDB layer
-    EDBLayer *layer = new EDBLayer(sn->getEDBLayer(), true);
+    EDBLayer *layer = new EDBLayer(sn->getEDBLayer(), false);
 
     std::map<PredId_t, std::vector<uint64_t>> edbPredicates;
     std::map<PredId_t, std::vector<uint64_t>> idbPredicates;
@@ -812,6 +812,13 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
                 auto t = literal.getTermAtPos(i);
                 edbPredicates[predid].push_back(t.getValue());
             }
+        }
+    }
+
+    std::vector<PredId_t> predicates = sn->getEDBLayer().getAllPredicateIDs();
+    for (auto pred : predicates) {
+        if (!edbPredicates.count(pred)) {
+            edbPredicates.insert(std::make_pair(pred, std::vector<uint64_t>()));
         }
     }
     for(auto &pair : edbPredicates) {
@@ -876,14 +883,15 @@ void _addIfNotExist(std::vector<Literal> &output, Literal l) {
         output.push_back(l);
 }
 
-void ExistentialRuleProcessor::RMFA_enhanceFunctionTerms(
+void ExistentialRuleProcessor::enhanceFunctionTerms(
         std::vector<Literal> &output,
         uint64_t &startFreshIDs,
+        bool rmfa,
         size_t startOutput) {
     size_t oldsize = output.size();
     //Check every fact until oldsize. If there is a function term, get also
     //all related facts
-    LOG(DEBUGL) << "RMFA_enhanceFuntionTerms, startOutput = " << startOutput << ", oldsize = " << oldsize;
+    LOG(DEBUGL) << "enhanceFuntionTerms, startOutput = " << startOutput << ", oldsize = " << oldsize;
     for(size_t i = startOutput; i < oldsize; ++i) {
         const auto literal = output[i];
         for(uint8_t j = 0; j < literal.getTupleSize(); ++j) {
@@ -907,7 +915,7 @@ void ExistentialRuleProcessor::RMFA_enhanceFunctionTerms(
                     mappings.insert(std::make_pair(nameVars[i], values[i]));
                 }
                 //Materialize the remaining facts giving fresh IDs to
-                //the rem. variables
+                //the rem. variables (only if RMFA, for RMFC, we use *).
                 auto const *rule = ruleContainer->getRule();
                 for(const auto &bLiteral : rule->getBody()) {
                     VTuple t(bLiteral.getTupleSize());
@@ -916,9 +924,14 @@ void ExistentialRuleProcessor::RMFA_enhanceFunctionTerms(
                         if (term.isVariable()) {
                             uint8_t varID = term.getId();
                             if (!mappings.count(varID)) {
-                                mappings.insert(
-                                        std::make_pair(varID,
-                                            startFreshIDs++));
+                                if (rmfa) {
+                                    mappings.insert(
+                                            std::make_pair(varID, startFreshIDs++));
+                                } else {
+                                    // Is this correct? Is 0 indeed '*'? TODO check
+                                    mappings.insert(
+                                            std::make_pair(varID, 0));
+                                }
                             }
                             t.set(VTerm(0, mappings[varID]), m);
                         } else {
@@ -958,7 +971,7 @@ void ExistentialRuleProcessor::RMFA_enhanceFunctionTerms(
     }
     //Recursively apply the function if there are new literals
     if (output.size() > oldsize) {
-        RMFA_enhanceFunctionTerms(output, startFreshIDs, oldsize);
+        enhanceFunctionTerms(output, startFreshIDs, rmfa, oldsize);
     }
 }
 
@@ -987,7 +1000,7 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
 #endif
 
     //Then I need to add all facts relevant to produce the function terms
-    RMFA_enhanceFunctionTerms(input, freshIDs);
+    enhanceFunctionTerms(input, freshIDs, true);
 
     //Finally I need to saturate "input" with the datalog rules
     std::unique_ptr<SemiNaiver> n = RMFA_saturateInput(input);
