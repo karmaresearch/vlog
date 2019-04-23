@@ -97,13 +97,13 @@ class Reasoner {
                 bool returnOnlyVars,
                 std::vector<uint8_t> *sortByFields);
 
-        static std::shared_ptr<SemiNaiver> fullMaterialization(EDBLayer &layer,
-                Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
-                bool restrictedChase, int nthreads, int interRuleThreads, bool shuffleRules);
+        //static std::shared_ptr<SemiNaiver> fullMaterialization(EDBLayer &layer,
+        //        Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
+        //        bool restrictedChase, int nthreads, int interRuleThreads, bool shuffleRules);
 
         VLIBEXP static std::shared_ptr<SemiNaiver> getSemiNaiver(EDBLayer &layer,
                 Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
-                bool restrictedChase,
+                TypeChase typeChase,
                 int nthreads, int interRuleThreads, bool shuffleRules);
 
         VLIBEXP static std::shared_ptr<TriggerSemiNaiver> getTriggeredSemiNaiver(

@@ -11,16 +11,23 @@ class Checker {
 
         static bool MFA(Program &p);
 
+        static bool MSA(Program &p);
+
         static bool RMFA(Program &p);
 
         static bool MFC(Program &p);
 
+        static void createCriticalInstance(Program &newProgram,
+                Program &p,
+                EDBLayer *db,
+                EDBLayer &layer);
+
         Program *getProgramForBlockingCheckRMFC(Program &p);
 
     public:
-		VLIBEXP static int check(Program &p, std::string alg, EDBLayer &db);
+        VLIBEXP static int check(Program &p, std::string alg, EDBLayer &db);
 
-		VLIBEXP static int checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db);
+        VLIBEXP static int checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db);
 
         static int checkFromString(std::string rulesString, std::string alg, EDBLayer &db);
 

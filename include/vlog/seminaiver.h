@@ -40,6 +40,8 @@ struct StatsSizeIDB {
     long derivation;
 };
 
+typedef enum TypeChase {RESTRICTED_CHASE, SKOLEM_CHASE, SUM_CHASE } TypeChase;
+
 typedef std::unordered_map<std::string, FCTable*> EDBCache;
 class ResultJoinProcessor;
 class SemiNaiver {
@@ -48,7 +50,7 @@ class SemiNaiver {
         bool opt_intersect;
         bool opt_filtering;
         bool multithreaded;
-        bool restrictedChase;
+        TypeChase typeChase;
         bool checkCyclicTerms;
         bool foundCyclicTerms;
         bool ignoreExistentialRules;
@@ -166,7 +168,7 @@ class SemiNaiver {
         VLIBEXP SemiNaiver(EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
-                bool restrictedChase, int nthreads, bool shuffleRules,
+                TypeChase chase, int nthreads, bool shuffleRules,
                 bool ignoreExistentialRules);
 
         //disable restricted chase
@@ -176,7 +178,7 @@ class SemiNaiver {
                 int nthreads, bool shuffleRules,
                 bool ignoreExistentialRules) :
             SemiNaiver(layer, program, opt_intersect, opt_filtering,
-                    multithreaded, false, nthreads, shuffleRules,
+                    multithreaded, TypeChase::SKOLEM_CHASE, nthreads, shuffleRules,
                     ignoreExistentialRules) {
             }
 
@@ -212,7 +214,7 @@ class SemiNaiver {
             return getTable(literal, minIteration, maxIteration, NULL);
         }
 
-		VLIBEXP FCIterator getTable(const PredId_t predid);
+        VLIBEXP FCIterator getTable(const PredId_t predid);
 
         size_t getSizeTable(const PredId_t predid) const;
 

@@ -376,7 +376,7 @@ void writeRuleDependencyGraph(EDBLayer &db, string pathRules, string filegraph) 
         return;
     }
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(db,
-            &p, true, true, false, false, 1, 1, false);
+            &p, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false);
 
     std::vector<int> nodes;
     std::vector<std::pair<int, int>> edges;
@@ -592,7 +592,8 @@ void launchFullMat(int argc,
                 &p, vm["no-intersect"].empty(),
                 vm["no-filtering"].empty(),
                 !vm["multithreaded"].empty(),
-                vm["restrictedChase"].as<bool>(),
+                vm["restrictedChase"].as<bool>()
+                ? TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE,
                 nthreads,
                 interRuleThreads,
                 ! vm["shufflerules"].empty());

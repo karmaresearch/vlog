@@ -43,8 +43,10 @@ int Checker::check(Program &p, std::string alg, EDBLayer &db) {
         return MFC(p) ? 2 : 0;
     } else if (alg == "RMFA") {
         return RMFA(p) ? 1 : 0;
+    } else if (alg == "MSA") {
+        // Model Summarisation Acyclic
+        return MSA(p) ? 1 : 0;
     } else {
-        // TODO: MSA, RMSA?
         LOG(ERRORL) << "Unknown algorithm: " << alg;
         throw 10;
         // return 0;
@@ -88,11 +90,10 @@ static void addIDBCritical(Program &p, EDBLayer *db) {
     }
 }
 
-bool Checker::MFA(Program &p) {
-    // Create  the critical instance (cdb)
-    EDBLayer *db = p.getKB();
-    EDBConf conf("", false);
-    EDBLayer layer(conf, false);
+void Checker::createCriticalInstance(Program &newProgram,
+        Program &p,
+        EDBLayer *db,
+        EDBLayer &layer) {
 
     //Populate the critical instance with new facts
     for(auto p : db->getAllPredicateIDs()) {
@@ -114,7 +115,6 @@ bool Checker::MFA(Program &p) {
         newRules.push_back(ruleString);
     }
 
-    Program newProgram(&layer);
     for (auto rule : newRules) {
         newProgram.parseRule(rule, false);
     }
@@ -122,14 +122,45 @@ bool Checker::MFA(Program &p) {
     // The critical instance should have initial values for ALL predicates,
     // not just the EDB ones ... --Ceriel
     addIDBCritical(newProgram, &layer);
+}
+
+bool Checker::MFA(Program &p) {
+    // Create  the critical instance (cdb)
+    EDBLayer *db = p.getKB();
+    EDBConf conf("", false);
+    EDBLayer layer(conf, false);
+
+    Program newProgram(&layer);
+    createCriticalInstance(newProgram, p, db, layer);
 
     //Launch the skolem chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, false, 1, 1, false);
+            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false);
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)
     if (sn->isFoundCyclicTerms()) {
         return false;   // Not MFA
+    } else {
+        return true;
+    }
+}
+
+bool Checker::MSA(Program &p) {
+    // Create  the critical instance (cdb)
+    EDBLayer *db = p.getKB();
+    EDBConf conf("", false);
+    EDBLayer layer(conf, false);
+
+    Program newProgram(&layer);
+    createCriticalInstance(newProgram, p, db, layer);
+
+    //Launch a simpler version of the skolem chase with the check for cyclic terms
+    std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
+            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false);
+    sn->checkAcyclicity();
+    //if check succeeds then return 0 (we don't know)
+    if (sn->isFoundCyclicTerms()) {
+        return false;   // Not MSA
     } else {
         return true;
     }
@@ -172,7 +203,7 @@ bool Checker::RMFA(Program &p) {
 
     //Launch the (special) restricted chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, true, 1, 0, false);
+            &newProgram, true, true, false, TypeChase::RESTRICTED_CHASE, 1, 0, false);
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)
     if (sn->isFoundCyclicTerms()) {
@@ -397,7 +428,7 @@ static bool rja_check(Program &p, const Rule &rulev, const Rule &rulew, uint8_t 
         newProgram.parseRule(rule, false);
     }
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, false, 1, 1, false);
+            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false);
     sn->run();
     Reasoner r((uint64_t) 0);
     Dictionary dictVariables;
@@ -572,7 +603,7 @@ bool Checker::MFC(Program &p) {
                 count++;
             }
             std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-                    &newProgram, true, true, false, false, 1, 1, false);
+                    &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false);
             sn->checkAcyclicity(ruleCount);
             // If we produce a cyclic term FOR THIS RULE, we have MFC.
             if (sn->isFoundCyclicTerms()) {
