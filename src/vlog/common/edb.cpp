@@ -694,8 +694,10 @@ static std::vector<std::shared_ptr<Column>> checkNewInGeneric(const Literal &l1,
     for (int i = 0; i < posInL2.size(); i++) {
         fieldsToSort2.push_back(posVars2[posInL2[i]]);
     }
-    EDBIterator *itr1 = p->getSortedIterator(l1, fieldsToSort1);
-    EDBIterator *itr2 = p2->getSortedIterator(l2, fieldsToSort2);
+    // EDBIterator *itr1 = p->getSortedIterator(l1, fieldsToSort1);
+    // EDBIterator *itr2 = p2->getSortedIterator(l2, fieldsToSort2);
+    EDBIterator *itr1 = p->getSortedIterator(l1, posInL1);
+    EDBIterator *itr2 = p2->getSortedIterator(l2, posInL2);
 
     std::vector<std::shared_ptr<ColumnWriter>> cols;
     for (int i = 0; i < fieldsToSort1.size(); i++) {
@@ -1152,7 +1154,8 @@ std::vector<std::shared_ptr<Column>> EDBTable::checkNewIn(
         fieldsToSort.push_back(posVars[posInL[i]]);
     }
 
-    EDBIterator *iter = getSortedIterator(l, fieldsToSort);
+    // EDBIterator *iter = getSortedIterator(l, fieldsToSort);
+    EDBIterator *iter = getSortedIterator(l, posInL);
 
     int sz = checkValues.size();
 
@@ -1304,14 +1307,15 @@ std::shared_ptr<Column> EDBTable::checkIn(
     //    }
 
     LOG(DEBUGL) << "EDBTable::checkIn, literal = " << l.tostring() << ", posInL = " << (int) posInL;
-    std::vector<uint8_t> posVars = l.getPosVars();
+//    std::vector<uint8_t> posVars = l.getPosVars();
     std::vector<uint8_t> fieldsToSort;
-    for (int i = 0; i < posVars.size(); i++) {
-        if (i == posInL) {
-            fieldsToSort.push_back(i);
-            break;
-        }
-    }
+//    for (int i = 0; i < posVars.size(); i++) {
+//        if (i == posInL) {
+//            fieldsToSort.push_back(i);
+//            break;
+//        }
+//    }
+    fieldsToSort.push_back(posInL);
     EDBIterator *iter = getSortedIterator(l, fieldsToSort);
 
     //Output

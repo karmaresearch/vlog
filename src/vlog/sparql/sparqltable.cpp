@@ -6,6 +6,7 @@
 using json = nlohmann::json;
 
 static bool curl_initialized = false;
+static int  numTables = 0;
 
 SparqlTable::SparqlTable(PredId_t predid, string repository, EDBLayer *layer, string f, string whereBody) :
     predid(predid), repository(repository), layer(layer), whereBody(whereBody) {
@@ -31,6 +32,7 @@ SparqlTable::SparqlTable(PredId_t predid, string repository, EDBLayer *layer, st
             }
             this->fieldVars.push_back(item);
         }
+	numTables++;
     }
 
 
@@ -203,6 +205,7 @@ json SparqlTable::launchQuery(std::string sparqlQuery) {
         std::string em(errorBuffer);
         LOG(WARNL) << "Launching query failed: " << em;
     }
+    curl_slist_free_all(headers);
     return output;
 }
 
@@ -336,6 +339,7 @@ EDBIterator *SparqlTable::getSortedIterator(const Literal &query,
             writers[i]->add(it->getElementAt(i));
         }
     }
+    delete it;
 
     std::vector<std::shared_ptr<Column>> columns;
     for (uint8_t i = 0; i < sz; ++i) {
@@ -393,6 +397,7 @@ uint64_t SparqlTable::getNTerms() {
 }
 
 void SparqlTable::releaseIterator(EDBIterator *itr) {
+    delete itr;
 }
 
 uint64_t SparqlTable::getSize() {
@@ -409,4 +414,9 @@ uint64_t SparqlTable::getSize() {
 
 SparqlTable::~SparqlTable() {
     curl_easy_cleanup(curl);
+    numTables--;
+    if (numTables == 0) {
+	curl_initialized = false;
+	curl_global_cleanup();
+    }
 }
