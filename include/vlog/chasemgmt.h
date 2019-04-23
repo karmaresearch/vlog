@@ -62,15 +62,19 @@ class ChaseMgmt {
                 uint64_t *currentblock;
                 std::unordered_map<ChaseRow, uint64_t, hash_ChaseRow> rows;
                 bool cyclicTerms;
+                TypeChase typeChase;
 
             public:
                 Rows(uint64_t startCounter, uint8_t sizerow,
-                        std::vector<uint8_t> nameArgVars) :
+                        std::vector<uint8_t> nameArgVars,
+                        TypeChase typeChase) :
                     startCounter(startCounter), sizerow(sizerow),
                     nameArgVars(nameArgVars) {
                         blockCounter = 0;
                         currentblock = NULL;
                         currentcounter = startCounter;
+                        cyclicTerms = false;
+                        this->typeChase = typeChase;
                     }
 
                 uint8_t getSizeRow() {
@@ -101,13 +105,17 @@ class ChaseMgmt {
                 std::map<uint8_t, ChaseMgmt::Rows> vars2rows;
                 uint64_t ruleBaseCounter;
                 Rule const * rule;
+                TypeChase chase;
+
             public:
                 RuleContainer(uint64_t ruleBaseCounter,
                         std::map<uint8_t, std::vector<uint8_t>> dep,
-                        Rule const * rule) {
+                        Rule const * rule,
+                        TypeChase chase) {
                     this->ruleBaseCounter = ruleBaseCounter;
                     dependencies = dep;
                     this->rule = rule;
+                    this->chase = chase;
                 }
 
                 bool containsCyclicTerms();

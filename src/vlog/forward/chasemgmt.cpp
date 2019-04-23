@@ -19,11 +19,15 @@ uint64_t ChaseMgmt::Rows::addRow(uint64_t* row) {
     rows[r] = currentcounter;
     currentblock += sizerow;
     blockCounter++;
-    if (startCounter == UINT32_MAX) {
+    if (((uint32_t)currentcounter) == UINT32_MAX) {
         LOG(ERRORL) << "I can assign at most 2^32 new IDs to an ext. variable... Stop!";
         throw 10;
     }
-    return currentcounter++;
+    auto out = currentcounter;
+    if (typeChase != TypeChase::SUM_CHASE) {
+        currentcounter++;
+    }
+    return out;
 }
 
 bool ChaseMgmt::Rows::existingRow(uint64_t *row, uint64_t &value) {
@@ -54,7 +58,7 @@ ChaseMgmt::Rows *ChaseMgmt::RuleContainer::getRows(uint8_t var) {
         // counter ID.
         startCounter += VAR_SHIFT(var);
         vars2rows.insert(std::make_pair(var, Rows(startCounter, sizerow,
-                        dependencies[var])));
+                        dependencies[var], chase)));
     }
     return &vars2rows.find(var)->second;
 }
@@ -83,7 +87,8 @@ ChaseMgmt::ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
             this->rules[r.rule.getId()] = std::unique_ptr<ChaseMgmt::RuleContainer>(
                     new ChaseMgmt::RuleContainer(ruleBaseCounter,
                         r.orderExecutions[0].dependenciesExtVars,
-                        &r.rule));
+                        &r.rule,
+                        typeChase));
         }
     }
 

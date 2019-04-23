@@ -171,8 +171,8 @@ void ExistentialRuleProcessor::filterDerivations(FCTable *t,
                 idx++;
             }
         }
-	table->releaseIterator(itr2);
-	itr1->clear();
+        table->releaseIterator(itr2);
+        itr1->clear();
         tableItr.moveNextCount();
     }
 
@@ -852,7 +852,7 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
         VTuple tuple(card);
         for(uint8_t i = 0; i < card; ++i) {
             // tuple.set(VTerm(i, 0), i);
-            tuple.set(VTerm(i+1, 0), i);	// I suppose these should all be variables ... --Ceriel
+            tuple.set(VTerm(i+1, 0), i);    // I suppose these should all be variables ... --Ceriel
         }
         Literal query(pred, tuple);
         FCBlock block(0, ltable, query, 0, NULL, 0, true);
@@ -981,8 +981,8 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
     LOG(DEBUGL) << "RMFA_check, headLiteral = " << headLiteral.tostring(NULL, NULL);
 #if DEBUG
     for (int i = 0; i < columnsToCheck.size(); i++) {
-	LOG(TRACEL) << "columnsToCheck[" << i << "] = " << (int) columnsToCheck[i];
-	LOG(TRACEL) << "headrow[" << (int) columnsToCheck[i] << "] = " << headrow[columnsToCheck[i]];
+        LOG(TRACEL) << "columnsToCheck[" << i << "] = " << (int) columnsToCheck[i];
+        LOG(TRACEL) << "headrow[" << (int) columnsToCheck[i] << "] = " << headrow[columnsToCheck[i]];
     }
 #endif
     //Get a starting value for the fresh IDs
@@ -995,7 +995,7 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
 
 #if DEBUG
     for (int i = 0; i < input.size(); i++) {
-	LOG(TRACEL) << "input[" << i << "] = " << input[i].tostring(NULL, NULL);
+        LOG(TRACEL) << "input[" << i << "] = " << input[i].tostring(NULL, NULL);
     }
 #endif
 
@@ -1018,7 +1018,7 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
             for(uint8_t j = 0; j < columnsToCheck.size(); ++j) {
                 auto cId = columnsToCheck[j];
 #if DEBUG
-		LOG(TRACEL) << "cId = " << (int) cId << ", currentValue = " << tbItr->getCurrentValue(cId);
+                LOG(TRACEL) << "cId = " << (int) cId << ", currentValue = " << tbItr->getCurrentValue(cId);
 #endif
                 if (tbItr->getCurrentValue(cId) != headrow[cId]) {
                     found = false;
@@ -1037,7 +1037,7 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
     delete &l;
     return found;
 }
- 
+
 void ExistentialRuleProcessor::consolidate(const bool isFinished) {
     if (replaceExtColumns && tmpRelation != NULL) {
         //Populate the allColumns vector with known columns and constants
