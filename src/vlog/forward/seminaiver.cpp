@@ -286,7 +286,7 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
         std::copy(allIDBRules[k].begin(), allIDBRules[k].end(), std::back_inserter(allrules));
     }
     chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt(allrules,
-                typeChase == TypeChase::RESTRICTED_CHASE, checkCyclicTerms,
+                typeChase, checkCyclicTerms,
                 singleRuleToCheck));
 #if DEBUG
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;

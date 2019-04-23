@@ -40,8 +40,6 @@ struct StatsSizeIDB {
     long derivation;
 };
 
-typedef enum TypeChase {RESTRICTED_CHASE, SKOLEM_CHASE, SUM_CHASE } TypeChase;
-
 typedef std::unordered_map<std::string, FCTable*> EDBCache;
 class ResultJoinProcessor;
 class SemiNaiver {

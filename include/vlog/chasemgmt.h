@@ -19,6 +19,7 @@
 #define RULEVARMASK (RULE_MASK|VAR_MASK)
 #define COUNTER(v) (v & 0xFFFFFFFF)
 
+typedef enum TypeChase {RESTRICTED_CHASE, SKOLEM_CHASE, SUM_CHASE } TypeChase;
 
 struct ChaseRow {
     uint8_t sz;
@@ -119,7 +120,7 @@ class ChaseMgmt {
         };
 
         std::vector<std::unique_ptr<ChaseMgmt::RuleContainer>> rules;
-        const bool restricted;
+        const TypeChase typeChase;
         const bool checkCyclic;
 
         const int ruleToCheck;
@@ -131,7 +132,7 @@ class ChaseMgmt {
 
     public:
         ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
-                const bool restricted, const bool checkCyclic,
+                const TypeChase typeChase, const bool checkCyclic,
                 const int ruleToCheck = -1);
 
         std::shared_ptr<Column> getNewOrExistingIDs(
@@ -153,7 +154,7 @@ class ChaseMgmt {
         }
 
         bool isRestricted() {
-            return restricted;
+            return typeChase == TypeChase::RESTRICTED_CHASE;
         }
 
         bool hasRuleToCheck() {

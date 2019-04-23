@@ -70,20 +70,22 @@ bool ChaseMgmt::RuleContainer::containsCyclicTerms() {
 
 //************** CHASE MGMT ***************
 ChaseMgmt::ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
-        const bool restricted, const bool checkCyclic, const int ruleToCheck) : restricted(restricted), checkCyclic(checkCyclic), ruleToCheck(ruleToCheck), cyclic(false) {
-    this->rules.resize(rules.size());
-    for(const auto &r : rules) {
-        if (r.rule.getId() >= rules.size()) {
-            LOG(ERRORL) << "Should not happen...";
-            throw 10;
+        const TypeChase typeChase, const bool checkCyclic,
+        const int ruleToCheck) : typeChase(typeChase), checkCyclic(checkCyclic),
+    ruleToCheck(ruleToCheck), cyclic(false) {
+        this->rules.resize(rules.size());
+        for(const auto &r : rules) {
+            if (r.rule.getId() >= rules.size()) {
+                LOG(ERRORL) << "Should not happen...";
+                throw 10;
+            }
+            uint64_t ruleBaseCounter = RULE_SHIFT(r.rule.getId());
+            this->rules[r.rule.getId()] = std::unique_ptr<ChaseMgmt::RuleContainer>(
+                    new ChaseMgmt::RuleContainer(ruleBaseCounter,
+                        r.orderExecutions[0].dependenciesExtVars,
+                        &r.rule));
         }
-        uint64_t ruleBaseCounter = RULE_SHIFT(r.rule.getId());
-        this->rules[r.rule.getId()] = std::unique_ptr<ChaseMgmt::RuleContainer>(
-                new ChaseMgmt::RuleContainer(ruleBaseCounter,
-                    r.orderExecutions[0].dependenciesExtVars,
-                    &r.rule));
     }
-}
 
 static bool checkValue(uint64_t target, uint64_t v, std::vector<uint64_t> &toCheck) {
     LOG(TRACEL) << "checkValue: target = " << target << ", v = " << v;
