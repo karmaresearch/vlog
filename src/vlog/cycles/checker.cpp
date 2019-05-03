@@ -41,6 +41,11 @@ int Checker::check(Program &p, std::string alg, EDBLayer &db) {
         // This one, as the name already suggests, is the other way around: if true, there is a cycle,
         // so we know it won't terminate in some cases.
         return MFC(p) ? 2 : 0;
+    } else if (alg == "RMFC") {
+        // Restricted Model Faithful Cyclic
+        // This one, as the name already suggests, also is the other way around: if true, there is a cycle,
+        // so we know it won't terminate in some cases.
+        return MFC(p, true) ? 2 : 0;
     } else if (alg == "RMFA") {
         return RMFA(p) ? 1 : 0;
     } else if (alg == "MSA") {
@@ -84,8 +89,8 @@ static void addIDBCritical(Program &p, EDBLayer *db) {
                 }
             }
             rule = rule + paramList + ") :- " + edbName + "(" + paramList + ")";
+            LOG(DEBUGL) << "Adding rule for IDB critical: " << rule;
             p.parseRule(rule, false);
-            LOG(DEBUGL) << "Adding rule: " << rule;
         }
     }
 }
@@ -111,7 +116,7 @@ void Checker::createCriticalInstance(Program &newProgram,
     std::vector<Rule> rules = p.getAllRules();
     for (auto rule : rules) {
         std::string ruleString = rule.toprettystring(&p, p.getKB(), true);
-        LOG(DEBUGL) << "Adding rule: " << ruleString;
+        LOG(DEBUGL) << "Adding rule replacing constants: " << ruleString;
         newRules.push_back(ruleString);
     }
 
@@ -541,13 +546,17 @@ bool Checker::JA(Program &p, bool restricted) {
     return true;
 }
 
-bool Checker::MFC(Program &p) {
+bool Checker::MFC(Program &p, bool restricted) {
     // First, create a copy of the rules.
     std::vector<std::string> rules;
     std::vector<Rule> r = p.getAllRules();
     for (auto rule : r) {
         std::string ruleString = rule.toprettystring(&p, p.getKB());
         rules.push_back(ruleString);
+    }
+    Program *restrictedProgram = NULL;
+    if (restricted) {
+        restrictedProgram = getProgramForBlockingCheckRMFC(p);
     }
     // Then, for each existential rule, do the MFC check.
     int ruleCount = 0;
@@ -575,8 +584,7 @@ bool Checker::MFC(Program &p) {
                 edbSet[predid].push_back(value);
             }
 
-            EDBConf conf("", false);
-            EDBLayer layer(conf, false);
+            EDBLayer layer(*(p.getKB()), false);
 
             for (auto pair : edbSet) {
                 std::string edbName = "__DUMMY__" + std::to_string(pair.first);
@@ -591,31 +599,45 @@ bool Checker::MFC(Program &p) {
                     }
                 }
                 rule = rule + paramList + ") :- " + edbName + "(" + paramList + ")";
-                LOG(DEBUGL) << "Adding rule: \"" << rule << "\"";
                 newRules.push_back(rule);
+            }
+
+            std::vector<PredId_t> predicates = p.getKB()->getAllPredicateIDs();
+            for (auto pred : predicates) {
+                if (!edbSet.count(pred)) {
+                    uint8_t arity = p.getKB()->getPredArity(pred);
+                    std::vector<uint64_t> empty;
+                    layer.addInmemoryTable(pred, arity, empty);
+                }
             }
 
             // Now create a new program, and materialize. But: don't apply rules to recursive terms.
             Program newProgram(&layer);
             int count = 0;
             for (auto rule : newRules) {
+                LOG(DEBUGL) << "Adding rule: \"" << rule << "\"";
                 newProgram.parseRule(rule, false);
                 count++;
             }
             std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-                    &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false);
+                    &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false, restrictedProgram);
             sn->checkAcyclicity(ruleCount);
             // If we produce a cyclic term FOR THIS RULE, we have MFC.
             if (sn->isFoundCyclicTerms()) {
-                LOG(INFOL) << "MFC: Cyclic rule: " << rule.toprettystring(&p, p.getKB());
+                LOG(INFOL) << (restricted ? "R" : "") << "MFC: Cyclic rule: " << rule.toprettystring(&p, p.getKB());
+                if (restrictedProgram != NULL) {
+                    delete restrictedProgram;
+                }
                 return true;    // MFC
             }
         }
         ruleCount++;
     }
+    if (restrictedProgram != NULL) {
+        delete restrictedProgram;
+    }
     return false;
 }
-
 
 Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
     // Create  the critical instance (cdb)
@@ -632,6 +654,7 @@ Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
         }
         facts.push_back(fact);
         layer->addInmemoryTable(db->getPredName(p), facts);
+        LOG(DEBUGL) << "Adding inmemory table for " << db->getPredName(p);
     }
 
     // Rewrite rules: all existential variables must be replaced with "*".

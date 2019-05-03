@@ -78,7 +78,7 @@ string set_to_string(std::unordered_set<int> s) {
 SemiNaiver::SemiNaiver(EDBLayer &layer,
         Program *program, bool opt_intersect, bool opt_filtering,
         bool multithreaded, TypeChase typeChase, int nthreads, bool shuffle,
-        bool ignoreExistentialRules) :
+        bool ignoreExistentialRules, Program *RMFC_check) :
     opt_intersect(opt_intersect),
     opt_filtering(opt_filtering),
     multithreaded(multithreaded),
@@ -88,7 +88,8 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
     program(program),
     nthreads(nthreads),
     checkCyclicTerms(false),
-    ignoreExistentialRules(ignoreExistentialRules) {
+    ignoreExistentialRules(ignoreExistentialRules),
+    RMFC_program(RMFC_check) {
 
         std::vector<Rule> ruleset = program->getAllRules();
         predicatesTables.resize(program->getMaxPredicateId());
@@ -648,6 +649,7 @@ bool SemiNaiver::bodyChangedSince(Rule &rule, uint32_t iteration) {
     for (int i = 0; i < nBodyLiterals; ++i) {
         if (body[i].getPredicate().getType() == EDB) {
             if (iteration == 0) {
+                LOG(DEBUGL) << "Returns true";
                 return true;
             }
             continue;

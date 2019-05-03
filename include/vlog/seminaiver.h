@@ -63,7 +63,7 @@ class SemiNaiver {
         bool ignoreDuplicatesElimination;
         std::vector<int> stratification;
         int nStratificationClasses;
-
+        Program *RMFC_program;
 
 #ifdef WEBINTERFACE
         long statsLastIteration;
@@ -167,7 +167,7 @@ class SemiNaiver {
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 TypeChase chase, int nthreads, bool shuffleRules,
-                bool ignoreExistentialRules);
+                bool ignoreExistentialRule, Program *RMFC_check = NULL);
 
         //disable restricted chase
         VLIBEXP SemiNaiver(EDBLayer &layer,
@@ -183,6 +183,10 @@ class SemiNaiver {
         VLIBEXP void run(unsigned long *timeout = NULL,
                 bool checkCyclicTerms = false) {
             run(0, 1, timeout, checkCyclicTerms, -1);
+        }
+
+        Program *get_RMFC_program() {
+            return RMFC_program;
         }
 
         bool opt_filter() {

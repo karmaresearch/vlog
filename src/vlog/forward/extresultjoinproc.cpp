@@ -390,7 +390,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     for(const auto &p : posToCopy) {
                         headrow[p.first] = tmprow[p.second];
                     }
-                    if (RMFA_check(tmprow.get(), h, headrow.get(), posToCheck)) {
+                    if (blocked_check(tmprow.get(), h, headrow.get(), posToCheck)) {
                         //It is blocked
                         blocked[i] = true;
                         LOG(DEBUGL) << "Blocking row " << i;
@@ -613,7 +613,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     for(const auto &p : columnsToCopy) {
                         headrow[p.first] = tmprow[p.second];
                     }
-                    if (RMFA_check(tmprow.get(), h, headrow.get(),
+                    if (blocked_check(tmprow.get(), h, headrow.get(),
                                 columnsToCheck)) { //Is blocked
                         blocked[i] = true;
                         LOG(DEBUGL) << "Blocking row " << i;
@@ -768,7 +768,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     }
 }
 
-void ExistentialRuleProcessor::RMFA_computeBodyAtoms(
+void ExistentialRuleProcessor::blocked_check_computeBodyAtoms(
         std::vector<Literal> &output,
         uint64_t *row) {
     const RuleExecutionPlan &plan = ruleDetails->orderExecutions[ruleExecOrder];
@@ -786,10 +786,8 @@ void ExistentialRuleProcessor::RMFA_computeBodyAtoms(
     }
 }
 
-std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
-        std::vector<Literal> &input) {
-    //Populate the EDB layer
-    EDBLayer *layer = new EDBLayer(sn->getEDBLayer(), false);
+std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::saturateInput(
+        std::vector<Literal> &input, Program *program, EDBLayer *layer) {
 
     std::map<PredId_t, std::vector<uint64_t>> edbPredicates;
     std::map<PredId_t, std::vector<uint64_t>> idbPredicates;
@@ -827,7 +825,6 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
     }
 
     //Launch the semi-naive evaluation
-    Program *program = sn->getProgram();
     std::unique_ptr<SemiNaiver> lsn(new SemiNaiver(
                 *layer, program, true, true, false, 1, false, true));
 
@@ -928,9 +925,12 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                                     mappings.insert(
                                             std::make_pair(varID, startFreshIDs++));
                                 } else {
-                                    // Is this correct? Is 0 indeed '*'? TODO check
+                                    Program *p = sn->get_RMFC_program();
+                                    assert(p != NULL);
+                                    uint64_t id = 0;
+                                    p->getKB()->getOrAddDictNumber("*", 1, id);
                                     mappings.insert(
-                                            std::make_pair(varID, 0));
+                                            std::make_pair(varID, id));
                                 }
                             }
                             t.set(VTerm(0, mappings[varID]), m);
@@ -975,23 +975,20 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
     }
 }
 
-bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
+bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
         const Literal &headLiteral,
         uint64_t *headrow, std::vector<uint8_t> &columnsToCheck) {
-    LOG(DEBUGL) << "RMFA_check, headLiteral = " << headLiteral.tostring(NULL, NULL);
+    LOG(DEBUGL) << "blocked_check, headLiteral = " << headLiteral.tostring(NULL, NULL);
 #if DEBUG
     for (int i = 0; i < columnsToCheck.size(); i++) {
         LOG(TRACEL) << "columnsToCheck[" << i << "] = " << (int) columnsToCheck[i];
         LOG(TRACEL) << "headrow[" << (int) columnsToCheck[i] << "] = " << headrow[columnsToCheck[i]];
     }
 #endif
-    //Get a starting value for the fresh IDs
-    uint64_t freshIDs = 1; //0 is star
 
-    //In this case I invoke the code needed for the RMFA
     std::vector<Literal> input; //"input" corresponds to B_\rho,\sigma in the paper
     //First I need to add to body atoms
-    RMFA_computeBodyAtoms(input, row);
+    blocked_check_computeBodyAtoms(input, row);
 
 #if DEBUG
     for (int i = 0; i < input.size(); i++) {
@@ -999,11 +996,22 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
     }
 #endif
 
-    //Then I need to add all facts relevant to produce the function terms
-    enhanceFunctionTerms(input, freshIDs, true);
+    std::unique_ptr<SemiNaiver> n;
 
-    //Finally I need to saturate "input" with the datalog rules
-    std::unique_ptr<SemiNaiver> n = RMFA_saturateInput(input);
+    //Get a starting value for the fresh IDs
+    uint64_t freshIDs = 1; //0 is star
+
+    //Then I need to add all facts relevant to produce the function terms
+    enhanceFunctionTerms(input, freshIDs, sn->get_RMFC_program() == NULL);
+    if (sn->get_RMFC_program() == NULL) {
+        //Finally I need to saturate "input" with the datalog rules
+        n = saturateInput(input, sn->getProgram(), new EDBLayer(sn->getEDBLayer(), false));
+    } else {
+        Program *p = sn->get_RMFC_program();
+        EDBLayer *layer = new EDBLayer(*(p->getKB()), true);
+        n = saturateInput(input, p, layer);
+        // TODO: exclusion of rule ρ⋆ under substitution σ⋆
+    }
 
     //Check if the head is blocked in this set
     bool found = false; //If found = true, then the rule application is blocked
@@ -1130,7 +1138,7 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                             }
                             headrow[j] = headReaders[j]->next();
                         }
-                        if (RMFA_check(tmprow.get(), h, headrow.get(),
+                        if (blocked_check(tmprow.get(), h, headrow.get(),
                                     columnsToCheck)) { //Is it blocked?
                             blocked[i] = true;
                             LOG(DEBUGL) << "Blocking row " << i;
