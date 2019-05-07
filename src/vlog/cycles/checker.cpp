@@ -66,9 +66,16 @@ static void addIDBCritical(Program &p, EDBLayer *db) {
     for (PredId_t v : allPredicates) {
         Predicate pred = p.getPredicate(v);
         if (pred.getType() == IDB) {
+            std::string name = p.getPredicateName(v);
+            LOG(DEBUGL) << "addIDBCritical: " << name;
+            if (name.find("__EXCLUDE_DUMMY__") == 0) {
+                LOG(DEBUGL) << "Continuing";
+                continue;
+            }
             // Add a rule with a dummy EDB predicate
             uint8_t cardinality = pred.getCardinality();
             std::string edbName = "__DUMMY__" + std::to_string(cardinality);
+            LOG(DEBUGL) << "Checking existence of " << edbName;
             if (! hasNewEDB[cardinality]) {
                 PredId_t predId = p.getOrAddPredicate(edbName, cardinality);
                 std::vector<std::vector<string>> facts;
@@ -132,8 +139,7 @@ void Checker::createCriticalInstance(Program &newProgram,
 bool Checker::MFA(Program &p) {
     // Create  the critical instance (cdb)
     EDBLayer *db = p.getKB();
-    EDBConf conf("", false);
-    EDBLayer layer(conf, false);
+    EDBLayer layer(*db, false);
 
     Program newProgram(&layer);
     createCriticalInstance(newProgram, p, db, layer);
@@ -153,8 +159,7 @@ bool Checker::MFA(Program &p) {
 bool Checker::MSA(Program &p) {
     // Create  the critical instance (cdb)
     EDBLayer *db = p.getKB();
-    EDBConf conf("", false);
-    EDBLayer layer(conf, false);
+    EDBLayer layer(*db, false);
 
     Program newProgram(&layer);
     createCriticalInstance(newProgram, p, db, layer);
@@ -174,8 +179,7 @@ bool Checker::MSA(Program &p) {
 bool Checker::RMFA(Program &p) {
     // Create  the critical instance (cdb)
     EDBLayer *db = p.getKB();
-    EDBConf conf("", false);
-    EDBLayer layer(conf, false);
+    EDBLayer layer(*db, false);
 
     //Populate the critical instance with new facts
     for(auto p : db->getAllPredicateIDs()) {
@@ -360,8 +364,7 @@ static bool rja_check(Program &p, const Rule &rulev, const Rule &rulew, uint8_t 
     generateConstants(p, edbSet, constantCount, varConstantMapv, rulev.getHeads());
     generateConstants(p, edbSet, constantCount, varConstantMapv, rulev.getBody());
 
-    EDBConf conf("", false);
-    EDBLayer layer(conf, false);
+    EDBLayer layer(*(p.getKB()), false);
 
     std::vector<std::string> nonGeneratingRules;
     std::vector<Rule> rules = p.getAllRules();
@@ -620,7 +623,7 @@ bool Checker::MFC(Program &p, bool restricted) {
                 count++;
             }
             std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-                    &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false, restrictedProgram);
+                    &newProgram, true, true, false, restricted ? TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE, 1, 0, false, restrictedProgram);
             sn->checkAcyclicity(ruleCount);
             // If we produce a cyclic term FOR THIS RULE, we have MFC.
             if (sn->isFoundCyclicTerms()) {
@@ -660,6 +663,7 @@ Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
     // Rewrite rules: all existential variables must be replaced with "*".
     std::vector<std::string> newRules;
     std::vector<Rule> rules = p.getAllRules();
+    size_t count = 0;
     for (auto rule : rules) {
         std::string output = "";
         std::vector<uint8_t> existentials = rule.getVarsNotInBody();
@@ -716,15 +720,32 @@ Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
             first = false;
             output += bodyAtom.toprettystring(&p, db, false);
         }
+        if (existentials.size() > 0) {
+            // Add negated term allowing for exclusion of a specific binding
+            output += ", neg_";
+            output += "__EXCLUDE_DUMMY__" + std::to_string(count) + "(";
+            std::vector<uint8_t> vars = rule.getVarsInBody();
+            bool f = true;
+            for (int i = 0; i < vars.size(); i++) {
+                if (! f) {
+                    output += ",";
+                }
+                f = false;
+                output += std::string("A") + std::to_string(vars[i]);
+            }
+            output += ")";
+        }
 
         LOG(DEBUGL) << "Adding rule: " << output;
         newRules.push_back(output);
+        count++;
     }
 
-    Program *newProgram = new Program(layer);
+    Program *newProgram = new Program(&p, layer);
     for (auto rule : newRules) {
         newProgram->parseRule(rule, false);
     }
+    LOG(DEBUGL) << "New Program: " << newProgram->tostring();
 
     // The critical instance should have initial values for ALL predicates,
     // not just the EDB ones ... --Ceriel

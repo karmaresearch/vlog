@@ -810,6 +810,9 @@ Program::Program(EDBLayer *kb) : kb(kb),
     cardPredicates(kb->getPredicateCardUnorderedMap()) {
     }
 
+Program::Program(Program *p, EDBLayer *kb) : kb(kb), dictPredicates(p->dictPredicates), cardPredicates(p->cardPredicates) {
+}
+
 std::string trim(const std::string& str,
         const std::string& whitespace = "\r \t")
 {

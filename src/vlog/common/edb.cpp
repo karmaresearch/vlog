@@ -142,6 +142,7 @@ void EDBLayer::addInmemoryTable(PredId_t id,
     EDBInfoTable infot;
     infot.id = id;
     if (doesPredExists(infot.id)) {
+        LOG(INFOL) << "Rewriting table for predicate " << id;
         dbPredicates.erase(infot.id);
     }
     infot.type = "INMEMORY";

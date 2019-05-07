@@ -476,6 +476,8 @@ class Program {
     public:
         VLIBEXP Program(EDBLayer *kb);
 
+        VLIBEXP Program(Program *p, EDBLayer *kb);
+
         EDBLayer *getKB() {
             return kb;
         }

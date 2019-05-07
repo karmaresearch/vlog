@@ -830,7 +830,7 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::saturateInput(
 
     //Populate the IDB layer
     for(auto &pair : idbPredicates) {
-        Predicate pred = sn->getProgram()->getPredicate(pair.first);
+        Predicate pred = program->getPredicate(pair.first);
         const uint8_t card = pred.getCardinality();
 
         //Construct the table
@@ -1009,8 +1009,19 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
     } else {
         Program *p = sn->get_RMFC_program();
         EDBLayer *layer = new EDBLayer(*(p->getKB()), true);
+        // Exclusion of rule ρ⋆ under substitution σ⋆
+        // we have to provide a binding for the added __EXCLUDE_DUMMY__.
+        const Rule &rule = p->getRule(ruleDetails->rule.getId());
+        const std::vector<Literal> &body = rule.getBody();
+        Literal lastLit = body.back();
+        VTuple tupl(lastLit.getTupleSize());
+        for (int i = 0; i < lastLit.getTupleSize(); i++) {
+            tupl.set(VTerm(0, row[i]), i);
+        }
+        input.push_back(Literal(lastLit.getPredicate(), tupl));
+        LOG(DEBUGL) << "Adding exclusion info for rule " << rule.tostring(p, layer) << ": " << input.back().tostring(p, layer);
+
         n = saturateInput(input, p, layer);
-        // TODO: exclusion of rule ρ⋆ under substitution σ⋆
     }
 
     //Check if the head is blocked in this set
