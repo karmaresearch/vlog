@@ -1086,6 +1086,13 @@ std::string Program::rewriteRDFOWLConstants(std::string input) {
         return input;
     }
 
+    //is this the correct way of saying that something is a literal of type string?
+    if (input.at(0)!='<' || input.at(input.length()-1)!='>'){
+        if (input.at(0)=='\"' && input.at(input.length()-1)=='\"')
+            input += "^^<http://www.w3.org/2001/XMLSchema#string>";
+        else
+            input = "\"" + input + "\"^^<http://www.w3.org/2001/XMLSchema#string>";
+    }
     return input;
 }
 
