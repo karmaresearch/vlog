@@ -14,6 +14,9 @@
 #include <set>
 #include <unordered_map>
 
+#include <parser/ruledriver.h>
+#include <parser/rulescanner.h>
+
 /*** PREDICATES ***/
 #define EDB 0
 #define IDB 1
@@ -498,6 +501,10 @@ class Program {
 
         VLIBEXP std::string readFromString(std::string rules, bool rewriteMultihead = false);
 
+        VLIBEXP void parseRuleFile(std::string pathFile, bool rewriteMultihead = false);
+        VLIBEXP void parseAST(MC::RuleAST *root, bool rewriteMultihead, Dictionary *dictVariables, std::vector<Literal> *listOfLiterals, std::vector<VTerm> *terms);
+        VLIBEXP void parseVariableAST(MC::RuleAST *root, Dictionary *dictVariables, std::vector<VTerm> *terms);
+        VLIBEXP void parseConstantAST(MC::RuleAST *root, std::vector<VTerm> *terms);
         PredId_t getPredicateID(std::string &p, const uint8_t card);
 
         VLIBEXP std::string getPredicateName(const PredId_t id);
