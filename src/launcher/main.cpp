@@ -101,6 +101,7 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
                 return false;
             }
 
+            //vm["rules"] is the path to the rule file
             if (vm["rules"].as<string>().compare("") != 0) {
                 string path = vm["rules"].as<string>();
                 if (!Utils::exists(path)) {
@@ -543,11 +544,12 @@ void launchFullMat(int argc,
         std::string pathRules) {
     //Load a program with all the rules
     Program p(&db);
-    std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
-    if (s != "") {
-        LOG(ERRORL) << s;
-        return;
-    }
+    //std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+    //if (s != "") {
+    //    LOG(ERRORL) << s;
+    //    return;
+    //}
+    p.parseRuleFile(pathRules); //L.'s method
 
     //Existential check
     if (p.areExistentialRules()) {
