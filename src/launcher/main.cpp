@@ -1187,11 +1187,13 @@ int main(int argc, const char** argv) {
         string rulesFile = vm["rules"].as<string>();
         string alg = vm["alg"].as<string>();
         checkAcyclicity(rulesFile, alg, *layer);
+	delete layer;
     } else if (cmd == "deps") {
         EDBConf conf(edbFile);
         EDBLayer *layer = new EDBLayer(conf, false);
         string rulesFile = vm["rules"].as<string>();
         detectDeps(rulesFile, *layer);
+	delete layer;
     }
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Runtime = " << sec.count() * 1000 << " milliseconds";
