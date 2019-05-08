@@ -75,5 +75,8 @@ neg\_ {return(token::NEGATE);}
 .          {std::cout << "Lexer ERROR. Unrecognized character: " << yytext << std::endl;
             std::exit(1);
            }
+
+\%[^\r\n]*(\r\n|\r|\n) { /* # comment */ }
+\%[^\r\n]*             { /* # comment on the last line with no terminating newline */}
 %%
 
