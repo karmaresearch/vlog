@@ -629,6 +629,7 @@ bool Checker::MFC(Program &p, bool restricted) {
             if (sn->isFoundCyclicTerms()) {
                 LOG(INFOL) << (restricted ? "R" : "") << "MFC: Cyclic rule: " << rule.toprettystring(&p, p.getKB());
                 if (restrictedProgram != NULL) {
+		    delete restrictedProgram->getKB();
                     delete restrictedProgram;
                 }
                 return true;    // MFC
@@ -637,6 +638,7 @@ bool Checker::MFC(Program &p, bool restricted) {
         ruleCount++;
     }
     if (restrictedProgram != NULL) {
+	delete restrictedProgram->getKB();
         delete restrictedProgram;
     }
     return false;
@@ -645,8 +647,7 @@ bool Checker::MFC(Program &p, bool restricted) {
 Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
     // Create  the critical instance (cdb)
     EDBLayer *db = p.getKB();
-    EDBConf conf("", false);
-    EDBLayer *layer = new EDBLayer(conf, false);
+    EDBLayer *layer = new EDBLayer(*db, false);
 
     //Populate the critical instance with new facts
     for(auto p : db->getAllPredicateIDs()) {

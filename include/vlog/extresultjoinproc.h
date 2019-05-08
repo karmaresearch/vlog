@@ -49,7 +49,7 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 uint64_t &sizecolumns,
                 std::vector<std::shared_ptr<Column>> &c);
 
-        bool blocked_check(uint64_t *row, const Literal &headLiteral,
+        bool blocked_check(uint64_t *row, size_t sizerow, const Literal &headLiteral,
                 uint64_t *headrow, std::vector<uint8_t> &columnsToCheck);
 
         void blocked_check_computeBodyAtoms(std::vector<Literal> &output,

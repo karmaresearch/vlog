@@ -390,7 +390,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     for(const auto &p : posToCopy) {
                         headrow[p.first] = tmprow[p.second];
                     }
-                    if (blocked_check(tmprow.get(), h, headrow.get(), posToCheck)) {
+                    if (blocked_check(tmprow.get(), c.size(), h, headrow.get(), posToCheck)) {
                         //It is blocked
                         blocked[i] = true;
                         LOG(DEBUGL) << "Blocking row " << i;
@@ -613,7 +613,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     for(const auto &p : columnsToCopy) {
                         headrow[p.first] = tmprow[p.second];
                     }
-                    if (blocked_check(tmprow.get(), h, headrow.get(),
+                    if (blocked_check(tmprow.get(), c.size(), h, headrow.get(),
                                 columnsToCheck)) { //Is blocked
                         blocked[i] = true;
                         LOG(DEBUGL) << "Blocking row " << i;
@@ -976,6 +976,7 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
 }
 
 bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
+	size_t sizeRow,
         const Literal &headLiteral,
         uint64_t *headrow, std::vector<uint8_t> &columnsToCheck) {
     LOG(DEBUGL) << "blocked_check, headLiteral = " << headLiteral.tostring(NULL, NULL);
@@ -985,6 +986,19 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
         LOG(TRACEL) << "headrow[" << (int) columnsToCheck[i] << "] = " << headrow[columnsToCheck[i]];
     }
 #endif
+    //For RMFC, we need to replace all non-skolem constants with *.
+    uint64_t newrow[256];
+    uint64_t newhead[256];
+    if (sn->get_RMFC_program() != NULL) {
+	for (int i = 0; i < sizeRow; i++) {
+	    newrow[i] = (row[i] & RULEVARMASK) != 0 ? row[i] : 0;;
+	}
+	row = newrow;
+	for (int i = 0; i < headLiteral.getTupleSize(); i++) {
+	    newhead[i] = (headrow[i] & RULEVARMASK) != 0 ? headrow[i] : 0;;
+	}
+	headrow = newhead;
+    }
 
     std::vector<Literal> input; //"input" corresponds to B_\rho,\sigma in the paper
     //First I need to add to body atoms
@@ -1026,7 +1040,13 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
 
     //Check if the head is blocked in this set
     bool found = false; //If found = true, then the rule application is blocked
-    auto itr = n->getTable(headLiteral.getPredicate().getId());
+    PredId_t pred = headLiteral.getPredicate().getId();
+    if (sn->get_RMFC_program() != NULL) {
+	// Different program, so pred id may be different in that program.
+	std::string name = sn->getProgram()->getPredicateName(pred);
+	pred = sn->get_RMFC_program()->getPredicate(name).getId();
+    }
+    auto itr = n->getTable(pred);
     while(!itr.isEmpty()) {
         auto table = itr.getCurrentTable();
         //Iterate over the content of the table
@@ -1037,7 +1057,7 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
             for(uint8_t j = 0; j < columnsToCheck.size(); ++j) {
                 auto cId = columnsToCheck[j];
 #if DEBUG
-                LOG(TRACEL) << "cId = " << (int) cId << ", currentValue = " << tbItr->getCurrentValue(cId);
+                LOG(TRACEL) << "cId = " << (int) cId << ", currentValue = " << tbItr->getCurrentValue(cId) << ", headrow[cId] = " << headrow[cId];
 #endif
                 if (tbItr->getCurrentValue(cId) != headrow[cId]) {
                     found = false;
@@ -1048,12 +1068,14 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
                 break;
             }
         }
+	table->releaseIterator(tbItr);
         if (found)
             break;
         itr.moveNextCount();
     }
     EDBLayer &l = n->getEDBLayer();
     delete &l;
+    LOG(DEBUGL) << "blocked_check returns " << found;
     return found;
 }
 
@@ -1149,7 +1171,7 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                             }
                             headrow[j] = headReaders[j]->next();
                         }
-                        if (blocked_check(tmprow.get(), h, headrow.get(),
+                        if (blocked_check(tmprow.get(), segmentSize, h, headrow.get(),
                                     columnsToCheck)) { //Is it blocked?
                             blocked[i] = true;
                             LOG(DEBUGL) << "Blocking row " << i;
