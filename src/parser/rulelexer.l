@@ -28,8 +28,8 @@ using token = MC::RuleParser::token;
 %option noyywrap
 %option c++
 
-/* See https://github.com/dajobe/raptor/blob/master/src/turtle_lexer.l */
-/* Tokens from Turtle 2013 spec - lex-ifyed to remove unicode ranges */ 
+ /* See https://github.com/dajobe/raptor/blob/master/src/turtle_lexer.l */
+ /* Tokens from Turtle 2013 spec - lex-ifyed to remove unicode ranges */
 HEX [0-9A-Fa-f]
 UCHAR "\\u"{HEX}{HEX}{HEX}{HEX}|"\\U"{HEX}{HEX}{HEX}{HEX}{HEX}{HEX}{HEX}{HEX}
 IRI "<"([^\x00-\x20<>\"{}\|^`\\]|{UCHAR})*">"
@@ -62,15 +62,7 @@ neg\_ {return(token::NEGATE);}
 
 \"([^\"\\\n\r]|\\[^\n\r])*\"   { yylval->build< std::string >( yytext );
                                  return(token::WORD);};
-[A-Z][a-zA-Z0-9]* {
-                     /**
-                     * Section 10.1.5.1 of the 3.0.2 Bison Manual says the
-                     * following should work:
-                     * yylval.build( yytext );
-                     * but it doesn't.
-                     * ref: http://goo.gl/KLn0w2
-                     */
-                     yylval->build< std::string >( yytext );
+[A-Z][a-zA-Z0-9]* {  yylval->build< std::string >( yytext );
                      return(token::UPPERWORD);
                      }
 \"         {return(token::LEFTPAR);}
