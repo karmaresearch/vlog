@@ -11,14 +11,22 @@ typedef std::pair<uint32_t, uint8_t> rpos;
 int Checker::checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db) {
     //Parse the rules into a program
     Program p(&db);
-    p.readFromFile(ruleFile, false); //we do not rewrite the heads
+    std::string s = p.readFromFile(ruleFile, false); //we do not rewrite the heads
+    if (s != "") {
+        LOG(ERRORL) << "Error: " << s;
+        throw 10;
+    }
     return check(p, alg, db);
 }
 
 int Checker::checkFromString(std::string rulesString, std::string alg, EDBLayer &db) {
     //Parse the rules into a program
     Program p(&db);
-    p.readFromString(rulesString, false); //we do not rewrite the heads
+    std::string s = p.readFromString(rulesString, false); //we do not rewrite the heads
+    if (s != "") {
+        LOG(ERRORL) << "Error: " << s;
+        throw 10;
+    }
     return check(p, alg, db);
 }
 
@@ -222,16 +230,16 @@ bool Checker::RMFA(Program &p) {
     }
 }
 
-static void closure(Program &p, std::vector<std::pair<PredId_t, uint8_t>> &input) {
+static void closure(Program &p, std::map<PredId_t, std::vector<uint32_t>> &occurrences,
+        std::vector<std::pair<PredId_t, uint8_t>> &input) {
     std::vector<std::pair<PredId_t, uint8_t>> toProcess = input;
     while (toProcess.size() > 0) {
         std::vector<std::pair<PredId_t, uint8_t>> newPos;
         // Go through all the rules, checking all bodies. If a <predicate, pos> matches with a variable of the rule,
         // check for this variable in the heads, and add positions.
-        auto rules = p.getAllRules();
         for (auto pos : toProcess) {
-            for (auto rule : rules) {
-                std::vector<uint8_t> vars = rule.getVarsInBody();
+            for (auto ruleId : occurrences[pos.first]) {
+                auto &rule = p.getRule(ruleId);
                 auto body = rule.getBody();
                 for (auto lit : body) {
                     if (lit.getPredicate().getId() == pos.first) {
@@ -282,6 +290,16 @@ static void closure(Program &p, std::vector<std::pair<PredId_t, uint8_t>> &input
 
 static void getAllExtPropagatePositions(Program &p, std::map<rpos, std::vector<vpos>> &allExtVarsPos) {
     auto rules = p.getAllRules();
+    // Create a map, for each predicate, to find out in which rule bodies it occurs.
+    std::map<PredId_t, std::vector<uint32_t>> occurrences;
+
+    for (auto rule : rules) {
+        auto body = rule.getBody();
+        for (auto lit : body) {
+            occurrences[lit.getPredicate().getId()].push_back(rule.getId());
+        }
+    }
+
     for (auto rule : rules) {
         if (rule.isExistential()) {
             // First, get the predicate positions of the existential variables in the head(s)
@@ -304,7 +322,7 @@ static void getAllExtPropagatePositions(Program &p, std::map<rpos, std::vector<v
             for (int i = 0; i < extVars.size(); i++) {
                 auto positions = predPositions[i];
                 // Compute the closures of these position sets: where do they propagate to?
-                closure(p, positions);
+                closure(p, occurrences, positions);
                 // We need the positions sorted to be able to call std::set_intersection later on.
                 std::sort(positions.begin(), positions.end());
                 rpos pos(rule.getId(), i);
@@ -348,7 +366,7 @@ static void generateConstants(Program &p, std::map<PredId_t, std::vector<std::ve
     }
 }
 
-static bool rja_check(Program &p, const Rule &rulev, const Rule &rulew, uint8_t x, uint8_t v, uint8_t w) {
+static bool rja_check(Program &p, Program &nongen_program, const Rule &rulev, const Rule &rulew, uint8_t x, uint8_t v, uint8_t w) {
     std::map<PredId_t, std::vector<std::vector<std::string>>> edbSet;
     int constantCount = 0;
     std::map<uint8_t, std::string> varConstantMapw;
@@ -364,17 +382,9 @@ static bool rja_check(Program &p, const Rule &rulev, const Rule &rulew, uint8_t 
     generateConstants(p, edbSet, constantCount, varConstantMapv, rulev.getHeads());
     generateConstants(p, edbSet, constantCount, varConstantMapv, rulev.getBody());
 
-    EDBLayer layer(*(p.getKB()), false);
+    EDBLayer layer(*(nongen_program.getKB()), true);
 
-    std::vector<std::string> nonGeneratingRules;
-    std::vector<Rule> rules = p.getAllRules();
-    for (auto rule : rules) {
-        if (! rule.isExistential()) {
-            std::string ruleString = rule.toprettystring(&p, p.getKB());
-            LOG(DEBUGL) << "NonGeneratingRule: \"" << ruleString << "\"";
-            nonGeneratingRules.push_back(ruleString);
-        }
-    }
+    Program newProgram(&nongen_program, &layer);
 
     for (auto pair : edbSet) {
         std::string edbName = "__DUMMY__" + std::to_string(pair.first);
@@ -390,7 +400,7 @@ static bool rja_check(Program &p, const Rule &rulev, const Rule &rulew, uint8_t 
         }
         rule = rule + paramList + ") :- " + edbName + "(" + paramList + ")";
         LOG(DEBUGL) << "Adding rule: \"" << rule << "\"";
-        nonGeneratingRules.push_back(rule);
+        newProgram.parseRule(rule, false);
     }
 
     // Add another rule to the ruleset, to determine if what we are looking for is materialized.
@@ -429,12 +439,8 @@ static bool rja_check(Program &p, const Rule &rulev, const Rule &rulew, uint8_t 
         newRule = newRule + ")";
     }
     LOG(DEBUGL) << "Adding rule: \"" << newRule << "\"";
-    nonGeneratingRules.push_back(newRule);
+    newProgram.parseRule(newRule, false);
 
-    Program newProgram(&layer);
-    for (auto rule : nonGeneratingRules) {
-        newProgram.parseRule(rule, false);
-    }
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
             &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false);
     sn->run();
@@ -443,6 +449,8 @@ static bool rja_check(Program &p, const Rule &rulev, const Rule &rulew, uint8_t 
     Literal query = newProgram.parseLiteral("__TARGET__(W)", dictVariables);
 
     TupleIterator *iter = r.getIteratorWithMaterialization(sn.get(), query, false, NULL);
+    // TupleIterator *iter = r.getTopDownIterator(query, NULL, NULL, layer, newProgram, false, NULL);
+    // TODO: does not work now, because of some unimplemented stuff in inmemorytable.
     bool retval = ! iter->hasNext();
     delete iter;
     return retval;
@@ -450,6 +458,7 @@ static bool rja_check(Program &p, const Rule &rulev, const Rule &rulew, uint8_t 
 
 bool Checker::JA(Program &p, bool restricted) {
     std::map<rpos, std::vector<vpos>> allExtVarsPos;
+    std::string type = restricted ? "RJA" : "JA";
 
     getAllExtPropagatePositions(p, allExtVarsPos);
 
@@ -488,9 +497,33 @@ bool Checker::JA(Program &p, bool restricted) {
                 }
                 dest++;
             }
+            // Now check if the graph is cyclic. 
+            // If it is, the ruleset is not JA (Joint Acyclic) (which means that the result is inconclusive).
+            // If the ruleset is JA, we know that the chase will terminate.
+            if (g.isCyclic()) {
+                LOG(DEBUGL) << "Ruleset is not " << type << "!";
+                return false;
+            }
             src++;
         }
     } else {
+        EDBLayer layer(*(p.getKB()), false);
+
+        std::vector<std::string> nonGeneratingRules;
+        std::vector<Rule> rules = p.getAllRules();
+        for (auto rule : rules) {
+            if (! rule.isExistential()) {
+                std::string ruleString = rule.toprettystring(&p, p.getKB());
+                LOG(DEBUGL) << "NonGeneratingRule: \"" << ruleString << "\"";
+                nonGeneratingRules.push_back(ruleString);
+            }
+        }
+        Program newProgram(&layer);
+
+        for (auto rule : nonGeneratingRules) {
+            newProgram.parseRule(rule, false);
+        }
+        
         for (auto &it : allExtVarsPos) {
             int dest = 0;
             const Rule &rulev = p.getRule(it.first.first);
@@ -526,7 +559,7 @@ bool Checker::JA(Program &p, bool restricted) {
                         // See Definition 4 of the paper
                         // Restricted Chase (Non) Termination for Existential Rules with Disjunctions
                         // by David Carral, Irina Dragoste and Markus Kroetzsch
-                        if (rja_check(p, rulev, rulew, x, v, w)) {
+                        if (rja_check(p, newProgram, rulev, rulew, x, v, w)) {
                             g.addEdge(src,dest);
                             break;
                         }
@@ -534,17 +567,17 @@ bool Checker::JA(Program &p, bool restricted) {
                 }
                 dest++;
             }
+            // Now check if the graph is cyclic. 
+            // If it is, the ruleset is not JA (Joint Acyclic) (which means that the result is inconclusive).
+            // If the ruleset is JA, we know that the chase will terminate.
+            if (g.isCyclic()) {
+                LOG(DEBUGL) << "Ruleset is not " << type << "!";
+                return false;
+            }
             src++;
         }
     }
 
-    // Now check if the graph is cyclic. If it is, the ruleset is not JA (Joint Acyclic) (which means that the result is inconclusive).
-    // If the ruleset is JA, we know that the chase will terminate.
-    std::string type = restricted ? "RJA" : "JA";
-    if (g.isCyclic()) {
-        LOG(DEBUGL) << "Ruleset is not " << type << "!";
-        return false;
-    }
     LOG(DEBUGL) << "RuleSet is " << type << "!";
     return true;
 }

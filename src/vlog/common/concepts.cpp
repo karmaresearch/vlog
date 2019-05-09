@@ -758,7 +758,7 @@ bool Program::stratify(std::vector<int> &stratification, int &nClasses) {
         std::set<uint64_t> toRemove;
         for (int i = 0; i < graphSize; i++) {
             if (stratification[i] < 0 && negationsClosure.getDestinations(i)->empty()) {
-                LOG(DEBUGL) << "Marking " << i << " with " << markedCount;
+                // LOG(DEBUGL) << "Marking " << i << " with " << markedCount;
                 stratification[i] = markedCount;
                 count++;
                 toRemove.insert(i);
@@ -1046,7 +1046,12 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     if (cardPredicates.find(predid) == cardPredicates.end()) {
         cardPredicates.insert(make_pair(predid, t.size()));
     } else {
-        if (cardPredicates.find(predid)->second != t.size()) {
+        int card = cardPredicates.find(predid)->second;
+        if (card == 0) {
+            cardPredicates.insert(make_pair(predid, t.size()));
+            card = t.size();
+        }
+        if (card != t.size()) {
             throw ("Wrong arity in predicate \""+ predicate + "\". It should be " + std::to_string((int) cardPredicates.find(predid)->second) +".");
         }
     }
