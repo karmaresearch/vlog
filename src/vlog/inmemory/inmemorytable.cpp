@@ -90,6 +90,9 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
     this->predid = predid;
     SegmentInserter *inserter = NULL;
     //Load the table in the database
+    if (repository == "") {
+        repository = ".";
+    }
     string tablefile = repository + "/" + tablename + ".csv";
     string gz = tablefile + ".gz";
     istream *ifs = NULL;
