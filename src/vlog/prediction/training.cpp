@@ -365,6 +365,8 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueriesAllPat
                             workingIDB = idbPred.getId();
                             workingIDBCard = idbPred.getCardinality();
                         }
+                        allPredicatesLog<< p.getPredicateName(workingIDB) << std::endl;
+
                         string qQuery = makeGenericQuery(p, workingIDB, workingIDBCard);
                         setOfUniquePredicates.insert(p.getPredicateName(workingIDB));
                         Literal qLiteral = p.parseLiteral(qQuery, dictVariables);
