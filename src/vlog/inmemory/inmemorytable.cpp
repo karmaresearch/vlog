@@ -236,8 +236,8 @@ InmemoryTable::InmemoryTable(PredId_t predid,
         segment = NULL;
     } else {
         segment = inserter->getSortedAndUniqueSegment();
-        delete inserter;
     }
+    delete inserter;
 }
 
 void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
