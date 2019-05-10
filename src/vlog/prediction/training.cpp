@@ -200,7 +200,6 @@ void getAllPaths(uint16_t source, vector<Edge>& path, vector<vector<Edge>>& path
         }
     }
 }
-
 std::vector<std::pair<std::string, int>> Training::generateTrainingQueriesAllPaths(EDBConf &conf,
         EDBLayer &db,
         Program &p,
@@ -1260,6 +1259,7 @@ void Training::execLiteralQueries(vector<string>& queryVector,
                     repeatQuery,
                     featuresVector,
                     decisionVector);
+            features += ",0";
             strResults.push_back(results);
             strFeatures.push_back(features);
             strQsqrTime.push_back(qsqrTime);
