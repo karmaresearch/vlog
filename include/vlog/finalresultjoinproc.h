@@ -42,7 +42,8 @@ class SingleHeadFinalRuleProcessor: public ResultJoinProcessor {
                 const uint8_t ruleExecOrder,
                 const size_t iteration,
                 const bool addToEndTable,
-                const int nthreads);
+                const int nthreads,
+                const bool ignoreDuplicatesElimination);
 
         SingleHeadFinalRuleProcessor(
                 Term_t *row,
@@ -56,7 +57,8 @@ class SingleHeadFinalRuleProcessor: public ResultJoinProcessor {
                 const uint8_t ruleExecOrder,
                 const size_t iteration,
                 const bool addToEndTable,
-                const int nthreads);
+                const int nthreads,
+                const bool ignoreDuplicatesElimination);
 
 #if DEBUG
         void checkSizes() const {
@@ -165,7 +167,6 @@ class SemiNaiver;
 class FinalRuleProcessor: public ResultJoinProcessor {
     private:
         std::vector<FCBlock> &listDerivations;
-        const uint8_t ruleExecOrder;
         const size_t iteration;
         bool newDerivation;
         std::vector<Literal> &heads;
@@ -173,6 +174,7 @@ class FinalRuleProcessor: public ResultJoinProcessor {
     protected:
         std::vector<std::unique_ptr<SingleHeadFinalRuleProcessor>> atomTables;
         const RuleExecutionDetails *ruleDetails;
+        const uint8_t ruleExecOrder;
         bool addToEndTable;
 
     public:
@@ -186,7 +188,8 @@ class FinalRuleProcessor: public ResultJoinProcessor {
                 const size_t iteration,
                 const bool addToEndTable,
                 const int nthreads,
-                SemiNaiver *sn);
+                SemiNaiver *sn,
+                const bool ignoreDuplicatesElimination);
 
         bool shouldAddToEndTable() {
             return addToEndTable;

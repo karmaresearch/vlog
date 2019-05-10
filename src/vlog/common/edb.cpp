@@ -24,6 +24,14 @@
 #include <unordered_map>
 #include <climits>
 
+
+EDBLayer::EDBLayer(EDBLayer &db, bool copyTables) {
+    this->predDictionary = db.predDictionary;
+    if (copyTables) {
+        this->dbPredicates = db.dbPredicates;
+    }
+}
+
 void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithreaded) {
     EDBInfoTable infot;
     const string pn = tableConf.predname;
@@ -108,14 +116,36 @@ void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
 }
 
 void EDBLayer::addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows) {
+    PredId_t id = (PredId_t) predDictionary->getOrAdd(predicate);
+    addInmemoryTable(predicate, id, rows);
+}
+
+void EDBLayer::addInmemoryTable(std::string predicate, PredId_t id, std::vector<std::vector<std::string>> &rows) {
     EDBInfoTable infot;
-    infot.id = (PredId_t) predDictionary->getOrAdd(predicate);
+    infot.id = id;
     if (doesPredExists(infot.id)) {
-        LOG(WARNL) << "Rewriting table for predicate " << predicate;
+        LOG(INFOL) << "Rewriting table for predicate " << predicate;
         dbPredicates.erase(infot.id);
     }
     infot.type = "INMEMORY";
     InmemoryTable *table = new InmemoryTable(infot.id, rows, this);
+    infot.arity = table->getArity();
+    infot.manager = std::shared_ptr<EDBTable>(table);
+    dbPredicates.insert(make_pair(infot.id, infot));
+    LOG(DEBUGL) << "Added table for " << predicate << ":" << infot.id;
+}
+
+
+void EDBLayer::addInmemoryTable(PredId_t id,
+        uint8_t arity,
+        std::vector<uint64_t> &rows) {
+    EDBInfoTable infot;
+    infot.id = id;
+    if (doesPredExists(infot.id)) {
+        dbPredicates.erase(infot.id);
+    }
+    infot.type = "INMEMORY";
+    InmemoryTable *table = new InmemoryTable(infot.id, arity, rows, this);
     infot.arity = table->getArity();
     infot.manager = std::shared_ptr<EDBTable>(table);
     dbPredicates.insert(make_pair(infot.id, infot));
@@ -139,6 +169,7 @@ void EDBLayer::addSparqlTable(const EDBConf::Table &tableConf) {
 #endif
 
 bool EDBLayer::doesPredExists(PredId_t id) const {
+    LOG(DEBUGL) << "doesPredExists for: " << id;
     return dbPredicates.count(id);
 }
 
@@ -540,6 +571,9 @@ bool EDBLayer::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
         return p->second.manager->isEmpty(query, posToFilter, valuesToFilter);
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
+        if (!rel) {
+            return true;
+        }
         assert(literal->getTupleSize() <= 2);
 
         std::unique_ptr<Literal> rewrittenLiteral;
@@ -607,13 +641,16 @@ bool EDBLayer::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
 
 // Only used in prematerialization
 void EDBLayer::addTmpRelation(Predicate & pred, IndexedTupleTable * table) {
+    if (pred.getId() >= tmpRelations.size()) {
+        tmpRelations.resize(2*pred.getId()+1);
+    }
     tmpRelations[pred.getId()] = table;
 }
 
 // Only used in prematerialization
 bool EDBLayer::checkValueInTmpRelation(const uint8_t relId, const uint8_t posInRelation,
         const Term_t value) const {
-    if (tmpRelations[relId] != NULL) {
+    if (relId < tmpRelations.size() && tmpRelations[relId] != NULL) {
         return tmpRelations[relId]->exists(posInRelation, value);
     } else {
         return true;
@@ -657,8 +694,10 @@ static std::vector<std::shared_ptr<Column>> checkNewInGeneric(const Literal &l1,
     for (int i = 0; i < posInL2.size(); i++) {
         fieldsToSort2.push_back(posVars2[posInL2[i]]);
     }
-    EDBIterator *itr1 = p->getSortedIterator(l1, fieldsToSort1);
-    EDBIterator *itr2 = p2->getSortedIterator(l2, fieldsToSort2);
+    // EDBIterator *itr1 = p->getSortedIterator(l1, fieldsToSort1);
+    // EDBIterator *itr2 = p2->getSortedIterator(l2, fieldsToSort2);
+    EDBIterator *itr1 = p->getSortedIterator(l1, posInL1);
+    EDBIterator *itr2 = p2->getSortedIterator(l2, posInL2);
 
     std::vector<std::shared_ptr<ColumnWriter>> cols;
     for (int i = 0; i < fieldsToSort1.size(); i++) {
@@ -842,7 +881,7 @@ bool EDBLayer::getDictText(const uint64_t id, char *text) {
         std::string t = termsDictionary->getRawValue(id);
         if (t != "") {
             memcpy(text, t.c_str(), t.size());
-	    text[t.size()] = '\0';
+            text[t.size()] = '\0';
             return true;
         }
     }
@@ -1115,7 +1154,8 @@ std::vector<std::shared_ptr<Column>> EDBTable::checkNewIn(
         fieldsToSort.push_back(posVars[posInL[i]]);
     }
 
-    EDBIterator *iter = getSortedIterator(l, fieldsToSort);
+    // EDBIterator *iter = getSortedIterator(l, fieldsToSort);
+    EDBIterator *iter = getSortedIterator(l, posInL);
 
     int sz = checkValues.size();
 
@@ -1267,14 +1307,15 @@ std::shared_ptr<Column> EDBTable::checkIn(
     //    }
 
     LOG(DEBUGL) << "EDBTable::checkIn, literal = " << l.tostring() << ", posInL = " << (int) posInL;
-    std::vector<uint8_t> posVars = l.getPosVars();
+//    std::vector<uint8_t> posVars = l.getPosVars();
     std::vector<uint8_t> fieldsToSort;
-    for (int i = 0; i < posVars.size(); i++) {
-	if (i == posInL) {
-	    fieldsToSort.push_back(i);
-	    break;
-	}
-    }
+//    for (int i = 0; i < posVars.size(); i++) {
+//        if (i == posInL) {
+//            fieldsToSort.push_back(i);
+//            break;
+//        }
+//    }
+    fieldsToSort.push_back(posInL);
     EDBIterator *iter = getSortedIterator(l, fieldsToSort);
 
     //Output

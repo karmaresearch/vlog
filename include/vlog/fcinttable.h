@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <string>
 #include <unordered_map>
+#include <set>
 
 class FCInternalTableItr {
     public:
@@ -136,6 +137,8 @@ class FCInternalTable {
         size_t estimateNRows() const {
             return estimateNRows(0, NULL, NULL);
         }
+
+        virtual size_t getRepresentationSize(std::set<uint64_t> &IDs) const = 0;
 
         virtual std::shared_ptr<const FCInternalTable> filter(
                 const uint8_t nPosToCopy, const uint8_t *posVarsToCopy,
@@ -310,7 +313,7 @@ class EDBFCInternalTableItr : public FCInternalTableItr {
         std::vector<uint8_t> fields;
         EDBIterator *edbItr;
         uint8_t nfields;
-        uint8_t posFields[SIZETUPLE];
+        uint8_t posFields[256];
         bool compiled;
         size_t iteration;
 
@@ -509,7 +512,7 @@ class InmemoryFCInternalTable : public FCInternalTable {
 
         bool isEDB() const {
             if (values != NULL) {
-                for (uint8_t i = 0; i < nfields; ++i) {
+                for (int i = 0; i < nfields; ++i) {
                     if (!values->getColumn(i)->isEDB()) {
                         return false;
                     }
@@ -519,6 +522,9 @@ class InmemoryFCInternalTable : public FCInternalTable {
         }
 
         size_t getNRows() const;
+
+
+        size_t getRepresentationSize(std::set<uint64_t> &IDs) const;
 
         bool isEmpty() const;
 
@@ -577,14 +583,14 @@ class EDBFCInternalTable : public FCInternalTable {
     private:
         const size_t iteration;
         const uint8_t nfields;
-        uint8_t posFields[SIZETUPLE];
+        uint8_t posFields[256];
         const QSQQuery query;
         EDBLayer *layer;
         Factory<EDBFCInternalTableItr> factory;
         std::vector<uint8_t> defaultSorting;
 
         EDBFCInternalTable(const size_t iteration,
-                const uint8_t nfields, uint8_t const posFields[SIZETUPLE],
+                const uint8_t nfields, uint8_t const posFields[256],
                 const QSQQuery &query,
                 EDBLayer *layer,
                 const std::vector<uint8_t> &defaultSorting) :
@@ -610,6 +616,8 @@ class EDBFCInternalTable : public FCInternalTable {
         }
 
         size_t getNRows() const;
+
+        size_t getRepresentationSize(std::set<uint64_t> &IDs) const;
 
         bool isEmpty() const;
 
@@ -738,6 +746,10 @@ class SingletonTable : public FCInternalTable {
 
         bool supportsDirectAccess() const {
             return true;
+        }
+
+        size_t getRepresentationSize(std::set<uint64_t> &IDs) const {
+            return 0;
         }
 
         FCInternalTableItr *getIterator() const {

@@ -1,16 +1,10 @@
 package karmaresearch.vlog;
 
-import java.util.ArrayList;
-
 import karmaresearch.vlog.Term.TermType;
 import karmaresearch.vlog.VLog.LogLevel;
 import karmaresearch.vlog.VLog.RuleRewriteStrategy;
 
-class Example {
-    // // TODO: replace Trident database with csv file.
-    // private static String edbConf0 = "EDB0_predname=TE\n"
-    // + "EDB0_type=Trident\n"
-    // + "EDB0_param0=/Users/ceriel/Downloads/iswc-2017.trident\n";
+public class Example {
 
     private static String edbConf0 = "EDB0_predname=TE\n"
             + "EDB0_type=INMEMORY\n" + "EDB0_param0=/Users/ceriel/Downloads\n"
@@ -70,45 +64,19 @@ class Example {
             new Rule(new Atom[] { new Atom("A", varX) },
                     new Atom[] { new Atom("AWT", varX, varA) }),
             new Rule(new Atom[] { new Atom("A", varX) },
-                    new Atom[] { new Atom("AWT", varA, varX) }) };
+                    new Atom[] { new Atom("AWT", varA, varX) }),
+            // Countries A and B working together: institutes C and D working
+            // together, C is from A, D is from B.
+            new Rule(new Atom[] { new Atom("CWT", varA, varB) },
+                    new Atom[] { new Atom("AWT", varC, varD),
+                            new Atom("InCountry", varC, varA),
+                            new Atom("InCountry", varD, varB) }) };
 
     public void run() throws Exception {
         VLog vlog = new VLog();
-        vlog.setLogLevel(LogLevel.DEBUG);
+        vlog.setLogLevel(LogLevel.INFO);
         vlog.start(edbConf0 + edbConf1, false);
         vlog.setRules(rules, RuleRewriteStrategy.NONE);
-        vlog.materialize(false);
-
-        // Now, A contains the organizations, and AWT contains pairs of
-        // organizations working together.
-        ArrayList<Rule> newRules = new ArrayList<>();
-        for (Rule r : rules) {
-            newRules.add(r);
-        }
-        // Create separate rules for each affiliation, since we cannot query ?A
-        // country ?B from the backend.
-        // That would cause timeout.
-        try (TermQueryResultIterator iter = vlog.query(new Atom("A", varA))) {
-            while (iter.hasNext()) {
-                Term t = iter.next()[0];
-                String s = t.getName();
-                newRules.add(new Rule(
-                        new Atom[] { new Atom("getCountries",
-                                new Term(TermType.CONSTANT, s), varA) },
-                        new Atom[] { new Atom("InCountry",
-                                new Term(TermType.CONSTANT, s), varA) }));
-            }
-        }
-        // Countries A and B working together: institutes C and D working
-        // together, C is from A, D is from B.
-        newRules.add(new Rule(new Atom[] { new Atom("CWT", varA, varB) },
-                new Atom[] { new Atom("AWT", varC, varD),
-                        new Atom("getCountries", varC, varA),
-                        new Atom("getCountries", varD, varB) }));
-
-        Rule[] rules = newRules.toArray(new Rule[newRules.size()]);
-        vlog.setRules(rules, RuleRewriteStrategy.NONE);
-
         vlog.materialize(false);
 
         // Print affiliations working together
@@ -120,20 +88,6 @@ class Example {
                     System.out.println(
                             "Found affiliation pair " + terms[0].getName()
                                     + " and " + terms[1].getName());
-                }
-            } else {
-                System.out.println("No pairs found");
-            }
-        }
-
-        // Print affiliation -> country mapping
-        try (TermQueryResultIterator iter1 = vlog
-                .query(new Atom("getCountries", varA, varB))) {
-            if (iter1.hasNext()) {
-                while (iter1.hasNext()) {
-                    Term[] terms = iter1.next();
-                    System.out.println("Found country " + terms[1].getName()
-                            + " for affiliation " + terms[0].getName());
                 }
             } else {
                 System.out.println("No pairs found");

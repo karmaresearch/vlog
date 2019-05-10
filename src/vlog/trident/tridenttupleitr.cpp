@@ -189,7 +189,10 @@ void TridentTupleItr::clear() {
 
 const char* TridentTupleItr::getUnderlyingArray(uint8_t column) {
     // const uint8_t pos = onlyVars ? varsPos[column] : (uint8_t) invPerm[column];
-    // return NULL;
+    return NULL;
+    // Note: Code below does not work anymore, since it assumes that physIterator is a NewColumnTable,
+    // which is no longer always true.
+    /*
     const uint8_t pos = varsPos[column];
     if (pos == 0 || nvars == 3) {
         // Can happen if asking for TE(?,?,?)
@@ -203,6 +206,7 @@ const char* TridentTupleItr::getUnderlyingArray(uint8_t column) {
     }
     LOG(ERRORL) << "This should not happen";
     throw 10;
+    */
 }
 
 size_t TridentTupleItr::getCardinality() {

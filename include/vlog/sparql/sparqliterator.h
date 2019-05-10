@@ -13,11 +13,11 @@ class SparqlIterator : public EDBIterator {
 	EDBLayer *layer;
 	json queryResult;
 	json::iterator it;
-	uint64_t row[128];
+	uint64_t row[256];
 	Literal query;
 	bool hasNextChecked;
 	bool hasNextValue;
-	int vars[128];	// for every position, indicates which variable number to use
+	int vars[256];	// for every position, indicates which variable number to use
 	std::vector<std::string> fieldVars;
 
     public:

@@ -21,6 +21,30 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
 endif()
 
+#Add macPorts
+# Detect if the "port" command is valid on this system; if so, return full path
+EXECUTE_PROCESS(COMMAND which port RESULT_VARIABLE DETECT_MACPORTS OUTPUT_VARIABLE MACPORTS_PREFIX ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+IF (${DETECT_MACPORTS} EQUAL 0)
+    # "/opt/local/bin/port" doesn't have libs, so we get the parent directory
+    GET_FILENAME_COMPONENT(MACPORTS_PREFIX ${MACPORTS_PREFIX} DIRECTORY)
+
+    # "/opt/local/bin" doesn't have libs, so we get the parent directory
+    GET_FILENAME_COMPONENT(MACPORTS_PREFIX ${MACPORTS_PREFIX} DIRECTORY)
+
+    # "/opt/local" is where MacPorts lives, add `/lib` suffix and link
+    LINK_DIRECTORIES(${MACPORTS_PREFIX}/lib)
+    INCLUDE_DIRECTORIES(${MACPORTS_PREFIX}/include)
+ENDIF()
+
+#Add homebrew
+EXECUTE_PROCESS(COMMAND brew --prefix RESULT_VARIABLE exitstatus OUTPUT_VARIABLE BREW_PREFIX ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+IF (${exitstatus} EQUAL 0)
+    LINK_DIRECTORIES(${BREW_PREFIX}/lib)
+    INCLUDE_DIRECTORIES(${BREW_PREFIX}/include)
+ENDIF()
+
 #add files to compile
 file(GLOB vlog_SRC
     "src/vlog/*.cpp"
@@ -30,6 +54,9 @@ file(GLOB vlog_SRC
     "src/vlog/magic/*.cpp"
     "src/vlog/inmemory/*.cpp"
     "src/vlog/trident/*.cpp"
+    "src/vlog/cycles/*.cpp"
+    "src/vlog/ml/*.cpp"
+    "src/vlog/deps/*.cpp"
     "src/launcher/vloglayer.cpp"
     "src/launcher/vlogscan.cpp"
     "src/vlog/prediction/*.cpp"
@@ -218,10 +245,9 @@ if(JAVA)
     add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:trident> ${CMAKE_SOURCE_DIR}/resources)
     add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:trident-sparql> ${CMAKE_SOURCE_DIR}/resources)
     add_custom_command(TARGET vlog-java COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:kognac-core> ${CMAKE_SOURCE_DIR}/resources)
-    add_jar(jvlog ${javaSRC} resources/${CMAKE_SHARED_LIBRARY_PREFIX}vlog-java${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}vlog-core${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}trident-core${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}trident-sparql${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}kognac-core${CMAKE_SHARED_LIBRARY_SUFFIX})
+    add_jar(jvlog ${javaSRC} resources/${CMAKE_SHARED_LIBRARY_PREFIX}vlog-java${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}vlog-core${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}trident-core${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}trident-sparql${CMAKE_SHARED_LIBRARY_SUFFIX} resources/${CMAKE_SHARED_LIBRARY_PREFIX}kognac-core${CMAKE_SHARED_LIBRARY_SUFFIX} GENERATE_NATIVE_HEADERS headers DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/src/vlog/java/native/)
     add_custom_command(TARGET jvlog POST_BUILD COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_SOURCE_DIR}/resources)
     add_custom_command(TARGET jvlog POST_BUILD COMMAND ${CMAKE_COMMAND} -E remove $<TARGET_FILE:vlog-java>)
     add_dependencies(jvlog vlog-java)
-    Create_javah(TARGET headers CLASSES karmaresearch.vlog.VLog karmaresearch.vlog.QueryResultIterator CLASSPATH jvlog DEPENDS ${javaSRC}  OUTPUT_NAME ${CMAKE_CURRENT_SOURCE_DIR}/src/vlog/java/native/vlog_native.h)
 ENDIF()
 TARGET_LINK_LIBRARIES(vlog vlog-core)
