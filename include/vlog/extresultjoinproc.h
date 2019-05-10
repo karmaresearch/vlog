@@ -49,7 +49,9 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 uint64_t &sizecolumns,
                 std::vector<std::shared_ptr<Column>> &c);
 
-        bool blocked_check(uint64_t *row, size_t sizerow, const Literal &headLiteral,
+        std::unique_ptr<SemiNaiver> computeSaturation(uint64_t *row, size_t sizeRow);
+
+        bool blocked_check(bool rmfc, std::unique_ptr<SemiNaiver> &saturation, const Literal &headLiteral,
                 uint64_t *headrow, std::vector<uint8_t> &columnsToCheck);
 
         void blocked_check_computeBodyAtoms(std::vector<Literal> &output,

@@ -327,86 +327,85 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
 
     if (chaseMgmt->isRestricted()) {
         std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
-        uint8_t count = 0;
-        std::vector<bool> blocked;
-        size_t blockedCount = 0;
+        int count = 0;
         if (chaseMgmt->isCheckCyclicMode()) {
+            std::vector<bool> blocked;
+            size_t blockedCount = 0;
             for (size_t i = 0; i < sizecolumns; i++) {
                 blocked.push_back(false);
             }
-        }
-        for(const auto &at : atomTables) {
-            const auto &h = at->getLiteral();
-            if (chaseMgmt->isCheckCyclicMode()) {
-                //Init
-                std::unique_ptr<uint64_t[]> tmprow(
-                        new uint64_t[c.size()]);
-                std::unique_ptr<uint64_t[]> headrow(
-                        new uint64_t[h.getTupleSize()]);
-
-                std::vector<std::unique_ptr<ColumnReader>> columnReaders;
-                for(uint8_t i = 0; i < c.size(); ++i) {
-                    columnReaders.push_back(c[i]->getReader());
-                }
-
-                //Check in the head the positions that should be checked
-                std::vector<uint8_t> posToCheck; //These are positions in the head.
-                std::vector<std::pair<uint8_t, uint8_t>> posToCopy;
+            uint64_t tmprow[256];
+            std::vector<std::unique_ptr<ColumnReader>> columnReaders;
+            for(uint8_t i = 0; i < c.size(); ++i) {
+                columnReaders.push_back(c[i]->getReader());
+            }
+            int hnum = 0;
+            std::vector<std::vector<uint8_t>> posToCheck(atomTables.size()); //These are positions in the head.
+            std::vector<std::vector<std::pair<uint8_t,uint8_t>>> columnsToCopy(atomTables.size());
+            std::vector<std::vector<uint64_t>> headrow(atomTables.size());
+            for(const auto &at : atomTables) {
+                const auto &h = at->getLiteral();
                 for(uint8_t j = 0; j < h.getTupleSize(); ++j) {
-                    const auto t = h.getTermAtPos(j);
+                    VTerm t = h.getTermAtPos(j);
                     if (t.isVariable()) {
                         bool found = false;
                         for(uint8_t i = 0; i < nCopyFromFirst; ++i) {
-                            if (posFromFirst[i].first == j) {
+                            if (posFromFirst[i].first == count + j) {
                                 found = true;
-                                posToCheck.push_back(j);
+                                columnsToCopy[hnum].push_back(std::make_pair(
+                                            j, posFromFirst[i].second));
+                                posToCheck[hnum].push_back(j);
                                 break;
                             }
                         }
-                        for(uint8_t i = 0; i < nCopyFromSecond && !found; ++i) {
-                            if (posFromSecond[i].first == j) {
-                                posToCheck.push_back(j);
+                        for(uint8_t m = 0; m < nCopyFromSecond && !found; ++m) {
+                            if (posFromSecond[m].first == count + j) {
+                                columnsToCopy[hnum].push_back(std::make_pair(
+                                            j, posFromSecond[m].second));
+                                posToCheck[hnum].push_back(j);
                                 break;
                             }
                         }
+                        headrow[hnum].push_back(0);
                     } else {
-                        posToCheck.push_back(j); //constants should be checked as well
-                        headrow[j] = t.getValue();
+                        posToCheck[hnum].push_back(j); //constants should be checked as well
+                        headrow[hnum].push_back(t.getValue());
                     }
                 }
+                hnum++;
+            }
 
-                for(size_t i = 0; i < sizecolumns; ++i) {
-                    if (blocked[i]) {
-                        continue;
+            for (size_t i = 0; i < sizecolumns; ++i) {
+                //Fill the row
+                for (uint8_t j = 0; j < c.size(); ++j) {
+                    if (!columnReaders[j]->hasNext()) {
+                        LOG(ERRORL) << "This should not happen";
                     }
-                    //Fill the row
-                    for(uint8_t j = 0; j < c.size(); ++j) {
-                        if (!columnReaders[j]->hasNext()) {
-                            LOG(ERRORL) << "This should not happen";
-                        }
-                        tmprow[j] = columnReaders[j]->next();
+                    tmprow[j] = columnReaders[j]->next();
+                }
+                count = 0;
+                std::unique_ptr<SemiNaiver> saturation = computeSaturation(tmprow, c.size());
+                hnum = 0;
+                for(const auto &at : atomTables) {
+                    const auto &h = at->getLiteral();
+
+                    for(const auto &p : columnsToCopy[hnum]) {
+                        headrow[hnum][p.first] = tmprow[p.second];
                     }
-                    //Fill the headrow with the values from row
-                    for(const auto &p : posToCopy) {
-                        headrow[p.first] = tmprow[p.second];
-                    }
-                    if (blocked_check(tmprow.get(), c.size(), h, headrow.get(), posToCheck)) {
+
+                    if (blocked_check(sn->get_RMFC_program() != NULL, saturation, h, &headrow[hnum][0], posToCheck[hnum])) {
                         //It is blocked
                         blocked[i] = true;
                         LOG(DEBUGL) << "Blocking row " << i;
                         blockedCount++;
+                        break;
                     }
+                    hnum++;
                 }
-            } else {
-                FCTable *t = sn->getTable(h.getPredicate().getId(),
-                        h.getPredicate().getCardinality());
-                filterDerivations(h, t, row, count, ruleDetails, nKnownColumns,
-                        posKnownColumns, c, sizecolumns, filterRows);
-                count += h.getTupleSize();
+                EDBLayer &l = saturation->getEDBLayer();
+                delete &l;
             }
-        }
 
-        if (chaseMgmt->isCheckCyclicMode()) {
             if (blockedCount == sizecolumns) {
                 return;
             }
@@ -416,6 +415,15 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                         filterRows.push_back(i);
                     }
                 }
+            }
+        } else {
+            for(const auto &at : atomTables) {
+                const auto &h = at->getLiteral();
+                FCTable *t = sn->getTable(h.getPredicate().getId(),
+                        h.getPredicate().getCardinality());
+                filterDerivations(h, t, row, count, ruleDetails, nKnownColumns,
+                        posKnownColumns, c, sizecolumns, filterRows);
+                count += h.getTupleSize();
             }
         }
 
@@ -559,77 +567,82 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         sizecolumns = c[0]->size();
     }
 
+    if (sizecolumns == 0) {
+        return;
+    }
+
     if (chaseMgmt->isRestricted()) {
         std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
-        uint8_t count = 0;
-        std::vector<bool> blocked;
-        size_t blockedCount = 0;
+        int count = 0;
         if (chaseMgmt->isCheckCyclicMode()) {
+            std::vector<bool> blocked;
+            size_t blockedCount = 0;
             for (size_t i = 0; i < sizecolumns; i++) {
                 blocked.push_back(false);
             }
-        }
-        for(const auto &at : atomTables) {
-            const auto &h = at->getLiteral();
-
-            if (chaseMgmt->isCheckCyclicMode()) {
-                std::unique_ptr<uint64_t[]> tmprow(new uint64_t[c.size()]);
-                std::unique_ptr<uint64_t[]> headrow(new uint64_t[h.getTupleSize()]);
-                std::vector<std::unique_ptr<ColumnReader>> columnReaders;
-                for(uint8_t i = 0; i < c.size(); ++i) {
-                    columnReaders.push_back(c[i]->getReader());
-                }
-
-                std::vector<uint8_t> columnsToCheck;
-                std::vector<std::pair<uint8_t,uint8_t>> columnsToCopy;
+            uint64_t tmprow[256];
+            std::vector<std::unique_ptr<ColumnReader>> columnReaders;
+            for(uint8_t i = 0; i < c.size(); ++i) {
+                columnReaders.push_back(c[i]->getReader());
+            }
+            int hnum = 0;
+            std::vector<std::vector<uint8_t>> posToCheck(atomTables.size()); //These are positions in the head.
+            std::vector<std::vector<std::pair<uint8_t,uint8_t>>> columnsToCopy(atomTables.size());
+            std::vector<std::vector<uint64_t>> headrow(atomTables.size());
+            for(const auto &at : atomTables) {
+                const auto &h = at->getLiteral();
                 for(uint8_t j = 0; j < h.getTupleSize(); ++j) {
                     VTerm t = h.getTermAtPos(j);
                     if (t.isVariable()) {
-                        bool found = false;
-                        for(uint8_t m = 0; m < nCopyFromSecond && !found; ++m) {
+                        for(uint8_t m = 0; m < nCopyFromSecond; ++m) {
                             if (posFromSecond[m].first == count + j) {
-                                found = true;
-                                columnsToCopy.push_back(std::make_pair(
+                                columnsToCopy[hnum].push_back(std::make_pair(
                                             j, posFromSecond[m].second));
-                                columnsToCheck.push_back(j);
+                                posToCheck[hnum].push_back(j);
+                                break;
                             }
                         }
+                        headrow[hnum].push_back(0);
                     } else {
-                        headrow[j] = t.getValue();
-                        columnsToCheck.push_back(j);
+                        posToCheck[hnum].push_back(j); //constants should be checked as well
+                        headrow[hnum].push_back(t.getValue());
                     }
                 }
-                for(size_t i = 0; i < sizecolumns; ++i) {
-                    if (blocked[i]) {
-                        continue;
+                count += h.getTupleSize();
+                hnum++;
+            }
+
+            for (size_t i = 0; i < sizecolumns; ++i) {
+                //Fill the row
+                for (uint8_t j = 0; j < c.size(); ++j) {
+                    if (!columnReaders[j]->hasNext()) {
+                        LOG(ERRORL) << "This should not happen";
                     }
-                    //Fill the row
-                    for(uint8_t j = 0; j < c.size(); ++j) {
-                        if (!columnReaders[j]->hasNext()) {
-                            LOG(ERRORL) << "This should not happen";
-                        }
-                        tmprow[j] = columnReaders[j]->next();
+                    tmprow[j] = columnReaders[j]->next();
+                }
+                count = 0;
+                std::unique_ptr<SemiNaiver> saturation = computeSaturation(tmprow, c.size());
+                hnum = 0;
+                for(const auto &at : atomTables) {
+                    const auto &h = at->getLiteral();
+
+                    for(const auto &p : columnsToCopy[hnum]) {
+                        headrow[hnum][p.first] = tmprow[p.second];
                     }
-                    for(const auto &p : columnsToCopy) {
-                        headrow[p.first] = tmprow[p.second];
-                    }
-                    if (blocked_check(tmprow.get(), c.size(), h, headrow.get(),
-                                columnsToCheck)) { //Is blocked
+
+                    if (blocked_check(sn->get_RMFC_program() != NULL, saturation, h, &headrow[hnum][0], posToCheck[hnum])) {
+                        //It is blocked
                         blocked[i] = true;
                         LOG(DEBUGL) << "Blocking row " << i;
                         blockedCount++;
+                        break;
                     }
+                    hnum++;
                 }
-            } else {
-                FCTable *t = sn->getTable(h.getPredicate().getId(),
-                        h.getPredicate().getCardinality());
-                filterDerivations(h, t, row, count, ruleDetails, nCopyFromSecond,
-                        posFromSecond, c, sizecolumns, filterRows);
+                EDBLayer &l = saturation->getEDBLayer();
+                delete &l;
             }
-            count += h.getTupleSize();
-        }
 
-        if (chaseMgmt->isCheckCyclicMode()) {
             if (blockedCount == sizecolumns) {
                 return;
             }
@@ -639,6 +652,15 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                         filterRows.push_back(i);
                     }
                 }
+            }
+        } else {
+            for(const auto &at : atomTables) {
+                const auto &h = at->getLiteral();
+                FCTable *t = sn->getTable(h.getPredicate().getId(),
+                        h.getPredicate().getCardinality());
+                filterDerivations(h, t, row, count, ruleDetails, nCopyFromSecond,
+                        posFromSecond, c, sizecolumns, filterRows);
+                count += h.getTupleSize();
             }
         }
 
@@ -665,7 +687,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     //Create existential columns store them in a vector with the corresponding
     //var ID
     std::map<uint8_t, std::shared_ptr<Column>> extvars;
-    uint8_t count = 0;
+    int count = 0;
     for(const auto &at : atomTables) {
         const auto &literal = at->getLiteral();
         for(uint8_t i = 0; i < literal.getTupleSize(); ++i) {
@@ -975,30 +997,16 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
     }
 }
 
-bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
-	size_t sizeRow,
-        const Literal &headLiteral,
-        uint64_t *headrow, std::vector<uint8_t> &columnsToCheck) {
-    LOG(DEBUGL) << "blocked_check, headLiteral = " << headLiteral.tostring(NULL, NULL);
-#if DEBUG
-    for (int i = 0; i < columnsToCheck.size(); i++) {
-        LOG(TRACEL) << "columnsToCheck[" << i << "] = " << (int) columnsToCheck[i];
-        LOG(TRACEL) << "headrow[" << (int) columnsToCheck[i] << "] = " << headrow[columnsToCheck[i]];
-    }
-#endif
+std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::computeSaturation(uint64_t *row,
+        size_t sizeRow) {
     //For RMFC, we need to replace all non-skolem constants with *.
     uint64_t newrow[256];
-    uint64_t newhead[256];
-    if (sn->get_RMFC_program() != NULL) {
-	for (int i = 0; i < sizeRow; i++) {
-	    newrow[i] = (row[i] & RULEVARMASK) != 0 ? row[i] : 0;;
-	}
-	row = newrow;
-	for (int i = 0; i < columnsToCheck.size(); i++) {
-	    uint64_t v = headrow[columnsToCheck[i]];
-	    newhead[columnsToCheck[i]] = (v & RULEVARMASK) != 0 ? v : 0;;
-	}
-	headrow = newhead;
+    Program *rmfc = sn->get_RMFC_program();
+    if (rmfc != NULL) {
+        for (int i = 0; i < sizeRow; i++) {
+            newrow[i] = (row[i] & RULEVARMASK) != 0 ? row[i] : 0;
+        }
+        row = newrow;
     }
 
     std::vector<Literal> input; //"input" corresponds to B_\rho,\sigma in the paper
@@ -1018,15 +1026,14 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
 
     //Then I need to add all facts relevant to produce the function terms
     enhanceFunctionTerms(input, freshIDs, sn->get_RMFC_program() == NULL);
-    if (sn->get_RMFC_program() == NULL) {
+    if (rmfc == NULL) {
         //Finally I need to saturate "input" with the datalog rules
         n = saturateInput(input, sn->getProgram(), new EDBLayer(sn->getEDBLayer(), false));
     } else {
-        Program *p = sn->get_RMFC_program();
-        EDBLayer *layer = new EDBLayer(*(p->getKB()), true);
+        EDBLayer *layer = new EDBLayer(*(rmfc->getKB()), true);
         // Exclusion of rule ρ⋆ under substitution σ⋆
         // we have to provide a binding for the added __EXCLUDE_DUMMY__.
-        const Rule &rule = p->getRule(ruleDetails->rule.getId());
+        const Rule &rule = rmfc->getRule(ruleDetails->rule.getId());
         const std::vector<Literal> &body = rule.getBody();
         Literal lastLit = body.back();
         VTuple tupl(lastLit.getTupleSize());
@@ -1034,20 +1041,46 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
             tupl.set(VTerm(0, row[i]), i);
         }
         input.push_back(Literal(lastLit.getPredicate(), tupl));
-        LOG(DEBUGL) << "Adding exclusion info for rule " << rule.tostring(p, layer) << ": " << input.back().tostring(p, layer);
+        LOG(DEBUGL) << "Adding exclusion info for rule " << rule.tostring(rmfc, layer) << ": " << input.back().tostring(rmfc, layer);
 
-        n = saturateInput(input, p, layer);
+        n = saturateInput(input, rmfc, layer);
+    }
+
+    return n;
+}
+
+bool ExistentialRuleProcessor::blocked_check(
+        bool rmfc,
+        std::unique_ptr<SemiNaiver> &saturation,
+        const Literal &headLiteral,
+        uint64_t *headrow, std::vector<uint8_t> &columnsToCheck) {
+    LOG(DEBUGL) << "blocked_check, headLiteral = " << headLiteral.tostring(NULL, NULL);
+#if DEBUG
+    for (int i = 0; i < columnsToCheck.size(); i++) {
+        LOG(TRACEL) << "columnsToCheck[" << i << "] = " << (int) columnsToCheck[i];
+        LOG(TRACEL) << "headrow[" << (int) columnsToCheck[i] << "] = " << headrow[columnsToCheck[i]];
+    }
+#endif
+    //For RMFC, we need to replace all non-skolem constants with *.
+    uint64_t newhead[256];
+
+    if (rmfc) {
+        for (int i = 0; i < columnsToCheck.size(); i++) {
+            uint64_t v = headrow[columnsToCheck[i]];
+            newhead[columnsToCheck[i]] = (v & RULEVARMASK) != 0 ? v : 0;;
+        }
+        headrow = newhead;
     }
 
     //Check if the head is blocked in this set
     bool found = false; //If found = true, then the rule application is blocked
     PredId_t pred = headLiteral.getPredicate().getId();
-    if (sn->get_RMFC_program() != NULL) {
-	// Different program, so pred id may be different in that program.
-	std::string name = sn->getProgram()->getPredicateName(pred);
-	pred = sn->get_RMFC_program()->getPredicate(name).getId();
+    if (rmfc) {
+        // Different program, so pred id may be different in that program.
+        std::string name = sn->getProgram()->getPredicateName(pred);
+        pred = saturation->getProgram()->getPredicate(name).getId();
     }
-    auto itr = n->getTable(pred);
+    auto itr = saturation->getTable(pred);
     while(!itr.isEmpty()) {
         auto table = itr.getCurrentTable();
         //Iterate over the content of the table
@@ -1069,13 +1102,11 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
                 break;
             }
         }
-	table->releaseIterator(tbItr);
+        table->releaseIterator(tbItr);
         if (found)
             break;
         itr.moveNextCount();
     }
-    EDBLayer &l = n->getEDBLayer();
-    delete &l;
     LOG(DEBUGL) << "blocked_check returns " << found;
     return found;
 }
@@ -1087,6 +1118,9 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
         allColumns.resize(rowsize);
         auto unfilterdSegment = tmpRelation->getSegment();
         uint64_t nrows = unfilterdSegment->getNRows();
+        if (nrows == 0) {
+            return;
+        }
         for(uint8_t i = 0; i < nKnownColumns; ++i) {
             allColumns[posKnownColumns[i]] = unfilterdSegment->getColumn(
                     posKnownColumns[i]);
@@ -1101,95 +1135,91 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
         //If the chase is restricted, we must first remove data
         if (chaseMgmt->isRestricted()) {
             std::vector<uint64_t> filterRows;
-            uint8_t count = 0;
-            std::vector<bool> blocked;
-            size_t blockedCount = 0;
+            int count = 0;
             if (chaseMgmt->isCheckCyclicMode()) {
-                for (size_t i = 0; i < nrows; i++) {
+                std::vector<bool> blocked;
+                size_t blockedCount = 0;
+                const uint8_t segmentSize = unfilterdSegment->getNColumns();
+                for (size_t i = 0; i < segmentSize; i++) {
                     blocked.push_back(false);
                 }
-            }
-            for(const auto &at : atomTables) {
-                const auto &h = at->getLiteral();
-                std::vector<std::shared_ptr<Column>> tobeRetained;
-                std::vector<uint8_t> columnsToCheck;
-                for(int i = 0; i < h.getTupleSize(); ++i) {
-                    tobeRetained.push_back(allColumns[count + i]);
-                    if (h.getTermAtPos(i).isVariable()) {
-                        //It is not a existential variable
-                        if (!posExtColumns.count(h.getTermAtPos(i).getId())) {
-                            columnsToCheck.push_back(i);
-                        } else {
-                            assert(allColumns[count + i] == NULL);
-                            //Add a dummy column
-                            tobeRetained[tobeRetained.size() - 1] =
-                                std::shared_ptr<Column>(
-                                        new CompressedColumn(0,
-                                            nrows));
-                        }
+                uint64_t tmprow[256];
+                uint64_t headrow[256];
+                std::vector<std::shared_ptr<Column>> segmentColumns;
+                std::vector<std::unique_ptr<ColumnReader>> segmentReaders;
+                for(uint8_t i = 0; i < segmentSize; ++i) {
+                    segmentColumns.push_back(unfilterdSegment->getColumn(i));
+                    segmentReaders.push_back(segmentColumns.back()->getReader());
+                }
+                std::vector<std::vector<uint8_t>> columnsToCheck(atomTables.size()); //These are positions in the head.
+                std::vector<std::vector<std::shared_ptr<Column>>> tobeRetained(atomTables.size());
+                std::vector<std::unique_ptr<ColumnReader>> headReaders;
+                for(int i = 0; i < allColumns.size(); ++i) {
+                    if (allColumns[i] != NULL) {
+                        headReaders.push_back(allColumns[i]->getReader());
+                    } else {
+                        headReaders.push_back(NULL);
                     }
                 }
-                if (chaseMgmt->isCheckCyclicMode()) {
-                    //Init
-                    const uint8_t segmentSize = unfilterdSegment->getNColumns();
-                    std::unique_ptr<uint64_t[]> tmprow(
-                            new uint64_t[segmentSize]);
-                    std::unique_ptr<uint64_t[]> headrow(
-                            new uint64_t[rowsize]);
-                    std::vector<std::shared_ptr<Column>> segmentColumns;
-                    std::vector<std::unique_ptr<ColumnReader>> segmentReaders;
-                    for(uint8_t i = 0; i < segmentSize; ++i) {
-                        segmentColumns.push_back(unfilterdSegment->getColumn(i));
-                        segmentReaders.push_back(segmentColumns.back()->getReader());
-                    }
-                    std::vector<std::unique_ptr<ColumnReader>> headReaders;
-                    for(uint8_t i = 0; i < allColumns.size(); ++i) {
-                        if (allColumns[i] != NULL) {
-                            headReaders.push_back(allColumns[i]->getReader());
-                        } else {
-                            headReaders.push_back(NULL);
+                int hnum = 0;
+                count = 0;
+                for(const auto &at : atomTables) {
+                    const auto &h = at->getLiteral();
+                    for(int i = 0; i < h.getTupleSize(); ++i) {
+                        tobeRetained[hnum].push_back(allColumns[count + i]);
+                        if (h.getTermAtPos(i).isVariable()) {
+                            //It is not a existential variable
+                            if (!posExtColumns.count(h.getTermAtPos(i).getId())) {
+                                columnsToCheck[hnum].push_back(i);
+                            } else {
+                                assert(allColumns[count + i] == NULL);
+                                //Add a dummy column
+                                tobeRetained[hnum][tobeRetained.size() - 1] =
+                                    std::shared_ptr<Column>(
+                                            new CompressedColumn(0,
+                                                nrows));
+                            }
                         }
                     }
-                    //Check the rows, one by one
-                    for(size_t i = 0; i < nrows; ++i) {
-                        if (blocked[i]) {
+                    hnum++;
+                    count += h.getTupleSize();
+                }
+
+                for (size_t i = 0; i < nrows; ++i) {
+                    //Fill the row
+                    for(uint8_t j = 0; j < segmentSize; ++j) {
+                        if (!segmentReaders[j]->hasNext()) {
+                            LOG(ERRORL) << "This should not happen";
+                        }
+                        tmprow[j] = segmentReaders[j]->next();
+                    }
+                    //Fill the potential head
+                    for(uint8_t j = 0; j < allColumns.size(); ++j) {
+                        if (headReaders[j] == NULL) {
                             continue;
                         }
-                        //Fill the row
-                        for(uint8_t j = 0; j < segmentSize; ++j) {
-                            if (!segmentReaders[j]->hasNext()) {
-                                LOG(ERRORL) << "This should not happen";
-                            }
-                            tmprow[j] = segmentReaders[j]->next();
+                        if (!headReaders[j]->hasNext()) {
+                            LOG(ERRORL) << "This should not happen";
                         }
-                        //Fill the potential head
-                        for(uint8_t j = 0; j < allColumns.size(); ++j) {
-                            if (headReaders[j] == NULL) {
-                                continue;
-                            }
-                            if (!headReaders[j]->hasNext()) {
-                                LOG(ERRORL) << "This should not happen";
-                            }
-                            headrow[j] = headReaders[j]->next();
-                        }
-                        if (blocked_check(tmprow.get(), segmentSize, h, headrow.get(),
-                                    columnsToCheck)) { //Is it blocked?
+                        headrow[j] = headReaders[j]->next();
+                    }
+                    std::unique_ptr<SemiNaiver> saturation = computeSaturation(tmprow, segmentSize);
+                    hnum = 0;
+                    for(const auto &at : atomTables) {
+                        const auto &h = at->getLiteral();
+                        if (blocked_check(sn->get_RMFC_program() != NULL, saturation, h, headrow,
+                                    columnsToCheck[hnum])) { //Is it blocked?
                             blocked[i] = true;
                             LOG(DEBUGL) << "Blocking row " << i;
                             blockedCount++;
+                            break;
                         }
+                        hnum++;
                     }
-                } else {
-                    FCTable *t = sn->getTable(h.getPredicate().getId(),
-                            h.getPredicate().getCardinality());
-                    filterDerivations(t, tobeRetained,
-                            columnsToCheck,
-                            filterRows);
+                    EDBLayer &l = saturation->getEDBLayer();
+                    delete &l;
                 }
-                count += h.getTupleSize();
-            }
 
-            if (chaseMgmt->isCheckCyclicMode()) {
                 if (blockedCount == nrows) {
                     tmpRelation = std::unique_ptr<SegmentInserter>();
                     return;
@@ -1200,6 +1230,34 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                             filterRows.push_back(i);
                         }
                     }
+                }
+            } else {
+                for(const auto &at : atomTables) {
+                    const auto &h = at->getLiteral();
+                    std::vector<std::shared_ptr<Column>> tobeRetained;
+                    std::vector<uint8_t> columnsToCheck;
+                    for(int i = 0; i < h.getTupleSize(); ++i) {
+                        tobeRetained.push_back(allColumns[count + i]);
+                        if (h.getTermAtPos(i).isVariable()) {
+                            //It is not a existential variable
+                            if (!posExtColumns.count(h.getTermAtPos(i).getId())) {
+                                columnsToCheck.push_back(i);
+                            } else {
+                                assert(allColumns[count + i] == NULL);
+                                //Add a dummy column
+                                tobeRetained[tobeRetained.size() - 1] =
+                                    std::shared_ptr<Column>(
+                                            new CompressedColumn(0,
+                                                nrows));
+                            }
+                        }
+                    }
+                    FCTable *t = sn->getTable(h.getPredicate().getId(),
+                            h.getPredicate().getCardinality());
+                    filterDerivations(t, tobeRetained,
+                            columnsToCheck,
+                            filterRows);
+                    count += h.getTupleSize();
                 }
             }
 
