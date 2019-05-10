@@ -11,7 +11,6 @@ typedef enum QueryType{
     QUERY_TYPE_GENERIC = 100,
     QUERY_TYPE_BOOLEAN = 1000
 }QueryType;
-
 class ML {
     public:
         static std::string makeGenericQuery(Program& p, PredId_t predId,

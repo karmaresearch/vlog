@@ -187,7 +187,7 @@ string printSubstitutions(vector<Substitution>& subs, EDBLayer& db) {
     return result;
 }
 
-void getAllPaths(uint16_t source, vector<Edge>& path, vector<vector<Edge>>& paths, int& maxDepth, Graph& graph, Program& p) {
+void getAllPaths(uint16_t source, vector<Edge>& path, vector<vector<Edge>>& paths, int& maxDepth, DepGraph& graph, Program& p) {
     if (!p.isPredicateIDB(source)) {
         paths.push_back(path);
     } else if (paths.size() >= maxDepth) {
@@ -212,7 +212,7 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueriesAllPat
     std::set<string> setOfUniquePredicates;
     std::unordered_map<string, vector<pair<string, int>>> queryMap;
 
-    Graph graph;
+    DepGraph graph;
 
     std::vector<Rule> rules = p.getAllRules();
     for (int i = 0; i < rules.size(); ++i) {
@@ -425,7 +425,7 @@ std::vector<std::pair<std::string, int>> Training::generateNewTrainingQueries(ED
     std::set<string> setOfUniquePredicates;
     std::unordered_map<string, vector<pair<string, int>>> queryMap;
 
-    Graph graph;
+    DepGraph graph;
 
     std::vector<Rule> rules = p.getAllRules();
     for (int i = 0; i < rules.size(); ++i) {
@@ -673,8 +673,8 @@ std::vector<std::pair<std::string, int>> Training::generateTrainingQueries(EDBCo
     std::set<string> setOfUniquePredicates;
 
     typedef pair<PredId_t, vector<Substitution>> EndpointWithEdge;
-    typedef unordered_map<uint16_t, vector<EndpointWithEdge>> Graph;
-    Graph graph;
+    typedef unordered_map<uint16_t, vector<EndpointWithEdge>> DepGraph;
+    DepGraph graph;
 
     std::vector<Rule> rules = p.getAllRules();
     for (int i = 0; i < rules.size(); ++i) {

@@ -63,6 +63,14 @@ class Reasoner {
                 std::vector<Term_t> *valueBindings, EDBLayer &layer,
                 Program &program);
 
+        void getMetrics(Literal &query,
+                std::vector<uint8_t> *posBindings,
+                std::vector<Term_t> *valueBindings,
+                EDBLayer &layer,
+                Program &program,
+                Metrics &metrics,
+                int maxDepth);
+
         VLIBEXP ReasoningMode chooseMostEfficientAlgo(Literal &query,
                 EDBLayer &layer, Program &program,
                 std::vector<uint8_t> *posBindings,
@@ -122,6 +130,7 @@ class Reasoner {
                 Program *p,
                 bool restrictedChase);
 
+        int getNumberOfIDBPredicates(Literal&, Program&);
 
         ~Reasoner() {
         }

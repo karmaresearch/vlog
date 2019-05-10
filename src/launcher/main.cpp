@@ -1248,13 +1248,13 @@ int main(int argc, const char** argv) {
         vt.push_back(vt2);
         vt.push_back(vt3);
         vt.push_back(vt4);
-        std::string s = p.readFromFile(rulesFile);
+        std::string s = program.readFromFile(rulesFile);
         if (s != "") {
             cerr << s << endl;
             return 1;
         }
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-        std::vector<std::pair<std::string,int>> trainingQueries = ML::generateTrainingQueries(*layer, p, vt, vm);
+        std::vector<std::pair<std::string,int>> trainingQueries = ML::generateTrainingQueries(*layer, program, vt, vm);
         std::chrono::duration<double> sec = std::chrono::system_clock::now()- start;
         int nQueries = trainingQueries.size();
         LOG(INFOL) << nQueries << " queries generated in " << sec.count() << " seconds";

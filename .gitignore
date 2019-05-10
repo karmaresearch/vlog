@@ -26,3 +26,6 @@ testOutput
 **/*.csv
 **/*.datalog
 **/*.ipynb
+**/*.stats
+**/*.conf
+**/*.swp

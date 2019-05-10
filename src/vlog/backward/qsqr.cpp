@@ -197,7 +197,7 @@ void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Ru
     for (std::vector<Rule>::iterator itr =
 	    r.begin(); itr != r.end(); ++itr) {
 	Literal head = itr->getHead(0);
-	Substitution substitutions[SIZETUPLE];
+	vector<Substitution> substitutions;
 	int nSubs = Literal::subsumes(substitutions, head, l);
 	if (nSubs < 0) {
 	    continue;
@@ -210,14 +210,14 @@ void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Ru
 
 	// Remove replacements of variables with variables ...
 	int filterednSubs = 0;
-	Substitution filteredSubstitutions[SIZETUPLE];
+	vector<Substitution> filteredSubstitutions;
 	for (int i = 0; i < nSubs; i++) {
 	    if (! substitutions[i].destination.isVariable()) {
 		 filteredSubstitutions[filterednSubs++] = substitutions[i];
 	    }
 	}
 
-        estimateRule(m, depth - 1, *itr, filteredSubstitutions, filterednSubs, execRules);
+    estimateRule(m, depth - 1, *itr, filteredSubstitutions, filterednSubs, execRules);
 	metrics.estimate += m.estimate;
 	metrics.intermediateResults += m.intermediateResults;
 	metrics.countRules += m.countRules;
@@ -226,7 +226,7 @@ void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Ru
     }
 }
 
-void QSQR::estimateRule(Metrics &metrics, int depth, Rule &rule, Substitution *subs, int nSubs, std::vector<Rule> &execRules) {
+void QSQR::estimateRule(Metrics &metrics, int depth, Rule &rule, vector<Substitution>& subs, int nSubs, std::vector<Rule> &execRules) {
     bool exists = false;
     for (std::vector<Rule>::iterator itr = execRules.begin(); itr != execRules.end() && ! exists; itr++) {
 	exists = itr->getHead(0) == rule.getHead(0) && itr->getBody() == rule.getBody();
@@ -237,14 +237,14 @@ void QSQR::estimateRule(Metrics &metrics, int depth, Rule &rule, Substitution *s
     }
     metrics.countRules++;
     std::vector<Literal> body = rule.getBody();
-    Literal substitutedHead = rule.getHead(0).substitutes(subs, nSubs);
+    Literal substitutedHead = rule.getHead(0).substitutes(subs);
     std::vector<uint8_t> headVars = substitutedHead.getAllVars();
     std::vector<uint8_t> allVars;
     bool noAnswers = false;
     for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end(); ++itr) {
 	Metrics m;
 	memset(&m, 0, sizeof(Metrics));
-	Literal substituted = itr->substitutes(subs, nSubs);
+	Literal substituted = itr->substitutes(subs);
 	LOG(DEBUGL) << "Substituted literal = " << substituted.tostring(program, &layer);
 	estimateQuery(m, depth, substituted, execRules);
 	metrics.countRules += m.countRules;
@@ -317,7 +317,7 @@ void QSQR::evaluate(Predicate &pred, BindingsTable *inputTable,
         task.repeat = repeat;
         task.totalAnswers = calculateAllAnswers();
         pushTask(task);
-        RuleExecutor *exec = rules[pred.getId()][pred.getAdorment()][0];
+        RuleExecutor *exec = rules[pred.getId()][pred.getAdornment()][0];
         exec->evaluate(inputTable, offsetInput, this, layer);
     }
 #endif
@@ -339,7 +339,7 @@ void QSQR::processTask(QSQR_Task &task) {
                             pushTask(newTask);
                             // LOG(DEBUGL) << "pushed new task QUERY, totalAnswers = " << newTask.totalAnswers;
                             RuleExecutor *exec = rules[task.pred.getId()]
-                                [task.pred.getAdorment()][task.currentRuleIndex];
+                                [task.pred.getAdornment()][task.currentRuleIndex];
                             exec->evaluate(task.inputTable, task.offsetInput, this, layer);
                         } else {
                             size_t newAnswers = calculateAllAnswers();
@@ -355,7 +355,7 @@ void QSQR::processTask(QSQR_Task &task) {
                                 pushTask(newTask);
                                 // LOG(DEBUGL) << "pushed new task QUERY(0), totalAnswers = " << newTask.totalAnswers;
                                 RuleExecutor *exec = rules[task.pred.getId()]
-                                    [task.pred.getAdorment()][0];
+                                    [task.pred.getAdornment()][0];
                                 exec->evaluate(task.inputTable, task.offsetInput, this, layer);
                             }
                         }

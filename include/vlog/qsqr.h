@@ -115,7 +115,7 @@ public:
 
     void estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Rule> &execRules);
 
-    void estimateRule(Metrics &metrics, int depth, Rule &rule, Substitution *subs, int nsubs, std::vector<Rule> &execRules);
+    void estimateRule(Metrics &metrics, int depth, Rule &rule, vector<Substitution>& subs, int nsubs, std::vector<Rule> &execRules);
 
     size_t estimate(int depth, Predicate &pred, BindingsTable *inputTable/*, size_t offsetInput*/);
 
