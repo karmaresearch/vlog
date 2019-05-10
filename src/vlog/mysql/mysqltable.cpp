@@ -47,7 +47,7 @@ void MySQLTable::executeQuery(const std::string &query, SegmentInserter *inserte
     sql::ResultSet *res = stmt->executeQuery(query);
 
     while(res->next()) {
-	uint64_t row[128];
+	uint64_t row[256];
 	for (int i = 0; i < arity; i++) {
 	    std::string field = res-> getString(fieldTables[i]);
 	    layer->getOrAddDictNumber(field.c_str(), field.size(), row[i]);

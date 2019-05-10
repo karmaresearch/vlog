@@ -64,3 +64,7 @@ std::shared_ptr<Column> FunctionalColumn::unique() const {
 bool FunctionalColumn::isConstant() const {
     return nvalues < 2;
 }
+
+size_t FunctionalColumn::getRepresentationSize() const {
+    return nvalues;
+}

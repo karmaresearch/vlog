@@ -408,35 +408,40 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
 
             //Setup the program
             program = std::unique_ptr<Program>(new Program(edb.get()));
-            program->readFromString(srules, vm["rewriteMultihead"].as<bool>());
-            program->sortRulesByIDBPredicates();
-            //Set up the ruleset and perform the pre-materialization if necessary
-            if (sauto != "") {
-                //Automatic prematerialization
-                std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-                Materialization *mat = new Materialization();
-                mat->guessLiteralsFromRules(*program, *edb.get());
-                mat->getAndStorePrematerialization(*edb.get(),
-                        *program,
-                        true, automatThreshold);
-                delete mat;
-                std::chrono::duration<double> sec = std::chrono::system_clock::now()
-                    - start;
-                LOG(INFOL) << "Runtime pre-materialization = " <<
-                    sec.count() * 1000 << " milliseconds";
-            } else if (spremat != "") {
-                std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-                Materialization *mat = new Materialization();
-                mat->loadLiteralsFromString(*program, spremat);
-                mat->getAndStorePrematerialization(*edb.get(), *program, false, ~0l);
-                program->sortRulesByIDBPredicates();
-                delete mat;
-                std::chrono::duration<double> sec = std::chrono::system_clock::now()
-                    - start;
-                LOG(INFOL) << "Runtime pre-materialization = " <<
-                    sec.count() * 1000 << " milliseconds";
-            }
-            page = "OK!";
+	    std::string s = program->readFromString(srules, vm["rewriteMultihead"].as<bool>());
+	    if (s != "") {
+		error = 1;
+		page = s;
+	    } else {
+		program->sortRulesByIDBPredicates();
+		//Set up the ruleset and perform the pre-materialization if necessary
+		if (sauto != "") {
+		    //Automatic prematerialization
+		    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+		    Materialization *mat = new Materialization();
+		    mat->guessLiteralsFromRules(*program, *edb.get());
+		    mat->getAndStorePrematerialization(*edb.get(),
+			    *program,
+			    true, automatThreshold);
+		    delete mat;
+		    std::chrono::duration<double> sec = std::chrono::system_clock::now()
+			- start;
+		    LOG(INFOL) << "Runtime pre-materialization = " <<
+			sec.count() * 1000 << " milliseconds";
+		} else if (spremat != "") {
+		    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+		    Materialization *mat = new Materialization();
+		    mat->loadLiteralsFromString(*program, spremat);
+		    mat->getAndStorePrematerialization(*edb.get(), *program, false, ~0l);
+		    program->sortRulesByIDBPredicates();
+		    delete mat;
+		    std::chrono::duration<double> sec = std::chrono::system_clock::now()
+			- start;
+		    LOG(INFOL) << "Runtime pre-materialization = " <<
+			sec.count() * 1000 << " milliseconds";
+		}
+		page = "OK!";
+	    }
         } else {
             page = "Error!";
         }

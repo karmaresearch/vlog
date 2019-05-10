@@ -11,16 +11,17 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
 
         //If the data is added row by row, then I set the following flag to true
         bool replaceExtColumns;
+        bool filterRecursive;
         uint8_t nConstantColumns;
-        uint8_t posConstantColumns[SIZETUPLE * 3];
+        uint8_t posConstantColumns[256];
         uint8_t nKnownColumns;
-        uint8_t posKnownColumns[SIZETUPLE * 3];
+        uint8_t posKnownColumns[256];
         std::map<uint8_t, std::vector<uint8_t>> posExtColumns;
         std::unique_ptr<SegmentInserter> tmpRelation;
         //In the above case, I store the data in a temporary segment, and assign
         //existential IDs when I consolidate
-	std::vector<uint8_t> varsUsedForExt;
-	std::vector<int> colsForExt;
+        std::vector<uint8_t> varsUsedForExt;
+        std::vector<int> colsForExt;
 
         static void filterDerivations(FCTable *t,
                 std::vector<std::shared_ptr<Column>> &tobeRetained,
@@ -44,6 +45,23 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 uint64_t &sizecolumns,
                 std::vector<std::shared_ptr<Column>> &c);
 
+        void retainNonRecursive(
+                uint64_t &sizecolumns,
+                std::vector<std::shared_ptr<Column>> &c);
+
+        bool RMFA_check(uint64_t *row, const Literal &headLiteral,
+                uint64_t *headrow, std::vector<uint8_t> &columnsToCheck);
+
+        void RMFA_computeBodyAtoms(std::vector<Literal> &output,
+                uint64_t *row);
+
+        void RMFA_enhanceFunctionTerms(std::vector<Literal> &output,
+                uint64_t &startFreshIDs,
+                size_t startOutput = 0);
+
+        std::unique_ptr<SemiNaiver> RMFA_saturateInput(
+                std::vector<Literal> &input);
+
     public:
         ExistentialRuleProcessor(
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
@@ -56,7 +74,9 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 const bool addToEndTable,
                 const int nthreads,
                 SemiNaiver *sn,
-                std::shared_ptr<ChaseMgmt> chaseMgmt);
+                std::shared_ptr<ChaseMgmt> chaseMgmt,
+                bool filterRecursive,
+                const bool ignoreDupElimin);
 
         void addColumns(const int blockid, FCInternalTableItr *itr,
                 const bool unique, const bool sorted,
@@ -71,29 +91,18 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 const bool sorted);
 
         void processResults(const int blockid, const Term_t *first,
-                FCInternalTableItr* second, const bool unique) {
-            //TODO: Chase...
-            LOG(ERRORL) << "Not implemented yet";
-            throw 10;
-        }
+                FCInternalTableItr* second, const bool unique);
 
         void processResults(const int blockid,
                 const std::vector<const std::vector<Term_t> *> &vectors1, size_t i1,
                 const std::vector<const std::vector<Term_t> *> &vectors2, size_t i2,
                 const bool unique);
 
-        void processResults(std::vector<int> &blockid, Term_t *p, std::vector<bool> &unique, std::mutex *m) {
-            //TODO: Chase...
-            LOG(ERRORL) << "Not implemented yet";
-            throw 10;
-        }
+        void processResults(std::vector<int> &blockid, Term_t *p,
+                std::vector<bool> &unique, std::mutex *m);
 
         void processResults(const int blockid, FCInternalTableItr *first,
-                FCInternalTableItr* second, const bool unique) {
-            //TODO: Chase...
-            LOG(ERRORL) << "Not implemented yet";
-            throw 10;
-        }
+                FCInternalTableItr* second, const bool unique);
 
         void consolidate(const bool isFinished);
 };

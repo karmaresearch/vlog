@@ -7,7 +7,7 @@
 
 #include <vector>
 
-#define MAX_MAPPINGS 8
+#define MAX_MAPPINGS 256
 
 #define TMPT_THRESHOLD  (32*1024*1024)
 
@@ -57,6 +57,8 @@ class ResultJoinProcessor {
         HashSet *rowsHash;
         size_t rowCount;
 #endif
+        const bool ignoreDupElimin;
+
     protected:
         virtual void processResults(const int blockid,
                 const bool unique, std::mutex *m) = 0;
@@ -71,9 +73,14 @@ class ResultJoinProcessor {
                 const uint8_t nCopyFromSecond,
                 const std::pair<uint8_t, uint8_t> *posFromFirst,
                 const std::pair<uint8_t, uint8_t> *posFromSecond,
-                const int nthreads) :
+                const int nthreads,
+                const bool ignoreDupElimin) :
             ResultJoinProcessor(rowsize, new Term_t[rowsize], true, nCopyFromFirst,
-                    nCopyFromSecond, posFromFirst, posFromSecond, nthreads) {
+                    nCopyFromSecond, posFromFirst, posFromSecond, nthreads,
+                    ignoreDupElimin) {
+                for (int i = 0; i < rowsize; i++) {
+                    row[i] = 0;
+                }
             }
 
         ResultJoinProcessor(const uint8_t rowsize, Term_t *row,
@@ -82,11 +89,13 @@ class ResultJoinProcessor {
                 const uint8_t nCopyFromSecond,
                 const std::pair<uint8_t, uint8_t> *posFromFirst,
                 const std::pair<uint8_t, uint8_t> *posFromSecond,
-                const int nthreads) :
+                const int nthreads,
+                const bool ignoreDupElimin) :
             rowsize(rowsize), row(row), deleteRow(deleteRow),
             nCopyFromFirst(nCopyFromFirst),
             nCopyFromSecond(nCopyFromSecond),
-            nthreads(nthreads) {
+            nthreads(nthreads),
+            ignoreDupElimin(ignoreDupElimin) {
                 for (uint8_t i = 0; i < nCopyFromFirst; ++i) {
                     this->posFromFirst[i] = posFromFirst[i];
                 }

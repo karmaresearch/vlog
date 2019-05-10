@@ -40,6 +40,16 @@ uint8_t InmemoryFCInternalTable::getRowSize() const {
     return nfields;
 }
 
+size_t InmemoryFCInternalTable::getRepresentationSize(std::set<uint64_t> &IDs) const {
+    if (this->unmergedSegments.size() > 0) {
+        LOG(ERRORL) << "All tables should not have any unmerged segment ...";
+        throw 10;
+    }
+    size_t size = nfields; //Every table can be seen as a meta-fact
+    size += values->getRepresentationSize(IDs);
+    return size;
+}
+
 FCInternalTableItr *InmemoryFCInternalTable::getIterator() const {
 
     assert(values == NULL || values->getNColumns() == nfields);
@@ -558,7 +568,7 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
        */
     for (uint8_t i = 0; i < nConstantsToFilter && match; ++i) {
         if (values->getColumn(posConstantsToFilter[i])->isConstant()) {
-            const Term_t v = values->getColumn(posConstantsToFilter[i])->getReader()->first();
+            const Term_t v = values->getColumn(posConstantsToFilter[i])->first();
             if (v != valuesConstantsToFilter[i]) {
                 match = false;
             }
@@ -580,7 +590,7 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
             Column *c1 = values->getColumn(repeatedVars[i].first).get();
             Column *c2 = values->getColumn(repeatedVars[i].second).get();
             if (c1->isConstant() && c2->isConstant()) {
-                if (c1->getReader()->first() != c2->getReader()->first()) {
+                if (c1->first() != c2->first()) {
                     match = false;
                     break;
                 }
@@ -639,7 +649,7 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
                 Column *c1 = values->getColumn(repeatedVars[i].first).get();
                 Column *c2 = values->getColumn(repeatedVars[i].second).get();
                 if (c1->isConstant() && c2->isConstant()) {
-                    if (c1->getReader()->first() != c2->getReader()->first()) {
+                    if (c1->first() != c2->first()) {
                         match = false;
                         break;
                     }
@@ -712,7 +722,7 @@ if (filteredSegment != NULL && !filteredSegment->isEmpty()) {
     }
 
     if (nVarsToCopy > 0) {
-        return std::shared_ptr<const FCInternalTable>(new InmemoryFCInternalTable(nVarsToCopy, iteration, true, filteredSegment));
+        return std::shared_ptr<const FCInternalTable>(new InmemoryFCInternalTable(nVarsToCopy, iteration, sorted, filteredSegment));
     } else {
         return std::shared_ptr<const FCInternalTable>(new SingletonTable(iteration));
     }
@@ -926,13 +936,17 @@ void MergerInternalTableItr::next() {
 }
 
 bool MITISorter::operator ()(const uint8_t i1, const uint8_t i2) const {
+    if (i1 == i2) {
+        return false;
+    }
     for (uint8_t i = 0; i < tuplesize; ++i) {
         Term_t v1 = iterators[i1].first->getCurrentValue(sortPos[i]);
         Term_t v2 = iterators[i2].first->getCurrentValue(sortPos[i]);
+        // LOG(TRACEL) << "i = " << i << ", i1 = " << i1 << ", v1 = " << v1 << ", i2 = " << i2 << ", v2 = " << v2;
         if (v1 > v2)
             return true;
         else if (v1 < v2)
             return false;
     }
-    return true;
+    return false;
 }

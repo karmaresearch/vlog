@@ -349,7 +349,7 @@ void JoinExecutor::verificativeJoinOneColumn(
                 }
                 size_t idx1 = 0;
                 size_t idx2 = 0;
-                Term_t outputRow[SIZETUPLE];
+                Term_t outputRow[256];
                 std::unique_ptr<ColumnReader> matchedKeysR = matchedKeys->getReader();
 
                 if (matchedKeysR->hasNext()) {
@@ -422,7 +422,7 @@ void JoinExecutor::verificativeJoinOneColumn(
                 throw 10;
 
             itr->next();
-            Term_t outputRow[SIZETUPLE];
+            Term_t outputRow[256];
             size_t idx1 = 0;
             size_t idx2 = 0;
             //FCInternalTableItr *titr = table->getSortedIterator();
@@ -517,7 +517,8 @@ void JoinExecutor::verificativeJoin(
     //       << plan.joinCoordinates[currentLiteral][0].first;
 
     // If the index of the result in the intermediate is equal to the index of the join in the intermediate...
-    if (hv.posFromFirst[currentLiteral][0].second ==
+    if (hv.posFromFirst[currentLiteral].size() > 0 &&
+	    hv.posFromFirst[currentLiteral][0].second ==
             hv.joinCoordinates[currentLiteral][0].first &&
             hv.sizeOutputRelation[currentLiteral] == 1 &&
             currentLiteral == hv.posFromFirst.size() - 1) { //The last literal checks that this is the last join we execute
@@ -535,6 +536,10 @@ void JoinExecutor::verificativeJoin(
     }
 }
 
+bool literalIsExpensive(const Literal &literal, EDBLayer &layer) {
+    return layer.expensiveEDBPredicate(literal.getPredicate().getId());
+}
+
 void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
         const std::vector<Literal> *outputLiterals, const Literal & literal,
         const size_t min, const size_t max,
@@ -547,8 +552,15 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
         const int currentLiteral,
         const int nthreads) {
 
+    // Input Negation. We check if the literal is negated before calling
+    // isJoinVerificative and isJoinTwoToOneJoin. Check performance issues.
+    if (literal.isNegated()) {
+        LOG(TRACEL) << "Calling leftjoin";
+        leftjoin(t1, naiver, outputLiterals, literal, min, max,
+                 joinsCoordinates, output, nthreads);
+    }
     //First I calculate whether the join is verificative or explorative.
-    if (JoinExecutor::isJoinVerificative(t1, hv, currentLiteral)) {
+    else if (JoinExecutor::isJoinVerificative(t1, hv, currentLiteral)) {
         LOG(TRACEL) << "Executing verificativeJoin. t1->getNRows()=" << t1->getNRows();
         verificativeJoin(naiver, t1, literal, min, max, output, hv,
                 currentLiteral, nthreads);
@@ -560,9 +572,16 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
     } else {
         //This code is to execute more generic joins. We do hash join if
         //keys are few and there is no ordering. Otherwise, merge join.
-        if (t1->estimateNRows() <= THRESHOLD_HASHJOIN
+        int factor = literalIsExpensive(literal, naiver->getEDBLayer()) ? 50 : 1;
+#ifdef DEBUG
+        LOG(TRACEL) << "joinsCoordinates.size() = " << joinsCoordinates.size();
+        for (int i = 0; i < joinsCoordinates.size(); i++) {
+            LOG(TRACEL) << "i = " << i << ", first = " << (int) joinsCoordinates[i].first << ", second = " << (int) joinsCoordinates[i].second;
+        }
+#endif
+        if (t1->estimateNRows() <= factor * THRESHOLD_HASHJOIN
                 && joinsCoordinates.size() < 3 && joinsCoordinates.size() > 0
-                && (joinsCoordinates.size() > 1 ||
+                && (factor != 1 || joinsCoordinates.size() > 1 ||
                     joinsCoordinates[0].first != joinsCoordinates[0].second ||
                     joinsCoordinates[0].first != 0)) {
             LOG(TRACEL) << "Executing hashjoin. t1->getNRows()=" << t1->getNRows();
@@ -2092,7 +2111,7 @@ bool DuplicateContainers::exists(const Term_t *v) {
         }
     } else {
         if (nfields == 1) {
-            uint8_t idxTable = 0;
+            size_t idxTable = 0;
             size_t emptyTables = 0;
             while (idxTable < ntables) {
                 if (tables[idxTable] != NULL) {
@@ -2115,7 +2134,7 @@ bool DuplicateContainers::exists(const Term_t *v) {
             }
             empty = emptyTables == ntables;
         } else {
-            uint8_t idxTable = 0;
+            size_t idxTable = 0;
             size_t emptyTables = 0;
             while (idxTable < ntables) {
                 if (tables[idxTable] != NULL) {
@@ -2218,3 +2237,248 @@ DuplicateContainers::DuplicateContainers(FCIterator & itr, const uint8_t sizerow
             }
         }
     }
+
+void JoinExecutor::leftjoin(const FCInternalTable * t1, SemiNaiver * naiver,
+        const std::vector<Literal> *outputLiterals,
+        const Literal &literalToQuery,
+        const uint32_t min, const uint32_t max,
+        std::vector<std::pair<uint8_t, uint8_t>> joinsCoordinates,
+        ResultJoinProcessor * output,
+        int nthreads) {
+    LOG(TRACEL) << "STARTING JoinExecutor::leftjoin";
+    //Find whether some of the join fields have a very low cardinality. We can group them.
+    std::vector<uint8_t> fields1;
+    std::vector<uint8_t> fields2;
+
+    for (uint32_t i = 0; i < joinsCoordinates.size(); ++i) {
+        fields1.push_back(joinsCoordinates[i].first);
+        fields2.push_back(joinsCoordinates[i].second);
+    }
+
+    //Do the join
+    TableFilterer filterer(naiver);
+    std::vector<std::shared_ptr<const FCInternalTable>> tablesToLeftJoin;
+    FCIterator it = naiver->getTable(literalToQuery, min, max,
+            &filterer);
+
+    LOG(TRACEL) << "literalToQuery" << literalToQuery.toprettystring(naiver->getProgram(), &(naiver->getEDBLayer()));
+    while (!it.isEmpty()) {
+        std::shared_ptr<const FCInternalTable> t = it.getCurrentTable();
+        bool ok = true;
+
+        //The first condition tests we are evaluating the last literal
+        bool isEligibleForPruning = outputLiterals != NULL &&
+            filterer.isEligibleForPartialSubs(
+                    it.getCurrentBlock(),
+                    *outputLiterals,
+                    t1,
+                    output->getNCopyFromFirst(),
+                    joinsCoordinates.size());
+        if (isEligibleForPruning) {
+            if (filterer.producedDerivationInPreviousStepsWithSubs(
+                        it.getCurrentBlock(),
+                        *outputLiterals, literalToQuery, t1,
+                        output->getNCopyFromFirst(),
+                        output->getPosFromFirst(),
+                        joinsCoordinates.size(),
+                        &joinsCoordinates[0])) {
+                ok = false;
+            }
+        }
+        if (ok)
+            tablesToLeftJoin.push_back(t);
+        it.moveNextCount();
+    }
+
+    LOG(TRACEL) << "CALLING JoinExecutor::left_join";
+    JoinExecutor::left_join(t1, fields1, tablesToLeftJoin, fields1, NULL, NULL,
+            fields2, output, nthreads);
+    LOG(TRACEL) << "ENDING JoinExecutor::leftjoin";
+}
+
+void JoinExecutor::left_join(const FCInternalTable * filteredT1,
+        std::vector<uint8_t> &fieldsToSortInMap,
+        std::vector<std::shared_ptr<const FCInternalTable>> &tables2,
+        const std::vector<uint8_t> &fields1,
+        const uint8_t *posOtherVars,
+        const std::vector<Term_t> *valuesOtherVars,
+        const std::vector<uint8_t> &fields2,
+        ResultJoinProcessor * output,
+        int nthreads) {
+
+    LOG(TRACEL) << "STARTING JoinExecutor::left_join";
+
+    int processedTables = 0;
+    bool first = true;
+
+    std::chrono::system_clock::time_point startS;
+    std::chrono::duration<double> secS;
+    size_t totalsize2 = 0;
+    for (auto t2 : tables2) {
+        size_t sz = t2->getNRows();
+        LOG(TRACEL) << "tables2 entry size = " << sz;
+        totalsize2 += sz;
+    }
+
+    startS = std::chrono::system_clock::now();
+
+    //Sort t1
+    FCInternalTableItr *sortedItr1 = filteredT1->sortBy(fields1, nthreads);
+    std::vector<const std::vector<Term_t> *> vectors1 = sortedItr1->getAllVectors(nthreads);
+
+    secS = std::chrono::system_clock::now() - startS;
+
+#if DEBUG
+    LOG(TRACEL) << "left_join: time sorting the left relation: " << secS.count() * 1000;
+    LOG(TRACEL) << "filteredT1->size = " << filteredT1->getNRows() << ", tables2.size() = " << tables2.size() << ", total t2 size = " << totalsize2;
+#endif
+
+    Output *out = new Output(output, NULL);
+
+    if (tables2.size() == 0) {
+        std::vector<const std::vector<Term_t> *> vectors2;
+        std::vector<uint8_t> dummyFields;
+        JoinExecutor::do_left_join(vectors1, vectors2, dummyFields, dummyFields, out);
+        sortedItr1->deleteAllVectors(vectors1);
+        filteredT1->releaseIterator(sortedItr1);
+        delete out;
+        return;
+    }
+
+    LOG(TRACEL) << "Main loop of left_join";
+    auto t2 = tables2[0];
+    processedTables++;
+    for (int i = 1; i < tables2.size(); i++) {
+        processedTables++;
+        t2 = t2->merge(tables2[i], nthreads);
+    }
+
+    //Sort t2
+    startS = std::chrono::system_clock::now();
+    //Also in this case, there might be no join fields
+    FCInternalTableItr *sortedItr2 = NULL;
+    if (fields2.size() > 0) {
+        LOG(TRACEL) << "t2->sortBy";
+        sortedItr2 = t2->sortBy(fields2, nthreads);
+    } else {
+        sortedItr2 = t2->getIterator();
+    }
+    std::vector<const std::vector<Term_t> *> vectors2 = sortedItr2->getAllVectors(nthreads);
+    secS = std::chrono::system_clock::now() - startS;
+
+    JoinExecutor::do_left_join(vectors1, vectors2, fields1, fields2, out);
+#if DEBUG
+    output->checkSizes();
+#endif
+
+    sortedItr2->deleteAllVectors(vectors2);
+    t2->releaseIterator(sortedItr2);
+    sortedItr1->deleteAllVectors(vectors1);
+    filteredT1->releaseIterator(sortedItr1);
+    delete out;
+#if DEBUG
+    LOG(TRACEL) << "Processed tables: " << processedTables;
+#endif
+    LOG(TRACEL) << "ENDING JoinExecutor::left_join";
+}
+
+/*
+ * JoinExecutor::do_left_join
+ *
+ * @author Larry Gonz\'alez
+ * @note based on do_merge_join_clasicalgo 11 par
+ */
+void JoinExecutor::do_left_join(
+        const std::vector<const std::vector<Term_t> *> &vectors1,
+        const std::vector<const std::vector<Term_t> *> &vectors2,
+        const std::vector<uint8_t> &fields1,
+        const std::vector<uint8_t> &fields2,
+        Output * output) {
+
+    //LOG(TRACEL) << "L. STARTING JoinExecutor::do_left_join 5 params";
+    //LOG(TRACEL) << "  L. vectors1";
+    //for (const std::vector<Term_t> * asd : vectors1){
+    //    LOG(TRACEL) << "    L. new vector";
+    //    for (Term_t asdt : *asd)
+    //        LOG(TRACEL) << "      L. term_t: " << asdt;
+    //}
+    //LOG(TRACEL) << "  L. vectors2";
+    //for (const std::vector<Term_t> * asd : vectors2){
+    //    LOG(TRACEL) << "    L. new vector";
+    //    for (Term_t asdt : *asd)
+    //        LOG(TRACEL) << "      L. term_t: " << asdt;
+    //}
+    //LOG(TRACEL) << "  L. fields1: ";
+    //for (auto v : fields1)
+    //    LOG(TRACEL) << "    L. " << v;
+    //LOG(TRACEL) << "  L. fields2: ";
+    //for (auto v : fields2)
+    //    LOG(TRACEL) << "    L. " << v;
+    //LOG(TRACEL) << "  L. XXXXXXXXXXXXXXXX";
+
+    size_t l1 = 0;
+    size_t l2 = 0;
+    size_t u1 = vectors1[0]->size();
+    size_t u2 = vectors2.size() > 0 ? vectors2[0]->size() : 0;
+
+    //Special case. There is no left join
+    if (fields1.size() == 0 && l1 < u1 && l2 < u2) {
+        if (vectors1.size() == 0) {
+            assert(vectors2.size() != 0);
+            for (size_t i = l2; i < u2; i++) {
+                output->processResults(0, vectors1, l1, vectors2, i, false);
+            }
+            return;
+        } else if (vectors2.size() == 0) {
+            for (size_t i = l1; i < u1; i++) {
+                output->processResults(0, vectors1, i, vectors2, l2, false);
+            }
+            return;
+        }
+    }
+
+    std::chrono::system_clock::time_point startL = std::chrono::system_clock::now();
+
+    //Note: we are not considering (size_t) total nor (size_t) max
+
+    int res = 0;
+    //LOG(TRACEL) << "  L. STARTING l1 < u1 || l2 < u2";
+    while (l1 < u1 || l2 < u2) {
+        // LOG(TRACEL) << "    L. XXXXXX";
+        // LOG(TRACEL) << "    L. l1: "<< l1;
+        // LOG(TRACEL) << "    L. u1: "<< u1;
+        // LOG(TRACEL) << "    L. l2: "<< l1;
+        // LOG(TRACEL) << "    L. u2: "<< u2;
+
+        if (l1 == u1)
+            break;
+
+        if (l2 == u2){
+            while (l1 < u1){
+                output->processResults(0, vectors1, l1, vectors2, u2, false);
+                ++l1;
+            }
+            break;
+        }
+
+        res = JoinExecutor::cmp(vectors1, l1, vectors2, l2, fields1, fields2);
+
+        if (res == 0){
+            LOG(TRACEL) << "  L. res = 0";
+            l1++;
+        } else if (res > 0) {
+            LOG(TRACEL) << "  L. res > 0";
+            l2++;
+        } else /* if (res < 0) */ {
+            LOG(TRACEL) << "  L. res < 0";
+            output->processResults(0, vectors1, l1, vectors2, u2, false);
+            ++l1;
+        }
+    }
+#if DEBUG
+    std::chrono::duration<double> secL = std::chrono::system_clock::now() - startL;
+    LOG(TRACEL) << "do_left_join: time loop: " << secL.count() * 1000;
+#endif
+    LOG(TRACEL) << "ENDING l1 < u1 || l2 < u2";
+    LOG(TRACEL) << "ENDING JoinExecutor::do_left_join 5 params";
+}

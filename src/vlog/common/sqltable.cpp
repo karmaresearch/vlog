@@ -204,7 +204,7 @@ void SQLTable::query(QSQQuery *query, TupleTable *outputTable,
     const Literal *l = query->getLiteral();
     const uint8_t npos = query->getNPosToCopy();
     uint8_t *pos = query->getPosToCopy();
-    uint64_t row[npos];
+	std::unique_ptr<uint64_t> row = std::unique_ptr<uint64_t>(new uint64_t[npos]);
     EDBIterator *iter;
 
     if (posToFilter == NULL || posToFilter->size() == 0) {
@@ -264,9 +264,9 @@ void SQLTable::query(QSQQuery *query, TupleTable *outputTable,
     while (iter->hasNext()) {
 	iter->next();
 	for (int i = 0; i < npos; i++) {
-	    row[i] = iter->getElementAt(pos[i]);
+	    row.get()[i] = iter->getElementAt(pos[i]);
 	}
-	outputTable->addRow(row);
+	outputTable->addRow(row.get());
 	count++;
     }
     iter->clear();

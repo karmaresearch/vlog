@@ -6,31 +6,33 @@
 using json = nlohmann::json;
 
 static bool curl_initialized = false;
+static int  numTables = 0;
 
 SparqlTable::SparqlTable(PredId_t predid, string repository, EDBLayer *layer, string f, string whereBody) :
     predid(predid), repository(repository), layer(layer), whereBody(whereBody) {
-	if (! curl_initialized) {
-	    curl_global_init(CURL_GLOBAL_ALL);
-	    curl_initialized = true;
-	}
-	curl = curl_easy_init();
-	//Extract fields
-	std::stringstream ss(f);
-	std::string item;
-	while (std::getline(ss, item, ',')) {
-	    bool alreadyPresent = false;
-	    for (int i = 0; i < fieldVars.size(); i++) {
-		if (item == fieldVars[i]) {
-		    LOG(WARNL) << "Repeated variable name " << item << " ignored.";
-		    alreadyPresent = true;
-		    break;
-		}
-	    }
-	    if (alreadyPresent) {
-		continue;
-	    }
-	    this->fieldVars.push_back(item);
-	}
+        if (! curl_initialized) {
+            curl_global_init(CURL_GLOBAL_ALL);
+            curl_initialized = true;
+        }
+        curl = curl_easy_init();
+        //Extract fields
+        std::stringstream ss(f);
+        std::string item;
+        while (std::getline(ss, item, ',')) {
+            bool alreadyPresent = false;
+            for (int i = 0; i < fieldVars.size(); i++) {
+                if (item == fieldVars[i]) {
+                    LOG(WARNL) << "Repeated variable name " << item << " ignored.";
+                    alreadyPresent = true;
+                    break;
+                }
+            }
+            if (alreadyPresent) {
+                continue;
+            }
+            this->fieldVars.push_back(item);
+        }
+	numTables++;
     }
 
 
@@ -57,40 +59,40 @@ std::string SparqlTable::generateQuery(const Literal &query) {
             if (! found) {
                 vars.push_back(variables.size());
                 variables.push_back(v);
-		select += " ?" + fieldVars[i];
+                select += " ?" + fieldVars[i];
             } else {
-		for (int j = 0; j < i; j++) {
-		    VTerm t2 = query.getTermAtPos(j);
-		    if (t2.isVariable() && t2.getId() == v) {
-			// Duplicate variable in the query.
-			select += " (?" + fieldVars[j] + " AS ?" + fieldVars[i] + ")";
-			//Replace all occurrences of this variable with its replacement.
-			std::string from = "?" + fieldVars[i];
-			std::string to = "?" + fieldVars[j];
-			size_t start_pos = 0;
-			while ((start_pos = wb.find(from, start_pos)) != std::string::npos) {
-			     wb.replace(start_pos, from.length(), to);
-			     start_pos += to.length();
-			}
-			break;
-		    }
-		}
-	    }
+                for (int j = 0; j < i; j++) {
+                    VTerm t2 = query.getTermAtPos(j);
+                    if (t2.isVariable() && t2.getId() == v) {
+                        // Duplicate variable in the query.
+                        select += " (?" + fieldVars[j] + " AS ?" + fieldVars[i] + ")";
+                        //Replace all occurrences of this variable with its replacement.
+                        std::string from = "?" + fieldVars[i];
+                        std::string to = "?" + fieldVars[j];
+                        size_t start_pos = 0;
+                        while ((start_pos = wb.find(from, start_pos)) != std::string::npos) {
+                            wb.replace(start_pos, from.length(), to);
+                            start_pos += to.length();
+                        }
+                        break;
+                    }
+                }
+            }
         } else {
-	    std::string val = layer->getDictText(t.getValue());
-	    // TODO: escape needed for string? And if value is not found in dictionary,
-	    // what to do then?
-	    // Also, the bracketing may depend on the type of the value (which we don't keep track of in VLog).
-	    // Or should we add bracketing when we put stuff in the dictionary???
-	    // TODO!!!
-	    if (val.find('<') == 0 || val.find('"') == 0) {
-		binds += " BIND (" + val + " AS ?" + fieldVars[i] + ") ";
-	    } else {
-		binds += " BIND \"" + val + "\" AS ?" + fieldVars[i] + ") ";
-	    }
-	    select += " ?" + fieldVars[i];
-	    vars.push_back(-1);
-	}
+            std::string val = layer->getDictText(t.getValue());
+            // TODO: escape needed for string? And if value is not found in dictionary,
+            // what to do then?
+            // Also, the bracketing may depend on the type of the value (which we don't keep track of in VLog).
+            // Or should we add bracketing when we put stuff in the dictionary???
+            // TODO!!!
+            if (val.find('<') == 0 || val.find('"') == 0) {
+                binds += " BIND (" + val + " AS ?" + fieldVars[i] + ") ";
+            } else {
+                binds += " BIND (\"" + val + "\" AS ?" + fieldVars[i] + ") ";
+            }
+            select += " ?" + fieldVars[i];
+            vars.push_back(-1);
+        }
     }
 
     std::string sparqlQuery = select + " WHERE {" + binds + wb + "}";
@@ -106,16 +108,16 @@ void SparqlTable::query(QSQQuery *query, TupleTable *outputTable,
     size_t sz = lit->getTupleSize();
 
     if (sz != fieldVars.size()) {
-	LOG(ERRORL) << "Wrong tuple size in query";
-	throw 10;
+        LOG(ERRORL) << "Wrong tuple size in query";
+        throw 10;
     }
 
-    Term_t row[128];
+    Term_t row[256];
     uint8_t *pos = query->getPosToCopy();
     const uint8_t npos = query->getNPosToCopy();
     if (posToFilter == NULL || posToFilter->size() == 0) {
-	std::vector<uint8_t> sortFields;
-	EDBIterator *iter = getSortedIterator(*lit, sortFields);
+        std::vector<uint8_t> sortFields;
+        EDBIterator *iter = getSortedIterator(*lit, sortFields);
         while (iter->hasNext()) {
             iter->next();
             for (uint8_t i = 0; i < npos; ++i) {
@@ -133,7 +135,9 @@ void SparqlTable::query(QSQQuery *query, TupleTable *outputTable,
 }
 
 size_t SparqlTable::estimateCardinality(const Literal &query) {
-    return getCardinality(query);
+    // return getCardinality(query);
+    // Just return a high number
+    return 100000000;
 }
 
 //Inspired by https://stackoverflow.com/questions/154536/encode-decode-urls-in-c#17708801
@@ -146,7 +150,7 @@ std::string escape(const std::string &s) {
     for (std::string::const_iterator i = s.cbegin(),
             n = s.cend(); i != n; ++i) {
         std::string::value_type c = (*i);
-        if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+        if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
             escaped << c;
             continue;
         }
@@ -184,23 +188,24 @@ json SparqlTable::launchQuery(std::string sparqlQuery) {
     struct curl_slist *headers = NULL;
     headers = curl_slist_append(headers, "Accept: application/sparql-results+json");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    
+
     CURLcode resp = curl_easy_perform(curl);
     LOG(DEBUGL) << "output = " << response.substr(0, 1000) << ((response.size() > 1000) ? " ..." : "");
     json output;
     if (resp == 0) {
-	try {
-	    output = json::parse(response);
-	    output = output["results"];
-	    output = output["bindings"];
-	} catch(nlohmann::detail::parse_error x) {
-	    LOG(WARNL) << "Returning empty result; parse error in response";
-	    LOG(DEBUGL) << "Response = " << response;
-	}
+        try {
+            output = json::parse(response);
+            output = output["results"];
+            output = output["bindings"];
+        } catch(nlohmann::detail::parse_error x) {
+            LOG(WARNL) << "Returning empty result; parse error in response";
+            LOG(DEBUGL) << "Response = " << response;
+        }
     } else {
-	std::string em(errorBuffer);
-	LOG(WARNL) << "Launching query failed: " << em;
+        std::string em(errorBuffer);
+        LOG(WARNL) << "Launching query failed: " << em;
     }
+    curl_slist_free_all(headers);
     return output;
 }
 
@@ -208,32 +213,31 @@ size_t SparqlTable::getCardinality(const Literal &query) {
     size_t sz = query.getTupleSize();
 
     if (sz != fieldVars.size()) {
-	LOG(WARNL) << "Wrong arity in query for getCardinality";
-	return 0;
+        LOG(WARNL) << "Wrong arity in query for getCardinality";
+        return 0;
     }
 
     std::string key = query.tostring();
     LOG(DEBUGL) << "Get cardinality for " << key;
-    
+
 //    std::string sparqlQuery = "SELECT (COUNT(*) AS ?cnt) WHERE { " + generateQuery(query) + " }";
 //    json output = launchQuery(sparqlQuery);
 //    json::iterator it = output.begin();
 //    if (it != output.end()) {
-//	std::string s = (*it)["cnt"]["value"];
-//	LOG(DEBUGL) << "Cardinality = " << s;
-//	size_t card = std::stoll(s);
-//	cachedCardinalities[key] = card;
-//	return card;
+//        std::string s = (*it)["cnt"]["value"];
+//        LOG(DEBUGL) << "Cardinality = " << s;
+//        size_t card = std::stoll(s);
+//        return card;
 //    }
 //  This apparently does not work, sometimes causes exceptions in endpoint.
 
-    EDBIterator *it = getIterator(query);
+    EDBIterator *eit = getIterator(query);
     size_t count = 0;
-    while (it->hasNext()) {
-	it->next();
-	count++;
+    while (eit->hasNext()) {
+        eit->next();
+        count++;
     }
-    delete it;
+    delete eit;
     return count;
 }
 
@@ -243,22 +247,22 @@ size_t SparqlTable::getCardinalityColumn(const Literal &query,
     size_t sz = query.getTupleSize();
 
     if (sz != fieldVars.size()) {
-	LOG(WARNL) << "Wrong arity in query for getCardinalityColumn";
-	return 0;
+        LOG(WARNL) << "Wrong arity in query for getCardinalityColumn";
+        return 0;
     }
 
     if (posColumn >= fieldVars.size()) {
-	LOG(WARNL) << "Wrong posColumn for getCardinalityColumn";
-	return 0;
+        LOG(WARNL) << "Wrong posColumn for getCardinalityColumn";
+        return 0;
     }
 
     std::string sparqlQuery = "SELECT (COUNT(DISTINCT ?" + fieldVars[posColumn] + ") AS ?cnt) WHERE { " + generateQuery(query) + " }";
     json output = launchQuery(sparqlQuery);
     json::iterator it = output.begin();
     if (it != output.end()) {
-	std::string s = (*it)["cnt"]["value"];
-	LOG(DEBUGL) << "CardinalityColumn = " << s;
-	return std::stoll(s);
+        std::string s = (*it)["cnt"]["value"];
+        LOG(DEBUGL) << "CardinalityColumn = " << s;
+        return std::stoll(s);
     }
     return 0;
 }
@@ -277,14 +281,14 @@ EDBIterator *SparqlTable::getIterator(const Literal &query) {
 
     json output;
     if (sz == fieldVars.size()) {
-	std::string key = query.tostring();
-	if (cachedTables.count(key) > 0) {
-	    output = cachedTables[key];
-	} else {
-	    std::string sparqlQuery = generateQuery(query);
-	    output = launchQuery(sparqlQuery);
-	    cachedTables[key] = output;
-	}
+        std::string key = query.tostring();
+        if (cachedTables.count(key) > 0) {
+            output = cachedTables[key];
+        } else {
+            std::string sparqlQuery = generateQuery(query);
+            output = launchQuery(sparqlQuery);
+            cachedTables[key] = output;
+        }
     }
     return new SparqlIterator(output, layer, query, fieldVars);
 }
@@ -304,25 +308,25 @@ EDBIterator *SparqlTable::getSortedIterator(const Literal &query,
 
     size_t sz = query.getTupleSize();
     if (sz != fieldVars.size()) {
-	json output;
-	return new SparqlIterator(output, layer, query, fieldVars);
+        json output;
+        return new SparqlIterator(output, layer, query, fieldVars);
     }
 
     LOG(DEBUGL) << "GetSortedIterator, query = " << query.tostring();
 
     uint64_t key = 0;
     if (sz <= 8 && query.getNUniqueVars() == sz) {
-	// See if we can find it in the cache.
-	key = __getKeyFromFields(fields);
-	if (cachedSegments.count(key)) {
-	    auto segment = cachedSegments[key];
-	    return new InmemoryIterator(segment, predid, fields);
-	}
+        // See if we can find it in the cache.
+        key = __getKeyFromFields(fields);
+        if (cachedSegments.count(key)) {
+            auto segment = cachedSegments[key];
+            return new InmemoryIterator(segment, predid, fields);
+        }
     }
 
     EDBIterator *it = getIterator(query);
     if (! it->hasNext()) {
-	return it;
+        return it;
     }
     std::vector<ColumnWriter *> writers;
     writers.resize(sz);
@@ -330,11 +334,12 @@ EDBIterator *SparqlTable::getSortedIterator(const Literal &query,
         writers[i] = new ColumnWriter();
     }
     while (it->hasNext()) {
-	it->next();
-	for (uint8_t i = 0; i < sz; ++i) {
+        it->next();
+        for (uint8_t i = 0; i < sz; ++i) {
             writers[i]->add(it->getElementAt(i));
         }
     }
+    delete it;
 
     std::vector<std::shared_ptr<Column>> columns;
     for (uint8_t i = 0; i < sz; ++i) {
@@ -367,8 +372,8 @@ EDBIterator *SparqlTable::getSortedIterator(const Literal &query,
 
     segment = segment->sortBy(&newFields);
     if (sz <= 8 && query.getNUniqueVars() == sz) {
-	// put it in the cache.
-	cachedSegments[key] = segment;
+        // put it in the cache.
+        cachedSegments[key] = segment;
     }
 
     return new InmemoryIterator(segment, predid, newFields);
@@ -392,6 +397,7 @@ uint64_t SparqlTable::getNTerms() {
 }
 
 void SparqlTable::releaseIterator(EDBIterator *itr) {
+    delete itr;
 }
 
 uint64_t SparqlTable::getSize() {
@@ -399,13 +405,18 @@ uint64_t SparqlTable::getSize() {
     json output = launchQuery(sparqlQuery);
     json::iterator it = output.begin();
     if (it != output.end()) {
-	std::string s = (*it)["cnt"]["value"];
-	LOG(DEBUGL) << "getSize = " << s;
-	return std::stoll(s);
+        std::string s = (*it)["cnt"]["value"];
+        LOG(DEBUGL) << "getSize = " << s;
+        return std::stoll(s);
     }
     return 0;
 }
 
 SparqlTable::~SparqlTable() {
     curl_easy_cleanup(curl);
+    numTables--;
+    if (numTables == 0) {
+	curl_initialized = false;
+	curl_global_cleanup();
+    }
 }

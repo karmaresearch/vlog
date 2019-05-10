@@ -54,7 +54,7 @@ FCIterator FCTable::read(const size_t mincount, const size_t maxcount) const {
     while (itr != blocks.end() && itr->iteration < mincount) {
         itr++;
     }
-    if (itr != blocks.end()) {
+    if (itr != blocks.end() && itr->iteration <= maxcount) {
         std::vector<FCBlock>::const_iterator endrange = itr + 1;
         while (endrange != blocks.end() && endrange->iteration <= maxcount) {
             endrange++;
@@ -73,8 +73,8 @@ FCBlock &FCTable::getLastBlock() {
 size_t FCTable::estimateCardinality(const Literal &literal, const size_t min, const size_t max) const {
     FCIterator itr = read(min, max);
     uint8_t nconstants = 0;
-    uint8_t posConstants[SIZETUPLE];
-    Term_t valueConstants[SIZETUPLE];
+    uint8_t posConstants[256];
+    Term_t valueConstants[256];
     for (uint8_t i = 0; i < literal.getTupleSize(); ++i) {
         VTerm t = literal.getTermAtPos(i);
         if (!t.isVariable()) {
@@ -99,7 +99,7 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal,
 
     if (shouldFilter) {
         if (blocks.size() == 0) {
-            return std::shared_ptr<FCTable>(this);;
+            return std::shared_ptr<FCTable>(new FCTable(NULL, sizeRow));
         }
         std::shared_ptr<FCTable> output;
         std::vector<FCBlock>::iterator itr = blocks.begin();
@@ -132,14 +132,14 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal,
 
         //Scan all tables to check whether there are tuples we can add in the table
         uint8_t nConstantsToFilter = 0;
-        uint8_t posConstantsToFilter[SIZETUPLE];
-        Term_t valuesConstantsToFilter[SIZETUPLE];
+        uint8_t posConstantsToFilter[256];
+        Term_t valuesConstantsToFilter[256];
 
         uint8_t nRepeatedVars = 0;
-        std::pair<uint8_t, uint8_t> repeatedVars[SIZETUPLE];
+        std::pair<uint8_t, uint8_t> repeatedVars[256];
 
         uint8_t nVarsToCopy = 0;
-        uint8_t posVarsToCopy[SIZETUPLE];
+        uint8_t posVarsToCopy[256];
 
         for (uint8_t i = 0; i < (uint8_t) literal.getTupleSize(); ++i) {
             VTerm t = literal.getTermAtPos(i);
@@ -325,7 +325,7 @@ bool FCTable::add(std::shared_ptr<const FCInternalTable> t,
     }
 
     //There is no tuple with the same iteration in the table. Add a new block
-    if (!t->isSorted()) {
+    if (!t->isSorted() && t->getNRows() > 1) {
         throw 10;
     }
 

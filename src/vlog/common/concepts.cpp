@@ -1,4 +1,5 @@
 #include <vlog/concepts.h>
+#include <vlog/graph.h>
 #include <vlog/optimizer.h>
 #include <vlog/edb.h>
 #include <vlog/fcinttable.h>
@@ -95,6 +96,9 @@ std::string Literal::tostring(Program *program, EDBLayer *db) const {
         predName = program->getPredicateName(pred.getId());
     else
         predName = std::to_string(pred.getId());
+    if (isNegated()) {
+        predName = "neg_" + predName;
+    }
 
     std::string out = predName + std::string("[") +
         std::to_string(pred.getType()) + std::string("]") +
@@ -134,7 +138,7 @@ std::string Literal::tostring(Program *program, EDBLayer *db) const {
     return out;
 }
 
-std::string Literal::toprettystring(Program *program, EDBLayer *db) const {
+std::string Literal::toprettystring(Program *program, EDBLayer *db, bool replaceConstants) const {
 
     std::string predName;
     if (program != NULL)
@@ -142,21 +146,24 @@ std::string Literal::toprettystring(Program *program, EDBLayer *db) const {
     else
         predName = std::to_string(pred.getId());
 
-    std::string out = predName + std::string("(");
+    std::string out = "";
+    if (isNegated())
+        out = "~";
+    out += predName + std::string("(");
 
     for (int i = 0; i < tuple.getSize(); ++i) {
         if (tuple.get(i).isVariable()) {
-            out += std::string("?") + std::to_string(tuple.get(i).getId());
+            out += std::string("A") + std::to_string(tuple.get(i).getId());
         } else {
-            if (db == NULL) {
+	    if (replaceConstants) {
+		out += "*";
+	    } else if (db == NULL) {
                 out += std::to_string(tuple.get(i).getValue());
             } else {
                 uint64_t id = tuple.get(i).getValue();
                 char text[MAX_TERM_SIZE];
                 if (db->getDictText(id, text)) {
                     string v = Program::compressRDFOWLConstants(std::string(text));
-                    if (v[0] == '<')
-                        v = v.substr(1, v.size() - 2);
                     out += v;
                 } else {
                     if (program == NULL) {
@@ -246,13 +253,13 @@ bool Literal::sameVarSequenceAs(const Literal &l) const {
     return false;
 }
 
-int Literal::subsumes(Substitution *substitutions, const Literal &l, const Literal &m) {
+int Literal::subsumes(std::vector<Substitution> &substitutions, const Literal &l, const Literal &m) {
+    substitutions.clear();
     if (l.getPredicate().getId() != m.getPredicate().getId()) {
         return -1;
     }
     assert (l.getTupleSize() == m.getTupleSize());
 
-    int tupleSize = 0;
     for (int i = 0; i < l.getTupleSize(); ++i) {
         VTerm tl = l.getTermAtPos(i);
         VTerm tm = m.getTermAtPos(i);
@@ -261,7 +268,7 @@ int Literal::subsumes(Substitution *substitutions, const Literal &l, const Liter
 
         if (tl.isVariable()) {
             bool found = false;
-            for (int j = 0; j < tupleSize && !found; ++j) {
+            for (int j = 0; j < substitutions.size() && !found; ++j) {
                 if (substitutions[j].origin == tl.getId()) {
                     found = true;
                     if (substitutions[j].destination != tm) {
@@ -269,24 +276,25 @@ int Literal::subsumes(Substitution *substitutions, const Literal &l, const Liter
                     }
                 }
             }
-            if (!found)
-                substitutions[tupleSize++] = Substitution(tl.getId(), tm);
+            if (!found) {
+                substitutions.push_back(Substitution(tl.getId(), tm));
+            }
         } else {
             if (tm.isVariable())
                 return -1;
         }
     }
-    return tupleSize;
+    return substitutions.size();
 }
 
-int Literal::getSubstitutionsA2B(Substitution *substitutions,
+int Literal::getSubstitutionsA2B(std::vector<Substitution> &substitutions,
         const Literal &a, const Literal &b) {
+    substitutions.clear();
     if (a.getPredicate().getId() != b.getPredicate().getId()) {
         return -1;
     }
     assert(a.getTupleSize() == b.getTupleSize());
 
-    int tupleSize = 0;
     for (int i = 0; i < a.getTupleSize(); ++i) {
         VTerm ta = a.getTermAtPos(i);
         VTerm tb = b.getTermAtPos(i);
@@ -298,7 +306,7 @@ int Literal::getSubstitutionsA2B(Substitution *substitutions,
         if (ta.isVariable()) {
             bool found = false;
             //Is there already a substitution?
-            for (int j = 0; j < tupleSize && !found; ++j) {
+            for (int j = 0; j < substitutions.size() && !found; ++j) {
                 if (substitutions[j].origin == ta.getId()) {
                     found = true;
                     if (substitutions[j].destination != tb) {
@@ -316,21 +324,21 @@ int Literal::getSubstitutionsA2B(Substitution *substitutions,
                 }
             }
             if (!found)
-                substitutions[tupleSize++] = Substitution(ta.getId(), tb);
+                substitutions.push_back(Substitution(ta.getId(), tb));
         } else {
             //if (tm.isVariable())
             //    return -1;
         }
     }
-    return tupleSize;
+    return substitutions.size();
 }
 
-Literal Literal::substitutes(Substitution * subs, const int nsubs) const {
+Literal Literal::substitutes(std::vector<Substitution> &subs) const {
     VTuple newTuple((uint8_t) this->tuple.getSize());
     for (uint8_t i = 0; i < newTuple.getSize(); ++i) {
         bool found = false;
         int j = 0;
-        while (j < nsubs && !found) {
+        while (j < subs.size() && !found) {
             if (subs[j].origin == tuple.get(i).getId()) {
                 found = true;
                 break;
@@ -434,13 +442,15 @@ bool Literal::operator==(const Literal & other) const {
         if (tuple.get(i) != other.tuple.get(i))
             return false;
     }
+    if (negated != other.isNegated())
+        return false;
     return true;
 }
 
 bool Rule::checkRecursion(const std::vector<Literal> &heads,
         const std::vector<Literal> &body) {
     for (const auto bodyLit : body) {
-        Substitution subs[10];
+        std::vector<Substitution> subs;
         for(const auto& head : heads) {
             if (Literal::getSubstitutionsA2B(subs, bodyLit, head) != -1)
                 return true;
@@ -465,10 +475,6 @@ void Rule::checkRule() const {
         }
     }
     LOG(DEBUGL) << "Rule " << this->tostring() << " has " << varCount << " variables";
-    if (varCount > SIZETUPLE) {
-        LOG(ERRORL) << "SIZETUPLE needs to be set to at least " << varCount << "!";
-        abort();
-    }
 }
 
 bool Rule::doesVarAppearsInFollowingPatterns(int startingPattern, uint8_t value) const {
@@ -512,14 +518,14 @@ Rule Rule::normalizeVars() const {
     }
     std::vector<Literal> newheads;
     for(auto &head : heads) {
-        Literal newHead = head.substitutes(&subs[0], subs.size());
+        Literal newHead = head.substitutes(subs);
         LOG(DEBUGL) << "head = " << head.tostring() << ", newHead = " << newHead.tostring();
         newheads.push_back(newHead);
     }
     std::vector<Literal> newBody;
     for (std::vector<Literal>::const_iterator itr = body.cbegin(); itr != body.cend();
             ++itr) {
-        newBody.push_back(itr->substitutes(&subs[0], subs.size()));
+        newBody.push_back(itr->substitutes(subs));
     }
     return Rule(ruleId, newheads, newBody);
 }
@@ -620,8 +626,17 @@ std::vector<uint8_t> Rule::getVarsNotInBody() const {
                 if (ok)
                     break;
             }
-            if (!ok)
-                out.push_back(var);
+            if (!ok) {
+                for (auto v : out) {
+                    if (v == var) {
+                        ok = true;
+                        break;
+                    }
+                }
+                if (! ok) {
+                    out.push_back(var);
+                }
+            }
         }
     }
     return out;
@@ -668,18 +683,93 @@ std::string Rule::tostring(Program * program, EDBLayer *db) const {
     return output;
 }
 
-std::string Rule::toprettystring(Program * program, EDBLayer *db) const {
+std::string Rule::toprettystring(Program * program, EDBLayer *db, bool replaceConstants) const {
     std::string output = "";
+    bool first = true;
     for(const auto& head : heads) {
-        output += head.toprettystring(program, db) + " AND ";
+	if (! first) {
+	    output += ",";
+	}
+        output += head.toprettystring(program, db, replaceConstants);
+	first = false;
     }
-    output = output.substr(0, output.length() - 5);
-    output += ":-";
+    output += " :- ";
+    first = true;
     for (int i = 0; i < body.size(); ++i) {
-        output += body[i].toprettystring(program, db) + std::string(",");
+	if (! first) {
+	    output += ",";
+	}
+	first = false;
+        output += body[i].toprettystring(program, db, replaceConstants);
     }
-    output = output.substr(0, output.size() - 1);
     return output;
+}
+
+bool Program::stratify(std::vector<int> &stratification, int &nClasses) {
+    // First check if the rules can be stratified.
+    std::set<std::pair<uint64_t, uint64_t>> usedNegated;
+    uint64_t graphSize = getMaxPredicateId() + 1;
+    Graph g(graphSize);
+    Graph depends(graphSize);
+    for (const Rule rule : allrules) {
+        for (const auto &head : rule.getHeads()) {
+            for (const auto &bodyLiteral : rule.getBody()) {
+                g.addEdge(bodyLiteral.getPredicate().getId(), head.getPredicate().getId());
+                depends.addEdge(head.getPredicate().getId(), bodyLiteral.getPredicate().getId());
+                if (bodyLiteral.isNegated() && bodyLiteral.getPredicate().getType() == IDB) {
+                    usedNegated.insert(std::make_pair(bodyLiteral.getPredicate().getId(), head.getPredicate().getId()));
+                    LOG(DEBUGL) << "Adding usedNegated: " << bodyLiteral.getPredicate().getId() << ", " << head.getPredicate().getId();
+                }
+            }
+        }
+    }
+
+    Graph negationsClosure(graphSize);
+
+    // Create a negationsClosure graph, one that has an edge from p to q iff there is a path from p to q in the dependency graph, containing a negative edge.
+    for (auto it = usedNegated.begin(); it != usedNegated.end(); ++it) {
+        // usedNegated contains all negative edges.
+        std::set<uint64_t> deps;
+        std::set<uint64_t> reaches;
+        depends.getRecursiveDestinations(it->first, deps);
+        g.getRecursiveDestinations(it->second, reaches);
+        // We know we have a negative edge from first to second.
+        // Now, if we can reach first from second, we have a cycle
+        // with a negative edge --> cannot be stratified.
+        if (reaches.find(it->first) != reaches.end()) {
+            return false;
+        }
+        for(auto it1 : reaches) {
+            for (auto it2 : deps) {
+                negationsClosure.addEdge(it1, it2);
+            }
+        }
+    }
+
+    stratification.resize(graphSize);
+    for (size_t i = 0; i < graphSize; i++) {
+        stratification[i] = -1;
+    }
+
+    
+    int markedCount = 0;
+    int count = 0;
+    while (count < graphSize) {
+        std::set<uint64_t> toRemove;
+        for (int i = 0; i < graphSize; i++) {
+            if (stratification[i] < 0 && negationsClosure.getDestinations(i)->empty()) {
+                LOG(DEBUGL) << "Marking " << i << " with " << markedCount;
+                stratification[i] = markedCount;
+                count++;
+                toRemove.insert(i);
+            }
+        }
+        negationsClosure.removeNodes(toRemove);
+        markedCount++;
+    }
+
+    nClasses = markedCount;
+    return true;
 }
 
 bool Program::areExistentialRules() {
@@ -691,8 +781,20 @@ bool Program::areExistentialRules() {
     return false;
 }
 
+bool Program::doesPredicateExist(const PredId_t id) const {
+    return cardPredicates.count(id);
+}
+
 const Rule &Program::getRule(uint32_t ruleid) const {
     return allrules[ruleid];
+}
+
+std::vector<PredId_t> Program::getAllPredicateIDs() const {
+    std::vector<PredId_t> result;
+    for (auto iter: cardPredicates) {
+        result.push_back(iter.first);
+    }
+    return result;
 }
 
 size_t Program::getNRulesByPredicate(PredId_t predid) const {
@@ -704,36 +806,60 @@ const std::vector<uint32_t> &Program::getRulesIDsByPredicate(PredId_t predid) co
 }
 
 Program::Program(EDBLayer *kb) : kb(kb),
-    dictPredicates(kb->getPredDictionary()) {
+    dictPredicates(kb->getPredDictionary()),
+    cardPredicates(kb->getPredicateCardUnorderedMap()) {
     }
 
-void Program::readFromFile(std::string pathFile, bool rewriteMultihead) {
+std::string trim(const std::string& str,
+        const std::string& whitespace = "\r \t")
+{
+    const auto strBegin = str.find_first_not_of(whitespace);
+    if (strBegin == std::string::npos)
+        return ""; // no content
+
+    const auto strEnd = str.find_last_not_of(whitespace);
+    const auto strRange = strEnd - strBegin + 1;
+
+    return str.substr(strBegin, strRange);
+}
+
+std::string Program::readFromFile(std::string pathFile, bool rewriteMultihead) {
     LOG(INFOL) << "Read program from file " << pathFile;
     if (pathFile == "") {
         LOG(INFOL) << "Using default rule TI(A,B,C) :- TE(A,B,C)";
-        parseRule("TI(A,B,C) :- TE(A,B,C)", false);
+        return parseRule("TI(A,B,C) :- TE(A,B,C)", false);
     } else {
         std::ifstream file(pathFile);
         std::string line;
         while (std::getline(file, line)) {
+            line = trim(line);
             if (line != "" && line.substr(0, 2) != "//") {
-                LOG(DEBUGL) << "Parsing rule " << line;
-                parseRule(line, rewriteMultihead);
+                LOG(DEBUGL) << "Parsing rule \"" << line << "\"";
+                std::string s = parseRule(line, rewriteMultihead);
+                if (s != "") {
+                    return s;
+                }
             }
         }
         //LOG(INFOL) << "New assigned constants: " << additionalConstants.size();
     }
+    return "";
 }
 
-void Program::readFromString(std::string rules, bool rewriteMultihead) {
+std::string Program::readFromString(std::string rules, bool rewriteMultihead) {
     stringstream ss(rules);
     string rule;
     while (getline(ss, rule)) {
+        rule = trim(rule);
         if (rule != "" && rule .substr(0, 2) != "//") {
             LOG(DEBUGL) << "Parsing rule " << rule;
-            parseRule(rule, rewriteMultihead);
+            std::string s = parseRule(rule, rewriteMultihead);
+            if (s != "") {
+                return s;
+            }
         }
     }
+    return "";
     //LOG(INFOL) << "New assigned constants: " << additionalConstants.size();
 }
 
@@ -784,11 +910,16 @@ std::string Program::rewriteRDFOWLConstants(std::string input) {
 Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     size_t posBeginTuple = l.find("(");
     if (posBeginTuple == std::string::npos) {
-        throw 10;
+        throw "Missing '(' in literal";
     }
-    std::string predicate = l.substr(0, posBeginTuple);
+    std::string predicate = trim(l.substr(0, posBeginTuple));
     std::string tuple = l.substr(posBeginTuple + 1, std::string::npos);
-    tuple = tuple.substr(0, tuple.size() - 1);
+    if (tuple[tuple.size() - 1] != ')') {
+        throw "Missing ')' in literal";
+    }
+    tuple = trim(tuple.substr(0, tuple.size() - 1));
+
+    LOG(DEBUGL) << "Found predicate \"" << predicate  << "\"";
 
     //Calculate the tuple
     std::vector<VTerm> t;
@@ -861,15 +992,21 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
         }
         if (posTerm != tuple.size()) {
             term = tuple.substr(0, posTerm);
-            tuple = tuple.substr(posTerm + 1, tuple.size());
+            tuple = trim(tuple.substr(posTerm + 1, tuple.size()));
         } else {
             term = tuple;
             tuple = "";
         }
 
+        LOG(DEBUGL) << "Found term \"" << term << "\"";
+
         //Parse the term
         if (std::isupper(term.at(0))) {
-            t.push_back(VTerm((uint8_t) dictVariables.getOrAdd(term), 0));
+            uint64_t v = dictVariables.getOrAdd(term);
+            if (v != (uint8_t) v) {
+                throw "Too many variables in rule (> 255)";
+            }
+            t.push_back(VTerm((uint8_t) v, 0));
         } else {
             //Constant
             term = rewriteRDFOWLConstants(term);
@@ -884,10 +1021,21 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
         }
     }
 
+    if (t.size() != (uint8_t) t.size()) {
+        throw "Arity of predicate " + predicate + " is too high (" + std::to_string(t.size()) + " > 255)";
+    }
+
     VTuple t1((uint8_t) t.size());
     int pos = 0;
     for (std::vector<VTerm>::iterator itr = t.begin(); itr != t.end(); ++itr) {
         t1.set(*itr, pos++);
+    }
+
+    //Check if predicate starts with "neg_".
+    bool negated = false;
+    if (predicate.substr(0,4) == "neg_") {
+        negated = true;
+        predicate = predicate.substr(4);
     }
 
     //Determine predicate
@@ -896,22 +1044,18 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
         cardPredicates.insert(make_pair(predid, t.size()));
     } else {
         if (cardPredicates.find(predid)->second != t.size()) {
-            LOG(INFOL) << "Wrong size in predicate: should be " << (int) cardPredicates.find(predid)->second;
-            throw 10;
+            throw ("Wrong arity in predicate \""+ predicate + "\". It should be " + std::to_string((int) cardPredicates.find(predid)->second) +".");
         }
     }
     Predicate pred(predid, Predicate::calculateAdornment(t1), kb->doesPredExists(predid) ? EDB : IDB, (uint8_t) t.size());
+    LOG(DEBUGL) << "Predicate : " << predicate << ", type = " << ((pred.getType() == EDB) ? "EDB" : "IDB");
 
-    Literal literal(pred, t1);
+    Literal literal(pred, t1, negated);
     return literal;
 }
 
 PredId_t Program::getPredicateID(std::string & p, const uint8_t card) {
     PredId_t predid = (PredId_t) dictPredicates.getOrAdd(p);
-    if (predid >= MAX_NPREDS) {
-        LOG(DEBUGL) << "Too many predicates";
-        throw OUT_OF_PREDICATES;
-    }
     //add the cardinality associated to this predicate
     if (cardPredicates.find(predid) == cardPredicates.end()) {
         //add it
@@ -932,7 +1076,7 @@ Program Program::clone() const {
 
 int Program::getNRules() const {
     int size = 0;
-    for (int j = 0; j < MAX_NPREDS; ++j) {
+    for (int j = 0; j < rules.size(); ++j) {
         size += rules[j].size();
     }
     return size;
@@ -946,9 +1090,7 @@ std::shared_ptr<Program> Program::cloneNew() const {
 }
 
 void Program::cleanAllRules() {
-    for (int i = 0; i < MAX_NPREDS; ++i) {
-        rules[i].clear();
-    }
+    rules.clear();
     allrules.clear();
 }
 
@@ -957,6 +1099,9 @@ void Program::addRule(Rule &rule, bool rewriteMultihead) {
         rewriteRule(rule);
     } else {
         for (const auto &head : rule.getHeads()) {
+            if (rules.size() <= head.getPredicate().getId()) {
+                rules.resize(head.getPredicate().getId() + 1);
+            }
             rules[head.getPredicate().getId()].push_back(allrules.size());
         }
         allrules.push_back(rule);
@@ -1002,69 +1147,76 @@ size_t findEndLiteral(std::string s) {
     size_t pos = s.find("),");
     size_t oldpos = 0;
     while (pos != std::string::npos) {
-	LOG(DEBUGL) << "string: " << s << ",found pos " << pos;
-	int count = 0;
-	for (int i = oldpos; i < pos; i++) {
-	    if (s[i] == '"') {
-		count++;
-	    }
-	}
-	LOG(DEBUGL) << "quote count = " << count;
-	if (count % 2 == 0) {
-	    return pos;
-	}
-	oldpos = pos;
-	pos = s.find("),", oldpos+2);
+        LOG(DEBUGL) << "string: " << s << ",found pos " << pos;
+        int count = 0;
+        for (int i = oldpos; i < pos; i++) {
+            if (s[i] == '"') {
+                count++;
+            }
+        }
+        LOG(DEBUGL) << "quote count = " << count;
+        if (count % 2 == 0) {
+            return pos;
+        }
+        oldpos = pos;
+        pos = s.find("),", oldpos+2);
     }
     return pos;
 }
 
-void Program::parseRule(std::string rule, bool rewriteMultihead) {
+std::string Program::parseRule(std::string rule, bool rewriteMultihead) {
     //split the rule between head and body
     Dictionary dictVariables;
     try {
         size_t posEndHead = rule.find(":-");
         if (posEndHead == std::string::npos) {
-            throw 10;
+            throw "Missing ':-'";
         }
         //process the head(s)
-        std::string head = rule.substr(0, posEndHead - 1);
+        std::string head = trim(rule.substr(0, posEndHead));
         std::vector<Literal> lHeads;
+        LOG(DEBUGL) << "head = \"" << head << "\"";
         while (head.size() > 0) {
             std::string headLiteral;
             size_t posEndLiteral = findEndLiteral(head);
             if (posEndLiteral != std::string::npos) {
-                headLiteral = head.substr(0, posEndLiteral + 1);
-                head = head.substr(posEndLiteral + 2, std::string::npos);
+                headLiteral = trim(head.substr(0, posEndLiteral + 1));
+                head = trim(head.substr(posEndLiteral + 2, std::string::npos));
             } else {
                 headLiteral = head;
                 head = "";
             }
+            LOG(DEBUGL) << "headliteral = \"" << headLiteral << "\"";
             Literal h = parseLiteral(headLiteral, dictVariables);
             lHeads.push_back(h);
         }
 
         //process the body
-        std::string body = rule.substr(posEndHead + 3, std::string::npos);
+        std::string body = trim(rule.substr(posEndHead+2, std::string::npos));
+        LOG(DEBUGL) << "body = \"" << body << "\"";
         std::vector<Literal> lBody;
         while (body.size() > 0) {
             std::string bodyLiteral;
             size_t posEndLiteral = findEndLiteral(body);
             if (posEndLiteral != std::string::npos) {
-                bodyLiteral = body.substr(0, posEndLiteral + 1);
-                body = body.substr(posEndLiteral + 2, std::string::npos);
+                bodyLiteral = trim(body.substr(0, posEndLiteral + 1));
+                body = trim(body.substr(posEndLiteral + 2, std::string::npos));
             } else {
                 bodyLiteral = body;
                 body = "";
             }
+            LOG(DEBUGL) << "bodyliteral = \"" << bodyLiteral << "\"";
             lBody.push_back(parseLiteral(bodyLiteral, dictVariables));
         }
 
         //Add the rule
         Rule r = Rule(allrules.size(), lHeads, lBody);
         addRule(r, rewriteMultihead);
-    } catch (int e) {
-        LOG(ERRORL) << "Failed in parsing rule " << rule;
+        return "";
+    } catch (std::string e) {
+        return "Failed parsing rule '" + rule + "': " + e;
+    } catch(char const * e) {
+        return "Failed parsing rule '" + rule + "': " + std::string(e);
     }
 }
 
@@ -1183,7 +1335,7 @@ struct RuleSorter {
 };
 
 void Program::sortRulesByIDBPredicates() {
-    for (int i = 0; i < MAX_NPREDS; ++i) {
+    for (int i = 0; i < rules.size(); ++i) {
         if (rules[i].size() > 0) {
             std::vector<uint32_t> tmpC = rules[i];
             std::stable_sort(tmpC.begin(), tmpC.end(), RuleSorter(allrules));
@@ -1229,6 +1381,9 @@ int64_t Program::getOrAddPredicate(std::string & p, uint8_t cardinality) {
             return -1;
         }
     }
+    if (id >= rules.size()) {
+        rules.resize(id+1);
+    }
     return id;
 }
 
@@ -1266,12 +1421,6 @@ std::vector<PredId_t> Program::getAllIDBPredicateIds() {
 
 std::string Program::tostring() {
     std::string output = "";
-    /*for (int i = 0; i < MAX_NPREDS; ++i) {
-      for (std::vector<Rule>::iterator itr = rules[i].begin(); itr != rules[i].end();
-      ++itr) {
-      output += itr->tostring() + std::string("\n");
-      }
-      }*/
     for(const auto &rule : allrules) {
         output += rule.tostring() + std::string("\n");
     }

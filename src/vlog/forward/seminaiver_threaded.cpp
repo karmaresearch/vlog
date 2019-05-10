@@ -7,8 +7,13 @@
 bool SemiNaiverThreaded::executeUntilSaturation(
         std::vector<RuleExecutionDetails> &ruleset,
         std::vector<StatIteration> &costRules,
+	uint32_t limitView,
         bool fixpoint) {
 
+    if (limitView != 0) {
+	LOG(ERRORL) << "limitView not implemented in parallel version;";
+	abort();
+    }
     //Create n threads
     std::vector<std::thread> threads(interRuleThreads);
     bool anotherRound;
@@ -38,7 +43,7 @@ bool SemiNaiverThreaded::executeUntilSaturation(
         //Copy all the derivations produced by the rules in the KB
         anotherRound = false;
         // anotherRound = doGlobalConsolidation(status);
-        for (int i = 0; i < MAX_NPREDS; i++) {
+        for (int i = 0; i < marked.size(); i++) {
             marked[i] = newMarked[i];
             if (marked[i]) {
                 anotherRound = true;
@@ -172,6 +177,7 @@ void SemiNaiverThreaded::runThread(
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         bool response = executeRule(ruleset[ruleToExecute],
                 data->iteration,
+		0,
                 // &res);
         NULL);
         std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
@@ -202,6 +208,7 @@ void SemiNaiverThreaded::runThread(
                     recursiveIterations++;
                     response = executeRule(ruleset[ruleToExecute],
                             data->iteration,
+			    0,
                             // &res);
                     NULL);
 

@@ -6,6 +6,7 @@
 #include <vlog/reasoner.h>
 #include <vlog/LogisticRegression.h>
 #include <layers/TridentLayer.hpp>
+#include <vlog/ml/ml.h>
 
 #include <trident/kb/kb.h>
 #include <trident/utils/json.h>
@@ -20,18 +21,12 @@ typedef struct Edge {
     vector<Substitution> backEdge;
 } Edge;
 
-typedef std::unordered_map<uint16_t, vector<Edge>> Graph;
-
-typedef enum QueryType{
-    QUERY_TYPE_MIXED = 0,
-    QUERY_TYPE_GENERIC = 100,
-    QUERY_TYPE_BOOLEAN = 1000
-}QueryType;
+typedef std::unordered_map<uint16_t, vector<Edge>> DepGraph;
 
 class Training {
 
     private:
-        Graph graph;
+        DepGraph graph;
     public:
 
     static std::vector<pair<string, int>> generateTrainingQueries(EDBConf& conf,

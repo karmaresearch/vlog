@@ -30,11 +30,14 @@ SingleHeadFinalRuleProcessor::SingleHeadFinalRuleProcessor(
         const uint8_t ruleExecOrder,
         const size_t iteration,
         const bool addToEndTable,
-        const int nthreads) : SingleHeadFinalRuleProcessor(
+        const int nthreads,
+        const bool ignoreDuplicatesElimination) :
+    SingleHeadFinalRuleProcessor(
             new Term_t[table->getSizeRow()], true,
             posFromFirst, posFromSecond, listDerivations, table, head,
-            posHeadInRule, ruleDetails, ruleExecOrder, iteration, addToEndTable,
-            nthreads)
+            posHeadInRule, ruleDetails, ruleExecOrder, iteration,
+            addToEndTable,
+            nthreads, ignoreDuplicatesElimination)
 {
 }
 
@@ -50,12 +53,14 @@ SingleHeadFinalRuleProcessor::SingleHeadFinalRuleProcessor(
         const uint8_t ruleExecOrder,
         const size_t iteration,
         const bool addToEndTable,
-        const int nthreads) :
+        const int nthreads,
+        const bool ignoreDuplicatesElimination) :
     ResultJoinProcessor(table->getSizeRow(), row, deleteRow,
             (uint8_t) posFromFirst.size(),
             (uint8_t) posFromSecond.size(),
             posFromFirst.size() > 0 ? & (posFromFirst[0]) : NULL,
-            posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads),
+            posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads,
+            ignoreDuplicatesElimination),
     listDerivations(listDerivations),
     ruleExecOrder(ruleExecOrder),
     iteration(iteration),
@@ -132,7 +137,7 @@ void SingleHeadFinalRuleProcessor::processResults(const int blockid, FCInternalT
         row[posFromSecond[i].first] = second->getCurrentValue(posFromSecond[i].second);
     }
 
-    processResults(blockid, unique, NULL);
+    processResults(blockid, unique || ignoreDupElimin, NULL);
 }
 
 void SingleHeadFinalRuleProcessor::processResults(const int blockid,
@@ -145,13 +150,13 @@ void SingleHeadFinalRuleProcessor::processResults(const int blockid,
     for (int i = 0; i < nCopyFromSecond; i++) {
         row[posFromSecond[i].first] = (*vectors2[posFromSecond[i].second])[i2];
     }
-    processResults(blockid, unique, NULL);
+    processResults(blockid, unique || ignoreDupElimin, NULL);
 }
 
 void SingleHeadFinalRuleProcessor::processResultsAtPos(const int blockid, const uint8_t pos,
         const Term_t v, const bool unique) {
     enlargeBuffers(blockid + 1);
-    if (!unique) {
+    if (!unique && !ignoreDupElimin) {
         if (tmpt[blockid] == NULL) {
             tmpt[blockid] = new SegmentInserter(rowsize);
         }
@@ -165,7 +170,7 @@ void SingleHeadFinalRuleProcessor::processResultsAtPos(const int blockid, const 
 }
 
 bool SingleHeadFinalRuleProcessor::isBlockEmpty(const int blockId, const bool unique) const {
-    if (!unique) {
+    if (!unique && !ignoreDupElimin) {
         return tmpt[blockId] == NULL || tmpt[blockId]->isEmpty();
     } else {
         return utmpt[blockId] == NULL || utmpt[blockId]->isEmpty();
@@ -196,7 +201,7 @@ void SingleHeadFinalRuleProcessor::addColumns(const int blockid,
         std::vector<std::shared_ptr<Column>> &columns,
         const bool unique, const bool sorted) {
     enlargeBuffers(blockid + 1);
-    if (!unique) {
+    if (!unique && !ignoreDupElimin) {
         if (tmpt[blockid] == NULL) {
             tmpt[blockid] = new SegmentInserter(rowsize);
         }
@@ -216,22 +221,22 @@ void SingleHeadFinalRuleProcessor::addColumns(const int blockid,
         FCInternalTableItr *itr, const bool unique,
         const bool sorted, const bool lastInsert) {
     enlargeBuffers(blockid + 1);
-    if (unique) { //I am sure that the results are unique...
+    if (unique || ignoreDupElimin) { //I am sure that the results are unique...
         if (utmpt[blockid] == NULL) {
             utmpt[blockid] = new SegmentInserter(rowsize);
         }
 
-        uint8_t columns[128];
+        uint8_t columns[256];
         for (uint32_t i = 0; i < nCopyFromSecond; ++i) {
             columns[i] = posFromSecond[i].second;
         }
         std::vector<std::shared_ptr<Column>> c =
             itr->getColumn(nCopyFromSecond,
                     columns);
-	if (rowsize == 0) {
-	    assert(c.size() == 0);
-	    return;
-	}
+        if (rowsize == 0) {
+            assert(c.size() == 0);
+            return;
+        }
         if (nCopyFromSecond > 1) {
             std::vector<std::shared_ptr<Column>> c2;
             int rowID = 0;
@@ -282,7 +287,7 @@ void SingleHeadFinalRuleProcessor::addColumns(const int blockid,
             tmpt[blockid] = new SegmentInserter(rowsize);
         }
 
-        uint8_t columns[128];
+        uint8_t columns[256];
         for (uint32_t i = 0; i < nCopyFromSecond; ++i) {
             columns[i] = posFromSecond[i].second;
         }
@@ -290,9 +295,9 @@ void SingleHeadFinalRuleProcessor::addColumns(const int blockid,
             itr->getColumn(nCopyFromSecond,
                     columns);
         assert(c.size() <= rowsize);
-	if (rowsize == 0) {
-	    return;
-	}
+        if (rowsize == 0) {
+            return;
+        }
 
         if (nCopyFromSecond > 1) {
             std::vector<std::shared_ptr<Column>> c2;
@@ -343,7 +348,7 @@ void SingleHeadFinalRuleProcessor::addColumn(const int blockid,
         const uint8_t pos, std::shared_ptr<Column> column,
         const bool unique, const bool sorted) {
     enlargeBuffers(blockid + 1);
-    if (!unique) {
+    if (!unique && !ignoreDupElimin) {
         if (tmpt[blockid] == NULL) {
             tmpt[blockid] = new SegmentInserter(rowsize);
         }
@@ -360,7 +365,7 @@ void SingleHeadFinalRuleProcessor::addColumn(const int blockid,
 void SingleHeadFinalRuleProcessor::processResults(const int blockid, const bool unique, std::mutex *m) {
     enlargeBuffers(blockid + 1);
 
-    if (!unique) {
+    if (!unique && !ignoreDupElimin) {
         if (tmpt[blockid] == NULL) {
             tmpt[blockid] = new SegmentInserter(rowsize);
         }
@@ -438,7 +443,7 @@ void SingleHeadFinalRuleProcessor::processResults(const int blockid, const bool 
 void SingleHeadFinalRuleProcessor::processResults(const int blockid, const bool unique,
         std::mutex *m) {
     enlargeBuffers(blockid + 1);
-    if (!unique) {
+    if (!unique && !ignoreDupElimin) {
         if (tmpt[blockid] == NULL) {
             tmpt[blockid] = new SegmentInserter(rowsize);
         }
@@ -737,17 +742,19 @@ FinalRuleProcessor::FinalRuleProcessor(
         const size_t iteration,
         const bool addToEndTable,
         const int nthreads,
-        SemiNaiver *sn) :
+        SemiNaiver *sn,
+        const bool ignoreDuplicatesElimination) :
     ResultJoinProcessor(__totLengthHeadAtoms(heads),
             (uint8_t) posFromFirst.size(),
             (uint8_t) posFromSecond.size(),
             posFromFirst.size() > 0 ? & (posFromFirst[0]) : NULL,
-            posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads),
+            posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads,
+            ignoreDuplicatesElimination),
     listDerivations(listDerivations),
-    ruleExecOrder(ruleExecOrder),
     iteration(iteration),
     newDerivation(false),
     ruleDetails(ruleDetails),
+    ruleExecOrder(ruleExecOrder),
     addToEndTable(addToEndTable),
     heads(heads)
 {
@@ -785,7 +792,8 @@ FinalRuleProcessor::FinalRuleProcessor(
                                                   ruleExecOrder,
                                                   iteration,
                                                   addToEndTable,
-                                                  nthreads)));
+                                                  nthreads,
+                                                  ignoreDuplicatesElimination)));
         headID++;
         currentTupleSize += h.getTupleSize();
     }
@@ -871,8 +879,12 @@ void FinalRuleProcessor::processResultsAtPos(const int blockid, const uint8_t po
 void FinalRuleProcessor::addColumns(const int blockid,
         std::vector<std::shared_ptr<Column>> &columns,
         const bool unique, const bool sorted) {
+    size_t offset = 0;
     for(auto &t : atomTables) {
-        t->addColumns(blockid, columns, unique, sorted);
+	size_t newOffset = offset + t->getRowSize();
+	std::vector<std::shared_ptr<Column>> c(columns.begin() + offset, columns.begin() + newOffset);
+        t->addColumns(blockid, c, unique, sorted);
+	offset = newOffset;
     }
 }
 

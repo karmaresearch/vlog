@@ -54,7 +54,7 @@ void ODBCTable::executeQuery(const std::string &query, SegmentInserter *inserter
     check(SQLExecDirectA(stmt, (SQLCHAR *) query.c_str(), SQL_NTS), "execute query");
     SQLRETURN res;
     while (SQL_SUCCEEDED(res = check(SQLFetch(stmt), "fetch result"))) {
-	uint64_t row[128];
+	uint64_t row[256];
 	for (int i = 0; i < arity; i++) {
 	    SQLLEN indicator;
 	    char buf[16384];

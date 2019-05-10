@@ -10,6 +10,7 @@
 #include <memory>
 #include <vector>
 #include <assert.h>
+#include <set>
 
 struct GetVectors {
     const std::vector<std::shared_ptr<Column>> &cols;
@@ -56,7 +57,7 @@ class SegmentIterator {
         std::vector<std::unique_ptr<ColumnReader>> readers;
 
     protected:
-        Term_t values[32];
+        Term_t values[256];
         SegmentIterator() {
         }
 
@@ -173,6 +174,8 @@ class Segment {
                 std::vector<uint8_t> *posInLiteral)
             const;
 
+        size_t getRepresentationSize(std::set<uint64_t> &IDs) const;
+
 #if DEBUG
         void checkSizes() const;
 #endif
@@ -234,7 +237,7 @@ class Segment {
         }
 
         Term_t firstInColumn(const uint8_t columnid) const {
-            return columns[columnid]->getReader()->first();
+            return columns[columnid]->first();
         }
 
         Term_t lastInColumn(const uint8_t columnid) const {
