@@ -994,8 +994,9 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
 	    newrow[i] = (row[i] & RULEVARMASK) != 0 ? row[i] : 0;;
 	}
 	row = newrow;
-	for (int i = 0; i < headLiteral.getTupleSize(); i++) {
-	    newhead[i] = (headrow[i] & RULEVARMASK) != 0 ? headrow[i] : 0;;
+	for (int i = 0; i < columnsToCheck.size(); i++) {
+	    uint64_t v = headrow[columnsToCheck[i]];
+	    newhead[columnsToCheck[i]] = (v & RULEVARMASK) != 0 ? v : 0;;
 	}
 	headrow = newhead;
     }
