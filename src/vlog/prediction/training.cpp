@@ -1053,6 +1053,7 @@ void Training::runQueries(vector<string>& trainingQueriesVector,
                     repeatQuery,
                     featuresVector,
                     decisionVector);
+            features += ",0";
             strResults.push_back(results);
             strFeatures.push_back(features);
             strQsqrTime.push_back(qsqrTime);
