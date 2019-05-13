@@ -235,7 +235,7 @@ class ColumnWriter {
                         b->size++;
                     } else {
                         blocks.push_back(CompressedColumnBlock((Term_t) v, 0, 0));
-                        if (_size > 16384 && blocks.size() > _size / 4) {
+                        if (_size > 256 && blocks.size() > _size / 4) {
                             // Compression not very effective; convert to uncompressed
                             compressed = false;
                             CompressedColumn col(blocks, /*offsetsize, deltas,*/ _size);
@@ -275,19 +275,21 @@ class ColumnReaderImpl : public ColumnReader {
           uint64_t lastBasePos;
           const int32_t *lastDelta;*/
 
-        const std::vector<CompressedColumnBlock> &blocks;
+        const CompressedColumnBlock *blocks;
         const size_t _size;
 
+        size_t numBlocks;
         size_t currentBlock;
         size_t posInBlock;
+        size_t position;
 
         //Term_t get(const size_t pos);
 
     public:
         ColumnReaderImpl(const std::vector<CompressedColumnBlock> &blocks,
                 const size_t size) : /*beginRange(0), endRange(0),*/
-            blocks(blocks), /*offsetsize(offsetsize), deltas(deltas),*/
-            _size(size), currentBlock(0), posInBlock(0) {
+            blocks(blocks.size() == 0 ? NULL : &blocks[0]), /*offsetsize(offsetsize), deltas(deltas),*/
+            _size(size), numBlocks(blocks.size()), currentBlock(0), posInBlock(0), position(0) {
             }
 
         Term_t first();
@@ -296,7 +298,9 @@ class ColumnReaderImpl : public ColumnReader {
 
         std::vector<Term_t> asVector();
 
-        bool hasNext();
+        bool hasNext() {
+            return position < _size;
+        }
 
         Term_t next();
 
@@ -713,7 +717,7 @@ class EDBColumn : public Column {
         size_t estimateSize() const;
 
         bool isEmpty() const {
-            return size() == 0;
+            return layer.isEmpty(l, NULL, NULL);
         }
 
         bool isEDB() const {

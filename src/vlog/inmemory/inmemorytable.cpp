@@ -695,7 +695,7 @@ uint8_t InmemoryTable::getArity() const {
 }
 
 uint64_t InmemoryTable::getSize() {
-    return segment->getNRows();
+    return segment == NULL ? 0 : segment->getNRows();
 }
 
 InmemoryTable::~InmemoryTable() {

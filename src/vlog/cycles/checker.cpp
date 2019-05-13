@@ -189,34 +189,8 @@ bool Checker::RMFA(Program &p) {
     EDBLayer *db = p.getKB();
     EDBLayer layer(*db, false);
 
-    //Populate the critical instance with new facts
-    for(auto p : db->getAllPredicateIDs()) {
-        std::vector<std::vector<string>> facts;
-        std::vector<string> fact;
-        for (int i = 0; i < db->getPredArity(p); ++i) {
-            fact.push_back("*");
-        }
-        facts.push_back(fact);
-        layer.addInmemoryTable(db->getPredName(p), facts);
-    }
-
-    // Rewrite rules: all constants must be replaced with "*".
-    std::vector<std::string> newRules;
-    std::vector<Rule> rules = p.getAllRules();
-    for (auto rule : rules) {
-        std::string ruleString = rule.toprettystring(&p, p.getKB(), true);
-        LOG(DEBUGL) << "Adding rule: " << ruleString;
-        newRules.push_back(ruleString);
-    }
-
     Program newProgram(&layer);
-    for (auto rule : newRules) {
-        newProgram.parseRule(rule, false);
-    }
-
-    // The critical instance should have initial values for ALL predicates,
-    // not just the EDB ones ... --Ceriel
-    addIDBCritical(newProgram, &layer);
+    createCriticalInstance(newProgram, p, db, layer);
 
     //Launch the (special) restricted chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
@@ -523,7 +497,7 @@ bool Checker::JA(Program &p, bool restricted) {
         for (auto rule : nonGeneratingRules) {
             newProgram.parseRule(rule, false);
         }
-        
+
         for (auto &it : allExtVarsPos) {
             int dest = 0;
             const Rule &rulev = p.getRule(it.first.first);
@@ -662,7 +636,7 @@ bool Checker::MFC(Program &p, bool restricted) {
             if (sn->isFoundCyclicTerms()) {
                 LOG(INFOL) << (restricted ? "R" : "") << "MFC: Cyclic rule: " << rule.toprettystring(&p, p.getKB());
                 if (restrictedProgram != NULL) {
-		    delete restrictedProgram->getKB();
+                    delete restrictedProgram->getKB();
                     delete restrictedProgram;
                 }
                 return true;    // MFC
@@ -671,7 +645,7 @@ bool Checker::MFC(Program &p, bool restricted) {
         ruleCount++;
     }
     if (restrictedProgram != NULL) {
-	delete restrictedProgram->getKB();
+        delete restrictedProgram->getKB();
         delete restrictedProgram;
     }
     return false;

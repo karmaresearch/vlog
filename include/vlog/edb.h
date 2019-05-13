@@ -147,6 +147,8 @@ class EDBLayer {
 
         uint8_t getPredArity(PredId_t id);
 
+        void setPredArity(PredId_t id, uint8_t arity);
+
         void addTmpRelation(Predicate &pred, IndexedTupleTable *table);
 
         bool isTmpRelationEmpty(Predicate &pred) {

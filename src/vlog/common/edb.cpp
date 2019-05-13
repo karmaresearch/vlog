@@ -132,7 +132,7 @@ void EDBLayer::addInmemoryTable(std::string predicate, PredId_t id, std::vector<
     infot.arity = table->getArity();
     infot.manager = std::shared_ptr<EDBTable>(table);
     dbPredicates.insert(make_pair(infot.id, infot));
-    LOG(DEBUGL) << "Added table for " << predicate << ":" << infot.id;
+    LOG(DEBUGL) << "Added table for " << predicate << ":" << infot.id << ", arity = " << (int) table->getArity() << ", size = " << table->getSize();
 }
 
 
@@ -954,6 +954,12 @@ uint8_t EDBLayer::getPredArity(PredId_t id) {
         return dbPredicates[id].arity;
     }
     return 0;
+}
+
+void EDBLayer::setPredArity(PredId_t id, uint8_t arity) {
+    if (dbPredicates.count(id)) {
+        dbPredicates[id].arity = arity;
+    }
 }
 
 void EDBMemIterator::init1(PredId_t id, std::vector<Term_t>* v, const bool c1, const Term_t vc1) {
