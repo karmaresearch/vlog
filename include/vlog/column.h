@@ -238,7 +238,7 @@ class ColumnWriter {
                         if (_size > 256 && blocks.size() > _size / 4) {
                             // Compression not very effective; convert to uncompressed
                             compressed = false;
-                            CompressedColumn col(blocks, /*offsetsize, deltas,*/ _size);
+                            CompressedColumn col(blocks, /*offsetsize, deltas,*/ _size + 1);
                             values = col.getReader()->asVector();
                             blocks.clear();
                         }
@@ -248,8 +248,8 @@ class ColumnWriter {
 #else
             values.push_back((Term_t) v);
 #endif
-            lastv = v;
             _size++;
+            lastv = v;
         }
 
         bool isEmpty() const { return _size == 0; }
