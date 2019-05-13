@@ -164,7 +164,8 @@ bool TableFilterer::isEligibleForPartialSubs(
             }
 
             //Is the rule in that block recursive?
-            if (childBlocks.back()->rule->rule.isRecursive()) {
+            //Note that some cyclicity checks have blocks with no rule.
+            if (childBlocks.back()->rule != NULL && childBlocks.back()->rule->rule.isRecursive()) {
                 //LOG(INFOL) << "THE LAST BLOCK in the prev predicate is recursive!";
                 //Ok now check the previous block (if any). I must be sure
                 //that the block occurred before the previous execution of this
