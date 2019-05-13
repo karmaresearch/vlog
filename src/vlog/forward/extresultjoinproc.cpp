@@ -865,7 +865,7 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::saturateInput(
         //Populate the table
         std::shared_ptr<const FCInternalTable> ltable(
                 new InmemoryFCInternalTable(card,
-                    0, false, inserter.getSegment()));
+                    0, true, inserter.getSortedAndUniqueSegment()));
 
         //Define a generic query
         VTuple tuple(card);
