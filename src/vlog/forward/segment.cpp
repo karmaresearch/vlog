@@ -1355,6 +1355,8 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
     bool prevrow1valid = false;
     SegmentInserter retainedValues(nfields);
 
+    bool nothingSkipped = true;
+
     while (active1 && active2) {
         if (toRead1) {
             segmentIterator->next();
@@ -1386,12 +1388,13 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
 
         long res = 0;
         for (uint8_t i = 0; i < nPosToCompare; ++i) {
-            if (segmentIterator->get(posToCompare[i]) != itr2->getCurrentValue(i)) {
-                res = segmentIterator->get(posToCompare[i]) - itr2->getCurrentValue(i);
+            res = segmentIterator->get(posToCompare[i]) - itr2->getCurrentValue(i);
+            if (res != 0) {
                 break;
             }
         }
         if (res == 0) {
+            nothingSkipped = false;
             toRead1 = true;
             active1 = segmentIterator->hasNext();
         } else if (res < 0) {
@@ -1402,6 +1405,15 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
             toRead2 = true;
             active2 = itr2->hasNext();
         }
+    }
+
+    if (nothingSkipped && ! duplicates) {
+        segmentIterator->clear();
+
+        if (itr2 != NULL) {
+            existingValues->releaseIterator(itr2);
+        }
+        return segment;
     }
 
     //Copy the remaining
@@ -1417,7 +1429,6 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
     }
 
     if (duplicates) {
-        //for (; idx1 < segment->getNRows(); ++idx1) {
         while (segmentIterator->hasNext()) {
             segmentIterator->next();
             if (prevrow1valid) {

@@ -413,6 +413,30 @@ std::vector<uint8_t> Literal::getNewVars(std::vector<uint8_t> &vars) const {
 
 }
 
+static std::vector<uint8_t> getAllVars(std::vector<Literal> &lits) {
+    std::vector<uint8_t> output;
+    for (Literal lit : lits) {
+        for (int i = 0; i < lit.getTupleSize(); ++i) {
+            VTerm t = lit.getTermAtPos(i);
+            if (t.isVariable()) {
+                bool found = false;
+                for (std::vector<uint8_t>::iterator itr = output.begin(); itr != output.end();
+                        ++itr) {
+                    if (*itr == t.getId()) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    output.push_back(t.getId());
+                }
+            }
+        }
+    }
+    return output;
+}
+
 std::vector<uint8_t> Literal::getAllVars() const {
     std::vector<uint8_t> output;
     for (int i = 0; i < getTupleSize(); ++i) {
@@ -806,11 +830,15 @@ const std::vector<uint32_t> &Program::getRulesIDsByPredicate(PredId_t predid) co
 }
 
 Program::Program(EDBLayer *kb) : kb(kb),
+    rewriteCounter(0),
     dictPredicates(kb->getPredDictionary()),
     cardPredicates(kb->getPredicateCardUnorderedMap()) {
     }
 
-Program::Program(Program *p, EDBLayer *kb) : kb(kb), dictPredicates(p->dictPredicates), cardPredicates(p->cardPredicates) {
+Program::Program(Program *p, EDBLayer *kb) : kb(kb),
+    rewriteCounter(0),
+    dictPredicates(p->dictPredicates),
+    cardPredicates(p->cardPredicates) {
 }
 
 std::string trim(const std::string& str,
@@ -1112,28 +1140,29 @@ void Program::cleanAllRules() {
     allrules.clear();
 }
 
-void Program::addRule(Rule &rule, bool rewriteMultihead) {
-    if (rewriteMultihead && rule.isExistential() && rule.getHeads().size() > 1) {
-        rewriteRule(rule);
-    } else {
-        for (const auto &head : rule.getHeads()) {
-            if (rules.size() <= head.getPredicate().getId()) {
-                rules.resize(head.getPredicate().getId() + 1);
-            }
-            rules[head.getPredicate().getId()].push_back(allrules.size());
+void Program::addRule(Rule &rule) {
+    assert(rule.getId() == allrules.size());
+    for (const auto &head : rule.getHeads()) {
+        if (rules.size() <= head.getPredicate().getId()) {
+            rules.resize(head.getPredicate().getId() + 1);
         }
-        allrules.push_back(rule);
+        rules[head.getPredicate().getId()].push_back(allrules.size());
     }
+    allrules.push_back(rule);
 }
 
 void Program::addRule(std::vector<Literal> heads, std::vector<Literal> body, bool rewriteMultihead) {
-    Rule rule(allrules.size(), heads, body);
-    addRule(rule, rewriteMultihead);
+    if (rewriteMultihead && heads.size() > 1) {
+        rewriteRule(heads, body);
+    } else {
+        Rule rule(allrules.size(), heads, body);
+        addRule(rule);
+    }
 }
 
 void Program::addAllRules(std::vector<Rule> &rules) {
     for (auto &r : rules) {
-        addRule(r);
+        addRule(r.getHeads(), r.getBody());
     }
 }
 
@@ -1228,8 +1257,7 @@ std::string Program::parseRule(std::string rule, bool rewriteMultihead) {
         }
 
         //Add the rule
-        Rule r = Rule(allrules.size(), lHeads, lBody);
-        addRule(r, rewriteMultihead);
+        addRule(lHeads, lBody, rewriteMultihead);
         return "";
     } catch (std::string e) {
         return "Failed parsing rule '" + rule + "': " + e;
@@ -1247,88 +1275,28 @@ static bool isInVector(uint8_t v, std::vector<uint8_t> &vec) {
     return false;
 }
 
-void Program::rewriteRule(Rule &r) {
-    std::vector<Literal> lHeads = r.getHeads();
-    std::vector<Literal> lBody = r.getBody();
-    LOG(DEBUGL) << "Trying to rewrite rule";
-    std::vector<uint8_t> bodyVars;
-    // First determine the non-existential variables.
-    for (auto body: lBody) {
-        for (int i = 0; i < body.getTupleSize(); i++) {
-            const VTerm t = body.getTermAtPos(i);
-            if (t.isVariable()) {
-                if (! isInVector(t.getId(), bodyVars)) {
-                    bodyVars.push_back(t.getId());
-                }
-            }
-        }
+void Program::rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lBody) {
+
+    std::vector<uint8_t> allHeadVars = getAllVars(lHeads);
+
+    // First, create a rule with a new head, containing all variables of the heads of the original rule.
+
+    std::string newHeadName = "__Generated__Head__" + std::to_string(rewriteCounter++);
+    Predicate newPred = getPredicate(getOrAddPredicate(newHeadName, allHeadVars.size()));
+    VTuple headTuple(allHeadVars.size());
+    for (int i = 0; i < allHeadVars.size(); i++) {
+        headTuple.set(VTerm(allHeadVars[i], 0), i);
     }
+    Literal newHead(newPred, headTuple);
+    std::vector<Literal> nh;
+    nh.push_back(newHead);
+    addRule(nh, lBody);
 
-    std::vector<uint8_t> done;
-    for (int i = 0; i < lHeads.size(); i++) {
-        if (! isInVector(i, done)) {
-            std::vector<uint8_t> extVars;
-            Literal head = lHeads[i];
-            std::vector<uint8_t> addedHeads;
-
-            addedHeads.push_back(i);
-            // Determine existential variables.
-            for (int k = 0; k < head.getTupleSize(); k++) {
-                const VTerm t = head.getTermAtPos(k);
-                if (t.isVariable()
-                        && ! isInVector(t.getId(), bodyVars)
-                        && ! isInVector(t.getId(), extVars)) {
-                    extVars.push_back(t.getId());
-                }
-            }
-            if (extVars.size() == 0) {
-                std::vector<Literal> heads;
-                done.push_back(i);
-                heads.push_back(lHeads[i]);
-                Rule r = Rule(allrules.size(), heads, lBody);
-                addRule(r);
-                continue;
-            }
-
-            for (int j = i+1; j < lHeads.size(); j++) {
-                if (isInVector(j, addedHeads)) {
-                    continue;
-                }
-                // Go through the head, to see if it uses an extvar that is used earlier.
-                Literal head1 = lHeads[j];
-                bool used = false;
-                for (int l = 0; l < head1.getTupleSize(); l++) {
-                    const VTerm t = head1.getTermAtPos(l);
-                    if (t.isVariable() && ! isInVector(t.getId(), bodyVars)) {
-                        if (isInVector(t.getId(), extVars)) {
-                            used = true;
-                            break;
-                        }
-                    }
-                }
-                if (used) {
-                    // If it does, we add it to the list of heads, and add all extvars that it uses
-                    // to the list, and restart the loop.
-                    for (int l = 0; l < head1.getTupleSize(); l++) {
-                        const VTerm t = head1.getTermAtPos(l);
-                        if (t.isVariable()
-                                && ! isInVector(t.getId(), bodyVars)
-                                && ! isInVector(t.getId(), extVars)) {
-                            extVars.push_back(t.getId());
-                        }
-                    }
-                    addedHeads.push_back(j);
-                    j = i;  // Will be incremented.
-                }
-            }
-            std::vector<Literal> newHeads;
-            for (uint8_t h : addedHeads) {
-                newHeads.push_back(lHeads[h]);
-                done.push_back(h);
-            }
-            Rule r = Rule(allrules.size(), newHeads, lBody);
-            addRule(r);
-        }
+    // Then, for each original head, create a rule with the generated head as body.
+    for (auto h : lHeads) {
+        std::vector<Literal> hv;
+        hv.push_back(h);
+        addRule(hv, nh);
     }
 }
 

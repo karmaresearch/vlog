@@ -931,8 +931,8 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     runLiteralQuery(edb, p, literal, reasoner, vm);
 }
 
-void checkAcyclicity(std::string ruleFile, std::string alg, EDBLayer &db) {
-    int response = Checker::checkFromFile(ruleFile, alg, db);
+void checkAcyclicity(std::string ruleFile, std::string alg, EDBLayer &db, bool rewriteMultihead) {
+    int response = Checker::checkFromFile(ruleFile, alg, db, rewriteMultihead);
     std::cout << "The response is: ";
     if (response == 0) {
         std::cout << "Unknown";
@@ -1186,7 +1186,7 @@ int main(int argc, const char** argv) {
         EDBLayer *layer = new EDBLayer(conf, false);
         string rulesFile = vm["rules"].as<string>();
         string alg = vm["alg"].as<string>();
-        checkAcyclicity(rulesFile, alg, *layer);
+        checkAcyclicity(rulesFile, alg, *layer, vm["rewriteMultihead"].as<bool>());
 	delete layer;
     } else if (cmd == "deps") {
         EDBConf conf(edbFile);

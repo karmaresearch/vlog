@@ -209,8 +209,7 @@ std::vector<Term_t> ColumnReaderImpl::asVector() {
                     *p++ = blocks[j].value;
                 }
             } else {
-                *p++ = blocks[j].value;
-                for (int32_t i = 1; i <= blocks[j].size; ++i) {
+                for (int32_t i = 0; i <= blocks[j].size; ++i) {
                     *p++ = blocks[j].value + blocks[j].delta * i;
                 }
             }

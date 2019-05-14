@@ -462,6 +462,7 @@ class Program {
         EDBLayer *kb;
         std::vector<std::vector<uint32_t>> rules;
         std::vector<Rule> allrules;
+        int rewriteCounter;
 
         Dictionary dictPredicates;
         std::unordered_map<PredId_t, uint8_t> cardPredicates;
@@ -469,7 +470,9 @@ class Program {
         //Move them to the EDB layer ...
         //Dictionary additionalConstants;
 
-        void rewriteRule(Rule &r);
+        void rewriteRule(std::vector<Literal> &heads, std::vector<Literal> &body);
+
+        void addRule(Rule &rule);
 
         std::string rewriteRDFOWLConstants(std::string input);
 
@@ -541,8 +544,6 @@ class Program {
         std::shared_ptr<Program> cloneNew() const;
 
         void cleanAllRules();
-
-        VLIBEXP void addRule(Rule &rule, bool rewriteMultihead = false);
 
         VLIBEXP void addRule(std::vector<Literal> heads,
                 std::vector<Literal> body, bool rewriteMultihead = false);

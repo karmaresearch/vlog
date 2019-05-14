@@ -27,9 +27,9 @@ class Checker {
     public:
         VLIBEXP static int check(Program &p, std::string alg, EDBLayer &db);
 
-        VLIBEXP static int checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db);
+        VLIBEXP static int checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db, bool rewriteMultihead = false);
 
-        VLIBEXP static int checkFromString(std::string rulesString, std::string alg, EDBLayer &db);
+        VLIBEXP static int checkFromString(std::string rulesString, std::string alg, EDBLayer &db, bool rewriteMultihead = false);
 
 };
 #endif

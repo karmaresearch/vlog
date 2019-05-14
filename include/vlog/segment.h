@@ -54,23 +54,26 @@ struct SegmentSorter {
 
 class SegmentIterator {
     private:
-        std::vector<std::unique_ptr<ColumnReader>> readers;
+        std::unique_ptr<ColumnReader> *readers;
+        int nfields;
 
     protected:
         Term_t values[256];
         SegmentIterator() {
+            readers = NULL;
         }
 
     public:
-        SegmentIterator(const uint8_t nfields, std::shared_ptr<Column> *columns) {
+        SegmentIterator(const uint8_t nfields, std::shared_ptr<Column> *columns) : nfields(nfields) {
+            readers = new std::unique_ptr<ColumnReader>[nfields];
             for (int i = 0; i < nfields; i++) {
-                readers.push_back(columns[i]->getReader());
+                readers[i] = columns[i]->getReader();
             }
         }
 
         virtual bool hasNext() {
-            for (const auto  &reader : readers) {
-                if (! reader->hasNext()) {
+            for (int i = 0; i < nfields; i++) {
+                if (! readers[i]->hasNext()) {
                     return false;
                 }
             }
@@ -78,23 +81,23 @@ class SegmentIterator {
         }
 
         virtual void next() {
-            int idx = 0;
-            for (const auto  &reader : readers) {
-                values[idx++] = reader->next();
+            for (int i = 0; i < nfields; i++) {
+                values[i] = readers[i]->next();
             }
         }
 
         virtual void clear() {
-            for (const auto  &reader : readers) {
-                reader->clear();
+            for (int i = 0; i < nfields; i++) {
+                readers[i]->clear();
             }
         }
 
-        virtual Term_t get(const uint8_t pos) {
+        Term_t get(const uint8_t pos) {
             return values[pos];
         }
 
         virtual ~SegmentIterator() {
+            delete[] readers;
         }
 };
 

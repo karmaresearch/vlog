@@ -8,10 +8,10 @@
 typedef std::pair<PredId_t, uint8_t> vpos;
 typedef std::pair<uint32_t, uint8_t> rpos;
 
-int Checker::checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db) {
+int Checker::checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db, bool rewriteMultihead) {
     //Parse the rules into a program
     Program p(&db);
-    std::string s = p.readFromFile(ruleFile, false); //we do not rewrite the heads
+    std::string s = p.readFromFile(ruleFile, rewriteMultihead);
     if (s != "") {
         LOG(ERRORL) << "Error: " << s;
         throw 10;
@@ -19,10 +19,10 @@ int Checker::checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db) 
     return check(p, alg, db);
 }
 
-int Checker::checkFromString(std::string rulesString, std::string alg, EDBLayer &db) {
+int Checker::checkFromString(std::string rulesString, std::string alg, EDBLayer &db, bool rewriteMultihead) {
     //Parse the rules into a program
     Program p(&db);
-    std::string s = p.readFromString(rulesString, false); //we do not rewrite the heads
+    std::string s = p.readFromString(rulesString, rewriteMultihead);
     if (s != "") {
         LOG(ERRORL) << "Error: " << s;
         throw 10;
