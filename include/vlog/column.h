@@ -123,7 +123,7 @@ struct CompressedColumnBlock {
     delta(delta), size(size) {}
 };
 
-class CompressedColumn: public Column {
+class CompressedColumn final : public Column {
     private:
         std::vector<CompressedColumnBlock> blocks;
         size_t _size;
@@ -269,7 +269,7 @@ class ColumnWriter {
 
 //----- END GENERIC INTERFACES -------
 
-class ColumnReaderImpl : public ColumnReader {
+class ColumnReaderImpl final : public ColumnReader {
     private:
         /*uint32_t beginRange, endRange;
           uint64_t lastBasePos;
@@ -309,7 +309,7 @@ class ColumnReaderImpl : public ColumnReader {
 };
 
 //----- INMEMORY COLUMN ----------
-class InmemColumnReader : public ColumnReader {
+class InmemColumnReader final : public ColumnReader {
     private:
         const std::vector<Term_t> &col;
         size_t start;
@@ -354,7 +354,7 @@ class InmemColumnReader : public ColumnReader {
         }
 };
 
-class InmemoryColumn : public Column {
+class InmemoryColumn final : public Column {
     private:
         std::vector<Term_t> values;
 
@@ -494,7 +494,7 @@ class InmemoryColumn : public Column {
 //----- END INMEMORY COLUMN ----------
 
 // START SUBCOLUMN (contains a subrange of an inmemory column)
-class SubColumn : public Column {
+class SubColumn final : public Column {
     private:
         std::shared_ptr<Column> parentColumn;
         const std::vector<Term_t> &values;
@@ -632,7 +632,7 @@ class SubColumn : public Column {
 
 
 //----- EDB COLUMN ----------
-class EDBColumnReader : public ColumnReader {
+class EDBColumnReader final : public ColumnReader {
     private:
         const Literal &l;
         EDBLayer &layer;
@@ -689,7 +689,7 @@ class EDBColumnReader : public ColumnReader {
 };
 
 
-class EDBColumn : public Column {
+class EDBColumn final : public Column {
     private:
         EDBLayer &layer;
         const Literal l;
@@ -773,7 +773,7 @@ class EDBColumn : public Column {
 //
 //----- FUNCTIONAL COLUMN ----------
 class ChaseMgmt;
-class FunctionalColumn : public Column {
+class FunctionalColumn final : public Column {
     private:
         uint64_t nvalues;
         uint64_t startvalue;

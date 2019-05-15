@@ -101,31 +101,27 @@ class SegmentIterator {
         }
 };
 
-class VectorSegmentIterator : public SegmentIterator {
+class VectorSegmentIterator final : public SegmentIterator {
     private:
         const std::vector<const std::vector<Term_t> *> vectors;
         int currentIndex;
-        bool first;
         int endIndex;
         int ncols;
         std::vector<bool> *allocatedVectors;
     public:
         VectorSegmentIterator(const std::vector<const std::vector<Term_t> *> &vectors, int firstIndex, int endIndex, std::vector<bool> *allocatedVectors)
-            : vectors(vectors), currentIndex(firstIndex), first(true), endIndex(endIndex), ncols(vectors.size()), allocatedVectors(allocatedVectors) {
+            : vectors(vectors), currentIndex(firstIndex-1), endIndex(endIndex), ncols(vectors.size()), allocatedVectors(allocatedVectors) {
                 if (endIndex > vectors[0]->size()) {
                     this->endIndex = vectors[0]->size();
                 }
             }
 
         bool hasNext() {
-            return currentIndex < endIndex - 1 || (first && currentIndex < endIndex);
+            return currentIndex < endIndex - 1;
         }
 
         void next() {
-            if (! first) {
-                currentIndex++;
-            }
-            first = false;
+            currentIndex++;
             for (int i = 0; i < ncols; i++) {
                 values[i] = (*vectors[i])[currentIndex];
             }

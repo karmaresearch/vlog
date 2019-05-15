@@ -1346,7 +1346,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
     }
 
     const uint8_t nfields = segment->getNColumns();
-    std::unique_ptr<SegmentIterator> segmentIterator = segment->iterator();
+    std::unique_ptr<VectorSegmentIterator> segmentIterator = segment->vectorIterator();
     active1 = segmentIterator->hasNext();
     assert(active1);
     segmentIterator->next();

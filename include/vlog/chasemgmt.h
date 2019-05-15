@@ -6,6 +6,7 @@
 
 #include <vector>
 #include <map>
+#include <set>
 #include <unordered_map>
 
 #define SIZE_BLOCK 1000
@@ -96,7 +97,7 @@ class ChaseMgmt {
                 bool existingRow(uint64_t *row, uint64_t &value);
 
                 bool checkRecursive(uint64_t target, uint64_t value,
-                        std::vector<uint64_t> &toCheck);
+                        std::set<uint64_t> &toCheck);
         };
 
         class RuleContainer {
@@ -134,9 +135,9 @@ class ChaseMgmt {
         const int ruleToCheck;
         bool cyclic;
 
-        bool checkRecursive(uint64_t target, uint64_t rv, int level);
+        bool checkSingle(uint64_t target, uint64_t rv, std::set<uint64_t> &toCheck);
 
-        bool checkNestedRecursive(uint64_t target, uint64_t rv, int level);
+        bool checkRecursive(uint64_t target, uint64_t rv);
 
     public:
         ChaseMgmt(std::vector<RuleExecutionDetails> &rules,

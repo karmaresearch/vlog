@@ -17,7 +17,7 @@
 #include <map>
 
 class Column;
-class EDBMemIterator : public EDBIterator {
+class EDBMemIterator final : public EDBIterator {
     private:
         uint8_t nfields = 0;
         bool isFirst = false, hasFirst = false;
