@@ -1113,7 +1113,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         //set (should be only during the execution of RMFA
     }
 
-    LOG(INFOL) << "Iteration: " << iteration <<
+    LOG(DEBUGL) << "Iteration: " << iteration <<
         " Rule: " << rule.tostring(program, &layer);
     //Set up timers
     const std::chrono::system_clock::time_point startRule = std::chrono::system_clock::now();
