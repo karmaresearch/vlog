@@ -507,6 +507,9 @@ void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
         return;
     }
 
+    if (t->nBlocks() > 32) {
+        t->collapseBlocks(ruleDetails->lastExecution, nthreads);
+    }
     if (utmpt != NULL) {
         for (int i = 0; i < nbuffers; ++i) {
             if (utmpt[i] != NULL && !utmpt[i]->isEmpty()) {

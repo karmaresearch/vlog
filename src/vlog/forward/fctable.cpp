@@ -66,6 +66,43 @@ FCIterator FCTable::read(const size_t mincount, const size_t maxcount) const {
     return i;
 }
 
+void FCTable::collapseBlocks(size_t maxIter, int nThreads) {
+    std::vector<FCBlock>::const_iterator last = blocks.begin();
+    while (last != blocks.end() && last->iteration < maxIter) {
+        last++;
+    }
+
+    if (last - blocks.begin() < 10) {
+        // Only collapse if it saves significantly on the number of blocks.
+        return;
+    }
+    std::vector<FCBlock>::const_iterator itr = last - 1;
+
+    std::shared_ptr<const FCInternalTable> currentTable(new InmemoryFCInternalTable(itr->table->getRowSize(), itr->iteration));
+
+    itr = last;
+    do {
+        itr--;
+        currentTable = currentTable->merge(itr->table, nThreads);
+    } while (itr != blocks.begin());
+
+    // blocks.erase(blocks.begin(), last-1);    // Does not compile.
+
+    itr = last-1;
+    std::vector<FCBlock> newBlocks;
+    while (itr != blocks.end()) {
+        newBlocks.push_back(*itr);
+        itr++;
+    }
+    blocks.clear();
+    itr = newBlocks.begin();
+    while (itr != newBlocks.end()) {
+        blocks.push_back(*itr);
+        itr++;
+    }
+    blocks.begin()->table = currentTable;
+}
+
 FCBlock &FCTable::getLastBlock() {
     return blocks.back();
 }
@@ -247,7 +284,7 @@ std::shared_ptr<const Segment> FCTable::retainFrom(
         std::shared_ptr<const Segment> t,
         const bool dupl,
         int nthreads) const {
-    bool passed = false;
+    bool duplicates = dupl;
 
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
@@ -260,17 +297,18 @@ std::shared_ptr<const Segment> FCTable::retainFrom(
     }
     //    LOG(TRACEL) << "retainFrom: t.size() = " << t->getNRows() << ", blocks.size() = " << blocks.size() << ", sz = " << sz;
 #endif
+    LOG(INFOL) << "FCTable::retainFrom: blocks.size() = " << blocks.size() << ", duplicates = " << dupl;
     for (std::vector<FCBlock>::const_iterator itr = blocks.cbegin();
             itr != blocks.cend();
             ++itr) {
-        t = SegmentInserter::retain(t, itr->table, dupl, nthreads);
+        t = SegmentInserter::retain(t, itr->table, duplicates, nthreads);
         //        LOG(TRACEL) << "after retain: t.size() = " << t->getNRows() << ", table size was " << itr->table->getNRows();
-        passed = true;
+        duplicates = false;     // Only check for duplicates at most once.
     }
 
-    if (!passed && dupl) {
+    if (duplicates) {
         //I still need to filter the segment.
-        t = SegmentInserter::retain(t, NULL, dupl, nthreads);
+        t = SegmentInserter::retain(t, NULL, true, nthreads);
     }
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(TRACEL) << "Time retainFrom = " << sec.count() * 1000;
