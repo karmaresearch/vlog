@@ -2,7 +2,7 @@
 
 //************** ROWS ***************
 uint64_t ChaseMgmt::Rows::addRow(uint64_t* row) {
-    LOG(DEBUGL) << "Addrow: " << row[0];
+    LOG(TRACEL) << "Addrow: " << row[0];
     if (!currentblock || blockCounter >= SIZE_BLOCK) {
         //Create a new block
         std::unique_ptr<uint64_t[]> n =
@@ -203,7 +203,7 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
                 }
             }
         }
-        LOG(DEBUGL) << "check: ruleid = " << ruleid << ", row[0] = " << row[0];
+        LOG(TRACEL) << "check: ruleid = " << ruleid << ", row[0] = " << row[0];
         uint64_t value = 0;
         if (!rows->existingRow(row, value)) {
             value = rows->addRow(row);
