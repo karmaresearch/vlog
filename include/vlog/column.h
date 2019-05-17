@@ -111,7 +111,6 @@ class Column {
 
 //----- COMPRESSED COLUMN ----------
 
-#define COLCOMPRB 1000000
 struct CompressedColumnBlock {
     const Term_t value;
     int64_t delta;
@@ -207,7 +206,7 @@ class ColumnWriter {
         bool compressed;
 
     public:
-        ColumnWriter() : cached(false), _size(0), lastv((Term_t) - 1), compressed(true) {}
+        ColumnWriter(bool compressed = true) : cached(false), _size(0), lastv((Term_t) - 1), compressed(compressed) {}
 
         ColumnWriter(std::vector<Term_t> &values) : cached(false), _size(values.size()), compressed(false) {
             this->values.swap(values);
@@ -231,7 +230,7 @@ class ColumnWriter {
                     if (v == lastv + b->delta) {
                         b->size++;
                     } else if (b->size == 0) {
-                        b->delta = v - b->value;
+                        b->delta = v - lastv;
                         b->size++;
                     } else {
                         blocks.push_back(CompressedColumnBlock((Term_t) v, 0, 0));
