@@ -413,10 +413,16 @@ class SegmentInserter {
         };
 
     public:
-        SegmentInserter(const uint8_t nfields) : nfields(nfields),
+        SegmentInserter(const uint8_t nfields, bool compressed = true) : nfields(nfields),
         segmentSorted(true), duplicates(true) {
-            columns.resize(nfields);
             copyColumns.resize(nfields);
+            if (compressed) {
+                columns.resize(nfields);
+            } else {
+                for (int i = 0; i < nfields; i++) {
+                    columns.push_back(ColumnWriter(false));
+                }
+            }
         }
 #if DEBUG
         void checkSizes() const;
