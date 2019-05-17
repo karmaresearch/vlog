@@ -89,7 +89,8 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::merge(std::share
     LOG(TRACEL) << "InmemoryFCInternalTable::merge";
     assert(!t->isEmpty() && t->getRowSize() == nfields);
 
-    if (isEmpty()) {
+    if (isEmpty() && ! t->isEDB()) {
+        // Note: EDBFCInternalTable does not support merge, so don't return that.
         return t;
     }
 
