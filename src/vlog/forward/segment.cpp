@@ -1368,6 +1368,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
                         if (prevrow1[i] != segmentIterator->get(i))
                             same = false;
                     if (same) {
+                        nothingSkipped = false;
                         active1 = segmentIterator->hasNext();
                         continue;
                     }
@@ -1407,7 +1408,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
         }
     }
 
-    if (nothingSkipped && ! duplicates) {
+    if (nothingSkipped && (! duplicates || ! segmentIterator->hasNext())) {
         segmentIterator->clear();
 
         if (itr2 != NULL) {
