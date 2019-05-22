@@ -198,7 +198,11 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
                     // Check if we are about to introduce a cyclic term ...
                     if ((row[j] & RULEVARMASK) != 0) {
                         LOG(TRACEL) << "to check: " << rulevar << ", read value " << row[j];
-                        cyclic = checkRecursive(rulevar, row[j]);
+                        if ((row[j] & RULEVARMASK) == rulevar) {
+                            cyclic = true;
+                        } else {
+                            cyclic = checkRecursive(rulevar, row[j]);
+                        }
                     }
                 }
             }
