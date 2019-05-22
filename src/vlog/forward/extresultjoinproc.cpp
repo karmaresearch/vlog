@@ -325,7 +325,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         }
     }
 
-    if (chaseMgmt->isRestricted()) {
+    if (chaseMgmt->isRestricted() || sn->get_RMFC_program() != NULL) {
         std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
         int count = 0;
         if (chaseMgmt->isCheckCyclicMode()) {
@@ -386,6 +386,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                 count = 0;
                 std::unique_ptr<SemiNaiver> saturation = computeSaturation(tmprow, c.size());
                 hnum = 0;
+                bool b = true;
                 for(const auto &at : atomTables) {
                     const auto &h = at->getLiteral();
 
@@ -393,14 +394,16 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                         headrow[hnum][p.first] = tmprow[p.second];
                     }
 
-                    if (blocked_check(sn->get_RMFC_program() != NULL, saturation, h, &headrow[hnum][0], posToCheck[hnum])) {
-                        //It is blocked
-                        blocked[i] = true;
-                        LOG(DEBUGL) << "Blocking row " << i;
-                        blockedCount++;
+                    if (! blocked_check(sn->get_RMFC_program() != NULL, saturation, h, &headrow[hnum][0], posToCheck[hnum])) {
+                        b = false;
                         break;
                     }
                     hnum++;
+                }
+                if (b) {
+                    blocked[i] = true;
+                    LOG(DEBUGL) << "Blocking row " << i;
+                    blockedCount++;
                 }
                 EDBLayer &l = saturation->getEDBLayer();
                 delete &l;
@@ -571,7 +574,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         return;
     }
 
-    if (chaseMgmt->isRestricted()) {
+    if (chaseMgmt->isRestricted()  || sn->get_RMFC_program() != NULL) {
         std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
         int count = 0;
         if (chaseMgmt->isCheckCyclicMode()) {
@@ -623,6 +626,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                 count = 0;
                 std::unique_ptr<SemiNaiver> saturation = computeSaturation(tmprow, c.size());
                 hnum = 0;
+                bool b = true;
                 for(const auto &at : atomTables) {
                     const auto &h = at->getLiteral();
 
@@ -630,14 +634,17 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                         headrow[hnum][p.first] = tmprow[p.second];
                     }
 
-                    if (blocked_check(sn->get_RMFC_program() != NULL, saturation, h, &headrow[hnum][0], posToCheck[hnum])) {
-                        //It is blocked
-                        blocked[i] = true;
-                        LOG(DEBUGL) << "Blocking row " << i;
-                        blockedCount++;
+                    if (! blocked_check(sn->get_RMFC_program() != NULL, saturation, h, &headrow[hnum][0], posToCheck[hnum])) {
+                        b = false;
                         break;
                     }
                     hnum++;
+                }
+                if (b) {
+                    //It is blocked
+                    blocked[i] = true;
+                    LOG(DEBUGL) << "Blocking row " << i;
+                    blockedCount++;
                 }
                 EDBLayer &l = saturation->getEDBLayer();
                 delete &l;
@@ -1054,6 +1061,11 @@ bool ExistentialRuleProcessor::blocked_check(
         std::unique_ptr<SemiNaiver> &saturation,
         const Literal &headLiteral,
         uint64_t *headrow, std::vector<uint8_t> &columnsToCheck) {
+    if (rmfc && ruleDetails->lastExecution <= 0) {
+        // We need one execution of this rule to introduce a skolem constant. Otherwise, it would immediately be blocked
+        // by the critical instance.
+        return false;
+    }
     LOG(DEBUGL) << "blocked_check, headLiteral = " << headLiteral.tostring(NULL, NULL);
 #if DEBUG
     for (int i = 0; i < columnsToCheck.size(); i++) {
@@ -1067,7 +1079,7 @@ bool ExistentialRuleProcessor::blocked_check(
     if (rmfc) {
         for (int i = 0; i < columnsToCheck.size(); i++) {
             uint64_t v = headrow[columnsToCheck[i]];
-            newhead[columnsToCheck[i]] = (v & RULEVARMASK) != 0 ? v : 0;;
+            newhead[columnsToCheck[i]] = (v & RULEVARMASK) != 0 ? v : 0;
         }
         headrow = newhead;
     }
@@ -1133,7 +1145,7 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
         }
 
         //If the chase is restricted, we must first remove data
-        if (chaseMgmt->isRestricted()) {
+        if (chaseMgmt->isRestricted()  || sn->get_RMFC_program() != NULL) {
             std::vector<uint64_t> filterRows;
             int count = 0;
             if (chaseMgmt->isCheckCyclicMode()) {
@@ -1205,16 +1217,20 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                     }
                     std::unique_ptr<SemiNaiver> saturation = computeSaturation(tmprow, segmentSize);
                     hnum = 0;
+                    bool b = true;
                     for(const auto &at : atomTables) {
                         const auto &h = at->getLiteral();
-                        if (blocked_check(sn->get_RMFC_program() != NULL, saturation, h, headrow,
+                        if (! blocked_check(sn->get_RMFC_program() != NULL, saturation, h, headrow,
                                     columnsToCheck[hnum])) { //Is it blocked?
-                            blocked[i] = true;
-                            LOG(DEBUGL) << "Blocking row " << i;
-                            blockedCount++;
+                            b = false;
                             break;
                         }
                         hnum++;
+                    }
+                    if (b) {
+                        blocked[i] = true;
+                        LOG(DEBUGL) << "Blocking row " << i;
+                        blockedCount++;
                     }
                     EDBLayer &l = saturation->getEDBLayer();
                     delete &l;
