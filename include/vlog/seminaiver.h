@@ -83,11 +83,11 @@ class SemiNaiver {
 
         size_t countAllIDBs();
 
-        bool bodyChangedSince(Rule &rule, uint32_t iteration);
+        bool bodyChangedSince(Rule &rule, size_t iteration);
 
         bool checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
                 const RuleExecutionPlan &plan,
-                uint32_t limitView,
+                size_t limitView,
                 std::vector<size_t> &cards);
 
         void processRuleFirstAtom(const uint8_t nBodyLiterals,
@@ -97,7 +97,7 @@ class SemiNaiver {
                 const size_t max,
                 int &processedTables,
                 const bool lastLiteral,
-                const uint32_t iteration,
+                const size_t iteration,
                 const RuleExecutionDetails &ruleDetails,
                 const uint8_t orderExecution,
                 std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
@@ -114,13 +114,13 @@ class SemiNaiver {
         bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
                 std::vector<std::vector<RuleExecutionDetails>> &allIDBRules,    // one entry for each stratification class
                 std::vector<StatIteration> &costRules,
-                const uint32_t limitView,
+                const size_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
                 std::vector<Literal> &heads,
-                const uint32_t iteration,
-                const uint32_t limitView,
+                const size_t iteration,
+                const size_t limitView,
                 std::vector<ResultJoinProcessor*> *finalResultContainer);
 
         size_t estimateCardTable(const Literal &literal,
@@ -136,8 +136,8 @@ class SemiNaiver {
         int nthreads;
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
-                const uint32_t iteration,
-                const uint32_t limitView,
+                const size_t iteration,
+                const size_t limitView,
                 std::vector<ResultJoinProcessor*> *finalResultContainer);
 
         virtual FCIterator getTableFromEDBLayer(const Literal & literal);
@@ -151,7 +151,7 @@ class SemiNaiver {
         virtual bool executeUntilSaturation(
                 std::vector<RuleExecutionDetails> &ruleset,
                 std::vector<StatIteration> &costRules,
-                uint32_t limitView,
+                size_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
 
         void prepare(std::vector<RuleExecutionDetails> &allrules,

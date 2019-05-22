@@ -217,7 +217,7 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
 bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
         std::vector<std::vector<RuleExecutionDetails>> &ruleset,
         std::vector<StatIteration> &costRules,
-        const uint32_t limitView,
+        const size_t limitView,
         bool fixpoint, unsigned long *timeout) {
 #if DEBUG
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
@@ -406,7 +406,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
 bool SemiNaiver::executeUntilSaturation(
         std::vector<RuleExecutionDetails> &ruleset,
         std::vector<StatIteration> &costRules,
-        const uint32_t limitView,
+        const size_t limitView,
         bool fixpoint, unsigned long *timeout) {
     size_t currentRule = 0;
     uint32_t rulesWithoutDerivation = 0;
@@ -641,7 +641,7 @@ void SemiNaiver::addDataToIDBRelation(const Predicate pred,
     table->addBlock(block);
 }
 
-bool SemiNaiver::bodyChangedSince(Rule &rule, uint32_t iteration) {
+bool SemiNaiver::bodyChangedSince(Rule &rule, size_t iteration) {
     LOG(DEBUGL) << "bodyChangedSince, iteration = " << iteration <<
         " Rule: " << rule.tostring(program, &layer);
     const std::vector<Literal> &body = rule.getBody();
@@ -657,9 +657,12 @@ bool SemiNaiver::bodyChangedSince(Rule &rule, uint32_t iteration) {
 
         PredId_t id = body[i].getPredicate().getId();
         FCTable *table = predicatesTables[id];
-        if (table == NULL || table->isEmpty() || table->getMaxIteration() < iteration) {
-            // if (iteration > 0 && (table == NULL || table->isEmpty() || table->getMaxIteration() < iteration))
-            LOG(DEBUGL) << "Continuing: old table or empty";
+        if (table == NULL || table->isEmpty()) {
+            LOG(DEBUGL) << "Continuing: empty table";
+            continue;
+        }
+        if (table->getMaxIteration() < iteration) {
+            LOG(DEBUGL) << "Continuing: old table";
             continue;
         }
         LOG(DEBUGL) << "Returns true";
@@ -671,7 +674,7 @@ bool SemiNaiver::bodyChangedSince(Rule &rule, uint32_t iteration) {
 
 bool SemiNaiver::checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
         const RuleExecutionPlan &plan,
-        uint32_t limitView,
+        size_t limitView,
         std::vector<size_t> &cards) {
     const uint8_t nBodyLiterals = (uint8_t) plan.plan.size();
     bool isOneRelEmpty = false;
@@ -765,7 +768,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
         const size_t max,
         int &processedTables,
         const bool lastLiteral,
-        const uint32_t iteration,
+        const size_t iteration,
         const RuleExecutionDetails &ruleDetails,
         const uint8_t orderExecution,
         std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
@@ -1086,7 +1089,7 @@ void SemiNaiver::saveStatistics(StatsRule &stats) {
 }
 
 bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
-        const uint32_t iteration, const uint32_t limitView,
+        const size_t iteration, const size_t limitView,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
     if (! bodyChangedSince(rule, ruleDetails.lastExecution)) {
@@ -1102,8 +1105,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 
 bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         std::vector<Literal> &heads,
-        const uint32_t iteration,
-        const uint32_t limitView,
+        const size_t iteration,
+        const size_t limitView,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
 
@@ -1278,6 +1281,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 }
             }
             if (min > max) {
+                optimalOrderIdx++;
                 continue;
             }
             LOG(DEBUGL) << "Evaluating atom " << optimalOrderIdx << " " << bodyLiteral->tostring() <<
