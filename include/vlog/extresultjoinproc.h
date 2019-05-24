@@ -51,14 +51,14 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
 
         std::unique_ptr<SemiNaiver> computeSaturation(uint64_t *row, size_t sizeRow);
 
-        bool blocked_check(bool rmfc, std::unique_ptr<SemiNaiver> &saturation, const Literal &headLiteral,
-                uint64_t *headrow, std::vector<uint8_t> &columnsToCheck);
+        bool blocked_check(bool rmfc, std::unique_ptr<SemiNaiver> &saturation);
 
         void blocked_check_computeBodyAtoms(std::vector<Literal> &output,
                 uint64_t *row);
 
         // enhanceFunctionTerms is used for RMFA as well as RMFC.
         void enhanceFunctionTerms(std::vector<Literal> &output,
+                std::vector<Literal> &toProcess,
                 uint64_t &startFreshIDs,
                 bool rmfa,
                 size_t startOutput = 0);

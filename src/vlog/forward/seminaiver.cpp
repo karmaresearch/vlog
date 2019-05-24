@@ -259,11 +259,14 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
         for (std::vector<RuleExecutionDetails>::iterator itr = allIDBRules[k].begin();
                 itr != allIDBRules[k].end();
                 ++itr) {
+#if DEBUG
             LOG(DEBUGL) << "Optimizing rule " << itr->rule.tostring(NULL, NULL);
+#endif
             itr->createExecutionPlans(checkCyclicTerms);
             itr->calculateNVarsInHeadFromEDB();
             itr->lastExecution = lastExecution;
 
+#if DEBUG
             for (int i = 0; i < itr->orderExecutions.size(); ++i) {
                 string plan = "";
                 for (int j = 0; j < itr->orderExecutions[i].plan.size(); ++j) {
@@ -273,6 +276,7 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
                 LOG(DEBUGL) << "-->" << plan;
             }
             LOG(DEBUGL) << itr->rule.tostring(program, &layer);
+#endif
         }
     }
     for (std::vector<RuleExecutionDetails>::iterator itr = allEDBRules.begin();
@@ -1117,7 +1121,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 
     if (ignoreExistentialRules && rule.isExistential()) {
         return false; //Skip the execution of existential rules if the flag is
-        //set (should be only during the execution of RMFA
+        //set (should be only during the execution of RMFA or RMFC).
     }
 
     LOG(INFOL) << "Iteration: " << iteration <<

@@ -127,16 +127,11 @@ void Checker::createCriticalInstance(Program &newProgram,
     }
 
     // Rewrite rules: all constants must be replaced with "*".
-    std::vector<std::string> newRules;
     std::vector<Rule> rules = p.getAllRules();
     for (auto rule : rules) {
         std::string ruleString = rule.toprettystring(&p, p.getKB(), true);
         LOG(DEBUGL) << "Adding rule replacing constants: " << ruleString;
-        newRules.push_back(ruleString);
-    }
-
-    for (auto rule : newRules) {
-        newProgram.parseRule(rule, false);
+        newProgram.parseRule(ruleString, false);
     }
 
     // The critical instance should have initial values for ALL predicates,
@@ -184,6 +179,28 @@ bool Checker::MSA(Program &p) {
     }
 }
 
+// Add special targets that have the head of existential rules as body, but only the non-existential variables in the head.
+// So, for instance, if we have a rule P(X,Y),Q(Y) :- R(X), then we add a rule Z(X) :- P(X,Y),Q(Y). This is for the implementation
+// of the blocked check.
+void Checker::addBlockCheckTargets(Program &p) {
+    std::vector<Rule> rules = p.getAllRules();
+    for (auto rule : rules) {
+        if (rule.isExistential()) {
+            auto newBody = rule.getHeads();
+            std::vector<uint8_t> headvars = rule.getVarsInBody();
+            std::string newPred = "__GENERATED_PRED__" + std::to_string(rule.getId());
+            Predicate newp = p.getPredicate(p.getPredicateID(newPred, headvars.size()));
+            VTuple t(headvars.size());
+            for (int i = 0; i < headvars.size(); i++) {
+                t.set(VTerm(0, headvars[i]), i);
+            }
+            std::vector<Literal> h;
+            h.push_back(Literal(newp, t));
+            p.addRule(h, newBody);
+        }
+    }
+}
+
 bool Checker::RMFA(Program &p) {
     // Create  the critical instance (cdb)
     EDBLayer *db = p.getKB();
@@ -192,6 +209,7 @@ bool Checker::RMFA(Program &p) {
     Program newProgram(&layer);
     createCriticalInstance(newProgram, p, db, layer);
 
+    addBlockCheckTargets(newProgram);
     //Launch the (special) restricted chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
             &newProgram, true, true, false, TypeChase::RESTRICTED_CHASE, 1, 0, false);
@@ -556,17 +574,23 @@ bool Checker::JA(Program &p, bool restricted) {
     return true;
 }
 
-bool Checker::MFC(Program &p, bool restricted) {
+bool Checker::MFC(Program &prg, bool restricted) {
     // First, create a copy of the rules.
     std::vector<std::string> rules;
+    Program *restrictedProgram = NULL;
+
+    Program p(&prg, prg.getKB());
+
+    if (restricted) {
+        addBlockCheckTargets(p);
+        restrictedProgram = getProgramForBlockingCheckRMFC(p);
+    }
+
     std::vector<Rule> r = p.getAllRules();
+
     for (auto rule : r) {
         std::string ruleString = rule.toprettystring(&p, p.getKB());
         rules.push_back(ruleString);
-    }
-    Program *restrictedProgram = NULL;
-    if (restricted) {
-        restrictedProgram = getProgramForBlockingCheckRMFC(p);
     }
     // Then, for each existential rule, do the MFC check.
     int ruleCount = 0;
