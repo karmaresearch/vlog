@@ -818,21 +818,19 @@ void _addIfNotExist(std::vector<Literal> &output, Literal l) {
 
 void ExistentialRuleProcessor::enhanceFunctionTerms(
         std::vector<Literal> &output,
-        std::vector<Literal> &toProcess,
         uint64_t &startFreshIDs,
         bool rmfa,
         size_t startOutput) {
-    size_t oldsize = toProcess.size();
+    size_t oldsize = output.size();
     //Check every fact until oldsize. If there is a function term, get also
     //all related facts
     LOG(DEBUGL) << "enhanceFuntionTerms, startOutput = " << startOutput << ", oldsize = " << oldsize << ", startFreshIDs = " << startFreshIDs;
     for(size_t i = startOutput; i < oldsize; ++i) {
-        const auto literal = toProcess[i];
+        const auto literal = output[i];
         for(uint8_t j = 0; j < literal.getTupleSize(); ++j) {
             const auto &term = literal.getTermAtPos(j);
             if (term.getValue() != COUNTER(term.getValue())) {
                 //This is a function term. Get rule ID
-                LOG(TRACEL) << "term.getValue() = " << term.getValue();
                 const uint64_t ruleID = GET_RULE(term.getValue());
                 auto *ruleContainer = chaseMgmt->getRuleContainer(ruleID);
                 assert(ruleContainer != NULL);
@@ -847,13 +845,11 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                 const auto &nameVars = rows->getNameArgVars();
                 std::map<uint8_t, uint64_t> mappings;
                 for(uint8_t i = 0; i < nvalues; ++i) {
-                    LOG(TRACEL) << "Add mapping " << (int) nameVars[i] << " to " << values[i];
                     mappings.insert(std::make_pair(nameVars[i], values[i]));
                 }
                 //Materialize the remaining facts giving fresh IDs to
                 //the rem. variables (only if RMFA, for RMFC, we use *).
                 auto const *rule = ruleContainer->getRule();
-                LOG(TRACEL) << "rule that produced this was " << rule->tostring(NULL, NULL);
                 for(const auto &bLiteral : rule->getBody()) {
                     VTuple t(bLiteral.getTupleSize());
                     for(uint8_t m = 0; m < bLiteral.getTupleSize(); ++m) {
@@ -879,7 +875,6 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                         }
                     }
                     _addIfNotExist(output, Literal(bLiteral.getPredicate(), t));
-                    _addIfNotExist(toProcess, Literal(bLiteral.getPredicate(), t));
                 }
                 //Also add the original variable, and consider other head atoms
                 //(but only if this is a nested call).
@@ -905,14 +900,14 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                             t.set(term, m);
                         }
                     }
-                    _addIfNotExist(toProcess, Literal(hLiteral.getPredicate(), t));
+                    _addIfNotExist(output, Literal(hLiteral.getPredicate(), t));
                 }
             }
         }
     }
     //Recursively apply the function if there are new literals
-    if (toProcess.size() > oldsize) {
-        enhanceFunctionTerms(output, toProcess, startFreshIDs, rmfa, oldsize);
+    if (output.size() > oldsize) {
+        enhanceFunctionTerms(output, startFreshIDs, rmfa, oldsize);
     }
 }
 
@@ -938,8 +933,7 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::computeSaturation(uint64_t
     uint64_t freshIDs = 1; //0 is star
 
     //Then I need to add all facts relevant to produce the function terms
-    std::vector<Literal> toProcess = input;
-    enhanceFunctionTerms(input, toProcess, freshIDs, sn->get_RMFC_program() == NULL, 0);
+    enhanceFunctionTerms(input, freshIDs, sn->get_RMFC_program() == NULL, 0);
     if (rmfc == NULL) {
         //Finally I need to saturate "input" with the datalog rules
         n = saturateInput(input, sn->getProgram(), new EDBLayer(sn->getEDBLayer(), false));

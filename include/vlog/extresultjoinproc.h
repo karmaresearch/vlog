@@ -58,7 +58,6 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
 
         // enhanceFunctionTerms is used for RMFA as well as RMFC.
         void enhanceFunctionTerms(std::vector<Literal> &output,
-                std::vector<Literal> &toProcess,
                 uint64_t &startFreshIDs,
                 bool rmfa,
                 size_t startOutput = 0);
