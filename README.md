@@ -40,7 +40,9 @@ docker run -ti karmaresearch/vlog
 
 ## Usage
 
-Please check the [Wiki](https://github.com/karmaresearch/vlog/wiki) for some instructions on how to run the program.
+Please check:
+*   the [Wiki](https://github.com/karmaresearch/vlog/wiki) for some instructions on how to run the program.
+*   a [screencast](https://iccl.inf.tu-dresden.de/w/images/1/18/Vlog-demo-iswc2016.mp4) presented at *ISWC'16, Posters and Demos*
 
 ## License
 
