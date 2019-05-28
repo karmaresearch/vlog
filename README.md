@@ -23,7 +23,7 @@ If you want to build the DEBUG version of the program, including the web interfa
 ```
 mkdir build_debug
 cd build_debug
-cmake DWEBINTERFACE=1 -DCMAKE_BUILD_TYPE=Debug ..
+cmake -DWEBINTERFACE=1 -DCMAKE_BUILD_TYPE=Debug ..
 make
 ```
 
