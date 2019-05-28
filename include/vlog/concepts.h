@@ -390,9 +390,9 @@ class Rule {
 
         bool isExistential() const;
 
-        std::vector<uint8_t> getVarsNotInBody() const;
+        std::vector<uint8_t> getVarsNotInBody() const;  // Existential variables.
 
-        std::vector<uint8_t> getVarsInBody() const;
+        std::vector<uint8_t> getVarsInBody() const; // Variables in the head that also occur in the body.
 
         const std::vector<Literal> &getBody() const {
             return body;
