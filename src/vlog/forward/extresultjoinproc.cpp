@@ -345,15 +345,11 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     }
                     tmprow[j] = columnReaders[j]->next();
                 }
-                std::unique_ptr<SemiNaiver> saturation = computeSaturation(tmprow, c.size());
 
-                if (blocked_check(sn->get_RMFC_program() != NULL, saturation)) {
+                if (blocked_check(tmprow, c.size())) {
                     blocked[i] = true;
-                    LOG(DEBUGL) << "Blocking row " << i;
                     blockedCount++;
                 }
-                EDBLayer &l = saturation->getEDBLayer();
-                delete &l;
             }
 
             if (blockedCount == sizecolumns) {
@@ -541,16 +537,12 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     }
                     tmprow[j] = columnReaders[j]->next();
                 }
-                std::unique_ptr<SemiNaiver> saturation = computeSaturation(tmprow, c.size());
 
-                if (blocked_check(sn->get_RMFC_program() != NULL, saturation)) {
+                if (blocked_check(tmprow, c.size())) {
                     //It is blocked
                     blocked[i] = true;
-                    LOG(DEBUGL) << "Blocking row " << i;
                     blockedCount++;
                 }
-                EDBLayer &l = saturation->getEDBLayer();
-                delete &l;
             }
 
             if (blockedCount == sizecolumns) {
@@ -700,22 +692,43 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     }
 }
 
-void ExistentialRuleProcessor::blocked_check_computeBodyAtoms(
+std::vector<uint64_t> ExistentialRuleProcessor::blocked_check_computeBodyAtoms(
         std::vector<Literal> &output,
         uint64_t *row) {
     const RuleExecutionPlan &plan = ruleDetails->orderExecutions[ruleExecOrder];
+#if DEBUG
+    LOG(TRACEL) << "Adding body atoms for rule " << ruleDetails->rule.tostring(NULL, NULL);
+#endif
     auto bodyAtoms = plan.plan;
     int idx = 0;
+    std::vector<uint8_t> vars = ruleDetails->rule.getVarsInBody();
+    std::vector<uint64_t> toMatch(vars.size());
+    std::vector<bool> found(vars.size());
+
     for(const auto &atom : bodyAtoms) {
         VTuple tuple(atom->getTuple());
         auto v2p = plan.vars2pos[idx];
         for(int i = 0; i < v2p.size(); ++i) {
             auto pair = v2p[i];
             tuple.set(VTerm(0, row[pair.second]), pair.first);
+            uint8_t varNo = atom->getTermAtPos(pair.first).getId();
+            for (int j = 0; j < vars.size(); j++) {
+                if (vars[j] == varNo) {
+                    if (! found[j]) {
+                        found[j] = true;
+                        toMatch[j] = row[pair.second];
+                    }
+                    break;
+                }
+            }
         }
         output.push_back(Literal(atom->getPredicate(), tuple));
+#if DEBUG
+        LOG(TRACEL) << "computeBodyAtoms: adding literal " << output[output.size()-1].tostring(NULL, NULL);
+#endif
         idx++;
     }
+    return toMatch;
 }
 
 std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::saturateInput(
@@ -824,9 +837,14 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
     size_t oldsize = output.size();
     //Check every fact until oldsize. If there is a function term, get also
     //all related facts
+#if DEBUG
     LOG(DEBUGL) << "enhanceFuntionTerms, startOutput = " << startOutput << ", oldsize = " << oldsize << ", startFreshIDs = " << startFreshIDs;
+#endif
     for(size_t i = startOutput; i < oldsize; ++i) {
         const auto literal = output[i];
+#if DEBUG
+        LOG(TRACEL) << "Processing literal " << literal.tostring(NULL, NULL);
+#endif
         for(uint8_t j = 0; j < literal.getTupleSize(); ++j) {
             const auto &term = literal.getTermAtPos(j);
             if (term.getValue() != COUNTER(term.getValue())) {
@@ -844,7 +862,7 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                 //Map them to variables
                 const auto &nameVars = rows->getNameArgVars();
                 std::map<uint8_t, uint64_t> mappings;
-                for(uint8_t i = 0; i < nvalues; ++i) {
+                for(int i = 0; i < nvalues; ++i) {
                     mappings.insert(std::make_pair(nameVars[i], values[i]));
                 }
                 //Materialize the remaining facts giving fresh IDs to
@@ -877,31 +895,34 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                     _addIfNotExist(output, Literal(bLiteral.getPredicate(), t));
                 }
                 //Also add the original variable, and consider other head atoms
-                //(but only if this is a nested call).
-                assert(!mappings.count(varID));
-                mappings.insert(std::make_pair(varID, term.getValue()));
+                //if (startOutput > 0) {
+                    assert(!mappings.count(varID));
+                    mappings.insert(std::make_pair(varID, term.getValue()));
 
-                for(const auto &hLiteral : rule->getHeads()) {
-                    if (hLiteral.getPredicate().getId() ==
-                            literal.getPredicate().getId()) {
-                        continue;
-                    }
-                    VTuple t(hLiteral.getTupleSize());
-                    for(uint8_t m = 0; m < hLiteral.getTupleSize(); ++m) {
-                        const VTerm term = hLiteral.getTermAtPos(m);
-                        if (term.isVariable()) {
-                            uint8_t varID = term.getId();
-                            if (!mappings.count(varID)) {
-                                LOG(ERRORL) << "There are existential variables not defined. Must implement their retrievals";
-                                throw 10;
-                            }
-                            t.set(VTerm(0, mappings[varID]), m);
-                        } else {
-                            t.set(term, m);
+                    for(const auto &hLiteral : rule->getHeads()) {
+                        /*
+                        if (hLiteral.getPredicate().getId() ==
+                                literal.getPredicate().getId()) {
+                            continue;
                         }
+                        */
+                        VTuple t(hLiteral.getTupleSize());
+                        for(uint8_t m = 0; m < hLiteral.getTupleSize(); ++m) {
+                            const VTerm term = hLiteral.getTermAtPos(m);
+                            if (term.isVariable()) {
+                                uint8_t varID = term.getId();
+                                if (!mappings.count(varID)) {
+                                    LOG(ERRORL) << "There are existential variables not defined. Must implement their retrievals";
+                                    throw 10;
+                                }
+                                t.set(VTerm(0, mappings[varID]), m);
+                            } else {
+                                t.set(term, m);
+                            }
+                        }
+                        _addIfNotExist(output, Literal(hLiteral.getPredicate(), t));
                     }
-                    _addIfNotExist(output, Literal(hLiteral.getPredicate(), t));
-                }
+                //}
             }
         }
     }
@@ -911,12 +932,18 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
     }
 }
 
-std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::computeSaturation(uint64_t *row,
+bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
         size_t sizeRow) {
     //For RMFC, we need to replace all non-skolem constants with *.
     uint64_t newrow[256];
     Program *rmfc = sn->get_RMFC_program();
     if (rmfc != NULL) {
+        if (ruleDetails->lastExecution <= 0) {
+            // We need one execution of this rule to introduce a skolem constant. Otherwise, it would immediately be blocked
+            // by the critical instance.
+            LOG(DEBUGL) << "blocked_check returns false";
+            return false;
+        }
         for (int i = 0; i < sizeRow; i++) {
             newrow[i] = (row[i] & RULEVARMASK) != 0 ? row[i] : 0;
         }
@@ -925,9 +952,9 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::computeSaturation(uint64_t
 
     std::vector<Literal> input; //"input" corresponds to B_\rho,\sigma in the paper
     //First I need to add to body atoms
-    blocked_check_computeBodyAtoms(input, row);
+    std::vector<uint64_t> toMatch = blocked_check_computeBodyAtoms(input, row);
 
-    std::unique_ptr<SemiNaiver> n;
+    std::unique_ptr<SemiNaiver> saturation;
 
     //Get a starting value for the fresh IDs
     uint64_t freshIDs = 1; //0 is star
@@ -936,7 +963,7 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::computeSaturation(uint64_t
     enhanceFunctionTerms(input, freshIDs, sn->get_RMFC_program() == NULL, 0);
     if (rmfc == NULL) {
         //Finally I need to saturate "input" with the datalog rules
-        n = saturateInput(input, sn->getProgram(), new EDBLayer(sn->getEDBLayer(), false));
+        saturation = saturateInput(input, sn->getProgram(), new EDBLayer(sn->getEDBLayer(), false));
     } else {
         EDBLayer *layer = new EDBLayer(*(rmfc->getKB()), true);
         // Exclusion of rule ρ⋆ under substitution σ⋆
@@ -949,40 +976,44 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::computeSaturation(uint64_t
             tupl.set(VTerm(0, row[i]), i);
         }
         input.push_back(Literal(lastLit.getPredicate(), tupl));
+#if DEBUG
         LOG(DEBUGL) << "Adding exclusion info for rule " << rule.tostring(rmfc, layer) << ": " << input.back().tostring(rmfc, layer);
+#endif
 
-        n = saturateInput(input, rmfc, layer);
+        saturation = saturateInput(input, rmfc, layer);
     }
 
-    return n;
-}
-
-bool ExistentialRuleProcessor::blocked_check(
-        bool rmfc,
-        std::unique_ptr<SemiNaiver> &saturation) {
-    if (rmfc && ruleDetails->lastExecution <= 0) {
-        // We need one execution of this rule to introduce a skolem constant. Otherwise, it would immediately be blocked
-        // by the critical instance.
-        return false;
-    }
     // Now, check our special rule (see cycles/checker.cpp).
     std::string specialPredicate = "__GENERATED_PRED__" + std::to_string(ruleDetails->rule.getId());
     PredId_t pred = saturation->getProgram()->getPredicate(specialPredicate).getId();
 
-    //Check if the head is blocked in this set, i.e., if this predicate has any derivations.
+    //Check if the head is blocked in this set, i.e., if this predicate has matching derivations.
     auto itr = saturation->getTable(pred);
     bool found = false;
     while ( ! found && !itr.isEmpty()) {
         auto table = itr.getCurrentTable();
         //Iterate over the content of the table
         auto tbItr = table->getIterator();
-        if (tbItr->hasNext()) {
+        assert(tbItr->getNColumns() == toMatch.size());
+        while (tbItr->hasNext()) {
+            tbItr->next();
             found = true;
+            for (int i = 0; i < toMatch.size(); i++) {
+                if (toMatch[i] != tbItr->getCurrentValue(i)) {
+                    found = false;
+                    break;
+                }
+            }
         }
         table->releaseIterator(tbItr);
         itr.moveNextCount();
     }
+
+    EDBLayer &l = saturation->getEDBLayer();
+    delete &l;
+
     LOG(DEBUGL) << "blocked_check returns " << found;
+
     return found;
 }
 
@@ -1031,14 +1062,10 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                         }
                         tmprow[j] = segmentReaders[j]->next();
                     }
-                    std::unique_ptr<SemiNaiver> saturation = computeSaturation(tmprow, segmentSize);
-                    if (blocked_check(sn->get_RMFC_program() != NULL, saturation)) { //Is it blocked?
+                    if (blocked_check(tmprow, segmentSize)) { //Is it blocked?
                         blocked[i] = true;
-                        LOG(DEBUGL) << "Blocking row " << i;
                         blockedCount++;
                     }
-                    EDBLayer &l = saturation->getEDBLayer();
-                    delete &l;
                 }
 
                 if (blockedCount == nrows) {
