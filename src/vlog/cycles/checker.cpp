@@ -76,7 +76,7 @@ static void addIDBCritical(Program &p, EDBLayer *db) {
         if (pred.getType() == IDB) {
             std::string name = p.getPredicateName(v);
             LOG(DEBUGL) << "addIDBCritical: " << name;
-            if (name.find("__EXCLUDE_DUMMY__") == 0) {
+            if (name.find("__EXCLUDE_DUMMY__") == 0 || name.find("__GENERATED_PRED__") == 0) {
                 LOG(DEBUGL) << "Continuing";
                 continue;
             }
@@ -124,6 +124,7 @@ void Checker::createCriticalInstance(Program &newProgram,
         }
         facts.push_back(fact);
         layer.addInmemoryTable(db->getPredName(p), facts);
+        LOG(DEBUGL) << "Adding inmemorytable for " << db->getPredName(p);
     }
 
     // Rewrite rules: all constants must be replaced with "*".
@@ -189,10 +190,10 @@ void Checker::addBlockCheckTargets(Program &p) {
             auto newBody = rule.getHeads();
             std::vector<uint8_t> headvars = rule.getVarsInBody();
             std::string newPred = "__GENERATED_PRED__" + std::to_string(rule.getId());
-            Predicate newp = p.getPredicate(p.getPredicateID(newPred, headvars.size()));
+            Predicate newp = p.getPredicate(p.getOrAddPredicate(newPred, headvars.size()));
             VTuple t(headvars.size());
             for (int i = 0; i < headvars.size(); i++) {
-                t.set(VTerm(0, headvars[i]), i);
+                t.set(VTerm(headvars[i], 0), i);
             }
             std::vector<Literal> h;
             h.push_back(Literal(newp, t));
@@ -576,10 +577,13 @@ bool Checker::JA(Program &p, bool restricted) {
 
 bool Checker::MFC(Program &prg, bool restricted) {
     // First, create a copy of the rules.
-    std::vector<std::string> rules;
     Program *restrictedProgram = NULL;
 
     Program p(&prg, prg.getKB());
+    for (auto rule: prg.getAllRules()) {
+        p.addRule(rule.getHeads(), rule.getBody());
+        LOG(DEBUGL) << "MFC: Added rule " << rule.tostring(NULL, NULL);
+    }
 
     if (restricted) {
         addBlockCheckTargets(p);
@@ -588,6 +592,7 @@ bool Checker::MFC(Program &prg, bool restricted) {
 
     std::vector<Rule> r = p.getAllRules();
 
+    std::vector<std::string> rules;
     for (auto rule : r) {
         std::string ruleString = rule.toprettystring(&p, p.getKB());
         rules.push_back(ruleString);
@@ -622,8 +627,9 @@ bool Checker::MFC(Program &prg, bool restricted) {
 
             for (auto pair : edbSet) {
                 std::string edbName = "__DUMMY__" + std::to_string(pair.first);
-                layer.addInmemoryTable(edbName, pair.second);
                 int cardinality = pair.second[0].size();
+                PredId_t predId = p.getOrAddPredicate(edbName, cardinality);
+                layer.addInmemoryTable(edbName, predId, pair.second);
                 std::string rule = p.getPredicateName(pair.first) + "(";
                 std::string paramList = "";
                 for (int i = 0; i < cardinality; i++) {
@@ -646,7 +652,7 @@ bool Checker::MFC(Program &prg, bool restricted) {
             }
 
             // Now create a new program, and materialize. But: don't apply rules to recursive terms.
-            Program newProgram(&layer);
+            Program newProgram(&p, &layer);
             int count = 0;
             for (auto rule : newRules) {
                 LOG(DEBUGL) << "Adding rule: \"" << rule << "\"";
