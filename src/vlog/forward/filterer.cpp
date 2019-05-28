@@ -29,7 +29,7 @@ bool TableFilterer::producedDerivationInPreviousSteps(
         const FCBlock *block) {
 
     const RuleExecutionDetails *rule = block->rule;
-    if (rule == NULL || rule->nIDBs == 0) {
+    if (rule == NULL || rule->nIDBs == 0 || rule->rule.isExistential()) {
         return false;
     }
 
@@ -37,16 +37,22 @@ bool TableFilterer::producedDerivationInPreviousSteps(
     std::vector<Substitution> subs;
     int nsubs = Literal::getSubstitutionsA2B(subs,
             rule->rule.getHead(block->posQueryInRule), currentQuery);
+#if DEBUG
     assert(nsubs != -1);
+    LOG(DEBUGL) << "head = " << rule->rule.getHead(block->posQueryInRule).tostring(NULL, NULL)
+        << ", current = " << currentQuery.tostring(NULL, NULL) << ", output = " << outputQuery.tostring(NULL, NULL);
+#endif
 
     for (const auto &lit : rule->rule.getBody()) {
         if (lit.getPredicate().getType() == IDB) {
             const Literal subsChild = lit.substitutes(subs);
+#if DEBUG
+            LOG(DEBUGL) << "subs = " << subsChild.tostring(NULL, NULL);
+#endif
             if (subsChild == outputQuery) {
                 //LOG(INFOL) << "SIMPLEPRUNING ok";
                 return true;
             }
-
         }
     }
     return false;
