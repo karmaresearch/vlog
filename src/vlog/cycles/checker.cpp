@@ -660,9 +660,7 @@ bool Checker::MFC(Program &prg, bool restricted) {
                 count++;
             }
             std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-                    // &newProgram, true, true, false, restricted ? TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE, 1, 0, false, restrictedProgram);
-                    // RMFC check should be done on skolemized rules.
-                    &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 0, false, restrictedProgram);
+                    &newProgram, true, true, false, restricted ? TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE, 1, 0, false, restrictedProgram);
             sn->checkAcyclicity(ruleCount);
             // If we produce a cyclic term FOR THIS RULE, we have MFC.
             if (sn->isFoundCyclicTerms()) {
