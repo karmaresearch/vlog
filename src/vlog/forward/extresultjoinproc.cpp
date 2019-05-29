@@ -832,15 +832,12 @@ void _addIfNotExist(std::vector<Literal> &output, Literal l) {
 void ExistentialRuleProcessor::enhanceFunctionTerms(
         std::vector<Literal> &output,
         uint64_t &startFreshIDs,
-        bool rmfa,
-        size_t startOutput) {
-    size_t oldsize = output.size();
-    //Check every fact until oldsize. If there is a function term, get also
-    //all related facts
+        bool rmfa) {
+    //If there is a function term, get also all related facts
 #if DEBUG
-    LOG(DEBUGL) << "enhanceFuntionTerms, startOutput = " << startOutput << ", oldsize = " << oldsize << ", startFreshIDs = " << startFreshIDs;
+    LOG(DEBUGL) << "enhanceFuntionTerms, startFreshIDs = " << startFreshIDs;
 #endif
-    for(size_t i = startOutput; i < oldsize; ++i) {
+    for(size_t i = 0; i < output.size(); ++i) {
         const auto literal = output[i];
 #if DEBUG
         LOG(TRACEL) << "Processing literal " << literal.tostring(NULL, NULL);
@@ -895,40 +892,34 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                     _addIfNotExist(output, Literal(bLiteral.getPredicate(), t));
                 }
                 //Also add the original variable, and consider other head atoms
-                //if (startOutput > 0) {
-                    assert(!mappings.count(varID));
-                    mappings.insert(std::make_pair(varID, term.getValue()));
+                assert(!mappings.count(varID));
+                mappings.insert(std::make_pair(varID, term.getValue()));
 
-                    for(const auto &hLiteral : rule->getHeads()) {
-                        /*
-                        if (hLiteral.getPredicate().getId() ==
-                                literal.getPredicate().getId()) {
-                            continue;
-                        }
-                        */
-                        VTuple t(hLiteral.getTupleSize());
-                        for(uint8_t m = 0; m < hLiteral.getTupleSize(); ++m) {
-                            const VTerm term = hLiteral.getTermAtPos(m);
-                            if (term.isVariable()) {
-                                uint8_t varID = term.getId();
-                                if (!mappings.count(varID)) {
-                                    LOG(ERRORL) << "There are existential variables not defined. Must implement their retrievals";
-                                    throw 10;
-                                }
-                                t.set(VTerm(0, mappings[varID]), m);
-                            } else {
-                                t.set(term, m);
-                            }
-                        }
-                        _addIfNotExist(output, Literal(hLiteral.getPredicate(), t));
+                for(const auto &hLiteral : rule->getHeads()) {
+                    /*
+                    if (hLiteral.getPredicate().getId() ==
+                            literal.getPredicate().getId()) {
+                        continue;
                     }
-                //}
+                    */
+                    VTuple t(hLiteral.getTupleSize());
+                    for(uint8_t m = 0; m < hLiteral.getTupleSize(); ++m) {
+                        const VTerm term = hLiteral.getTermAtPos(m);
+                        if (term.isVariable()) {
+                            uint8_t varID = term.getId();
+                            if (!mappings.count(varID)) {
+                                LOG(ERRORL) << "There are existential variables not defined. Must implement their retrievals";
+                                throw 10;
+                            }
+                            t.set(VTerm(0, mappings[varID]), m);
+                        } else {
+                            t.set(term, m);
+                        }
+                    }
+                    _addIfNotExist(output, Literal(hLiteral.getPredicate(), t));
+                }
             }
         }
-    }
-    //Recursively apply the function if there are new literals
-    if (output.size() > oldsize) {
-        enhanceFunctionTerms(output, startFreshIDs, rmfa, oldsize);
     }
 }
 
@@ -960,7 +951,7 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
     uint64_t freshIDs = 1; //0 is star
 
     //Then I need to add all facts relevant to produce the function terms
-    enhanceFunctionTerms(input, freshIDs, sn->get_RMFC_program() == NULL, 0);
+    enhanceFunctionTerms(input, freshIDs, sn->get_RMFC_program() == NULL);
     if (rmfc == NULL) {
         //Finally I need to saturate "input" with the datalog rules
         saturation = saturateInput(input, sn->getProgram(), new EDBLayer(sn->getEDBLayer(), false));
