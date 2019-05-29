@@ -325,31 +325,9 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         }
     }
 
-    if (chaseMgmt->isRestricted()) {
+    if (chaseMgmt->isRestricted() || sn->get_RMFC_program() != NULL) {
         std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
         int count = 0;
-        for(const auto &at : atomTables) {
-            const auto &h = at->getLiteral();
-            FCTable *t = sn->getTable(h.getPredicate().getId(),
-                    h.getPredicate().getCardinality());
-            filterDerivations(h, t, row, count, ruleDetails, nKnownColumns,
-                    posKnownColumns, c, sizecolumns, filterRows);
-            count += h.getTupleSize();
-        }
-
-        if (filterRows.size() == sizecolumns * atomTables.size()) {
-            return; //every substitution already exists in the database. Nothing
-            //new can be derived.
-        }
-
-        //Filter out the potential values for the derivation
-        //(only restricted chase can do it)
-        if (!filterRows.empty()) {
-            retainNonExisting(filterRows, sizecolumns, c);
-        }
-
-        filterRows.clear();
-
         if (chaseMgmt->isCheckCyclicMode()) {
             std::vector<bool> blocked(sizecolumns);
             size_t blockedCount = 0;
@@ -377,7 +355,6 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
             if (blockedCount == sizecolumns) {
                 return;
             }
-
             for (size_t i = 0; i < sizecolumns; i++) {
                 if (blocked[i]) {
                     for (int j = 0; j < atomTables.size(); j++) {
@@ -385,16 +362,26 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     }
                 }
             }
-
-            if (filterRows.size() == sizecolumns * atomTables.size()) {
-                return; //every remaining substitution is blocked.
+        } else {
+            for(const auto &at : atomTables) {
+                const auto &h = at->getLiteral();
+                FCTable *t = sn->getTable(h.getPredicate().getId(),
+                        h.getPredicate().getCardinality());
+                filterDerivations(h, t, row, count, ruleDetails, nKnownColumns,
+                        posKnownColumns, c, sizecolumns, filterRows);
+                count += h.getTupleSize();
             }
+        }
 
-            //Filter out the potential values for the derivation
-            //(only restricted chase can do it)
-            if (!filterRows.empty()) {
-                retainNonExisting(filterRows, sizecolumns, c);
-            }
+        if (filterRows.size() == sizecolumns * atomTables.size()) {
+            return; //every substitution already exists in the database. Nothing
+            //new can be derived.
+        }
+
+        //Filter out the potential values for the derivation
+        //(only restricted chase can do it)
+        if (!filterRows.empty()) {
+            retainNonExisting(filterRows, sizecolumns, c);
         }
     }
 
@@ -530,32 +517,9 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         return;
     }
 
-    if (chaseMgmt->isRestricted()) {
+    if (chaseMgmt->isRestricted()  || sn->get_RMFC_program() != NULL) {
         std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
         int count = 0;
-
-        for(const auto &at : atomTables) {
-            const auto &h = at->getLiteral();
-            FCTable *t = sn->getTable(h.getPredicate().getId(),
-                    h.getPredicate().getCardinality());
-            filterDerivations(h, t, row, count, ruleDetails, nCopyFromSecond,
-                    posFromSecond, c, sizecolumns, filterRows);
-            count += h.getTupleSize();
-        }
-
-        if (filterRows.size() == sizecolumns * atomTables.size()) {
-            return; //every substitution already exists in the database. Nothing
-            //new can be derived.
-        }
-
-        //Filter out the potential values for the derivation
-        //(only restricted chase can do it)
-        if (!filterRows.empty()) {
-            retainNonExisting(filterRows, sizecolumns, c);
-        }
-
-        filterRows.clear();
-
         if (chaseMgmt->isCheckCyclicMode()) {
             std::vector<bool> blocked(sizecolumns);
             size_t blockedCount = 0;
@@ -591,17 +555,26 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     }
                 }
             }
-
-            if (filterRows.size() == sizecolumns * atomTables.size()) {
-                return; //every substitution already exists in the database. Nothing
-                //new can be derived.
+        } else {
+            for(const auto &at : atomTables) {
+                const auto &h = at->getLiteral();
+                FCTable *t = sn->getTable(h.getPredicate().getId(),
+                        h.getPredicate().getCardinality());
+                filterDerivations(h, t, row, count, ruleDetails, nCopyFromSecond,
+                        posFromSecond, c, sizecolumns, filterRows);
+                count += h.getTupleSize();
             }
+        }
 
-            //Filter out the potential values for the derivation
-            //(only restricted chase can do it)
-            if (!filterRows.empty()) {
-                retainNonExisting(filterRows, sizecolumns, c);
-            }
+        if (filterRows.size() == sizecolumns * atomTables.size()) {
+            return; //every substitution already exists in the database. Nothing
+            //new can be derived.
+        }
+
+        //Filter out the potential values for the derivation
+        //(only restricted chase can do it)
+        if (!filterRows.empty()) {
+            retainNonExisting(filterRows, sizecolumns, c);
         }
     }
 
@@ -859,12 +832,15 @@ void _addIfNotExist(std::vector<Literal> &output, Literal l) {
 void ExistentialRuleProcessor::enhanceFunctionTerms(
         std::vector<Literal> &output,
         uint64_t &startFreshIDs,
-        bool rmfa) {
-    // If there is a function term, get also all related facts
+        bool rmfa,
+        size_t startOutput) {
+    size_t oldsize = output.size();
+    //Check every fact until oldsize. If there is a function term, get also
+    //all related facts
 #if DEBUG
-    LOG(DEBUGL) << "enhanceFuntionTerms, startFreshIDs = " << startFreshIDs;
+    LOG(DEBUGL) << "enhanceFuntionTerms, startOutput = " << startOutput << ", oldsize = " << oldsize << ", startFreshIDs = " << startFreshIDs;
 #endif
-    for(size_t i = 0; i < output.size(); ++i) {
+    for(size_t i = startOutput; i < oldsize; ++i) {
         const auto literal = output[i];
 #if DEBUG
         LOG(TRACEL) << "Processing literal " << literal.tostring(NULL, NULL);
@@ -919,34 +895,40 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                     _addIfNotExist(output, Literal(bLiteral.getPredicate(), t));
                 }
                 //Also add the original variable, and consider other head atoms
-                assert(!mappings.count(varID));
-                mappings.insert(std::make_pair(varID, term.getValue()));
+                //if (startOutput > 0) {
+                    assert(!mappings.count(varID));
+                    mappings.insert(std::make_pair(varID, term.getValue()));
 
-                for(const auto &hLiteral : rule->getHeads()) {
-                    /*
-                    if (hLiteral.getPredicate().getId() ==
-                            literal.getPredicate().getId()) {
-                        continue;
-                    }
-                    */
-                    VTuple t(hLiteral.getTupleSize());
-                    for(uint8_t m = 0; m < hLiteral.getTupleSize(); ++m) {
-                        const VTerm term = hLiteral.getTermAtPos(m);
-                        if (term.isVariable()) {
-                            uint8_t varID = term.getId();
-                            if (!mappings.count(varID)) {
-                                LOG(ERRORL) << "There are existential variables not defined. Must implement their retrievals";
-                                throw 10;
-                            }
-                            t.set(VTerm(0, mappings[varID]), m);
-                        } else {
-                            t.set(term, m);
+                    for(const auto &hLiteral : rule->getHeads()) {
+                        /*
+                        if (hLiteral.getPredicate().getId() ==
+                                literal.getPredicate().getId()) {
+                            continue;
                         }
+                        */
+                        VTuple t(hLiteral.getTupleSize());
+                        for(uint8_t m = 0; m < hLiteral.getTupleSize(); ++m) {
+                            const VTerm term = hLiteral.getTermAtPos(m);
+                            if (term.isVariable()) {
+                                uint8_t varID = term.getId();
+                                if (!mappings.count(varID)) {
+                                    LOG(ERRORL) << "There are existential variables not defined. Must implement their retrievals";
+                                    throw 10;
+                                }
+                                t.set(VTerm(0, mappings[varID]), m);
+                            } else {
+                                t.set(term, m);
+                            }
+                        }
+                        _addIfNotExist(output, Literal(hLiteral.getPredicate(), t));
                     }
-                    _addIfNotExist(output, Literal(hLiteral.getPredicate(), t));
-                }
+                //}
             }
         }
+    }
+    //Recursively apply the function if there are new literals
+    if (output.size() > oldsize) {
+        enhanceFunctionTerms(output, startFreshIDs, rmfa, oldsize);
     }
 }
 
@@ -978,7 +960,7 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
     uint64_t freshIDs = 1; //0 is star
 
     //Then I need to add all facts relevant to produce the function terms
-    enhanceFunctionTerms(input, freshIDs, sn->get_RMFC_program() == NULL);
+    enhanceFunctionTerms(input, freshIDs, sn->get_RMFC_program() == NULL, 0);
     if (rmfc == NULL) {
         //Finally I need to saturate "input" with the datalog rules
         saturation = saturateInput(input, sn->getProgram(), new EDBLayer(sn->getEDBLayer(), false));
@@ -1057,7 +1039,7 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
         }
 
         //If the chase is restricted, we must first remove data
-        if (chaseMgmt->isRestricted()) {
+        if (chaseMgmt->isRestricted()  || sn->get_RMFC_program() != NULL) {
             std::vector<uint64_t> filterRows;
             int count = 0;
             if (chaseMgmt->isCheckCyclicMode()) {
@@ -1065,9 +1047,11 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                 const uint8_t segmentSize = unfilterdSegment->getNColumns();
                 std::vector<bool> blocked(nrows);
                 uint64_t tmprow[256];
+                std::vector<std::shared_ptr<Column>> segmentColumns;
                 std::vector<std::unique_ptr<ColumnReader>> segmentReaders;
                 for(uint8_t i = 0; i < segmentSize; ++i) {
-                    segmentReaders.push_back(unfilterdSegment->getColumn(i)->getReader());
+                    segmentColumns.push_back(unfilterdSegment->getColumn(i));
+                    segmentReaders.push_back(segmentColumns.back()->getReader());
                 }
 
                 for (size_t i = 0; i < nrows; ++i) {
@@ -1095,44 +1079,34 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                         }
                     }
                 }
-                if (filterRows.size() == nrows * atomTables.size()) {
-                    tmpRelation = std::unique_ptr<SegmentInserter>();
-                    return; //every substitution already exists in the database.
-                    // Nothing new can be derived.
-                }
-                //Filter out only valid subs
-                if (!filterRows.empty()) {
-                    retainNonExisting(filterRows, nrows, allColumns);
-                }
-                filterRows.clear();
-            }
-
-            for(const auto &at : atomTables) {
-                const auto &h = at->getLiteral();
-                std::vector<std::shared_ptr<Column>> tobeRetained;
-                std::vector<uint8_t> columnsToCheck;
-                for(int i = 0; i < h.getTupleSize(); ++i) {
-                    tobeRetained.push_back(allColumns[count + i]);
-                    if (h.getTermAtPos(i).isVariable()) {
-                        //It is not a existential variable
-                        if (!posExtColumns.count(h.getTermAtPos(i).getId())) {
-                            columnsToCheck.push_back(i);
-                        } else {
-                            assert(allColumns[count + i] == NULL);
-                            //Add a dummy column
-                            tobeRetained[tobeRetained.size() - 1] =
-                                std::shared_ptr<Column>(
-                                        new CompressedColumn(0,
-                                            nrows));
+            } else {
+                for(const auto &at : atomTables) {
+                    const auto &h = at->getLiteral();
+                    std::vector<std::shared_ptr<Column>> tobeRetained;
+                    std::vector<uint8_t> columnsToCheck;
+                    for(int i = 0; i < h.getTupleSize(); ++i) {
+                        tobeRetained.push_back(allColumns[count + i]);
+                        if (h.getTermAtPos(i).isVariable()) {
+                            //It is not a existential variable
+                            if (!posExtColumns.count(h.getTermAtPos(i).getId())) {
+                                columnsToCheck.push_back(i);
+                            } else {
+                                assert(allColumns[count + i] == NULL);
+                                //Add a dummy column
+                                tobeRetained[tobeRetained.size() - 1] =
+                                    std::shared_ptr<Column>(
+                                            new CompressedColumn(0,
+                                                nrows));
+                            }
                         }
                     }
+                    FCTable *t = sn->getTable(h.getPredicate().getId(),
+                            h.getPredicate().getCardinality());
+                    filterDerivations(t, tobeRetained,
+                            columnsToCheck,
+                            filterRows);
+                    count += h.getTupleSize();
                 }
-                FCTable *t = sn->getTable(h.getPredicate().getId(),
-                        h.getPredicate().getCardinality());
-                filterDerivations(t, tobeRetained,
-                        columnsToCheck,
-                        filterRows);
-                count += h.getTupleSize();
             }
 
             if (filterRows.size() == nrows * atomTables.size()) {
