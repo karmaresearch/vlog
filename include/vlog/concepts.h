@@ -300,7 +300,7 @@ class Literal {
         static int getSubstitutionsA2B(
                 std::vector<Substitution> &substitutions, const Literal &a, const Literal &b);
 
-        Literal substitutes(std::vector<Substitution> &substitions) const;
+        Literal substitutes(std::vector<Substitution> &substitions, int *nsubs = NULL) const;
 
         bool sameVarSequenceAs(const Literal &l) const;
 

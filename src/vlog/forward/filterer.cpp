@@ -29,7 +29,7 @@ bool TableFilterer::producedDerivationInPreviousSteps(
         const FCBlock *block) {
 
     const RuleExecutionDetails *rule = block->rule;
-    if (rule == NULL || rule->nIDBs == 0 || rule->rule.isExistential()) {
+    if (rule == NULL || rule->nIDBs == 0) {
         return false;
     }
 
@@ -44,12 +44,16 @@ bool TableFilterer::producedDerivationInPreviousSteps(
 #endif
 
     for (const auto &lit : rule->rule.getBody()) {
-        if (lit.getPredicate().getType() == IDB) {
-            const Literal subsChild = lit.substitutes(subs);
+        if (lit.getPredicate().getId() == outputQuery.getPredicate().getId()) {
+            int ns;
+            int nv = lit.getNVars();
+            const Literal subsChild = lit.substitutes(subs, &ns);
 #if DEBUG
             LOG(DEBUGL) << "subs = " << subsChild.tostring(NULL, NULL);
 #endif
-            if (subsChild == outputQuery) {
+            if (ns == nv && subsChild == outputQuery) {
+                // Note: this is only correct if all variables in the literal have been substituted.
+                // Otherwise, this could be a coincidental match.
                 //LOG(INFOL) << "SIMPLEPRUNING ok";
                 return true;
             }

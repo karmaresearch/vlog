@@ -333,8 +333,9 @@ int Literal::getSubstitutionsA2B(std::vector<Substitution> &substitutions,
     return substitutions.size();
 }
 
-Literal Literal::substitutes(std::vector<Substitution> &subs) const {
+Literal Literal::substitutes(std::vector<Substitution> &subs, int *nsubs) const {
     VTuple newTuple((uint8_t) this->tuple.getSize());
+    int ns = 0;
     for (uint8_t i = 0; i < newTuple.getSize(); ++i) {
         bool found = false;
         int j = 0;
@@ -347,9 +348,13 @@ Literal Literal::substitutes(std::vector<Substitution> &subs) const {
         }
         if (found) {
             newTuple.set(subs[j].destination, i);
+            ns++;
         } else {
             newTuple.set(tuple.get(i), i);
         }
+    }
+    if (nsubs != NULL) {
+        *nsubs = ns;
     }
     return Literal(pred, newTuple);
 }
