@@ -14,17 +14,30 @@ cmake ..
 make
 ```
 
-External libraries should be automatically downloaded and installed in the same directory. The only library that should be already installed is zlib, which is necessary to read gzip files. This library is usually already present by default.
+### Dependencies
+*   zlib
+*   bison (3.0 or higher)
+*   flex (2.6 or higher)
+*   Other external libraries should be automatically downloaded and installed in the same directory.
 
-To enable the web-interface, you need to use the -DWEBINTERFACE=1 option to cmake.
+### Options for cmake
+*   `-DWEBINTERFACE=1` to enable the web interface
+*   `-DCMAKE_BUILD_TYPE=Debug` to build the DEBUG version of the program
+*   `-DSPARQL=1` to support SPARQL queries to external data sources
+*   `-DJAVA=1` to build the java modules
+*   For other options, please check the file `CMakeLists.txt`
 
-If you want to build the DEBUG version of the program, including the web interface: proceed as follows:
+#### Example
+
+In this example we show how to install VLog in debug mode, with support for the web interface from the command line.
 
 ```
-mkdir build_debug
-cd build_debug
-cmake -DWEBINTERFACE=1 -DCMAKE_BUILD_TYPE=Debug ..
-make
+$ git clone https://github.com/karmaresearch/vlog.git
+$ cd vlog
+$ mkdir build_debug
+$ cd build_debug
+$ cmake -DWEBINTERFACE=1 -DCMAKE_BUILD_TYPE=Debug ..
+$ make -j
 ```
 
 ## Docker
