@@ -23,7 +23,7 @@ If you want to build the DEBUG version of the program, including the web interfa
 ```
 mkdir build_debug
 cd build_debug
-cmake DWEBINTERFACE=1 -DCMAKE_BUILD_TYPE=Debug ..
+cmake -DWEBINTERFACE=1 -DCMAKE_BUILD_TYPE=Debug ..
 make
 ```
 
@@ -40,7 +40,9 @@ docker run -ti karmaresearch/vlog
 
 ## Usage
 
-Please check the [Wiki](https://github.com/karmaresearch/vlog/wiki) for some instructions on how to run the program.
+Please check:
+*   the [Wiki](https://github.com/karmaresearch/vlog/wiki) for some instructions on how to run the program.
+*   a [screencast](https://iccl.inf.tu-dresden.de/w/images/1/18/Vlog-demo-iswc2016.mp4) presented at *ISWC'16, Posters and Demos*
 
 ## License
 
