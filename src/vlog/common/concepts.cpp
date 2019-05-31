@@ -886,6 +886,7 @@ void Program::parseAST(MC::RuleAST *root, bool rewriteMultihead, Dictionary *dic
         Rule r = Rule(allrules.size(), listOfHeadLiterals, listOfBodyLiterals);
         addRule(r, rewriteMultihead);
         //LOG(DEBUGL) <<  "L. rule parsing completed";
+        LOG(DEBUGL) <<  "Adding rule: "<< r.toprettystring(this, this->kb, false);
     } else if (type == "LISTOFLITERALS") {
         //LOG(DEBUGL) <<  "L. starting listofliterals parsing";
         MC::RuleAST *firstLiteral = root->getFirst();
