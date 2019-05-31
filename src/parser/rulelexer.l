@@ -49,13 +49,6 @@ neg\_ {return(token::NEGATE);}
 ~     {return(token::NEGATE);}
 
 [a-z][a-zA-Z0-9]* {
-                     /**
-                     * Section 10.1.5.1 of the 3.0.2 Bison Manual says the
-                     * following should work:
-                     * yylval.build( yytext );
-                     * but it doesn't.
-                     * ref: http://goo.gl/KLn0w2
-                     */
                      yylval->build< std::string >( yytext );
                      return(token::LOWERWORD);
                      }
@@ -65,7 +58,6 @@ neg\_ {return(token::NEGATE);}
 [A-Z][a-zA-Z0-9]* {  yylval->build< std::string >( yytext );
                      return(token::UPPERWORD);
                      }
-\"         {return(token::LEFTPAR);}
 \(         {return(token::LEFTPAR);}
 \)         {return(token::RIGHTPAR);}
 ,          {return(token::COMMA);}
