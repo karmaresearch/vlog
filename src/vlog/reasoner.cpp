@@ -936,9 +936,9 @@ std::shared_ptr<SemiNaiver> Reasoner::getSemiNaiver(EDBLayer &layer,
 
 std::shared_ptr<TriggerSemiNaiver> Reasoner::getTriggeredSemiNaiver(EDBLayer &layer,
         Program *p,
-        bool restrictedChase) {
+        TypeChase chase) {
     std::shared_ptr<TriggerSemiNaiver> sn(new TriggerSemiNaiver(
-                layer, p, restrictedChase));
+                layer, p, chase));
     return sn;
 }
 

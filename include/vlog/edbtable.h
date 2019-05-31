@@ -70,8 +70,8 @@ class EDBTable {
             return false;
         }
 
-        virtual bool areTermsEncoded() {
-            return true;
+        virtual std::shared_ptr<const Segment> getSegment() {
+            return std::shared_ptr<const Segment>();
         }
 };
 

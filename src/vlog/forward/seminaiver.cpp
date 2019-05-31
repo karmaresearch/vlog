@@ -710,329 +710,288 @@ bool SemiNaiver::checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
             isOneRelEmpty = true;
             break;
         }
-        LOG(DEBUGL) << "Returns false";
-        return false;
+    }
+    return isOneRelEmpty;
+}
+
+struct CreateParallelFirstAtom {
+    const std::vector<const std::vector<Term_t> *> vectors;
+    const std::vector<Output *> outputs;
+    const size_t chunksz;
+    const size_t sz;
+    const bool uniqueResults;
+    const std::vector<Term_t> *fvfirst;
+    const std::vector<Term_t> *fvsecond;
+
+    CreateParallelFirstAtom(const std::vector<const std::vector<Term_t> *> vectors,
+            const std::pair<uint8_t, uint8_t> *fv,
+            const std::vector<Output *> outputs, const size_t chunksz,
+            const size_t sz, const bool uniqueResults) :
+        vectors(vectors), outputs(outputs), chunksz(chunksz), sz(sz),
+        uniqueResults(uniqueResults) {
+            if (fv == NULL) {
+                fvfirst = NULL;
+                fvsecond = NULL;
+            } else {
+                fvfirst = vectors[fv->first];
+                fvsecond = vectors[fv->second];
+            }
+        }
+
+    void operator()(const ParallelRange& r) const {
+
+        for (int i = r.begin(); i != r.end(); i++) {
+            size_t begin = r.begin() * chunksz;
+            size_t end = begin + chunksz;
+            if (end > sz) end = sz;
+            if (begin == end) {
+                return;
+            }
+
+            if (fvfirst != NULL) {
+                for (size_t j = begin; j < end; j++) {
+                    if ((*fvfirst)[j] == (*fvsecond)[j]) {
+                        continue;
+                    }
+                    outputs[i]->processResults(0,
+                            vectors, j,
+                            vectors, j, uniqueResults);
+                }
+            } else {
+                for (size_t j = begin; j < end; j++) {
+                    outputs[i]->processResults(0,
+                            vectors, j,
+                            vectors, j, uniqueResults);
+                }
+            }
+        }
+    }
+};
+
+void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
+        const Literal *bodyLiteral,
+        std::vector<Literal> &heads,
+        const size_t min,
+        const size_t max,
+        int &processedTables,
+        const bool lastLiteral,
+        const size_t iteration,
+        const RuleExecutionDetails &ruleDetails,
+        const uint8_t orderExecution,
+        std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
+        ResultJoinProcessor *joinOutput) {
+    //If the rule has only one body literal, has the same bindings list of the head,
+    //and the current head relation is empty, then I can simply copy the table
+    FCIterator literalItr = getTable(*bodyLiteral, min, max);
+    TableFilterer queryFilterer(this);
+    if (bodyLiteral->getPredicate().getType() == IDB) {
+        processedTables += literalItr.getNTables();
+    }
+    Literal &firstHeadLiteral = heads[0];
+    auto idHeadPredicate = firstHeadLiteral.getPredicate().getId();
+    FCTable *firstEndTable = getTable(idHeadPredicate, firstHeadLiteral.
+            getPredicate().getCardinality());
+
+    //Can I copy the table in the body as is?
+    bool rawCopy = lastLiteral && heads.size() == 1 && literalItr.getNTables() == 1;
+    if (rawCopy) {
+        rawCopy &= firstEndTable->isEmpty() &&
+            firstEndTable->getSizeRow() == literalItr.getCurrentTable()->getRowSize() &&
+            firstHeadLiteral.sameVarSequenceAs(*bodyLiteral) &&
+            bodyLiteral->getTupleSize() == firstHeadLiteral.getTupleSize() &&
+            ((SingleHeadFinalRuleProcessor*)joinOutput)->shouldAddToEndTable();
     }
 
-    bool SemiNaiver::checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
-            const RuleExecutionPlan &plan,
-            uint32_t limitView,
-            std::vector<size_t> &cards) {
-        const uint8_t nBodyLiterals = (uint8_t) plan.plan.size();
-        bool isOneRelEmpty = false;
-        //First I check if there are tuples in each relation.
-        //And if there are, then I count how many
-        //Get the cardinality of all relations
-        for (int i = 0; i < nBodyLiterals; ++i) {
-            size_t min = plan.ranges[i].first, max = plan.ranges[i].second;
-            if (min == 1)
-                min = ruleDetails.lastExecution;
-            if (max == 1)
-                max = ruleDetails.lastExecution - 1;
-            if (limitView > 0 && max >= limitView) {
-                max = limitView - 1;
-            }
-            if (min > max) {
-                return true;
+    if (rawCopy) { //The previous check was successful
+        while (!literalItr.isEmpty()) {
+            std::shared_ptr<const FCInternalTable> table =
+                literalItr.getCurrentTable();
+
+            if (!queryFilterer.
+                    producedDerivationInPreviousSteps(
+                        firstHeadLiteral, *bodyLiteral,
+                        literalItr.getCurrentBlock())) {
+
+                triggers += table->getNRows();
+                firstEndTable->add(table->cloneWithIteration(iteration),
+                        firstHeadLiteral, 0, &ruleDetails,
+                        orderExecution, iteration, true, nthreads);
+
             }
 
-            cards.push_back(estimateCardTable(*plan.plan[i], min, max));
-            LOG(DEBUGL) << "Estimation of the atom " <<
-                plan.plan[i]->tostring(program, &layer) <<
-                " is " << cards.back() << " in the range " <<
-                min << " " << max;
-            if (cards.back() == 0) {
-                isOneRelEmpty = true;
-                break;
-            }
+            literalItr.moveNextCount();
         }
-        return isOneRelEmpty;
-    }
+    } else if (nBodyLiterals == 1) {
+        const bool uniqueResults =
+            !ruleDetails.rule.isExistential() && opt_filtering
+            && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
+            && literalItr.getNTables() == 1 && heads.size() == 1;
+        while (!literalItr.isEmpty()) {
+            //Add the columns to the output container
+            // Can lastLiteral be false if nBodyLiterals == 1??? --Ceriel
+            if (!lastLiteral || ruleDetails.rule.isExistential() ||
+                    heads.size() != 1 || !queryFilterer.
+                    producedDerivationInPreviousSteps(
+                        firstHeadLiteral,
+                        *bodyLiteral,
+                        literalItr.getCurrentBlock())) {
 
-    struct CreateParallelFirstAtom {
-        const std::vector<const std::vector<Term_t> *> vectors;
-        const std::vector<Output *> outputs;
-        const size_t chunksz;
-        const size_t sz;
-        const bool uniqueResults;
-        const std::vector<Term_t> *fvfirst;
-        const std::vector<Term_t> *fvsecond;
-
-        CreateParallelFirstAtom(const std::vector<const std::vector<Term_t> *> vectors,
-                const std::pair<uint8_t, uint8_t> *fv,
-                const std::vector<Output *> outputs, const size_t chunksz,
-                const size_t sz, const bool uniqueResults) :
-            vectors(vectors), outputs(outputs), chunksz(chunksz), sz(sz),
-            uniqueResults(uniqueResults) {
-                if (fv == NULL) {
-                    fvfirst = NULL;
-                    fvsecond = NULL;
-                } else {
-                    fvfirst = vectors[fv->first];
-                    fvsecond = vectors[fv->second];
-                }
-            }
-
-        void operator()(const ParallelRange& r) const {
-
-            for (int i = r.begin(); i != r.end(); i++) {
-                size_t begin = r.begin() * chunksz;
-                size_t end = begin + chunksz;
-                if (end > sz) end = sz;
-                if (begin == end) {
-                    return;
-                }
-
-                if (fvfirst != NULL) {
-                    for (size_t j = begin; j < end; j++) {
-                        if ((*fvfirst)[j] == (*fvsecond)[j]) {
-                            continue;
-                        }
-                        outputs[i]->processResults(0,
-                                vectors, j,
-                                vectors, j, uniqueResults);
-                    }
-                } else {
-                    for (size_t j = begin; j < end; j++) {
-                        outputs[i]->processResults(0,
-                                vectors, j,
-                                vectors, j, uniqueResults);
-                    }
-                }
-            }
-        }
-    };
-
-    void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
-            const Literal *bodyLiteral,
-            std::vector<Literal> &heads,
-            const size_t min,
-            const size_t max,
-            int &processedTables,
-            const bool lastLiteral,
-            const uint32_t iteration,
-            const RuleExecutionDetails &ruleDetails,
-            const uint8_t orderExecution,
-            std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
-            ResultJoinProcessor *joinOutput) {
-        //If the rule has only one body literal, has the same bindings list of the head,
-        //and the current head relation is empty, then I can simply copy the table
-        FCIterator literalItr = getTable(*bodyLiteral, min, max);
-        TableFilterer queryFilterer(this);
-        if (bodyLiteral->getPredicate().getType() == IDB) {
-            processedTables += literalItr.getNTables();
-        }
-        Literal &firstHeadLiteral = heads[0];
-        auto idHeadPredicate = firstHeadLiteral.getPredicate().getId();
-        FCTable *firstEndTable = getTable(idHeadPredicate, firstHeadLiteral.
-                getPredicate().getCardinality());
-
-        //Can I copy the table in the body as is?
-        bool rawCopy = lastLiteral && heads.size() == 1 && literalItr.getNTables() == 1;
-        if (rawCopy) {
-            rawCopy &= firstEndTable->isEmpty() &&
-                firstEndTable->getSizeRow() == literalItr.getCurrentTable()->getRowSize() &&
-                firstHeadLiteral.sameVarSequenceAs(*bodyLiteral) &&
-                bodyLiteral->getTupleSize() == firstHeadLiteral.getTupleSize() &&
-                ((SingleHeadFinalRuleProcessor*)joinOutput)->shouldAddToEndTable();
-        }
-
-        if (rawCopy) { //The previous check was successful
-            while (!literalItr.isEmpty()) {
                 std::shared_ptr<const FCInternalTable> table =
                     literalItr.getCurrentTable();
-
-                if (!queryFilterer.
-                        producedDerivationInPreviousSteps(
-                            firstHeadLiteral, *bodyLiteral,
-                            literalItr.getCurrentBlock())) {
-
-                    triggers += table->getNRows();
-                    firstEndTable->add(table->cloneWithIteration(iteration),
-                            firstHeadLiteral, 0, &ruleDetails,
-                            orderExecution, iteration, true, nthreads);
-
-                }
-
-                literalItr.moveNextCount();
-            }
-        } else if (nBodyLiterals == 1) {
-            const bool uniqueResults =
-                !ruleDetails.rule.isExistential() && opt_filtering
-                && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
-                && literalItr.getNTables() == 1 && heads.size() == 1;
-            while (!literalItr.isEmpty()) {
-                //Add the columns to the output container
-                // Can lastLiteral be false if nBodyLiterals == 1??? --Ceriel
-                if (!lastLiteral || ruleDetails.rule.isExistential() ||
-                        heads.size() != 1 || !queryFilterer.
-                        producedDerivationInPreviousSteps(
-                            firstHeadLiteral,
-                            *bodyLiteral,
-                            literalItr.getCurrentBlock())) {
-
-                    std::shared_ptr<const FCInternalTable> table =
-                        literalItr.getCurrentTable();
-                    FCInternalTableItr *interitr = table->getIterator();
-
-                    bool unique = uniqueResults && firstEndTable->isEmpty();
-                    bool sorted = uniqueResults && firstHeadLiteral.
-                        sameVarSequenceAs(*bodyLiteral);
-                    joinOutput->addColumns(0, interitr,
-                            unique,
-                            sorted,
-                            literalItr.getNTables() == 1);
-
-                    table->releaseIterator(interitr);
-                }
-                // No else-clause here? Yes, can only be duplicates
-                literalItr.moveNextCount();
-            }
-        } else {
-            //Copy the iterator in the tmp container.
-            //This process cannot derive duplicates if the number of variables is equivalent.
-            const bool uniqueResults = heads.size() == 1
-                && ! ruleDetails.rule.isExistential()
-                && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
-                && (!lastLiteral || firstEndTable->isEmpty());
-
-            while (!literalItr.isEmpty()) {
-                std::shared_ptr<const FCInternalTable> table = literalItr.getCurrentTable();
-                LOG(DEBUGL) << "Creating iterator";
                 FCInternalTableItr *interitr = table->getIterator();
-                std::pair<uint8_t, uint8_t> *fv = NULL;
-                std::pair<uint8_t, uint8_t> psColumnsToFilter;
-                if (filterValueVars != NULL) {
-                    assert(filterValueVars->size() == 1);
-                    fv = &(*filterValueVars)[0];
-                    psColumnsToFilter = removePosConstants(*fv, *bodyLiteral);
-                    fv = &psColumnsToFilter;
-                }
 
-                std::vector<const std::vector<Term_t> *> vectors;
-                vectors = interitr->getAllVectors(nthreads);
+                bool unique = uniqueResults && firstEndTable->isEmpty();
+                bool sorted = uniqueResults && firstHeadLiteral.
+                    sameVarSequenceAs(*bodyLiteral);
+                joinOutput->addColumns(0, interitr,
+                        unique,
+                        sorted,
+                        literalItr.getNTables() == 1);
 
-                if (vectors.size() > 0) {
-                    size_t sz = vectors[0]->size();
-                    int chunksz = (sz + nthreads - 1) / nthreads;
-                    if (nthreads > 1 && chunksz > 1024) {
-                        std::mutex m;
-                        std::vector<Output *> outputs;
-                        for (int i = 0; i < nthreads; i++) {
-                            outputs.push_back(new Output(joinOutput, &m));
-                        }
-                        //tbb::parallel_for(tbb::blocked_range<int>(0, nthreads, 1),
-                        //        CreateParallelFirstAtom(vectors, fv, outputs, chunksz, sz, uniqueResults));
-                        ParallelTasks::parallel_for(0, nthreads, 1,
-                                CreateParallelFirstAtom(vectors, fv, outputs,
-                                    chunksz, sz, uniqueResults));
-                        // Maintain order of outputs, so:
-                        for (int i = 0; i < nthreads; i++) {
-                            outputs[i]->flush();
-                            delete outputs[i];
-                        }
-                    } else {
-                        const std::vector<Term_t> *fvfirst = NULL;
-                        const std::vector<Term_t> *fvsecond = NULL;
-                        if (fv != NULL) {
-                            fvfirst = vectors[fv->first];
-                            fvsecond = vectors[fv->second];
-                            for (int i = 0; i < fvfirst->size(); i++) {
-                                if ((*fvfirst)[i] == (*fvsecond)[i]) {
-                                    continue;
-                                }
+                table->releaseIterator(interitr);
+            }
+            // No else-clause here? Yes, can only be duplicates
+            literalItr.moveNextCount();
+        }
+    } else {
+        //Copy the iterator in the tmp container.
+        //This process cannot derive duplicates if the number of variables is equivalent.
+        const bool uniqueResults = heads.size() == 1
+            && ! ruleDetails.rule.isExistential()
+            && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
+            && (!lastLiteral || firstEndTable->isEmpty());
 
-                                joinOutput->processResults(0,
-                                        vectors, i,
-                                        vectors, i, uniqueResults);
-                            }
-                        } else {
-                            for (int i = 0; i < vectors[0]->size(); i++) {
-                                joinOutput->processResults(0,
-                                        vectors, vectors[0]->size(),
-                                        vectors, i, uniqueResults);
-                            }
-                        }
+        while (!literalItr.isEmpty()) {
+            std::shared_ptr<const FCInternalTable> table = literalItr.getCurrentTable();
+            LOG(DEBUGL) << "Creating iterator";
+            FCInternalTableItr *interitr = table->getIterator();
+            std::pair<uint8_t, uint8_t> *fv = NULL;
+            std::pair<uint8_t, uint8_t> psColumnsToFilter;
+            if (filterValueVars != NULL) {
+                assert(filterValueVars->size() == 1);
+                fv = &(*filterValueVars)[0];
+                psColumnsToFilter = removePosConstants(*fv, *bodyLiteral);
+                fv = &psColumnsToFilter;
+            }
+
+            std::vector<const std::vector<Term_t> *> vectors;
+            vectors = interitr->getAllVectors(nthreads);
+
+            if (vectors.size() > 0) {
+                size_t sz = vectors[0]->size();
+                int chunksz = (sz + nthreads - 1) / nthreads;
+                if (nthreads > 1 && chunksz > 1024) {
+                    std::mutex m;
+                    std::vector<Output *> outputs;
+                    for (int i = 0; i < nthreads; i++) {
+                        outputs.push_back(new Output(joinOutput, &m));
                     }
-                    interitr->deleteAllVectors(vectors);
+                    //tbb::parallel_for(tbb::blocked_range<int>(0, nthreads, 1),
+                    //        CreateParallelFirstAtom(vectors, fv, outputs, chunksz, sz, uniqueResults));
+                    ParallelTasks::parallel_for(0, nthreads, 1,
+                            CreateParallelFirstAtom(vectors, fv, outputs,
+                                chunksz, sz, uniqueResults));
+                    // Maintain order of outputs, so:
+                    for (int i = 0; i < nthreads; i++) {
+                        outputs[i]->flush();
+                        delete outputs[i];
+                    }
                 } else {
-                    while (interitr->hasNext()) {
-                        interitr->next();
-                        if (fv != NULL) {
-                            //otherwise I miss others
-                            if (interitr->getCurrentValue(fv->first) ==
-                                    interitr->getCurrentValue(
-                                        fv->second)) {
+                    const std::vector<Term_t> *fvfirst = NULL;
+                    const std::vector<Term_t> *fvsecond = NULL;
+                    if (fv != NULL) {
+                        fvfirst = vectors[fv->first];
+                        fvsecond = vectors[fv->second];
+                        for (int i = 0; i < fvfirst->size(); i++) {
+                            if ((*fvfirst)[i] == (*fvsecond)[i]) {
                                 continue;
                             }
-                        }
 
-                        joinOutput->processResults(0,
-                                (FCInternalTableItr*)NULL,
-                                interitr, uniqueResults);
+                            joinOutput->processResults(0,
+                                    vectors, i,
+                                    vectors, i, uniqueResults);
+                        }
+                    } else {
+                        for (int i = 0; i < vectors[0]->size(); i++) {
+                            joinOutput->processResults(0,
+                                    vectors, vectors[0]->size(),
+                                    vectors, i, uniqueResults);
+                        }
                     }
                 }
-                LOG(DEBUGL) << "Releasing iterator";
-                table->releaseIterator(interitr);
-                literalItr.moveNextCount();
+                interitr->deleteAllVectors(vectors);
+            } else {
+                while (interitr->hasNext()) {
+                    interitr->next();
+                    if (fv != NULL) {
+                        //otherwise I miss others
+                        if (interitr->getCurrentValue(fv->first) ==
+                                interitr->getCurrentValue(
+                                    fv->second)) {
+                            continue;
+                        }
+                    }
+
+                    joinOutput->processResults(0,
+                            (FCInternalTableItr*)NULL,
+                            interitr, uniqueResults);
+                }
             }
+            LOG(DEBUGL) << "Releasing iterator";
+            table->releaseIterator(interitr);
+            literalItr.moveNextCount();
         }
     }
+}
 
-    /**
-     * SemiNaiver::reorderPlanForNegatedLiterals.
-     * @author Larry Gonz\'alez
-     * @note: based on SemiNaiver::reorderPlan
-     *
-     * To support input negation, we need to guarantee that the variables in the
-     * negated literal are bounded by other variables in previous literals. This
-     * function check if the RuleExecutionPlan satisfy that restriction, and if it
-     * doesn't, then it move back the negated literal until their variables are
-     * bounded. If it not possible, then it thows an error.
-     *
-     * @param plan:  &RuleExecutionPlan
-     * @param heads: vector < Literal >
-     * */
-    void SemiNaiver::reorderPlanForNegatedLiterals(RuleExecutionPlan &plan, const std::vector<Literal> &heads){
-        std::set<uint8_t> bounded_vars;
-        std::vector<uint8_t> literal_indexes;
-        std::vector<uint8_t> new_order;
-        bounded_vars.clear();
-        literal_indexes.clear();
-        new_order.clear();
+/**
+ * SemiNaiver::reorderPlanForNegatedLiterals.
+ * @author Larry Gonz\'alez
+ * @note: based on SemiNaiver::reorderPlan
+ *
+ * To support input negation, we need to guarantee that the variables in the
+ * negated literal are bounded by other variables in previous literals. This
+ * function check if the RuleExecutionPlan satisfy that restriction, and if it
+ * doesn't, then it move back the negated literal until their variables are
+ * bounded. If it not possible, then it thows an error.
+ *
+ * @param plan:  &RuleExecutionPlan
+ * @param heads: vector < Literal >
+ * */
+void SemiNaiver::reorderPlanForNegatedLiterals(RuleExecutionPlan &plan, const std::vector<Literal> &heads){
+    std::set<uint8_t> bounded_vars;
+    std::vector<uint8_t> literal_indexes;
+    std::vector<uint8_t> new_order;
+    bounded_vars.clear();
+    literal_indexes.clear();
+    new_order.clear();
 
-        bool c1; // isnegated
-        bool c2; // are variables bounded?
+    bool c1; // isnegated
+    bool c2; // are variables bounded?
 
-        for (uint8_t i=0; i < plan.plan.size(); ++i)
-            literal_indexes.push_back(i);
+    for (uint8_t i=0; i < plan.plan.size(); ++i)
+        literal_indexes.push_back(i);
 
-        // literal_indexes[i] is the index --from plan.plan-- of the next literal
-        while(!literal_indexes.empty()) {
-            int i;
-            const Literal *literal_i;
-            std::vector<uint8_t> vars_i;
+    // literal_indexes[i] is the index --from plan.plan-- of the next literal
+    while(!literal_indexes.empty()) {
+        int i;
+        const Literal *literal_i;
+        std::vector<uint8_t> vars_i;
 
-            for (i=0; i < literal_indexes.size(); ++i){
-                literal_i = plan.plan[literal_indexes[i]];
-                vars_i = literal_i->getAllVars(); // unique variables ordered by appearing order
-                std::set<uint8_t> s_vars_i(vars_i.begin(), vars_i.end()); //set
+        for (i=0; i < literal_indexes.size(); ++i){
+            literal_i = plan.plan[literal_indexes[i]];
+            vars_i = literal_i->getAllVars(); // unique variables ordered by appearing order
+            std::set<uint8_t> s_vars_i(vars_i.begin(), vars_i.end()); //set
 
-                c1 = literal_i->isNegated();
-                c2 = std::includes(std::begin(bounded_vars), std::end(bounded_vars),
-                        std::begin(s_vars_i), std::end(s_vars_i));
-                if (!c1 || (c1 && c2))
-                    break;
-            }
-            if (i >= literal_indexes.size())
-                throw std::runtime_error("Input Negation Error. Impossible to bound variables in negated atom.");
-
-            for (auto ele: vars_i)
-                bounded_vars.insert(ele);
-            new_order.push_back(literal_indexes[i]);
-            literal_indexes.erase(literal_indexes.begin() + i);
+            c1 = literal_i->isNegated();
+            c2 = std::includes(std::begin(bounded_vars), std::end(bounded_vars),
+                    std::begin(s_vars_i), std::end(s_vars_i));
+            if (!c1 || (c1 && c2))
+                break;
         }
-        bool toReorder = false;
+        if (i >= literal_indexes.size())
+            throw std::runtime_error("Input Negation Error. Impossible to bound variables in negated atom.");
+
         for (auto ele: vars_i)
             bounded_vars.insert(ele);
         new_order.push_back(literal_indexes[i]);
@@ -1138,7 +1097,7 @@ void SemiNaiver::saveStatistics(StatsRule &stats) {
 }
 
 bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
-        const uint32_t iteration, const uint32_t limitView,
+        const size_t iteration, const size_t limitView,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
     if (! bodyChangedSince(rule, ruleDetails.lastExecution)) {
@@ -1329,26 +1288,43 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                     max = limitView - 1;
                 }
             }
-        }
-        if (min > max) {
-            optimalOrderIdx++;
-            continue;
-        }
-        LOG(DEBUGL) << "Evaluating atom " << optimalOrderIdx << " " << bodyLiteral->tostring() <<
-            " min=" << min << " max=" << max;
+            if (min > max) {
+                optimalOrderIdx++;
+                continue;
+            }
+            LOG(DEBUGL) << "Evaluating atom " << optimalOrderIdx << " " << bodyLiteral->tostring() <<
+                " min=" << min << " max=" << max;
 
-        if (first) {
-            std::chrono::system_clock::time_point startFirstA = std::chrono::system_clock::now();
-            if (lastLiteral || bodyLiteral->getNVars() > 0) {
-                processRuleFirstAtom(nBodyLiterals, bodyLiteral,
-                        heads, min, max, processedTables,
-                        lastLiteral,
-                        iteration, ruleDetails,
-                        orderExecution,
-                        filterValueVars,
-                        joinOutput);
-                durationFirstAtom += std::chrono::system_clock::now() - startFirstA;
-                first = false;
+            if (first) {
+                std::chrono::system_clock::time_point startFirstA = std::chrono::system_clock::now();
+                if (lastLiteral || bodyLiteral->getNVars() > 0) {
+                    processRuleFirstAtom(nBodyLiterals, bodyLiteral,
+                            heads, min, max, processedTables,
+                            lastLiteral,
+                            iteration, ruleDetails,
+                            orderExecution,
+                            filterValueVars,
+                            joinOutput);
+                    durationFirstAtom += std::chrono::system_clock::now() - startFirstA;
+                    first = false;
+                }
+            } else {
+                //Perform the join
+                std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+                JoinExecutor::join(this, currentResults.get(),
+                        lastLiteral ? &heads: NULL,
+                        *bodyLiteral, min, max, filterValueVars,
+                        plan.joinCoordinates[optimalOrderIdx],
+                        joinOutput,
+                        lastLiteral, ruleDetails,
+                        plan,
+                        processedTables,
+                        optimalOrderIdx,
+                        multithreaded ? nthreads : -1);
+                std::chrono::duration<double> d =
+                    std::chrono::system_clock::now() - start;
+                LOG(DEBUGL) << "Time join: " << d.count() * 1000;
+                durationJoin += d;
             }
 
             //Clean up possible duplicates

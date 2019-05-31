@@ -15,12 +15,8 @@ class TriggerSemiNaiver: public SemiNaiver {
 
     public:
         TriggerSemiNaiver(EDBLayer &layer,
-                Program *program, bool restrictedChase) :
-
-            //     SemiNaiver(ruleset, layer, program, false, false, false, restrictedChase, 1, false) {
-            //     }
-
-            SemiNaiver(layer, program, false, false, false, restrictedChase, 1, false) {
+                Program *program, TypeChase chase) :
+            SemiNaiver(layer, program, false, false, false, chase, 1, false, false) {
             }
 
         VLIBEXP void run(std::string trigger_paths);

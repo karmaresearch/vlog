@@ -49,11 +49,6 @@ class SemiNaiver {
         bool opt_filtering;
         bool multithreaded;
 
-        TypeChase typeChase;
-        bool checkCyclicTerms;
-        bool foundCyclicTerms;
-        bool ignoreExistentialRules;
-        std::shared_ptr<ChaseMgmt> chaseMgmt;
 
         std::chrono::system_clock::time_point startTime;
         bool running;
@@ -130,7 +125,8 @@ class SemiNaiver {
 
     protected:
         std::shared_ptr<ChaseMgmt> chaseMgmt;
-        bool restrictedChase;
+        TypeChase typeChase;
+        //bool restrictedChase;
         bool checkCyclicTerms;
         bool foundCyclicTerms;
         bool ignoreExistentialRules;

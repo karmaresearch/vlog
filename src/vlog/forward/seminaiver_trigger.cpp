@@ -22,7 +22,7 @@ void TriggerSemiNaiver::run(std::string trigger_paths) {
 
     //Set up chase data structure
     chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt(allrules,
-                restrictedChase, checkCyclicTerms, -1));
+                typeChase, checkCyclicTerms, -1));
 
     //Do not check for duplicates anymore
     setIgnoreDuplicatesElimination();
