@@ -63,7 +63,7 @@ file(GLOB vlog_SRC
 
 #PARSER GENERATOR
 find_package(BISON 3.0 REQUIRED)
-find_package(FLEX REQUIRED)
+find_package(FLEX 2.6 REQUIRED)
 
 add_custom_target(parserdirectory ALL COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/parser)
 
