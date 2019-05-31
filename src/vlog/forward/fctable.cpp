@@ -297,7 +297,7 @@ std::shared_ptr<const Segment> FCTable::retainFrom(
     }
     LOG(DEBUGL) << "retainFrom: t.size() = " << t->getNRows() << ", blocks.size() = " << blocks.size() << ", sz = " << sz;
 #endif
-    LOG(INFOL) << "FCTable::retainFrom: blocks.size() = " << blocks.size() << ", duplicates = " << dupl;
+    LOG(DEBUGL) << "FCTable::retainFrom: blocks.size() = " << blocks.size() << ", duplicates = " << dupl;
     for (std::vector<FCBlock>::const_iterator itr = blocks.cbegin();
             itr != blocks.cend();
             ++itr) {

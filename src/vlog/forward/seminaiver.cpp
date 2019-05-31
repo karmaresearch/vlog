@@ -1128,7 +1128,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         //set (should be only during the execution of RMFA or RMFC).
     }
 
-    LOG(INFOL) << "Iteration: " << iteration <<
+    LOG(DEBUGL) << "Iteration: " << iteration <<
         " Rule: " << rule.tostring(program, &layer);
 
     //Set up timers
