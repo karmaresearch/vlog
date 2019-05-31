@@ -29,7 +29,7 @@ make
 
 #### Example
 
-In this example we show how to install VLog in debug mode, with support for the web interface from the command line.
+In this example we show how to install VLog in debug mode with support for the web interface from the command line.
 
 ```
 $ git clone https://github.com/karmaresearch/vlog.git
@@ -39,6 +39,8 @@ $ cd build_debug
 $ cmake -DWEBINTERFACE=1 -DCMAKE_BUILD_TYPE=Debug ..
 $ make -j
 ```
+
+Please note that the option `-j` for make will build VLog in parallel
 
 ## Docker
 
