@@ -111,7 +111,6 @@ class Column {
 
 //----- COMPRESSED COLUMN ----------
 
-#define COLCOMPRB 1000000
 struct CompressedColumnBlock {
     const Term_t value;
     int64_t delta;
@@ -123,7 +122,7 @@ struct CompressedColumnBlock {
     delta(delta), size(size) {}
 };
 
-class CompressedColumn: public Column {
+class CompressedColumn final : public Column {
     private:
         std::vector<CompressedColumnBlock> blocks;
         size_t _size;
@@ -207,7 +206,7 @@ class ColumnWriter {
         bool compressed;
 
     public:
-        ColumnWriter() : cached(false), _size(0), lastv((Term_t) - 1), compressed(true) {}
+        ColumnWriter(bool compressed = true) : cached(false), _size(0), lastv((Term_t) - 1), compressed(compressed) {}
 
         ColumnWriter(std::vector<Term_t> &values) : cached(false), _size(values.size()), compressed(false) {
             this->values.swap(values);
@@ -231,14 +230,14 @@ class ColumnWriter {
                     if (v == lastv + b->delta) {
                         b->size++;
                     } else if (b->size == 0) {
-                        b->delta = v - b->value;
+                        b->delta = v - lastv;
                         b->size++;
                     } else {
                         blocks.push_back(CompressedColumnBlock((Term_t) v, 0, 0));
-                        if (_size > 16384 && blocks.size() > _size / 4) {
+                        if (_size > 256 && blocks.size() > _size / 4) {
                             // Compression not very effective; convert to uncompressed
                             compressed = false;
-                            CompressedColumn col(blocks, /*offsetsize, deltas,*/ _size);
+                            CompressedColumn col(blocks, /*offsetsize, deltas,*/ _size + 1);
                             values = col.getReader()->asVector();
                             blocks.clear();
                         }
@@ -248,8 +247,8 @@ class ColumnWriter {
 #else
             values.push_back((Term_t) v);
 #endif
-            lastv = v;
             _size++;
+            lastv = v;
         }
 
         bool isEmpty() const { return _size == 0; }
@@ -269,25 +268,27 @@ class ColumnWriter {
 
 //----- END GENERIC INTERFACES -------
 
-class ColumnReaderImpl : public ColumnReader {
+class ColumnReaderImpl final : public ColumnReader {
     private:
         /*uint32_t beginRange, endRange;
           uint64_t lastBasePos;
           const int32_t *lastDelta;*/
 
-        const std::vector<CompressedColumnBlock> &blocks;
+        const CompressedColumnBlock *blocks;
         const size_t _size;
 
+        size_t numBlocks;
         size_t currentBlock;
         size_t posInBlock;
+        size_t position;
 
         //Term_t get(const size_t pos);
 
     public:
         ColumnReaderImpl(const std::vector<CompressedColumnBlock> &blocks,
                 const size_t size) : /*beginRange(0), endRange(0),*/
-            blocks(blocks), /*offsetsize(offsetsize), deltas(deltas),*/
-            _size(size), currentBlock(0), posInBlock(0) {
+            blocks(blocks.size() == 0 ? NULL : &blocks[0]), /*offsetsize(offsetsize), deltas(deltas),*/
+            _size(size), numBlocks(blocks.size()), currentBlock(0), posInBlock(0), position(0) {
             }
 
         Term_t first();
@@ -296,7 +297,9 @@ class ColumnReaderImpl : public ColumnReader {
 
         std::vector<Term_t> asVector();
 
-        bool hasNext();
+        bool hasNext() {
+            return position < _size;
+        }
 
         Term_t next();
 
@@ -305,7 +308,7 @@ class ColumnReaderImpl : public ColumnReader {
 };
 
 //----- INMEMORY COLUMN ----------
-class InmemColumnReader : public ColumnReader {
+class InmemColumnReader final : public ColumnReader {
     private:
         const std::vector<Term_t> &col;
         size_t start;
@@ -350,7 +353,7 @@ class InmemColumnReader : public ColumnReader {
         }
 };
 
-class InmemoryColumn : public Column {
+class InmemoryColumn final : public Column {
     private:
         std::vector<Term_t> values;
 
@@ -490,7 +493,7 @@ class InmemoryColumn : public Column {
 //----- END INMEMORY COLUMN ----------
 
 // START SUBCOLUMN (contains a subrange of an inmemory column)
-class SubColumn : public Column {
+class SubColumn final : public Column {
     private:
         std::shared_ptr<Column> parentColumn;
         const std::vector<Term_t> &values;
@@ -628,7 +631,7 @@ class SubColumn : public Column {
 
 
 //----- EDB COLUMN ----------
-class EDBColumnReader : public ColumnReader {
+class EDBColumnReader final : public ColumnReader {
     private:
         const Literal &l;
         EDBLayer &layer;
@@ -685,7 +688,7 @@ class EDBColumnReader : public ColumnReader {
 };
 
 
-class EDBColumn : public Column {
+class EDBColumn final : public Column {
     private:
         EDBLayer &layer;
         const Literal l;
@@ -713,7 +716,7 @@ class EDBColumn : public Column {
         size_t estimateSize() const;
 
         bool isEmpty() const {
-            return size() == 0;
+            return layer.isEmpty(l, NULL, NULL);
         }
 
         bool isEDB() const {
@@ -769,7 +772,7 @@ class EDBColumn : public Column {
 //
 //----- FUNCTIONAL COLUMN ----------
 class ChaseMgmt;
-class FunctionalColumn : public Column {
+class FunctionalColumn final : public Column {
     private:
         uint64_t nvalues;
         uint64_t startvalue;

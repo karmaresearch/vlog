@@ -157,6 +157,12 @@ class FCTable {
                 const uint8_t ruleExecOrder,
                 const size_t iteration, const bool isCompleted, int nthreads);
 
+        int nBlocks() {
+            return blocks.size();
+        }
+
+        void collapseBlocks(size_t iteration, int nThreads);
+
         ~FCTable();
 };
 

@@ -178,19 +178,18 @@ class FCInternalTable {
         virtual ~FCInternalTable();
 };
 
-class VectorFCInternalTableItr : public FCInternalTableItr {
+class VectorFCInternalTableItr final : public FCInternalTableItr {
     private:
         const std::vector<const std::vector<Term_t> *> vectors;
         int beginIndex;
         int endIndex;
         int currentIndex;
-        bool first;
 
     public:
         VectorFCInternalTableItr(const std::vector<const std::vector<Term_t> *> &vectors,
                 int beginIndex, int endIndex) :
             vectors(vectors), beginIndex(beginIndex), endIndex(endIndex),
-            currentIndex(beginIndex), first(true) {
+            currentIndex(beginIndex-1) {
                 if (endIndex > vectors[0]->size()) {
                     endIndex = vectors[0]->size();
                 }
@@ -223,22 +222,18 @@ class VectorFCInternalTableItr : public FCInternalTableItr {
         }
 
         bool hasNext() {
-            return currentIndex < endIndex - 1 || (first && currentIndex < endIndex);
+            return currentIndex < endIndex - 1;
         }
 
         void next() {
-            if (! first) {
-                currentIndex++;
-            }
-            first = false;
+            currentIndex++;
         }
 
         void clear() {
         }
 
         void reset() {
-            currentIndex = beginIndex;
-            first = true;
+            currentIndex = beginIndex - 1;
         }
 
         ~VectorFCInternalTableItr() {
@@ -246,7 +241,7 @@ class VectorFCInternalTableItr : public FCInternalTableItr {
         }
 };
 
-class InmemoryFCInternalTableItr : public FCInternalTableItr {
+class InmemoryFCInternalTableItr final : public FCInternalTableItr {
     private:
         uint8_t nfields;
         size_t iteration;
@@ -308,7 +303,7 @@ class InmemoryFCInternalTableItr : public FCInternalTableItr {
         }
 };
 
-class EDBFCInternalTableItr : public FCInternalTableItr {
+class EDBFCInternalTableItr final : public FCInternalTableItr {
     private:
         std::vector<uint8_t> fields;
         EDBIterator *edbItr;
@@ -362,7 +357,7 @@ struct MITISorter {
     bool operator ()(const uint8_t i1, const uint8_t i2) const;
 };
 
-class MergerInternalTableItr : public FCInternalTableItr {
+class MergerInternalTableItr final : public FCInternalTableItr {
     private:
         std::vector<uint8_t> indices;
         const std::vector<std::pair<FCInternalTableItr*, size_t>> iterators;
@@ -433,7 +428,7 @@ struct InmemoryFCInternalTableUnmergedSegment {
             }
 };
 
-class InmemoryFCInternalTable : public FCInternalTable {
+class InmemoryFCInternalTable final : public FCInternalTable {
     private:
         const uint8_t nfields;
         const size_t iteration;
@@ -579,7 +574,7 @@ class InmemoryFCInternalTable : public FCInternalTable {
         ~InmemoryFCInternalTable();
 };
 
-class EDBFCInternalTable : public FCInternalTable {
+class EDBFCInternalTable final : public FCInternalTable {
     private:
         const size_t iteration;
         const uint8_t nfields;
@@ -673,7 +668,7 @@ class EDBFCInternalTable : public FCInternalTable {
         ~EDBFCInternalTable();
 };
 
-class SingletonItr : public FCInternalTableItr {
+class SingletonItr final : public FCInternalTableItr {
     private:
         const size_t iteration;
         bool first;
@@ -724,7 +719,7 @@ class SingletonItr : public FCInternalTableItr {
 
 };
 
-class SingletonTable : public FCInternalTable {
+class SingletonTable final : public FCInternalTable {
     private:
         const size_t iteration;
 

@@ -49,6 +49,12 @@ class SemiNaiver {
         bool opt_filtering;
         bool multithreaded;
 
+        TypeChase typeChase;
+        bool checkCyclicTerms;
+        bool foundCyclicTerms;
+        bool ignoreExistentialRules;
+        std::shared_ptr<ChaseMgmt> chaseMgmt;
+
         std::chrono::system_clock::time_point startTime;
         bool running;
 
@@ -58,7 +64,7 @@ class SemiNaiver {
         bool ignoreDuplicatesElimination;
         std::vector<int> stratification;
         int nStratificationClasses;
-
+        Program *RMFC_program;
 
 #ifdef WEBINTERFACE
         long statsLastIteration;
@@ -78,11 +84,11 @@ class SemiNaiver {
 
         size_t countAllIDBs();
 
-        bool bodyChangedSince(Rule &rule, uint32_t iteration);
+        bool bodyChangedSince(Rule &rule, size_t iteration);
 
         bool checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
                 const RuleExecutionPlan &plan,
-                uint32_t limitView,
+                size_t limitView,
                 std::vector<size_t> &cards);
 
         void processRuleFirstAtom(const uint8_t nBodyLiterals,
@@ -92,7 +98,7 @@ class SemiNaiver {
                 const size_t max,
                 int &processedTables,
                 const bool lastLiteral,
-                const uint32_t iteration,
+                const size_t iteration,
                 const RuleExecutionDetails &ruleDetails,
                 const uint8_t orderExecution,
                 std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
@@ -109,13 +115,13 @@ class SemiNaiver {
         bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
                 std::vector<std::vector<RuleExecutionDetails>> &allIDBRules,    // one entry for each stratification class
                 std::vector<StatIteration> &costRules,
-                const uint32_t limitView,
+                const size_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
                 std::vector<Literal> &heads,
-                const uint32_t iteration,
-                const uint32_t limitView,
+                const size_t iteration,
+                const size_t limitView,
                 std::vector<ResultJoinProcessor*> *finalResultContainer);
 
         size_t estimateCardTable(const Literal &literal,
@@ -138,8 +144,8 @@ class SemiNaiver {
         uint64_t triggers;
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
-                const uint32_t iteration,
-                const uint32_t limitView,
+                const size_t iteration,
+                const size_t limitView,
                 std::vector<ResultJoinProcessor*> *finalResultContainer);
 
         virtual FCIterator getTableFromEDBLayer(const Literal & literal);
@@ -153,7 +159,7 @@ class SemiNaiver {
         virtual bool executeUntilSaturation(
                 std::vector<RuleExecutionDetails> &ruleset,
                 std::vector<StatIteration> &costRules,
-                uint32_t limitView,
+                size_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
 
         void prepare(std::vector<RuleExecutionDetails> &allrules,
@@ -168,8 +174,8 @@ class SemiNaiver {
         VLIBEXP SemiNaiver(EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
-                bool restrictedChase, int nthreads, bool shuffleRules,
-                bool ignoreExistentialRules);
+                TypeChase chase, int nthreads, bool shuffleRules,
+                bool ignoreExistentialRule, Program *RMFC_check = NULL);
 
         //disable restricted chase
         VLIBEXP SemiNaiver(EDBLayer &layer,
@@ -178,13 +184,17 @@ class SemiNaiver {
                 int nthreads, bool shuffleRules,
                 bool ignoreExistentialRules) :
             SemiNaiver(layer, program, opt_intersect, opt_filtering,
-                    multithreaded, false, nthreads, shuffleRules,
+                    multithreaded, TypeChase::SKOLEM_CHASE, nthreads, shuffleRules,
                     ignoreExistentialRules) {
             }
 
         VLIBEXP void run(unsigned long *timeout = NULL,
                 bool checkCyclicTerms = false) {
             run(0, 1, timeout, checkCyclicTerms, -1);
+        }
+
+        Program *get_RMFC_program() {
+            return RMFC_program;
         }
 
         bool opt_filter() {

@@ -431,7 +431,7 @@ void Materialization::rewriteLiteralInProgram(Literal & prematLiteral, Literal &
 
     for (std::vector<Rule>::iterator itr = rewrittenRules.begin(); itr != rewrittenRules.end();
             ++itr) {
-        p.addRule(*itr);
+        p.addRule(itr->getHeads(), itr->getBody());
     }
 
     //Add all rules that map the new edb relations

@@ -90,6 +90,9 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
     this->predid = predid;
     SegmentInserter *inserter = NULL;
     //Load the table in the database
+    if (repository == "") {
+        repository = ".";
+    }
     string tablefile = repository + "/" + tablename + ".csv";
     string gz = tablefile + ".gz";
     istream *ifs = NULL;
@@ -233,8 +236,8 @@ InmemoryTable::InmemoryTable(PredId_t predid,
         segment = NULL;
     } else {
         segment = inserter->getSortedAndUniqueSegment();
-        delete inserter;
     }
+    delete inserter;
 }
 
 void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
@@ -692,7 +695,7 @@ uint8_t InmemoryTable::getArity() const {
 }
 
 uint64_t InmemoryTable::getSize() {
-    return segment->getNRows();
+    return segment == NULL ? 0 : segment->getNRows();
 }
 
 InmemoryTable::~InmemoryTable() {
