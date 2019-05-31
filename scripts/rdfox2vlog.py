@@ -56,7 +56,7 @@ for line in open(rulesin, 'rt'):
         if len(tkns) > 2:
             print(line)
         head, predid = processAtom(head, predid)
-        body = body[:-2]
+        body = body[:-1]
         body = body.split(', ')
         bodyAtoms = []
         for bodyAtom in body:

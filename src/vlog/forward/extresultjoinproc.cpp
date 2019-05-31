@@ -171,6 +171,8 @@ void ExistentialRuleProcessor::filterDerivations(FCTable *t,
                 idx++;
             }
         }
+        table->releaseIterator(itr2);
+        itr1->clear();
         tableItr.moveNextCount();
     }
 
@@ -422,16 +424,19 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
             //new can be derived.
         }
 
-        if (filterRows.size() == sizecolumns * atomTables.size()) {
-            return; //every substitution already exists in the database. Nothing
-            //new can be derived.
-        }
-
         //Filter out the potential values for the derivation
         //(only restricted chase can do it)
         if (!filterRows.empty()) {
             retainNonExisting(filterRows, sizecolumns, c);
         }
+    }
+
+    if (filterRecursive) {
+        retainNonRecursive(sizecolumns, c);
+    }
+
+    if (sizecolumns == 0) {
+        return;
     }
 
     std::vector<std::shared_ptr<Column>> knownColumns;
@@ -624,6 +629,19 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
             count += h.getTupleSize();
         }
 
+        if (chaseMgmt->isCheckCyclicMode()) {
+            if (blockedCount == sizecolumns) {
+                return;
+            }
+            for (size_t i = 0; i < sizecolumns; i++) {
+                if (blocked[i]) {
+                    for (int j = 0; j < atomTables.size(); j++) {
+                        filterRows.push_back(i);
+                    }
+                }
+            }
+        }
+
         if (filterRows.size() == sizecolumns * atomTables.size()) {
             return; //every substitution already exists in the database. Nothing
             //new can be derived.
@@ -634,6 +652,14 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         if (!filterRows.empty()) {
             retainNonExisting(filterRows, sizecolumns, c);
         }
+    }
+
+    if (filterRecursive) {
+        retainNonRecursive(sizecolumns, c);
+    }
+
+    if (sizecolumns == 0) {
+        return;
     }
 
     //Create existential columns store them in a vector with the corresponding
@@ -763,9 +789,11 @@ void ExistentialRuleProcessor::RMFA_computeBodyAtoms(
 std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
         std::vector<Literal> &input) {
     //Populate the EDB layer
-    EDBLayer layer(sn->getEDBLayer());
+    EDBLayer *layer = new EDBLayer(sn->getEDBLayer(), true);
+
     std::map<PredId_t, std::vector<uint64_t>> edbPredicates;
     std::map<PredId_t, std::vector<uint64_t>> idbPredicates;
+
     for(const auto &literal : input) {
         auto predid = literal.getPredicate().getId();
         if (literal.getPredicate().getType() != EDB) {
@@ -788,13 +816,13 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
     }
     for(auto &pair : edbPredicates) {
         uint8_t arity = sn->getEDBLayer().getPredArity(pair.first);
-        layer.addInmemoryTable(pair.first, arity, pair.second);
+        layer->addInmemoryTable(pair.first, arity, pair.second);
     }
 
     //Launch the semi-naive evaluation
     Program *program = sn->getProgram();
-    std::unique_ptr<SemiNaiver> lsn(new SemiNaiver(program->getAllRules(),
-                layer, program, true, true, false, 1, false, true));
+    std::unique_ptr<SemiNaiver> lsn(new SemiNaiver(
+                *layer, program, true, true, false, 1, false, true));
 
     //Populate the IDB layer
     for(auto &pair : idbPredicates) {
@@ -817,7 +845,7 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::RMFA_saturateInput(
         VTuple tuple(card);
         for(uint8_t i = 0; i < card; ++i) {
             // tuple.set(VTerm(i, 0), i);
-            tuple.set(VTerm(i+1, 0), i);	// I suppose these should all be variables ... --Ceriel
+            tuple.set(VTerm(i+1, 0), i);    // I suppose these should all be variables ... --Ceriel
         }
         Literal query(pred, tuple);
         FCBlock block(0, ltable, query, 0, NULL, 0, true);
@@ -940,8 +968,8 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
     LOG(DEBUGL) << "RMFA_check, headLiteral = " << headLiteral.tostring(NULL, NULL);
 #if DEBUG
     for (int i = 0; i < columnsToCheck.size(); i++) {
-	LOG(TRACEL) << "columnsToCheck[" << i << "] = " << (int) columnsToCheck[i];
-	LOG(TRACEL) << "headrow[" << (int) columnsToCheck[i] << "] = " << headrow[columnsToCheck[i]];
+        LOG(TRACEL) << "columnsToCheck[" << i << "] = " << (int) columnsToCheck[i];
+        LOG(TRACEL) << "headrow[" << (int) columnsToCheck[i] << "] = " << headrow[columnsToCheck[i]];
     }
 #endif
     //Get a starting value for the fresh IDs
@@ -954,7 +982,7 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
 
 #if DEBUG
     for (int i = 0; i < input.size(); i++) {
-	LOG(TRACEL) << "input[" << i << "] = " << input[i].tostring(NULL, NULL);
+        LOG(TRACEL) << "input[" << i << "] = " << input[i].tostring(NULL, NULL);
     }
 #endif
 
@@ -977,7 +1005,7 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
             for(uint8_t j = 0; j < columnsToCheck.size(); ++j) {
                 auto cId = columnsToCheck[j];
 #if DEBUG
-		LOG(TRACEL) << "cId = " << (int) cId << ", currentValue = " << tbItr->getCurrentValue(cId);
+                LOG(TRACEL) << "cId = " << (int) cId << ", currentValue = " << tbItr->getCurrentValue(cId);
 #endif
                 if (tbItr->getCurrentValue(cId) != headrow[cId]) {
                     found = false;
@@ -992,6 +1020,8 @@ bool ExistentialRuleProcessor::RMFA_check(uint64_t *row,
             break;
         itr.moveNextCount();
     }
+    EDBLayer &l = n->getEDBLayer();
+    delete &l;
     return found;
 }
 

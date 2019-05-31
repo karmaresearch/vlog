@@ -1,4 +1,5 @@
 #include <vlog/concepts.h>
+#include <vlog/graph.h>
 #include <vlog/optimizer.h>
 #include <vlog/edb.h>
 #include <vlog/fcinttable.h>
@@ -95,6 +96,9 @@ std::string Literal::tostring(Program *program, EDBLayer *db) const {
         predName = program->getPredicateName(pred.getId());
     else
         predName = std::to_string(pred.getId());
+    if (isNegated()) {
+        predName = "neg_" + predName;
+    }
 
     std::string out = predName + std::string("[") +
         std::to_string(pred.getType()) + std::string("]") +
@@ -142,7 +146,10 @@ std::string Literal::toprettystring(Program *program, EDBLayer *db, bool replace
     else
         predName = std::to_string(pred.getId());
 
-    std::string out = predName + std::string("(");
+    std::string out = "";
+    if (isNegated())
+        out = "~";
+    out += predName + std::string("(");
 
     for (int i = 0; i < tuple.getSize(); ++i) {
         if (tuple.get(i).isVariable()) {
@@ -436,6 +443,8 @@ bool Literal::operator==(const Literal & other) const {
         if (tuple.get(i) != other.tuple.get(i))
             return false;
     }
+    if (negated != other.isNegated())
+        return false;
     return true;
 }
 
@@ -697,6 +706,73 @@ std::string Rule::toprettystring(Program * program, EDBLayer *db, bool replaceCo
     return output;
 }
 
+bool Program::stratify(std::vector<int> &stratification, int &nClasses) {
+    // First check if the rules can be stratified.
+    std::set<std::pair<uint64_t, uint64_t>> usedNegated;
+    uint64_t graphSize = getMaxPredicateId() + 1;
+    Graph g(graphSize);
+    Graph depends(graphSize);
+    for (const Rule rule : allrules) {
+        for (const auto &head : rule.getHeads()) {
+            for (const auto &bodyLiteral : rule.getBody()) {
+                g.addEdge(bodyLiteral.getPredicate().getId(), head.getPredicate().getId());
+                depends.addEdge(head.getPredicate().getId(), bodyLiteral.getPredicate().getId());
+                if (bodyLiteral.isNegated() && bodyLiteral.getPredicate().getType() == IDB) {
+                    usedNegated.insert(std::make_pair(bodyLiteral.getPredicate().getId(), head.getPredicate().getId()));
+                    LOG(DEBUGL) << "Adding usedNegated: " << bodyLiteral.getPredicate().getId() << ", " << head.getPredicate().getId();
+                }
+            }
+        }
+    }
+
+    Graph negationsClosure(graphSize);
+
+    // Create a negationsClosure graph, one that has an edge from p to q iff there is a path from p to q in the dependency graph, containing a negative edge.
+    for (auto it = usedNegated.begin(); it != usedNegated.end(); ++it) {
+        // usedNegated contains all negative edges.
+        std::set<uint64_t> deps;
+        std::set<uint64_t> reaches;
+        depends.getRecursiveDestinations(it->first, deps);
+        g.getRecursiveDestinations(it->second, reaches);
+        // We know we have a negative edge from first to second.
+        // Now, if we can reach first from second, we have a cycle
+        // with a negative edge --> cannot be stratified.
+        if (reaches.find(it->first) != reaches.end()) {
+            return false;
+        }
+        for(auto it1 : reaches) {
+            for (auto it2 : deps) {
+                negationsClosure.addEdge(it1, it2);
+            }
+        }
+    }
+
+    stratification.resize(graphSize);
+    for (size_t i = 0; i < graphSize; i++) {
+        stratification[i] = -1;
+    }
+
+    
+    int markedCount = 0;
+    int count = 0;
+    while (count < graphSize) {
+        std::set<uint64_t> toRemove;
+        for (int i = 0; i < graphSize; i++) {
+            if (stratification[i] < 0 && negationsClosure.getDestinations(i)->empty()) {
+                LOG(DEBUGL) << "Marking " << i << " with " << markedCount;
+                stratification[i] = markedCount;
+                count++;
+                toRemove.insert(i);
+            }
+        }
+        negationsClosure.removeNodes(toRemove);
+        markedCount++;
+    }
+
+    nClasses = markedCount;
+    return true;
+}
+
 bool Program::areExistentialRules() {
     for(auto& rule : allrules) {
         if (rule.isExistential()) {
@@ -731,7 +807,8 @@ const std::vector<uint32_t> &Program::getRulesIDsByPredicate(PredId_t predid) co
 }
 
 Program::Program(EDBLayer *kb) : kb(kb),
-    dictPredicates(kb->getPredDictionary()) {
+    dictPredicates(kb->getPredDictionary()),
+    cardPredicates(kb->getPredicateCardUnorderedMap()) {
     }
 
 std::string trim(const std::string& str,
@@ -955,28 +1032,31 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
         t1.set(*itr, pos++);
     }
 
+    //Check if predicate starts with "neg_".
+    bool negated = false;
+    if (predicate.substr(0,4) == "neg_") {
+        negated = true;
+        predicate = predicate.substr(4);
+    }
+
     //Determine predicate
     PredId_t predid = (PredId_t) dictPredicates.getOrAdd(predicate);
     if (cardPredicates.find(predid) == cardPredicates.end()) {
         cardPredicates.insert(make_pair(predid, t.size()));
     } else {
         if (cardPredicates.find(predid)->second != t.size()) {
-            throw ("Wrong arity in predicate: should be " +  std::to_string((int) cardPredicates.find(predid)->second));
+            throw ("Wrong arity in predicate \""+ predicate + "\". It should be " + std::to_string((int) cardPredicates.find(predid)->second) +".");
         }
     }
     Predicate pred(predid, Predicate::calculateAdornment(t1), kb->doesPredExists(predid) ? EDB : IDB, (uint8_t) t.size());
     LOG(DEBUGL) << "Predicate : " << predicate << ", type = " << ((pred.getType() == EDB) ? "EDB" : "IDB");
 
-    Literal literal(pred, t1);
+    Literal literal(pred, t1, negated);
     return literal;
 }
 
 PredId_t Program::getPredicateID(std::string & p, const uint8_t card) {
     PredId_t predid = (PredId_t) dictPredicates.getOrAdd(p);
-    if (predid >= MAX_NPREDS) {
-        LOG(DEBUGL) << "Too many predicates";
-        throw OUT_OF_PREDICATES;
-    }
     //add the cardinality associated to this predicate
     if (cardPredicates.find(predid) == cardPredicates.end()) {
         //add it
@@ -997,7 +1077,7 @@ Program Program::clone() const {
 
 int Program::getNRules() const {
     int size = 0;
-    for (int j = 0; j < MAX_NPREDS; ++j) {
+    for (int j = 0; j < rules.size(); ++j) {
         size += rules[j].size();
     }
     return size;
@@ -1011,9 +1091,7 @@ std::shared_ptr<Program> Program::cloneNew() const {
 }
 
 void Program::cleanAllRules() {
-    for (int i = 0; i < MAX_NPREDS; ++i) {
-        rules[i].clear();
-    }
+    rules.clear();
     allrules.clear();
 }
 
@@ -1022,6 +1100,9 @@ void Program::addRule(Rule &rule, bool rewriteMultihead) {
         rewriteRule(rule);
     } else {
         for (const auto &head : rule.getHeads()) {
+            if (rules.size() <= head.getPredicate().getId()) {
+                rules.resize(head.getPredicate().getId() + 1);
+            }
             rules[head.getPredicate().getId()].push_back(allrules.size());
         }
         allrules.push_back(rule);
@@ -1255,7 +1336,7 @@ struct RuleSorter {
 };
 
 void Program::sortRulesByIDBPredicates() {
-    for (int i = 0; i < MAX_NPREDS; ++i) {
+    for (int i = 0; i < rules.size(); ++i) {
         if (rules[i].size() > 0) {
             std::vector<uint32_t> tmpC = rules[i];
             std::stable_sort(tmpC.begin(), tmpC.end(), RuleSorter(allrules));
@@ -1301,6 +1382,9 @@ int64_t Program::getOrAddPredicate(std::string & p, uint8_t cardinality) {
             return -1;
         }
     }
+    if (id >= rules.size()) {
+        rules.resize(id+1);
+    }
     return id;
 }
 
@@ -1326,12 +1410,6 @@ std::vector<PredId_t> Program::getAllEDBPredicateIds() {
 
 std::string Program::tostring() {
     std::string output = "";
-    /*for (int i = 0; i < MAX_NPREDS; ++i) {
-      for (std::vector<Rule>::iterator itr = rules[i].begin(); itr != rules[i].end();
-      ++itr) {
-      output += itr->tostring() + std::string("\n");
-      }
-      }*/
     for(const auto &rule : allrules) {
         output += rule.tostring() + std::string("\n");
     }

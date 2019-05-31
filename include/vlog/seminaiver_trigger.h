@@ -14,9 +14,13 @@ class TriggerSemiNaiver: public SemiNaiver {
                 std::vector<std::shared_ptr<const FCInternalTable>> &tables);
 
     public:
-        TriggerSemiNaiver(std::vector<Rule> ruleset, EDBLayer &layer,
+        TriggerSemiNaiver(EDBLayer &layer,
                 Program *program, bool restrictedChase) :
-            SemiNaiver(ruleset, layer, program, false, false, false, restrictedChase, 1, false) {
+
+            //     SemiNaiver(ruleset, layer, program, false, false, false, restrictedChase, 1, false) {
+            //     }
+
+            SemiNaiver(layer, program, false, false, false, restrictedChase, 1, false) {
             }
 
         VLIBEXP void run(std::string trigger_paths);

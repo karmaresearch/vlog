@@ -571,7 +571,7 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
        */
     for (uint8_t i = 0; i < nConstantsToFilter && match; ++i) {
         if (values->getColumn(posConstantsToFilter[i])->isConstant()) {
-            const Term_t v = values->getColumn(posConstantsToFilter[i])->getReader()->first();
+            const Term_t v = values->getColumn(posConstantsToFilter[i])->first();
             if (v != valuesConstantsToFilter[i]) {
                 match = false;
             }
@@ -593,7 +593,7 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
             Column *c1 = values->getColumn(repeatedVars[i].first).get();
             Column *c2 = values->getColumn(repeatedVars[i].second).get();
             if (c1->isConstant() && c2->isConstant()) {
-                if (c1->getReader()->first() != c2->getReader()->first()) {
+                if (c1->first() != c2->first()) {
                     match = false;
                     break;
                 }
@@ -652,7 +652,7 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
                 Column *c1 = values->getColumn(repeatedVars[i].first).get();
                 Column *c2 = values->getColumn(repeatedVars[i].second).get();
                 if (c1->isConstant() && c2->isConstant()) {
-                    if (c1->getReader()->first() != c2->getReader()->first()) {
+                    if (c1->first() != c2->first()) {
                         match = false;
                         break;
                     }

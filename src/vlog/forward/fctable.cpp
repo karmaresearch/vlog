@@ -99,7 +99,7 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal,
 
     if (shouldFilter) {
         if (blocks.size() == 0) {
-            return std::shared_ptr<FCTable>(this);;
+            return std::shared_ptr<FCTable>(new FCTable(NULL, sizeRow));
         }
         std::shared_ptr<FCTable> output;
         std::vector<FCBlock>::iterator itr = blocks.begin();
@@ -325,7 +325,7 @@ bool FCTable::add(std::shared_ptr<const FCInternalTable> t,
     }
 
     //There is no tuple with the same iteration in the table. Add a new block
-    if (!t->isSorted()) {
+    if (!t->isSorted() && t->getNRows() > 1) {
         throw 10;
     }
 

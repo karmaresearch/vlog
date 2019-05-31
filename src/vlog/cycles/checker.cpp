@@ -1,17 +1,32 @@
 #include <vlog/cycles/checker.h>
 #include <vlog/reasoner.h>
 #include <vlog/seminaiver.h>
+#include <vlog/graph.h>
 
 #include <kognac/logs.h>
 
 typedef std::pair<PredId_t, uint8_t> vpos;
 typedef std::pair<uint32_t, uint8_t> rpos;
 
-int Checker::check(std::string ruleFile, std::string alg, EDBLayer &db) {
+int Checker::checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db) {
     //Parse the rules into a program
     Program p(&db);
     p.readFromFile(ruleFile, false); //we do not rewrite the heads
+    return check(p, alg, db);
+}
 
+int Checker::checkFromString(std::string rulesString, std::string alg, EDBLayer &db) {
+    //Parse the rules into a program
+    Program p(&db);
+    p.readFromString(rulesString, false); //we do not rewrite the heads
+    return check(p, alg, db);
+}
+
+int Checker::check(Program &p, std::string alg, EDBLayer &db) {
+    if (! p.areExistentialRules()) {
+        LOG(INFOL) << "No existential rules, termination detection not run";
+        return 1;
+    }
     if (alg == "MFA") {
         // Model Faithful Acyclic
         return MFA(p) ? 1 : 0;
@@ -31,7 +46,8 @@ int Checker::check(std::string ruleFile, std::string alg, EDBLayer &db) {
     } else {
         // TODO: MSA, RMSA?
         LOG(ERRORL) << "Unknown algorithm: " << alg;
-        return 0;
+        throw 10;
+        // return 0;
     }
 }
 
@@ -55,6 +71,7 @@ static void addIDBCritical(Program &p, EDBLayer *db) {
                 }
                 facts.push_back(fact);
                 db->addInmemoryTable(edbName, predId, facts);
+                hasNewEDB[cardinality] = true;
             }
             std::string rule = p.getPredicateName(v) + "(";
             std::string paramList = "";
@@ -563,60 +580,5 @@ bool Checker::MFC(Program &p) {
         }
         ruleCount++;
     }
-    return false;
-}
-
-Graph::Graph(int V)
-{
-    this->V = V;
-    adj = new list<int>[V];
-}
-
-void Graph::addEdge(int v, int w)
-{
-    LOG(TRACEL) << "Adding edge from " << v << " to " << w;
-    adj[v].push_back(w); // Add w to v’s list.
-}
-
-// This function is a variation of DFSUytil() in https://www.geeksforgeeks.org/archives/18212
-bool Graph::isCyclicUtil(int v, bool visited[], bool *recStack) {
-    if(visited[v] == false) {
-        // Mark the current node as visited and part of recursion stack
-        visited[v] = true;
-        recStack[v] = true;
-
-        // Recur for all the vertices adjacent to this vertex
-        list<int>::iterator i;
-        for(i = adj[v].begin(); i != adj[v].end(); ++i) {
-            if ( !visited[*i] && isCyclicUtil(*i, visited, recStack) )
-                return true;
-            else if (recStack[*i])
-                return true;
-        }
-    }
-    recStack[v] = false; // remove the vertex from recursion stack
-    return false;
-}
-
-// Returns true if the graph contains a cycle, else false.
-// This function is a variation of DFS() in https://www.geeksforgeeks.org/archives/18212
-bool Graph::isCyclic() {
-    // Mark all the vertices as not visited and not part of recursion
-    // stack
-    bool *visited = new bool[V];
-    bool *recStack = new bool[V];
-    for(int i = 0; i < V; i++) {
-        visited[i] = false;
-        recStack[i] = false;
-    }
-
-    // Call the recursive helper function to detect cycle in different
-    // DFS trees
-    for(int i = 0; i < V; i++) {
-        if (isCyclicUtil(i, visited, recStack)) {
-            return true;
-        }
-    }
-
     return false;
 }

@@ -563,7 +563,7 @@ void launchTriggeredMat(int argc,
 void printRepresentationSize(std::shared_ptr<SemiNaiver> sn) {
     size_t size = 0;
     std::set<uint64_t> columnsIDs;
-    for(size_t i = 0; i < MAX_NPREDS; ++i) {
+    for(size_t i = 0; i < sn->getProgram()->getNPredicates(); ++i) {
         if (!sn->getProgram()->doesPredicateExist(i)) {
             continue;
         }
@@ -979,7 +979,7 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
 }
 
 void checkAcyclicity(std::string ruleFile, std::string alg, EDBLayer &db) {
-    int response = Checker::check(ruleFile, alg, db);
+    int response = Checker::checkFromFile(ruleFile, alg, db);
     std::cout << "The response is: ";
     if (response == 0) {
         std::cout << "Unknown";

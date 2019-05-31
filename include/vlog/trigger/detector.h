@@ -22,7 +22,7 @@ class Detector {
     public:
         std::vector<Equivalence> getDatabaseDependencies(Program &prog, EDBLayer &layer);
 
-        void printDatabaseDependencies(Program &prog, EDBLayer &layer);
+		VLIBEXP void printDatabaseDependencies(Program &prog, EDBLayer &layer);
 };
 
 #endif

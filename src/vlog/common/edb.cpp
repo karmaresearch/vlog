@@ -25,10 +25,10 @@
 #include <climits>
 
 
-EDBLayer::EDBLayer(EDBLayer &db) {
+EDBLayer::EDBLayer(EDBLayer &db, bool copyTables) {
     this->predDictionary = db.predDictionary;
-    for (int i = 0; i < MAX_NPREDS; ++i) {
-        tmpRelations[i] = NULL;
+    if (copyTables) {
+        this->dbPredicates = db.dbPredicates;
     }
 }
 
@@ -146,7 +146,7 @@ void EDBLayer::addInmemoryTable(std::string predicate, PredId_t id, std::vector<
     EDBInfoTable infot;
     infot.id = id;
     if (doesPredExists(infot.id)) {
-        LOG(WARNL) << "Rewriting table for predicate " << predicate;
+        LOG(INFOL) << "Rewriting table for predicate " << predicate;
         dbPredicates.erase(infot.id);
     }
     infot.type = "INMEMORY";
@@ -663,13 +663,16 @@ bool EDBLayer::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
 
 // Only used in prematerialization
 void EDBLayer::addTmpRelation(Predicate & pred, IndexedTupleTable * table) {
+    if (pred.getId() >= tmpRelations.size()) {
+        tmpRelations.resize(2*pred.getId()+1);
+    }
     tmpRelations[pred.getId()] = table;
 }
 
 // Only used in prematerialization
 bool EDBLayer::checkValueInTmpRelation(const uint8_t relId, const uint8_t posInRelation,
         const Term_t value) const {
-    if (tmpRelations[relId] != NULL) {
+    if (relId < tmpRelations.size() && tmpRelations[relId] != NULL) {
         return tmpRelations[relId]->exists(posInRelation, value);
     } else {
         return true;
@@ -713,8 +716,10 @@ static std::vector<std::shared_ptr<Column>> checkNewInGeneric(const Literal &l1,
     for (int i = 0; i < posInL2.size(); i++) {
         fieldsToSort2.push_back(posVars2[posInL2[i]]);
     }
-    EDBIterator *itr1 = p->getSortedIterator(l1, fieldsToSort1);
-    EDBIterator *itr2 = p2->getSortedIterator(l2, fieldsToSort2);
+    // EDBIterator *itr1 = p->getSortedIterator(l1, fieldsToSort1);
+    // EDBIterator *itr2 = p2->getSortedIterator(l2, fieldsToSort2);
+    EDBIterator *itr1 = p->getSortedIterator(l1, posInL1);
+    EDBIterator *itr2 = p2->getSortedIterator(l2, posInL2);
 
     std::vector<std::shared_ptr<ColumnWriter>> cols;
     for (int i = 0; i < fieldsToSort1.size(); i++) {
@@ -1171,7 +1176,8 @@ std::vector<std::shared_ptr<Column>> EDBTable::checkNewIn(
         fieldsToSort.push_back(posVars[posInL[i]]);
     }
 
-    EDBIterator *iter = getSortedIterator(l, fieldsToSort);
+    // EDBIterator *iter = getSortedIterator(l, fieldsToSort);
+    EDBIterator *iter = getSortedIterator(l, posInL);
 
     int sz = checkValues.size();
 
@@ -1323,14 +1329,15 @@ std::shared_ptr<Column> EDBTable::checkIn(
     //    }
 
     LOG(DEBUGL) << "EDBTable::checkIn, literal = " << l.tostring() << ", posInL = " << (int) posInL;
-    std::vector<uint8_t> posVars = l.getPosVars();
+//    std::vector<uint8_t> posVars = l.getPosVars();
     std::vector<uint8_t> fieldsToSort;
-    for (int i = 0; i < posVars.size(); i++) {
-        if (i == posInL) {
-            fieldsToSort.push_back(i);
-            break;
-        }
-    }
+//    for (int i = 0; i < posVars.size(); i++) {
+//        if (i == posInL) {
+//            fieldsToSort.push_back(i);
+//            break;
+//        }
+//    }
+    fieldsToSort.push_back(posInL);
     EDBIterator *iter = getSortedIterator(l, fieldsToSort);
 
     //Output

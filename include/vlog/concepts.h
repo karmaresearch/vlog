@@ -3,6 +3,7 @@
 
 #include <vlog/support.h>
 #include <vlog/consts.h>
+#include <vlog/graph.h>
 
 #include <kognac/logs.h>
 
@@ -10,19 +11,31 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <vector>
+#include <set>
 #include <unordered_map>
 
 /*** PREDICATES ***/
 #define EDB 0
 #define IDB 1
-#define MAX_NPREDS 32768
-#define OUT_OF_PREDICATES   32768
+#define MAX_NPREDS (2048*1024)
 
-typedef uint16_t PredId_t;
+typedef uint32_t PredId_t;
 
 class EDBLayer;
 
 using namespace std;
+
+inline std::string fields2str(const std::vector<uint8_t> &fields) {
+    ostringstream os;
+    os << "[" << fields.size() << "]{";
+    for (auto f : fields) {
+       os << (int)f << ",";
+    }
+    os << "}";
+
+    return os.str();
+}
+
 
 /*** TERMS ***/
 class VTerm {
@@ -246,8 +259,11 @@ class Literal {
     private:
         const Predicate pred;
         const VTuple tuple;
+        const bool negated;
     public:
-        Literal(const Predicate pred, const VTuple tuple) : pred(pred), tuple(tuple) {}
+        Literal(const Predicate pred, const VTuple tuple) : pred(pred), tuple(tuple), negated(false) {}
+
+        Literal(const Predicate pred, const VTuple tuple, bool negated) : pred(pred), tuple(tuple), negated(negated) {}
 
         Predicate getPredicate() const {
             return pred;
@@ -271,6 +287,10 @@ class Literal {
 
         size_t getNBoundVariables() const {
             return pred.getNFields(pred.getAdorment());
+        }
+
+        bool isNegated() const {
+            return negated;
         }
 
         static int mgu(Substitution *substitutions, const Literal &l, const Literal &m);
@@ -411,6 +431,17 @@ class Rule {
             return i;
         }
 
+        uint8_t numberOfNegatedLiteralsInBody() {
+            uint8_t result = 0;
+            for (std::vector<Literal>::const_iterator itr = getBody().begin();
+                    itr != getBody().end(); ++itr) {
+                if (itr->isNegated()){
+                    ++result;
+                }
+            }
+            return result;
+        }
+
         void checkRule() const;
 
         std::string tostring(Program *program, EDBLayer *db) const;
@@ -429,7 +460,7 @@ class Program {
     private:
         //const uint64_t assignedIds;
         EDBLayer *kb;
-        std::vector<uint32_t> rules[MAX_NPREDS];
+        std::vector<std::vector<uint32_t>> rules;
         std::vector<Rule> allrules;
 
         Dictionary dictPredicates;
@@ -452,6 +483,10 @@ class Program {
         VLIBEXP void setKB(EDBLayer *e) {
             kb = e;
         }
+
+	uint64_t getMaxPredicateId() {
+	    return dictPredicates.getCounter();
+	}
 
         std::string parseRule(std::string rule, bool rewriteMultihead);
 
@@ -522,6 +557,10 @@ class Program {
 
         int getNIDBPredicates();
 
+        int getNPredicates() {
+            return rules.size();
+        }
+
         std::string tostring();
 
         VLIBEXP bool areExistentialRules();
@@ -529,6 +568,11 @@ class Program {
         static std::string compressRDFOWLConstants(std::string input);
 
         VLIBEXP std::vector<PredId_t> getAllEDBPredicateIds();
+
+        // Returns true if stratification succeeded, and then stores the stratification in the parameter.
+        // The result vector is indexed by predicate id, and then gives the stratification class.
+        // The number of stratification classes is also returned.
+        bool stratify(std::vector<int> &stratification, int &nStatificationClasses);
 
         ~Program() {
         }

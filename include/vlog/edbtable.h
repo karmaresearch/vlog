@@ -66,8 +66,12 @@ class EDBTable {
             return false;
         }
 
-        virtual std::shared_ptr<const Segment> getSegment() {
-            return std::shared_ptr<const Segment>();
+        virtual bool expensiveLayer() {
+            return false;
+        }
+
+        virtual bool areTermsEncoded() {
+            return true;
         }
 };
 
