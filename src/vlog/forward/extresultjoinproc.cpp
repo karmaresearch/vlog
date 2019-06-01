@@ -325,7 +325,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         }
     }
 
-    if (chaseMgmt->isRestricted() || sn->get_RMFC_program() != NULL) {
+    if (chaseMgmt->isRestricted()) {
         std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
         int count = 0;
         if (chaseMgmt->isCheckCyclicMode()) {
@@ -517,7 +517,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         return;
     }
 
-    if (chaseMgmt->isRestricted()  || sn->get_RMFC_program() != NULL) {
+    if (chaseMgmt->isRestricted()) {
         std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
         int count = 0;
         if (chaseMgmt->isCheckCyclicMode()) {
@@ -1030,7 +1030,7 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
         }
 
         //If the chase is restricted, we must first remove data
-        if (chaseMgmt->isRestricted()  || sn->get_RMFC_program() != NULL) {
+        if (chaseMgmt->isRestricted()) {
             std::vector<uint64_t> filterRows;
             int count = 0;
             if (chaseMgmt->isCheckCyclicMode()) {

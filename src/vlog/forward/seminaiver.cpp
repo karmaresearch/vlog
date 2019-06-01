@@ -450,14 +450,6 @@ bool SemiNaiver::executeUntilSaturation(
         }
         iteration++;
 
-        if (timeout != NULL && *timeout != 0) {
-            std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
-            if (s.count() > *timeout) {
-                *timeout = 0;   // To indicate materialization was stopped because of timeout.
-                return newDer;
-            }
-        }
-
         if (response) {
             if (checkCyclicTerms) {
                 foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
@@ -465,6 +457,10 @@ bool SemiNaiver::executeUntilSaturation(
                     LOG(DEBUGL) << "Found a cyclic term";
                     return newDer;
                 }
+            }
+
+            if (typeChase == TypeChase::RESTRICTED_CHASE && ruleset[currentRule].rule.isExistential()) {
+                return response;
             }
 
             //I disable this...
