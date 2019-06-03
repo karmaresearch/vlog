@@ -995,6 +995,9 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
                     break;
                 }
             }
+            if (found) {
+                break;
+            }
         }
         table->releaseIterator(tbItr);
         itr.moveNextCount();
