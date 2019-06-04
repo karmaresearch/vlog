@@ -684,6 +684,10 @@ bool Checker::MFC(Program &prg, bool restricted) {
 Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
     // Create  the critical instance (cdb)
     EDBLayer *db = p.getKB();
+    // Add "*" to the dictionary of the original program, so that it will not clash with other
+    // generated constants.
+    uint64_t id = 0;
+    db->getOrAddDictNumber("*", 1, id);
     EDBLayer *layer = new EDBLayer(*db, false);
 
     //Populate the critical instance with new facts
