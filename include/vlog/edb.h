@@ -78,7 +78,7 @@ class EDBLayer {
         Factory<EDBMemIterator> memItrFactory;
         std::vector<IndexedTupleTable *>tmpRelations;
 
-        std::unique_ptr<Dictionary> termsDictionary;
+        std::shared_ptr<Dictionary> termsDictionary;
         std::string rootPath;
 
         VLIBEXP void addTridentTable(const EDBConf::Table &tableConf, bool multithreaded);

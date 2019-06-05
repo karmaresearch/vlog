@@ -108,6 +108,9 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
 
         uint32_t ruleid = 0;
         this->allIDBRules.resize(nStratificationClasses);
+        for (int i = 0; i < nStratificationClasses; i++) {
+            this->allIDBRules[i].reserve(ruleset.size());
+        }
         for (std::vector<Rule>::iterator itr = ruleset.begin(); itr != ruleset.end();
                 ++itr) {
             RuleExecutionDetails *d = new RuleExecutionDetails(*itr, ruleid++);
@@ -123,6 +126,9 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
             } else
                 this->allEDBRules.push_back(*d);
             delete d;
+        }
+        for (int i = 0; i < nStratificationClasses; i++) {
+            this->allIDBRules[i].reserve(this->allIDBRules[i].size());
         }
 
 #if 0
@@ -256,6 +262,7 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     LOG(DEBUGL) << "Optimizing ruleset...";
 #endif
+    size_t allRulesSize = 0;
     for (int k = 0; k < allIDBRules.size(); k++) {
         for (std::vector<RuleExecutionDetails>::iterator itr = allIDBRules[k].begin();
                 itr != allIDBRules[k].end();
@@ -278,6 +285,7 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
             }
             LOG(DEBUGL) << itr->rule.tostring(program, &layer);
 #endif
+            allRulesSize += allIDBRules[k].size();
         }
     }
     for (std::vector<RuleExecutionDetails>::iterator itr = allEDBRules.begin();
@@ -285,6 +293,8 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
             ++itr) {
         itr->createExecutionPlans(checkCyclicTerms);
     }
+    allRulesSize += allEDBRules.size();
+    allrules.reserve(allRulesSize);
 
     //Setup the datastructures to handle the chase
     std::copy(allEDBRules.begin(), allEDBRules.end(), std::back_inserter(allrules));
@@ -452,14 +462,6 @@ bool SemiNaiver::executeUntilSaturation(
         }
         iteration++;
 
-        if (timeout != NULL && *timeout != 0) {
-            std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
-            if (s.count() > *timeout) {
-                *timeout = 0;   // To indicate materialization was stopped because of timeout.
-                return newDer;
-            }
-        }
-
         if (response) {
             if (checkCyclicTerms) {
                 foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
@@ -468,6 +470,14 @@ bool SemiNaiver::executeUntilSaturation(
                     return newDer;
                 }
             }
+<<<<<<< HEAD
+=======
+
+            if (typeChase == TypeChase::RESTRICTED_CHASE && ruleset[currentRule].rule.isExistential()) {
+                return response;
+            }
+
+>>>>>>> critical
             //I disable this...
             if (false && ruleset[currentRule].rule.isRecursive() && limitView == 0) {
                 //Is the rule recursive? Go until saturation...

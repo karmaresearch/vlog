@@ -27,6 +27,7 @@
 
 EDBLayer::EDBLayer(EDBLayer &db, bool copyTables) {
     this->predDictionary = db.predDictionary;
+    this->termsDictionary = db.termsDictionary;
     if (copyTables) {
         this->dbPredicates = db.dbPredicates;
     }
@@ -885,11 +886,12 @@ bool EDBLayer::getOrAddDictNumber(const char *text, const size_t sizeText,
     if (!resp) {
         if (!termsDictionary.get()) {
             LOG(DEBUGL) << "The additional terms will start from " << getNTerms();
-            termsDictionary = std::unique_ptr<Dictionary>(
+            termsDictionary = std::shared_ptr<Dictionary>(
                     new Dictionary(getNTerms()));
         }
         std::string t(text, sizeText);
         id = termsDictionary->getOrAdd(t);
+        LOG(DEBUGL) << "getOrAddDictNumber \"" << t << "\" returns " << id;
         resp = true;
     }
     return resp;

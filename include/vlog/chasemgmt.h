@@ -170,6 +170,10 @@ class ChaseMgmt {
             return ruleToCheck >= 0;
         }
 
+        int getRuleToCheck() {
+            return ruleToCheck;
+        }
+
         bool isCheckCyclicMode() {
             return checkCyclic;
         }

@@ -325,7 +325,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         }
     }
 
-    if (chaseMgmt->isRestricted() || sn->get_RMFC_program() != NULL) {
+    if (chaseMgmt->isRestricted()) {
         std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
         int count = 0;
         if (chaseMgmt->isCheckCyclicMode()) {
@@ -517,7 +517,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         return;
     }
 
-    if (chaseMgmt->isRestricted()  || sn->get_RMFC_program() != NULL) {
+    if (chaseMgmt->isRestricted()) {
         std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
         int count = 0;
         if (chaseMgmt->isCheckCyclicMode()) {
@@ -866,30 +866,32 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                 //the rem. variables (only if RMFA, for RMFC, we use *).
                 auto const *rule = ruleContainer->getRule();
                 for(const auto &bLiteral : rule->getBody()) {
-                    VTuple t(bLiteral.getTupleSize());
-                    for(uint8_t m = 0; m < bLiteral.getTupleSize(); ++m) {
-                        const VTerm term = bLiteral.getTermAtPos(m);
-                        if (term.isVariable()) {
-                            uint8_t varID = term.getId();
-                            if (!mappings.count(varID)) {
-                                if (rmfa) {
-                                    mappings.insert(
-                                            std::make_pair(varID, startFreshIDs++));
-                                } else {
-                                    Program *p = sn->get_RMFC_program();
-                                    assert(p != NULL);
-                                    uint64_t id = 0;
-                                    p->getKB()->getOrAddDictNumber("*", 1, id);
-                                    mappings.insert(
-                                            std::make_pair(varID, id));
+                    if (! bLiteral.isNegated()) {
+                        VTuple t(bLiteral.getTupleSize());
+                        for(uint8_t m = 0; m < bLiteral.getTupleSize(); ++m) {
+                            const VTerm term = bLiteral.getTermAtPos(m);
+                            if (term.isVariable()) {
+                                uint8_t varID = term.getId();
+                                if (!mappings.count(varID)) {
+                                    if (rmfa) {
+                                        mappings.insert(
+                                                std::make_pair(varID, startFreshIDs++));
+                                    } else {
+                                        Program *p = sn->get_RMFC_program();
+                                        assert(p != NULL);
+                                        uint64_t id = 0;
+                                        p->getKB()->getOrAddDictNumber("*", 1, id);
+                                        mappings.insert(
+                                                std::make_pair(varID, id));
+                                    }
                                 }
+                                t.set(VTerm(0, mappings[varID]), m);
+                            } else {
+                                t.set(term, m);
                             }
-                            t.set(VTerm(0, mappings[varID]), m);
-                        } else {
-                            t.set(term, m);
                         }
+                        _addIfNotExist(output, Literal(bLiteral.getPredicate(), t));
                     }
-                    _addIfNotExist(output, Literal(bLiteral.getPredicate(), t));
                 }
                 //Also add the original variable, and consider other head atoms
                 assert(!mappings.count(varID));
@@ -929,9 +931,9 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
     uint64_t newrow[256];
     Program *rmfc = sn->get_RMFC_program();
     if (rmfc != NULL) {
-        if (ruleDetails->lastExecution <= 0) {
-            // We need one execution of this rule to introduce a skolem constant. Otherwise, it would immediately be blocked
-            // by the critical instance.
+        if (chaseMgmt->getRuleToCheck() == ruleDetails->rule.getId() && ruleDetails->lastExecution <= 0) {
+            // We need one execution of this rule to introduce a skolem constant.
+            // Otherwise, it would immediately be blocked by the critical instance.
             LOG(DEBUGL) << "blocked_check returns false";
             return false;
         }
@@ -995,6 +997,9 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
                     break;
                 }
             }
+            if (found) {
+                break;
+            }
         }
         table->releaseIterator(tbItr);
         itr.moveNextCount();
@@ -1030,7 +1035,7 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
         }
 
         //If the chase is restricted, we must first remove data
-        if (chaseMgmt->isRestricted()  || sn->get_RMFC_program() != NULL) {
+        if (chaseMgmt->isRestricted()) {
             std::vector<uint64_t> filterRows;
             int count = 0;
             if (chaseMgmt->isCheckCyclicMode()) {
