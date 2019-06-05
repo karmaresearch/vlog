@@ -12,21 +12,21 @@
 // class IncrementalState;
 
 IncrementalState::IncrementalState(// const
-                                   ProgramArgs &vm,
-                                   const std::shared_ptr<SemiNaiver> from,
-                                   const std::vector<std::string> &eMinus) :
-        vm(vm), fromSemiNaiver(from), eMinus(eMinus),
-        conf(NULL), layer(NULL), program(NULL) {
-    dredDir = vm["dred"].as<string>();
-    nthreads = vm["nthreads"].as<int>();
-    if (vm["multithreaded"].empty()) {
-        nthreads = -1;
+        ProgramArgs &vm,
+        const std::shared_ptr<SemiNaiver> from,
+        const std::vector<std::string> &eMinus) :
+    vm(vm), fromSemiNaiver(from), eMinus(eMinus),
+    conf(NULL), layer(NULL), program(NULL) {
+        dredDir = vm["dred"].as<string>();
+        nthreads = vm["nthreads"].as<int>();
+        if (vm["multithreaded"].empty()) {
+            nthreads = -1;
+        }
+        interRuleThreads = vm["interRuleThreads"].as<int>();
+        if (vm["multithreaded"].empty()) {
+            interRuleThreads = 0;
+        }
     }
-    interRuleThreads = vm["interRuleThreads"].as<int>();
-    if (vm["multithreaded"].empty()) {
-        interRuleThreads = 0;
-    }
-}
 
 IncrementalState::~IncrementalState() {
     for (auto r: rm) {
@@ -76,58 +76,59 @@ std::string IncrementalState::printArgs(const Literal &lit, const EDBLayer *kb) 
 
 // class IncrOverdelete : public IncrementalState
 IncrOverdelete::IncrOverdelete(// const
-                               ProgramArgs &vm,
-                               const std::shared_ptr<SemiNaiver> from,
-                               const std::vector<std::string> &eMinus) :
-        IncrementalState(vm, from, eMinus) {
+        ProgramArgs &vm,
+        const std::shared_ptr<SemiNaiver> from,
+        const std::vector<std::string> &eMinus) :
+    IncrementalState(vm, from, eMinus) {
 
-    // Overdelete
-    // Create a Program, create a SemiNaiver, run...
+        // Overdelete
+        // Create a Program, create a SemiNaiver, run...
 
-    std::string confString = confContents();
+        std::string confString = confContents();
 
-    LOG(INFOL) << "Generated edb.conf:";
-    LOG(INFOL) << confString;
+        LOG(INFOL) << "Generated edb.conf:";
+        LOG(INFOL) << confString;
 
-    conf = new EDBConf(confString, false);
-    NamedSemiNaiver from_map;
-    from_map["base"] = from;
-    layer = new EDBLayer(*conf, false, from_map);
-    layer->setName("overdelete");
+        conf = new EDBConf(confString, false);
+        NamedSemiNaiver from_map;
+        from_map["base"] = from;
+        layer = new EDBLayer(*conf, false, from_map);
+        layer->setName("overdelete");
 
-    std::string overdelete_rules = convertRules();
-    std::cout << "Overdelete rule set:" << std::endl;
-    std::cout << overdelete_rules;
+        std::string overdelete_rules = convertRules();
+        std::cout << "Overdelete rule set:" << std::endl;
+        std::cout << overdelete_rules;
 
-    program = new Program(layer);
-    program->readFromString(overdelete_rules, 
-                            vm["rewriteMultihead"].as<bool>());
+        program = new Program(layer);
+        program->readFromString(overdelete_rules,
+                vm["rewriteMultihead"].as<bool>());
 
-    std::vector<PredId_t> remove_pred;
-    for (const auto &n: eMinus) {
-        PredId_t p = program->getPredicate(n).getId();
-        remove_pred.push_back(p);
-        LOG(ERRORL) << "FIXME: the removal predicate is called " << name2eMinus("TE") << " here";
-        PredId_t pMinus = program->getPredicate(name2eMinus("TE")).getId();
-        rm[p] = new EDBRemoveLiterals(pMinus, layer);
-        // rm[p]->dump(std::cerr, *layer);
-        LOG(INFOL) << "Add removal predicate " << pMinus << " for predicate " << p;
+        std::vector<PredId_t> remove_pred;
+        for (const auto &n: eMinus) {
+            PredId_t p = program->getPredicate(n).getId();
+            remove_pred.push_back(p);
+            LOG(ERRORL) << "FIXME: the removal predicate is called " << name2eMinus("TE") << " here";
+            PredId_t pMinus = program->getPredicate(name2eMinus("TE")).getId();
+            rm[p] = new EDBRemoveLiterals(pMinus, layer);
+            // rm[p]->dump(std::cerr, *layer);
+            LOG(INFOL) << "Add removal predicate " << pMinus << " for predicate " << p;
+        }
+        layer->addRemoveLiterals(rm);
+
+        //Prepare the materialization
+        sn = Reasoner::getSemiNaiver(
+                *layer,
+                program,
+                vm["no-intersect"].empty(),
+                vm["no-filtering"].empty(),
+                !vm["multithreaded"].empty(),
+                vm["restrictedChase"].as<bool>()
+                ? TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE,
+                nthreads,
+                interRuleThreads,
+                ! vm["shufflerules"].empty());
+        sn->setName("overdelete");
     }
-    layer->addRemoveLiterals(rm);
-
-    //Prepare the materialization
-    sn = Reasoner::getSemiNaiver(
-            *layer,
-            program,
-            vm["no-intersect"].empty(),
-            vm["no-filtering"].empty(),
-            !vm["multithreaded"].empty(),
-            vm["restrictedChase"].as<bool>(),
-            nthreads,
-            interRuleThreads,
-            ! vm["shufflerules"].empty());
-    sn->setName("overdelete");
-}
 
 
 /**
@@ -301,78 +302,79 @@ std::string IncrOverdelete::convertRules() const {
 // class IncrRederive : public IncrementalState
 
 IncrRederive::IncrRederive(// const
-                           ProgramArgs vm,
-                           const std::shared_ptr<SemiNaiver> from,
-                           const std::vector<std::string> &eMinus,
-                           const IncrOverdelete &overdelete) :
-        IncrementalState(vm, from, eMinus),
-        overdelete(overdelete) {
-    std::string confString = confContents();
-    LOG(INFOL) << "Generated rederive edb.conf:";
-    LOG(INFOL) << confString;
+        ProgramArgs vm,
+        const std::shared_ptr<SemiNaiver> from,
+        const std::vector<std::string> &eMinus,
+        const IncrOverdelete &overdelete) :
+    IncrementalState(vm, from, eMinus),
+    overdelete(overdelete) {
+        std::string confString = confContents();
+        LOG(INFOL) << "Generated rederive edb.conf:";
+        LOG(INFOL) << confString;
 
-    conf = new EDBConf(confString, false);
-    NamedSemiNaiver from_map;
-    from_map["base"] = from;
-    from_map["overdelete"] = overdelete.getSN();
-    layer = new EDBLayer(*conf, false, from_map);
-    layer->setName("rederive");
+        conf = new EDBConf(confString, false);
+        NamedSemiNaiver from_map;
+        from_map["base"] = from;
+        from_map["overdelete"] = overdelete.getSN();
+        layer = new EDBLayer(*conf, false, from_map);
+        layer->setName("rederive");
 
-    std::string rules = convertRules();
-    std::cout << "Rederive rule set:" << std::endl;
-    std::cout << rules;
+        std::string rules = convertRules();
+        std::cout << "Rederive rule set:" << std::endl;
+        std::cout << rules;
 
-    program = new Program(layer);
-    program->readFromString(rules, vm["rewriteMultihead"].as<bool>());
+        program = new Program(layer);
+        program->readFromString(rules, vm["rewriteMultihead"].as<bool>());
 
-    // The Removals should contain not only TE@dMinus (= E^-) for TE
-    // but also q@dMinus for q (all q)
+        // The Removals should contain not only TE@dMinus (= E^-) for TE
+        // but also q@dMinus for q (all q)
 
-    // Add the user removals
-    for (const auto &r: eMinus) {
-        LOG(ERRORL) << "FIXME: the removal predicate is called " << name2eMinus("TE") << " here";
-        std::string rm_name = name2eMinus("TE");
-        PredId_t e = program->getPredicate(r).getId();
-        PredId_t rm_pred = program->getPredicate(rm_name).getId();
-        rm[e] = new EDBRemoveLiterals(rm_pred, layer);
-    }
-
-    Program *sn_program = fromSemiNaiver->getProgram();
-    const std::vector<std::string> idbs = sn_program->getAllPredicateStrings();
-    std::vector<std::pair<PredId_t, std::string>> idb_pred;
-    for (const std::string &p : idbs) {
-        PredId_t pred = sn_program->getPredicate(p).getId();
-        if (sn_program->isPredicateIDB(pred)) {
-            idb_pred.push_back(std::pair<PredId_t, std::string>(pred, p));
+        // Add the user removals
+        for (const auto &r: eMinus) {
+            LOG(ERRORL) << "FIXME: the removal predicate is called " << name2eMinus("TE") << " here";
+            std::string rm_name = name2eMinus("TE");
+            PredId_t e = program->getPredicate(r).getId();
+            PredId_t rm_pred = program->getPredicate(rm_name).getId();
+            rm[e] = new EDBRemoveLiterals(rm_pred, layer);
         }
-    }
 
-    // const
-    Program *op = overdelete.getSN()->getProgram();
-    for (const auto &pp : idb_pred) {
-        // Read the Q^v values from our own EDB tables
-        std::string rm_name = name2dMinus(pp.second);
-        PredId_t rm_pred = op->getPredicate(rm_name).getId();
-        LOG(INFOL) << "dMinus table for " << pp.second << " is "<< rm_name;
-        // Feed that to the Removal
-        rm[pp.first] = new EDBRemoveLiterals(rm_pred, layer);
-        LOG(INFOL) << "Add removal predicate " << rm_pred << " for predicate " << pp.first;
-    }
-    layer->addRemoveLiterals(rm);
+        Program *sn_program = fromSemiNaiver->getProgram();
+        const std::vector<std::string> idbs = sn_program->getAllPredicateStrings();
+        std::vector<std::pair<PredId_t, std::string>> idb_pred;
+        for (const std::string &p : idbs) {
+            PredId_t pred = sn_program->getPredicate(p).getId();
+            if (sn_program->isPredicateIDB(pred)) {
+                idb_pred.push_back(std::pair<PredId_t, std::string>(pred, p));
+            }
+        }
 
-    //Prepare the materialization
-    sn = Reasoner::getSemiNaiver(
-            *layer,
-            program,
-            vm["no-intersect"].empty(),
-            vm["no-filtering"].empty(),
-            !vm["multithreaded"].empty(),
-            vm["restrictedChase"].as<bool>(),
-            nthreads,
-            interRuleThreads,
-            ! vm["shufflerules"].empty());
-    sn->setName("rederive");
-}
+        // const
+        Program *op = overdelete.getSN()->getProgram();
+        for (const auto &pp : idb_pred) {
+            // Read the Q^v values from our own EDB tables
+            std::string rm_name = name2dMinus(pp.second);
+            PredId_t rm_pred = op->getPredicate(rm_name).getId();
+            LOG(INFOL) << "dMinus table for " << pp.second << " is "<< rm_name;
+            // Feed that to the Removal
+            rm[pp.first] = new EDBRemoveLiterals(rm_pred, layer);
+            LOG(INFOL) << "Add removal predicate " << rm_pred << " for predicate " << pp.first;
+        }
+        layer->addRemoveLiterals(rm);
+
+        //Prepare the materialization
+        sn = Reasoner::getSemiNaiver(
+                *layer,
+                program,
+                vm["no-intersect"].empty(),
+                vm["no-filtering"].empty(),
+                !vm["multithreaded"].empty(),
+                vm["restrictedChase"].as<bool>()
+                    ? TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE,
+                nthreads,
+                interRuleThreads,
+                ! vm["shufflerules"].empty());
+        sn->setName("rederive");
+    }
 
 
 /**
@@ -545,84 +547,85 @@ std::string IncrRederive::convertRules() const {
  *      u(q) :- q@dPlus                 this is an "EDB" relation
  */
 IncrAdd::IncrAdd(// const
-                 ProgramArgs vm,
-                 const std::shared_ptr<SemiNaiver> from,
-                 const std::vector<std::string> &eMinus,
-                 const std::vector<std::string> &eAdd,
-                 const IncrOverdelete &overdelete,
-                 const IncrRederive &rederive) :
-        IncrementalState(vm, from, eMinus), eAdd(eAdd), overdelete(overdelete),
-        rederive(rederive) {
-    std::string confString = confContents();
-    LOG(INFOL) << "Generated additions edb.conf:";
-    LOG(INFOL) << confString;
+        ProgramArgs vm,
+        const std::shared_ptr<SemiNaiver> from,
+        const std::vector<std::string> &eMinus,
+        const std::vector<std::string> &eAdd,
+        const IncrOverdelete &overdelete,
+        const IncrRederive &rederive) :
+    IncrementalState(vm, from, eMinus), eAdd(eAdd), overdelete(overdelete),
+    rederive(rederive) {
+        std::string confString = confContents();
+        LOG(INFOL) << "Generated additions edb.conf:";
+        LOG(INFOL) << confString;
 
-    // LOG(ERRORL) << "For now, grab an additions EDBConf from file";
-    // conf = new EDBConf(vm["dred"].as<string>() + "/edb.conf-additions");
-    conf = new EDBConf(confString, false);
-    NamedSemiNaiver from_map;
-    from_map["base"] = from;
-    from_map["overdelete"] = overdelete.getSN();
-    from_map["rederive"] = rederive.getSN();
-    layer = new EDBLayer(*conf, false, from_map);
-    layer->setName("additions");
+        // LOG(ERRORL) << "For now, grab an additions EDBConf from file";
+        // conf = new EDBConf(vm["dred"].as<string>() + "/edb.conf-additions");
+        conf = new EDBConf(confString, false);
+        NamedSemiNaiver from_map;
+        from_map["base"] = from;
+        from_map["overdelete"] = overdelete.getSN();
+        from_map["rederive"] = rederive.getSN();
+        layer = new EDBLayer(*conf, false, from_map);
+        layer->setName("additions");
 
-    std::string rules = convertRules();
-    std::cout << "Addition rule set:" << std::endl;
-    std::cout << rules;
+        std::string rules = convertRules();
+        std::cout << "Addition rule set:" << std::endl;
+        std::cout << rules;
 
-    program = new Program(layer);
-    program->readFromString(rules, vm["rewriteMultihead"].as<bool>());
+        program = new Program(layer);
+        program->readFromString(rules, vm["rewriteMultihead"].as<bool>());
 
-    // The Removals should contain not only TE@dMinus (= E^-) for TE
-    // but also q@dMinus for q (all q)
+        // The Removals should contain not only TE@dMinus (= E^-) for TE
+        // but also q@dMinus for q (all q)
 
-    // Add the user removals
-    for (const auto &r: eMinus) {
-        std::string rm_name = name2eMinus(r);
-        PredId_t e = program->getPredicate(r).getId();
-        PredId_t rm_pred = program->getPredicate(rm_name).getId();
-        rm[e] = new EDBRemoveLiterals(rm_pred, layer);
-    }
-
-    Program *sn_program = fromSemiNaiver->getProgram();
-    const std::vector<std::string> idbs = sn_program->getAllPredicateStrings();
-    std::vector<std::pair<PredId_t, std::string>> idb_pred;
-    for (const std::string &p : idbs) {
-        PredId_t pred = sn_program->getPredicate(p).getId();
-        if (sn_program->isPredicateIDB(pred)) {
-            idb_pred.push_back(std::pair<PredId_t, std::string>(pred, p));
+        // Add the user removals
+        for (const auto &r: eMinus) {
+            std::string rm_name = name2eMinus(r);
+            PredId_t e = program->getPredicate(r).getId();
+            PredId_t rm_pred = program->getPredicate(rm_name).getId();
+            rm[e] = new EDBRemoveLiterals(rm_pred, layer);
         }
-    }
 
-    // const
-    Program *op = overdelete.getSN()->getProgram();
-    for (const auto &pp : idb_pred) {
-        // Read the Q^v values from our own EDB tables
-        std::string rm_name = name2dMinus(pp.second);
-        PredId_t rm_pred = op->getPredicate(rm_name).getId();
-        LOG(DEBUGL) << "dMinus table for " << pp.second << " is "<< rm_name;
-        // Feed that to the Removal
-        rm[pp.first] = new EDBRemoveLiterals(rm_pred, layer);
-    }
-    for (const auto &r : rm) {
-        LOG(INFOL) << "Add removal predicate for predicate " << r.first;
-    }
-    layer->addRemoveLiterals(rm);
+        Program *sn_program = fromSemiNaiver->getProgram();
+        const std::vector<std::string> idbs = sn_program->getAllPredicateStrings();
+        std::vector<std::pair<PredId_t, std::string>> idb_pred;
+        for (const std::string &p : idbs) {
+            PredId_t pred = sn_program->getPredicate(p).getId();
+            if (sn_program->isPredicateIDB(pred)) {
+                idb_pred.push_back(std::pair<PredId_t, std::string>(pred, p));
+            }
+        }
 
-    //Prepare the materialization
-    sn = Reasoner::getSemiNaiver(
-            *layer,
-            program,
-            vm["no-intersect"].empty(),
-            vm["no-filtering"].empty(),
-            !vm["multithreaded"].empty(),
-            vm["restrictedChase"].as<bool>(),
-            nthreads,
-            interRuleThreads,
-            ! vm["shufflerules"].empty());
-    sn->setName("additions");
-}
+        // const
+        Program *op = overdelete.getSN()->getProgram();
+        for (const auto &pp : idb_pred) {
+            // Read the Q^v values from our own EDB tables
+            std::string rm_name = name2dMinus(pp.second);
+            PredId_t rm_pred = op->getPredicate(rm_name).getId();
+            LOG(DEBUGL) << "dMinus table for " << pp.second << " is "<< rm_name;
+            // Feed that to the Removal
+            rm[pp.first] = new EDBRemoveLiterals(rm_pred, layer);
+        }
+        for (const auto &r : rm) {
+            LOG(INFOL) << "Add removal predicate for predicate " << r.first;
+        }
+        layer->addRemoveLiterals(rm);
+
+        //Prepare the materialization
+        sn = Reasoner::getSemiNaiver(
+                *layer,
+                program,
+                vm["no-intersect"].empty(),
+                vm["no-filtering"].empty(),
+                !vm["multithreaded"].empty(),
+                vm["restrictedChase"].as<bool>()
+                    ? TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE,
+                nthreads,
+                interRuleThreads,
+                ! vm["shufflerules"].empty());
+        sn->setName("additions");
+    }
 
 IncrAdd::~IncrAdd() {
 }
@@ -766,5 +769,5 @@ std::string IncrAdd::confContents() const {
     }
 
     return os.str();
-    
+
 }
