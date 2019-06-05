@@ -917,7 +917,7 @@ MergerInternalTableItr::MergerInternalTableItr(const std::vector<std::pair<FCInt
         const std::vector<uint8_t> &positionsToSort, const uint8_t nfields)
     : iterators(iterators), firstCall(true),
     sorter(iterators, (uint8_t) positionsToSort.size(), sortPos), nfields(nfields) {
-        for (uint8_t i = 0; i < iterators.size(); ++i) {
+        for (size_t i = 0; i < iterators.size(); ++i) {
             indices.push_back(i);
         }
         for (uint8_t i = 0; i < positionsToSort.size(); ++i)
@@ -944,11 +944,11 @@ void MergerInternalTableItr::next() {
     }
 }
 
-bool MITISorter::operator ()(const uint8_t i1, const uint8_t i2) const {
+bool MITISorter::operator ()(const size_t i1, const size_t i2) const {
     if (i1 == i2) {
         return false;
     }
-    for (uint8_t i = 0; i < tuplesize; ++i) {
+    for (int i = 0; i < tuplesize; ++i) {
         Term_t v1 = iterators[i1].first->getCurrentValue(sortPos[i]);
         Term_t v2 = iterators[i2].first->getCurrentValue(sortPos[i]);
         // LOG(TRACEL) << "i = " << i << ", i1 = " << i1 << ", v1 = " << v1 << ", i2 = " << i2 << ", v2 = " << v2;

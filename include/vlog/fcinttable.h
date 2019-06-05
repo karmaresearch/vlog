@@ -354,12 +354,12 @@ struct MITISorter {
             const uint8_t tuplesize, uint8_t *sortPos) : iterators(iterators),
     tuplesize(tuplesize), sortPos(sortPos) {}
 
-    bool operator ()(const uint8_t i1, const uint8_t i2) const;
+    bool operator ()(const size_t i1, const size_t i2) const;
 };
 
 class MergerInternalTableItr final : public FCInternalTableItr {
     private:
-        std::vector<uint8_t> indices;
+        std::vector<size_t> indices;
         const std::vector<std::pair<FCInternalTableItr*, size_t>> iterators;
         uint8_t sortPos[10];
         bool firstCall;

@@ -766,6 +766,10 @@ bool Program::stratify(std::vector<int> &stratification, int &nClasses) {
             }
         }
     }
+    if (usedNegated.empty()) {
+        nClasses = 1;
+        return true;
+    }
 
     Graph negationsClosure(graphSize);
 
