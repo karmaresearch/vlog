@@ -299,7 +299,11 @@ void JoinExecutor::verificativeJoinOneColumn(
     }
     keys.push_back(make_pair(prevKey, std::make_pair(beginning,
                     currentIdx)));
+#define RESET_SORTED_ITR        1
+#if RESET_SORTED_ITR
+#else
     intermediateResults->releaseIterator(itr);
+#endif
 
     //3- Query the KB
     FCIterator tableItr = naiver->getTable(literal, min, max);
@@ -316,7 +320,13 @@ void JoinExecutor::verificativeJoinOneColumn(
         shared_ptr<const Column> column = table->
             getColumn(hv.joinCoordinates[currentLiteral][0].second);
         LOG(TRACEL) << "Count = " << count;
+#if RESET_SORTED_ITR
+        itr->reset();
+#else
         FCInternalTableItr *itr = intermediateResults->sortBy(joinField /*, nthreads */);
+#endif
+        HiResTimer t_iter("verificativeJoin iteration");
+        t_iter.start();
         EDBLayer &layer = naiver->getEDBLayer();
         if (column->isEDB() && layer.supportsCheckIn(((EDBColumn*) column.get())->getLiteral())) {
             //Offload a merge join to the EDB layer
@@ -421,6 +431,7 @@ void JoinExecutor::verificativeJoinOneColumn(
             if (!itr->hasNext())
                 throw 10;
 
+            LOG(TRACEL) << "Column is not EDB";
             itr->next();
             Term_t outputRow[256];
             size_t idx1 = 0;
@@ -493,10 +504,19 @@ void JoinExecutor::verificativeJoinOneColumn(
             output->checkSizes();
 #endif
         }
+#if RESET_SORTED_ITR
+#else
         intermediateResults->releaseIterator(itr);
+#endif
         keys.swap(newKeys);
         tableItr.moveNextCount();
+        t_iter.stop();
+        LOG(INFOL) << t_iter.tostring();
     }
+#if RESET_SORTED_ITR
+    intermediateResults->releaseIterator(itr);
+#else
+#endif
     LOG(TRACEL) << "Loop executed " << count << " times";
 }
 
@@ -1515,6 +1535,10 @@ void JoinExecutor::do_merge_join_classicalgo(const std::vector<const std::vector
         uint8_t p1 = fields1[0];
         uint8_t p2 = fields2[0];
 
+        assert(p1 < vectors1.size());
+        assert(p2 < vectors2.size());
+        assert(l1 < (*vectors1[p1]).size());
+        assert(u2 - 1 < (*vectors2[p2]).size());
         if ((*vectors1[p1])[l1] > (*vectors2[p2])[u2 - 1]) {
             LOG(TRACEL) << "No possible results: begin value of range larger than end value of vector2";
             return;
@@ -1973,7 +1997,8 @@ void JoinExecutor::do_mergejoin(const FCInternalTable * filteredT1,
            */
         secS = std::chrono::system_clock::now() - startS;
         FCInternalTableItr *itr2 = sortedItr2;
-        size_t t2Size = t2->getNRows();
+        size_t t2Size = vectors2[0]->size();
+        assert(t2->getNRows() == t2Size);
         if (faster) {
             sortedItr2 = new VectorFCInternalTableItr(vectors2, 0, t2Size);
             LOG(TRACEL) << "Faster algo";

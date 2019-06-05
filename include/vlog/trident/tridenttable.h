@@ -124,6 +124,11 @@ public:
 
     bool getDictText(const uint64_t id, std::string &text);
 
+    uint8_t getArity() const {
+        // Moved this manifest constant from edb importer to here       RFHH
+        return 3;
+    }
+
     uint64_t getNTerms();
 
     uint64_t getSize();

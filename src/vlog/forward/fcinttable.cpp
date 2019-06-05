@@ -782,7 +782,11 @@ FCInternalTableItr *InmemoryFCInternalTable::sortBy(const std::vector<uint8_t> &
     } else {
         if (primarySort && !isSorted()) {
             LOG(TRACEL) << "InmemoryFCInternalTable::sorting";
+            HiResTimer t_sortby("InmemoryFCInternalTable::sorting");
+            t_sortby.start();
             sortedValues = values->sortBy(NULL);
+            t_sortby.stop();
+            LOG(INFOL) << t_sortby.tostring();
         } else {
             sortedValues = values;
         }
@@ -790,7 +794,11 @@ FCInternalTableItr *InmemoryFCInternalTable::sortBy(const std::vector<uint8_t> &
 
     if (!primarySort) {
         LOG(TRACEL) << "InmemoryFCInternalTable::sorting2";
+        HiResTimer t_sort2("InmemoryFCInternalTable::sorting2");
+        t_sort2.start();
         sortedValues = sortedValues->sortBy(&fields);
+        t_sort2.stop();
+        LOG(INFOL) << t_sort2.tostring();
     }
 
     InmemoryFCInternalTableItr *tableItr = new InmemoryFCInternalTableItr();

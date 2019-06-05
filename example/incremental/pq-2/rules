@@ -1,0 +1,3 @@
+p(X,Y) :- TE(X,rdf:predicate,Y)
+q(X,Y) :- p(X,Y)
+q(X,Y) :- p(X,Z),q(Z,Y)

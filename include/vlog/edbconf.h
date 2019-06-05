@@ -20,7 +20,7 @@ public:
         Table(bool encoded) : encoded(encoded) {}
     };
 
-private:
+protected:
     std::vector<Table> tables;
 
     void parse(string f);
@@ -30,7 +30,7 @@ public:
 
     EDBConf(string rawcontent) : EDBConf(rawcontent, true) {}
 
-    const std::vector<Table> &getTables() {
+    const std::vector<Table> &getTables() const {
         return tables;
     }
 };

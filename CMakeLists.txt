@@ -52,6 +52,7 @@ file(GLOB vlog_SRC
     "src/vlog/backward/*.cpp"
     "src/vlog/forward/*.cpp"
     "src/vlog/magic/*.cpp"
+    "src/vlog/incremental/*.cpp"
     "src/vlog/inmemory/*.cpp"
     "src/vlog/trident/*.cpp"
     "src/vlog/cycles/*.cpp"
@@ -87,7 +88,9 @@ ELSE()
         DOWNLOAD_DIR .
         SOURCE_DIR trident
         BUILD_IN_SOURCE 1
-        CMAKE_ARGS "-DSPARQL=1"
+        CMAKE_ARGS 
+		-DSPARQL=1
+		-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
         INSTALL_COMMAND ""
         )
     ExternalProject_Get_Property(git-trident SOURCE_DIR)

@@ -915,10 +915,20 @@ EDBIterator *TridentTable::getIterator(const Literal &query) {
     return itr;
 }
 
+static std::string fields2string(const std::vector<uint8_t> &fields) {
+    ostringstream os;
+    os << "[" << fields.size() << "]{";
+    for (auto f : fields) {
+        os << (int)f << ", ";
+    }
+    os << "}";
+    return os.str();
+}
+
 EDBIterator *TridentTable::getSortedIterator(const Literal &query,
         const std::vector<uint8_t> &fields) {
     const Literal *literal = &query;
-    LOG(DEBUGL) << "Get sorted iterator for query " << literal->tostring(NULL, layer);
+    LOG(DEBUGL) << "Get sorted iterator for query " << literal->tostring(NULL, layer) << " fields " << fields2string(fields);
     TridentIterator *itr = getTridentIter();
     itr->init(query.getPredicate().getId(), q, *literal, fields, multithreaded ? &mutex : NULL);
     return itr;

@@ -71,6 +71,8 @@ class SemiNaiver {
         PredId_t currentPredicate;
 #endif
 
+        std::string name;
+
     private:
         FCIterator getTableFromIDBLayer(const Literal & literal,
                 const size_t minIteration,
@@ -211,6 +213,36 @@ class SemiNaiver {
         VLIBEXP void storeOnFiles(std::string path, const bool decompress,
                 const int minLevel, const bool csv);
 
+        std::ostream& dumpTables(std::ostream &os) {
+            for (PredId_t i = 0; i < MAX_NPREDS; ++i) {
+                FCTable *table = predicatesTables[i];
+                if (table != NULL && !table->isEmpty()) {
+                    char buffer[MAX_TERM_SIZE];
+
+                    os << "Table " << getProgram()->getPredicateName(i) << std::endl;
+                    FCIterator itr = table->read(0);
+                    const uint8_t sizeRow = table->getSizeRow();
+                    while (!itr.isEmpty()) {
+                        std::shared_ptr<const FCInternalTable> t = itr.getCurrentTable();
+                        FCInternalTableItr *iitr = t->getIterator();
+                        while (iitr->hasNext()) {
+                            iitr->next();
+                            std::string row = "    ";
+                            row += to_string(iitr->getCurrentIteration());
+                            for (uint8_t m = 0; m < sizeRow; ++m) {
+                                row += "\t" + to_string(iitr->getCurrentValue(m));
+                            }
+                            os << row << std::endl;
+                        }
+                        t->releaseIterator(iitr);
+                        itr.moveNextCount();
+                    }
+                }
+            }
+
+            return os;
+        }
+
         FCIterator getTable(const Literal &literal, const size_t minIteration,
                 const size_t maxIteration) {
             return getTable(literal, minIteration, maxIteration, NULL);
@@ -275,6 +307,14 @@ class SemiNaiver {
 
         std::chrono::system_clock::time_point getStartingTimeMs() {
             return startTime;
+        }
+
+        void setName(const std::string &name) {
+            this->name = name;
+        }
+
+        const std::string &getName() const {
+            return name;
         }
 
 };
