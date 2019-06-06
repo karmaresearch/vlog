@@ -37,7 +37,7 @@ public:
         inverseMap.set_empty_key((Term_t) -1);
     }
 
-    SimpleHashmap &getMap() {
+    const SimpleHashmap &getMap() const {
         return map;
     }
 
@@ -65,8 +65,8 @@ public:
 	return counter;
     }
 
-    bool get(const std::string &rawValue, Term_t &id) {
-        SimpleHashmap::iterator itr = map.find(rawValue);
+    bool get(const std::string &rawValue, Term_t &id) const {
+        SimpleHashmap::const_iterator itr = map.find(rawValue);
         if (itr == map.end()) {
             return false;
         } else {
@@ -75,25 +75,25 @@ public:
         }
     }
 
-    std::vector<std::string> getKeys() {
+    std::vector<std::string> getKeys() const {
         std::vector<std::string> output;
-        for (SimpleHashmap::iterator itr = map.begin(); itr != map.end(); ++itr) {
+        for (SimpleHashmap::const_iterator itr = map.begin(); itr != map.end(); ++itr) {
             output.push_back(itr->first);
         }
         return output;
     }
 
-    std::string getRawValue(const Term_t id) {
-        SimpleInverseHashMap::iterator itr = inverseMap.find(id);
+    std::string getRawValue(const Term_t id) const {
+        SimpleInverseHashMap::const_iterator itr = inverseMap.find(id);
         if (itr == inverseMap.end()) {
             return std::string("");
         }
         return itr->second;
     }
 
-    std::string tostring() {
+    std::string tostring() const {
         std::string output = "";
-        for (SimpleHashmap::iterator itr = map.begin(); itr != map.end(); ++itr) {
+        for (SimpleHashmap::const_iterator itr = map.begin(); itr != map.end(); ++itr) {
             output += itr->first + std::string(" ") + std::to_string(itr->second) + std::string("\n");
         }
         return output;

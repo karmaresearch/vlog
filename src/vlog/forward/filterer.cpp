@@ -285,7 +285,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs(
     // I think using posVarsInHead[posHead[0].first] is incorrect.
     // What we need here is the position of the variable in the head (outputQuery),
     // which is given by posHead[0].first.
-    // posLiterals is different: these are in fact the join coordinates,
+    // posLiteral is different: these are in fact the join coordinates,
     // so the name is confusing to say the least. But, posLiteral[0].second
     // thus is the number of the variable in the currentQuery, so we do indeed
     // need to use posVarsInLit[posLiteral[0].second] to get its position in

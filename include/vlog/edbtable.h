@@ -62,6 +62,8 @@ class EDBTable {
             return true;
         }
 
+        virtual uint8_t getArity() const = 0;
+
         virtual bool useSegments() {
             return false;
         }

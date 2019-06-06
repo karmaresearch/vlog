@@ -50,6 +50,20 @@ std::vector<uint8_t> Literal::getPosVars() const {
     return out;
 }
 
+std::vector<int> Literal::getVarnumInLiteral() const {
+    std::vector<int> out(tuple.getSize());
+    int varNum = 0;
+    for (uint8_t i = 0; i < tuple.getSize(); ++i) {
+        if (tuple.get(i).isVariable()) {
+            out[i] = varNum;
+            varNum++;
+        } else {
+            out[i] = -1;
+        }
+    }
+    return out;
+}
+
 uint8_t Literal::getNUniqueVars() const {
     std::vector<uint8_t> exVar;
     uint8_t n = 0;
@@ -89,7 +103,7 @@ std::string Literal::tostring() const {
     return tostring(NULL, NULL);
 }
 
-std::string Literal::tostring(Program *program, EDBLayer *db) const {
+std::string Literal::tostring(const Program *program, const EDBLayer *db) const {
 
     std::string predName;
     if (program != NULL)
@@ -138,7 +152,7 @@ std::string Literal::tostring(Program *program, EDBLayer *db) const {
     return out;
 }
 
-std::string Literal::toprettystring(Program *program, EDBLayer *db, bool replaceConstants) const {
+std::string Literal::toprettystring(const Program *program, const EDBLayer *db, bool replaceConstants) const {
 
     std::string predName;
     if (program != NULL)
@@ -155,7 +169,7 @@ std::string Literal::toprettystring(Program *program, EDBLayer *db, bool replace
         if (tuple.get(i).isVariable()) {
             out += std::string("A") + std::to_string(tuple.get(i).getId());
         } else {
-            if (replaceConstants) {                
+            if (replaceConstants) {
                 out += "*" + std::to_string(tuple.get(i).getValue());
             } else if (db == NULL) {
                 out += std::to_string(tuple.get(i).getValue());
@@ -781,7 +795,7 @@ bool Program::stratify(std::vector<int> &stratification, int &nClasses) {
         stratification[i] = -1;
     }
 
-    
+
     int markedCount = 0;
     int count = 0;
     while (count < graphSize) {
@@ -802,7 +816,7 @@ bool Program::stratify(std::vector<int> &stratification, int &nClasses) {
     return true;
 }
 
-bool Program::areExistentialRules() {
+bool Program::areExistentialRules() const {
     for(auto& rule : allrules) {
         if (rule.isExistential()) {
             return true;
@@ -845,7 +859,7 @@ Program::Program(Program *p, EDBLayer *kb) : kb(kb),
     rewriteCounter(0),
     dictPredicates(p->dictPredicates),
     cardPredicates(p->cardPredicates) {
-}
+    }
 
 std::string trim(const std::string& str,
         const std::string& whitespace = "\r \t")
@@ -1106,7 +1120,7 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     return literal;
 }
 
-PredId_t Program::getPredicateID(std::string & p, const uint8_t card) {
+PredId_t Program::getPredicateID(const std::string & p, const uint8_t card) {
     PredId_t predid = (PredId_t) dictPredicates.getOrAdd(p);
     //add the cardinality associated to this predicate
     if (cardPredicates.find(predid) == cardPredicates.end()) {
@@ -1118,7 +1132,7 @@ PredId_t Program::getPredicateID(std::string & p, const uint8_t card) {
     return predid;
 }
 
-std::string Program::getPredicateName(const PredId_t id) {
+std::string Program::getPredicateName(const PredId_t id) const {
     return dictPredicates.getRawValue(id);
 }
 
@@ -1172,11 +1186,11 @@ void Program::addAllRules(std::vector<Rule> &rules) {
     }
 }
 
-bool Program::isPredicateIDB(const PredId_t id) {
+bool Program::isPredicateIDB(const PredId_t id) const {
     return !kb->doesPredExists(id);
 }
 
-int Program::getNEDBPredicates() {
+int Program::getNEDBPredicates() const {
     int n = 0;
     for (const auto &el : dictPredicates.getMap()) {
         if (kb->doesPredExists(el.second)) {
@@ -1186,7 +1200,7 @@ int Program::getNEDBPredicates() {
     return n;
 }
 
-int Program::getNIDBPredicates() {
+int Program::getNIDBPredicates() const {
     int n = 0;
     for (const auto &el : dictPredicates.getMap()) {
         if (!kb->doesPredExists(el.second)) {
@@ -1313,7 +1327,7 @@ std::vector<Rule> Program::getAllRulesByPredicate(PredId_t predid) const {
     return out;
 }
 
-std::vector<Rule> Program::getAllRules() {
+std::vector<Rule> Program::getAllRules() const {
     return allrules;
 }
 
@@ -1336,11 +1350,11 @@ void Program::sortRulesByIDBPredicates() {
     }
 }
 
-Predicate Program::getPredicate(std::string & p) {
+Predicate Program::getPredicate(const std::string & p) {
     return getPredicate(p, 0);
 }
 
-Predicate Program::getPredicate(const PredId_t id) {
+Predicate Program::getPredicate(const PredId_t id) const {
     if (kb->doesPredExists(id)) {
         return Predicate(id, 0, EDB, kb->getPredArity(id));
     }
@@ -1351,7 +1365,7 @@ Predicate Program::getPredicate(const PredId_t id) {
     return Predicate(id, 0, IDB, 0);
 }
 
-Predicate Program::getPredicate(std::string & p, uint8_t adornment) {
+Predicate Program::getPredicate(const std::string & p, uint8_t adornment) {
     PredId_t id = (PredId_t) dictPredicates.getOrAdd(p);
     if (kb->doesPredExists(id)) {
         return Predicate(id, adornment, EDB, kb->getPredArity(id));
@@ -1363,7 +1377,7 @@ Predicate Program::getPredicate(std::string & p, uint8_t adornment) {
     return Predicate(id, 0, IDB, 0);
 }
 
-int64_t Program::getOrAddPredicate(std::string & p, uint8_t cardinality) {
+int64_t Program::getOrAddPredicate(const std::string & p, uint8_t cardinality) {
     PredId_t id = (PredId_t) dictPredicates.getOrAdd(p);
     if (cardPredicates.find(id) == cardPredicates.end()) {
         cardPredicates.insert(make_pair(id, cardinality));
@@ -1379,11 +1393,11 @@ int64_t Program::getOrAddPredicate(std::string & p, uint8_t cardinality) {
     return id;
 }
 
-std::string Program::getAllPredicates() {
+std::string Program::getAllPredicates() const {
     return dictPredicates.tostring();
 }
 
-std::vector<std::string> Program::getAllPredicateStrings() {
+std::vector<std::string> Program::getAllPredicateStrings() const {
     return dictPredicates.getKeys();
 }
 
@@ -1399,7 +1413,7 @@ std::vector<PredId_t> Program::getAllEDBPredicateIds() {
     return output;
 }
 
-std::string Program::tostring() {
+std::string Program::tostring() const {
     std::string output = "";
     for(const auto &rule : allrules) {
         output += rule.tostring() + std::string("\n");

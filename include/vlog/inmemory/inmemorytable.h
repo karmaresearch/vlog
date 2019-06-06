@@ -81,12 +81,15 @@ class InmemoryTable : public EDBTable {
 
         InmemoryTable(PredId_t predid, std::vector<std::vector<std::string>> &entries, EDBLayer *layer);
 
-        InmemoryTable(PredId_t predid,
-                uint8_t arity,
-                std::vector<uint64_t> &entries,
-                EDBLayer *layer);
+        InmemoryTable(PredId_t predid, uint8_t arity, std::vector<uint64_t> &entries, EDBLayer *layer);
 
-        uint8_t getArity() const;
+        InmemoryTable(PredId_t predid,
+                      const Literal &query,
+                      // const
+                      EDBIterator *iter,
+                      EDBLayer *layer);
+
+        virtual uint8_t getArity() const;
 
         void query(QSQQuery *query, TupleTable *outputTable,
                 std::vector<uint8_t> *posToFilter,
@@ -127,6 +130,41 @@ class InmemoryTable : public EDBTable {
         void releaseIterator(EDBIterator *itr);
 
         uint64_t getSize();
+
+        std::ostream &dump(std::ostream &os) {
+            std::string name = layer->getPredName(predid);
+            os << "Table " << name << std::endl;
+            Predicate pred(predid, 0, EDB, arity);
+            VTuple t = VTuple(arity);
+            for (uint8_t i = 0; i < t.getSize(); ++i) {
+                t.set(VTerm(i + 1, 0), i);
+            }
+            Literal lit(pred, t);
+            EDBIterator *itr = getIterator(lit);
+            const uint8_t sizeRow = getArity();
+            while (itr->hasNext()) {
+                itr->next();
+                os << "Get another row from the InmemoryTable!" << std::endl;
+                for (uint8_t m = 0; m < sizeRow; ++m) {
+                    os << "\t";
+                    std::string buffer;
+                    if (getDictText(itr->getElementAt(m), buffer)) {
+                        os << buffer;
+                    } else {
+                        uint64_t v = itr->getElementAt(m);
+                        std::string t = "" + std::to_string(v >> 40) + "_"
+                            + std::to_string((v >> 32) & 0377) + "_"
+                            + std::to_string(v & 0xffffffff);
+                        os << t;
+                    }
+                }
+                os << std::endl;
+            }
+
+            releaseIterator(itr);
+
+            return os;
+        }
 
         ~InmemoryTable();
 };

@@ -28,7 +28,7 @@ void EDBConf::setRootPath(std::string path) {
     this->rootPath = path;
 }
 
-std::string EDBConf::getRootPath() {
+std::string EDBConf::getRootPath() const {
     return rootPath;
 }
 

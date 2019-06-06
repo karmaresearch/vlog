@@ -1,3 +1,6 @@
+#ifndef __VLOG_UTILS_INCLUDED
+#define __VLOG_UTILS_INCLUDED
+
 #include <vlog/consts.h>
 #include <trident/utils/json.h>
 #include <dblayer.hpp>
@@ -7,8 +10,6 @@
 
 #include <string>
 
-#ifndef __VLOG_UTILS_INCLUDED
-#define __VLOG_UTILS_INCLUDED
 class VLogUtils {
     private:
         static void parseQuery(bool &success,

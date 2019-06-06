@@ -11,13 +11,23 @@
 #include <vlog/edbiterator.h>
 #include <vlog/edbconf.h>
 
+#include <vlog/incremental/removal.h>
+
 #include <kognac/factory.h>
 
 #include <vector>
 #include <map>
 
 class Column;
-class EDBMemIterator final : public EDBIterator {
+class SemiNaiver;       // Why cannot I break the software hierarchy? RFHH
+class EDBFCInternalTable;
+
+using RemoveLiteralOf = std::unordered_map<PredId_t, const EDBRemoveLiterals *>;
+
+using NamedSemiNaiver = std::unordered_map<std::string,
+      std::shared_ptr<SemiNaiver>>;
+
+class EDBMemIterator : public EDBIterator {
     private:
         uint8_t nfields = 0;
         bool isFirst = false, hasFirst = false;
@@ -62,6 +72,7 @@ class EDBMemIterator final : public EDBIterator {
         ~EDBMemIterator() {}
 };
 
+
 class EDBLayer {
     private:
 
@@ -71,6 +82,8 @@ class EDBLayer {
             string type;
             std::shared_ptr<EDBTable> manager;
         };
+
+        const EDBConf &conf;
 
         std::shared_ptr<Dictionary> predDictionary;
         std::map<PredId_t, EDBInfoTable> dbPredicates;
@@ -98,58 +111,92 @@ class EDBLayer {
         VLIBEXP void addInmemoryTable(const EDBConf::Table &tableConf);
         VLIBEXP void addSparqlTable(const EDBConf::Table &tableConf);
 
+        VLIBEXP void addEDBonIDBTable(const EDBConf::Table &tableConf);
+        VLIBEXP void addEDBimporter(const EDBConf::Table &tableConf);
+
+        // literals to be removed during iteration
+        RemoveLiteralOf removals;
+
+        // For incremental reasoning: EDBonIDB must know which SemiNaiver(s) to
+        // query
+        NamedSemiNaiver prevSemiNaiver;
+
+        // need to import the mapping predid -> Predicate from prevSemiNaiver
+        void handlePrevSemiNaiver();
+
+        std::string name;
+
     public:
         EDBLayer(EDBLayer &db, bool copyTables = false);
 
-        EDBLayer(EDBConf &conf, bool multithreaded) {
-            const std::vector<EDBConf::Table> tables = conf.getTables();
-            rootPath = conf.getRootPath();
+        EDBLayer(const EDBConf &conf, bool multithreaded,
+                const NamedSemiNaiver &prevSemiNaiver) :
+            conf(conf), prevSemiNaiver(prevSemiNaiver) {
 
-            predDictionary = std::shared_ptr<Dictionary>(new Dictionary());
+                const std::vector<EDBConf::Table> tables = conf.getTables();
+                rootPath = conf.getRootPath();
 
-            for (const auto &table : tables) {
-                if (table.type == "Trident") {
-                    addTridentTable(table, multithreaded);
+                predDictionary = std::shared_ptr<Dictionary>(new Dictionary());
+
+                if (prevSemiNaiver.size() != 0) {
+                    handlePrevSemiNaiver();
+                }
+
+                for (const auto &table : tables) {
+                    if (table.type == "Trident") {
+                        addTridentTable(table, multithreaded);
 #ifdef MYSQL
-                } else if (table.type == "MySQL") {
-                    addMySQLTable(table);
+                    } else if (table.type == "MySQL") {
+                        addMySQLTable(table);
 #endif
 #ifdef ODBC
-                } else if (table.type == "ODBC") {
-                    addODBCTable(table);
+                    } else if (table.type == "ODBC") {
+                        addODBCTable(table);
 #endif
 #ifdef MAPI
-                } else if (table.type == "MAPI") {
-                    addMAPITable(table);
+                    } else if (table.type == "MAPI") {
+                        addMAPITable(table);
 #endif
 #ifdef MDLITE
-                } else if (table.type == "MDLITE") {
-                    addMDLiteTable(table);
+                    } else if (table.type == "MDLITE") {
+                        addMDLiteTable(table);
 #endif
-                } else if (table.type == "INMEMORY") {
-                    addInmemoryTable(table);
+                    } else if (table.type == "INMEMORY") {
+                        addInmemoryTable(table);
 #ifdef SPARQL
-                } else if (table.type == "SPARQL") {
-                    addSparqlTable(table);
+                    } else if (table.type == "SPARQL") {
+                        addSparqlTable(table);
 #endif
-                } else {
-                    LOG(ERRORL) << "Type of table is not supported";
-                    throw 10;
+                    } else if (table.type == "EDBonIDB") {
+                        addEDBonIDBTable(table);
+                    } else if (table.type == "EDBimporter") {
+                        addEDBimporter(table);
+                    } else {
+                        LOG(ERRORL) << "Type of table is not supported";
+                        throw 10;
+                    }
                 }
             }
-        }
 
-        std::vector<PredId_t> getAllPredicateIDs();
+        EDBLayer(const EDBConf &conf, bool multithreaded) :
+            EDBLayer(conf, multithreaded, NamedSemiNaiver()) {
+            }
 
         std::vector<PredId_t> getAllEDBPredicates();
 
         uint64_t getPredSize(PredId_t id);
 
-        string getPredType(PredId_t id);
+        std::vector<PredId_t> getAllPredicateIDs() const;
 
-        string getPredName(PredId_t id);
+        uint64_t getPredSize(PredId_t id) const;
 
-        uint8_t getPredArity(PredId_t id);
+        string getPredType(PredId_t id) const;
+
+        string getPredName(PredId_t id) const;
+
+        uint8_t getPredArity(PredId_t id) const;
+
+        PredId_t getPredID(const std::string &name) const;
 
         void setPredArity(PredId_t id, uint8_t arity);
 
@@ -237,18 +284,18 @@ class EDBLayer {
                 uint8_t posColumn);
 
         VLIBEXP bool getDictNumber(const char *text,
-                const size_t sizeText, uint64_t &id);
+                const size_t sizeText, uint64_t &id) const;
 
         VLIBEXP bool getOrAddDictNumber(const char *text,
                 const size_t sizeText, uint64_t &id);
 
-        VLIBEXP bool getDictText(const uint64_t id, char *text);
+        VLIBEXP bool getDictText(const uint64_t id, char *text) const;
 
-        VLIBEXP std::string getDictText(const uint64_t id);
+        VLIBEXP std::string getDictText(const uint64_t id) const;
 
-        Predicate getDBPredicate(int idx);
+        Predicate getDBPredicate(int idx) const;
 
-        std::shared_ptr<EDBTable> getEDBTable(PredId_t id) {
+        std::shared_ptr<EDBTable> getEDBTable(PredId_t id) const {
             if (dbPredicates.count(id)) {
                 return dbPredicates.find(id)->second.manager;
             } else {
@@ -256,13 +303,15 @@ class EDBLayer {
             }
         }
 
-        string getTypeEDBPredicate(PredId_t id) {
+        string getTypeEDBPredicate(PredId_t id) const {
             if (dbPredicates.count(id)) {
                 return dbPredicates.find(id)->second.type;
             } else {
                 return "";
             }
         }
+
+        VLIBEXP uint64_t getNTerms() const;
 
         bool expensiveEDBPredicate(PredId_t id) {
             if (dbPredicates.count(id)) {
@@ -271,9 +320,25 @@ class EDBLayer {
             return false;
         }
 
-        VLIBEXP uint64_t getNTerms();
-
         void releaseIterator(EDBIterator *itr);
+
+        VLIBEXP void addRemoveLiterals(const RemoveLiteralOf &rm) {
+            removals.insert(rm.begin(), rm.end());
+        }
+
+        VLIBEXP bool hasRemoveLiterals(PredId_t pred) const {
+            if (removals.empty()) {
+                return false;
+            }
+            if (removals.find(pred) == removals.end()) {
+                return false;
+            }
+            if (removals.at(pred)->size() == 0) {
+                return false;
+            }
+
+            return true;
+        }
 
         // For JNI interface ...
         VLIBEXP void addInmemoryTable(std::string predicate,
@@ -286,6 +351,18 @@ class EDBLayer {
         VLIBEXP void addInmemoryTable(PredId_t predicate,
                 uint8_t arity,
                 std::vector<uint64_t> &rows);
+
+        const EDBConf &getConf() const {
+            return conf;
+        }
+
+        void setName(const std::string &name) {
+            this->name = name;
+        }
+
+        const std::string &getName() const {
+            return name;
+        }
 
         ~EDBLayer() {
             for (int i = 0; i < tmpRelations.size(); ++i) {

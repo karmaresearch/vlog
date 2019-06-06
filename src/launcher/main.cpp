@@ -14,6 +14,11 @@
 
 #include <vlog/cycles/checker.h>
 
+//Incremental, will probably move away
+#include <vlog/inmemory/inmemorytable.h>
+#include <vlog/incremental/edb-table-from-idb.h>
+#include <vlog/incremental/incremental-concepts.h>
+
 //Used to load a Trident KB
 #include <vlog/trident/tridenttable.h>
 #include <launcher/vloglayer.h>
@@ -43,6 +48,8 @@
 #include <chrono>
 #include <thread>
 #include <cmath>
+
+// #include <valgrind/callgrind.h>
 
 using namespace std;
 
@@ -202,6 +209,15 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
                             path + string("' does not exists")).c_str());
                 return false;
             }
+            if (! vm["rm"].empty()) {
+                std::string filename = vm["rm"].as<string>();
+                if (!Utils::exists(filename)) {
+                    printErrorMsg((string("The remove-literals file ") +
+                                filename +
+                                string(" does not exist")).c_str());
+                    return false;
+                }
+            }
         } else if (cmd == "mat_tg") {
             string path = vm["trigger_paths"].as<string>();
             if (path == "") {
@@ -280,6 +296,14 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             string("Set maximum number of threads to use when run in multithreaded mode. Default is " + to_string(std::max((unsigned int)1, std::thread::hardware_concurrency() / 2))).c_str(), false);
     query_options.add<int>("", "interRuleThreads", 0,
             "Set maximum number of threads to use for inter-rule parallelism. Default is 0", false);
+    query_options.add<string>("", "rm", "",
+            "File with facts to suppress (remove) from the EDB", false);
+    query_options.add<string>("", "dred", "",
+            "Directory with files with facts to add/remove from the EDB", false);
+    query_options.add<string>("", "dred-rm", "",
+            "file with facts to remove from the EDB", false);
+    query_options.add<string>("", "dred-add", "",
+            "file with facts to add to the EDB", false);
 
     query_options.add<bool>("", "shufflerules", false,
             "shuffle rules randomly instead of using heuristics (only for <mat>, and only when running multithreaded).", false);
@@ -445,6 +469,31 @@ void computeTriggerGraph(EDBLayer &db,
     ofstream fout(fileout_path);
     tg.saveAllPaths(db, fout);
     fout.close();
+}
+
+static void store_mat(const std::string &path, ProgramArgs &vm,
+        const std::shared_ptr<SemiNaiver> sn) {
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+
+    Exporter exp(sn);
+
+    string storemat_format = vm["storemat_format"].as<string>();
+
+    if (storemat_format == "files" || storemat_format == "csv") {
+        sn->storeOnFiles(path,
+                vm["decompressmat"].as<bool>(), 0, storemat_format == "csv");
+    } else if (storemat_format == "db") {
+        //I will store the details on a Trident index
+        exp.generateTridentDiffIndex(path);
+    } else if (storemat_format == "nt") {
+        exp.generateNTTriples(path, vm["decompressmat"].as<bool>());
+    } else {
+        LOG(ERRORL) << "Option 'storemat_format' not recognized";
+        throw 10;
+    }
+
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    LOG(INFOL) << "Time to index and store the materialization on disk = " << sec.count() << " seconds";
 }
 
 void launchTriggeredMat(int argc,
@@ -672,12 +721,96 @@ void launchFullMat(int argc,
             printRepresentationSize(sn);
         }
 
+        if (vm["dred"].empty()) {
+            // CALLGRIND_START_INSTRUMENTATION;
+        }
+
         LOG(INFOL) << "Starting full materialization";
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         sn->run();
         std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
         LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
         sn->printCountAllIDBs("");
+
+        if (! vm["dred"].empty()) {
+            std::chrono::system_clock::time_point start;
+            std::chrono::duration<double> sec;
+
+            std::vector<std::string> remove_pred_names;
+            if (vm["dred-rm"].empty()) {
+                LOG(INFOL) << "use default remove table TE_remove";
+                remove_pred_names.push_back("TE");
+            } else {
+                remove_pred_names.push_back(vm["dred-rm"].as<string>());
+            }
+            std::vector<std::string> add_pred_names;
+            if (vm["dred-add"].empty()) {
+                LOG(INFOL) << "use default add table TE_add";
+                add_pred_names.push_back("TE");
+            } else {
+                add_pred_names.push_back(vm["dred-add"].as<string>());
+            }
+
+            LOG(INFOL) << "***************** Create Overdelete";
+
+            IncrOverdelete overdelete(vm, sn, remove_pred_names);
+
+            // CALLGRIND_START_INSTRUMENTATION;
+
+            LOG(INFOL) << "Starting overdeletion materialization";
+            start = std::chrono::system_clock::now();
+            overdelete.run();
+            sec = std::chrono::system_clock::now() - start;
+            LOG(INFOL) << "Runtime overdelete = " << sec.count() * 1000 << " milliseconds";
+            overdelete.getSN()->printCountAllIDBs("");
+
+            if (vm["storemat_path"].as<string>() != "") {
+                store_mat(vm["storemat_path"].as<string>() + ".overdelete", vm, overdelete.getSN());
+            }
+
+            if (true) {
+                // Continue same with Rederive
+                // Create a Program, create a SemiNaiver, run...
+                LOG(INFOL) << "***************** Create Rederive";
+
+                IncrRederive rederive(vm, sn, remove_pred_names, overdelete);
+
+                LOG(INFOL) << "Starting rederive materialization";
+                start = std::chrono::system_clock::now();
+                rederive.run();
+                sec = std::chrono::system_clock::now() - start;
+                LOG(INFOL) << "Runtime rederive = " << sec.count() * 1000 << " milliseconds";
+                rederive.getSN()->printCountAllIDBs("");
+
+                if (vm["storemat_path"].as<string>() != "") {
+                    store_mat(vm["storemat_path"].as<string>() + ".rederive", vm, rederive.getSN());
+                }
+
+                if (true) {
+                    // Continue same with Addition
+                    // Create a Program, create a SemiNaiver, run...
+                    LOG(INFOL) << "***************** Create Addition";
+
+                    IncrAdd addition(vm, sn, remove_pred_names, add_pred_names,
+                            overdelete, rederive);
+
+                    LOG(INFOL) << "Starting addition materialization";
+                    start = std::chrono::system_clock::now();
+                    addition.run();
+                    sec = std::chrono::system_clock::now() - start;
+                    LOG(INFOL) << "Runtime addition = " << sec.count() * 1000 << " milliseconds";
+                    addition.getSN()->printCountAllIDBs("");
+
+                    if (vm["storemat_path"].as<string>() != "") {
+                        store_mat(vm["storemat_path"].as<string>() + ".add", vm, addition.getSN());
+                    }
+                } else {
+                    LOG(ERRORL) << "For now, ALSO SKIP ADDITION";
+                }
+            } else {
+                LOG(ERRORL) << "For now, SKIP REDERIVE";
+            }
+        }
 
 #if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
         if (vm["monitorThread"].as<bool>()) {
@@ -693,27 +826,7 @@ void launchFullMat(int argc,
 
 
         if (vm["storemat_path"].as<string>() != "") {
-            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-
-            Exporter exp(sn);
-
-            string storemat_format = vm["storemat_format"].as<string>();
-
-            if (storemat_format == "files" || storemat_format == "csv") {
-                sn->storeOnFiles(vm["storemat_path"].as<string>(),
-                        vm["decompressmat"].as<bool>(), 0, storemat_format == "csv");
-            } else if (storemat_format == "db") {
-                //I will store the details on a Trident index
-                exp.generateTridentDiffIndex(vm["storemat_path"].as<string>());
-            } else if (storemat_format == "nt") {
-                exp.generateNTTriples(vm["storemat_path"].as<string>(), vm["decompressmat"].as<bool>());
-            } else {
-                LOG(ERRORL) << "Option 'storemat_format' not recognized";
-                throw 10;
-            }
-
-            std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-            LOG(INFOL) << "Time to index and store the materialization on disk = " << sec.count() << " seconds";
+            store_mat(vm["storemat_path"].as<string>(), vm, sn);
         }
 #ifdef WEBINTERFACE
         if (webint) {
@@ -1077,10 +1190,29 @@ int main(int argc, const char** argv) {
         EDBConf conf(edbFile);
         conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, ! vm["multithreaded"].empty());
+        EDBRemoveLiterals *rm;
+        if (! vm["rm"].empty()) {
+            std::string path(vm["rm"].as<string>());
+            LOG(ERRORL) << "FIXME: currently E has fixed name TE";
+            PredId_t remove_pred = layer->getPredID("TE");
+            InmemoryTable rmTable(Utils::parentDir(path), Utils::filename(path),
+                    remove_pred, layer);
+            rm = new EDBRemoveLiterals(vm["rm"].as<string>(), layer);
+            // rm = new EDBRemoveLiterals(rmTable, remove_pred, layer);
+            // rm->dump(std::cerr, *layer);
+            // Would like to move the thing i.s.o. copy RFHH
+            std::unordered_map<PredId_t, const EDBRemoveLiterals *> rm_map;
+            rm_map[remove_pred] = rm;
+            layer->addRemoveLiterals(rm_map);
+        }
         // EDBLayer layer(conf, false);
         launchFullMat(argc, argv, full_path, *layer, vm,
                 vm["rules"].as<string>());
         delete layer;
+        if (! vm["rm"].empty()) {
+            LOG(ERRORL) << "FIXME: need to delete this RemoveLiterals";
+            // delete rm;
+        }
     } else if (cmd == "mat_tg") {
         EDBConf conf(edbFile);
         conf.setRootPath(Utils::parentDir(edbFile));
