@@ -171,6 +171,7 @@ std::string Literal::toprettystring(const Program *program, const EDBLayer *db, 
         } else {
             if (replaceConstants) {
                 out += "*" + std::to_string(tuple.get(i).getValue());
+                //out += "*";
             } else if (db == NULL) {
                 out += std::to_string(tuple.get(i).getValue());
             } else {
@@ -766,6 +767,10 @@ bool Program::stratify(std::vector<int> &stratification, int &nClasses) {
                 }
             }
         }
+    }
+    if (usedNegated.empty()) {
+        nClasses = 1;
+        return true;
     }
 
     Graph negationsClosure(graphSize);

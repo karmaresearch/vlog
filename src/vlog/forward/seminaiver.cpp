@@ -124,7 +124,7 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
             }
             if (d->nIDBs != 0) {
                 PredId_t id = itr->getFirstHead().getPredicate().getId();
-                this->allIDBRules[stratification[id]].push_back(*d);
+                this->allIDBRules[nStratificationClasses == 1 ? 0 : stratification[id]].push_back(*d);
             } else
                 this->allEDBRules.push_back(*d);
             delete d;
