@@ -18,6 +18,17 @@
 
 typedef enum {TOPDOWN, MAGIC} ReasoningMode;
 
+struct Metrics {
+    size_t estimate;
+    size_t intermediateResults;
+    int countIntermediateQueries;
+    double cost;
+    int countRules;
+    int countUniqueRules;
+    int countIDBPredicates;
+    uint8_t boundedness;
+};
+
 class Reasoner {
     private:
 
@@ -51,6 +62,14 @@ class Reasoner {
         size_t estimate(Literal &query, std::vector<uint8_t> *posBindings,
                 std::vector<Term_t> *valueBindings, EDBLayer &layer,
                 Program &program);
+
+        void getMetrics(Literal &query,
+                std::vector<uint8_t> *posBindings,
+                std::vector<Term_t> *valueBindings,
+                EDBLayer &layer,
+                Program &program,
+                Metrics &metrics,
+                int maxDepth);
 
         VLIBEXP ReasoningMode chooseMostEfficientAlgo(Literal &query,
                 EDBLayer &layer, Program &program,
@@ -107,6 +126,7 @@ class Reasoner {
                 Program *p,
                 TypeChase typeChase);
 
+        int getNumberOfIDBPredicates(Literal&, Program&);
 
         ~Reasoner() {
         }

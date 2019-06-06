@@ -113,7 +113,7 @@ std::string Literal::tostring(const Program *program, const EDBLayer *db) const 
 
     std::string out = (isNegated() ? "~" : "") + predName + std::string("[") +
         std::to_string(pred.getType()) + std::string("]") +
-        adornmentToString(pred.getAdorment(), tuple.getSize()) + std::string("(");
+        adornmentToString(pred.getAdornment(), tuple.getSize()) + std::string("(");
 
     for (int i = 0; i < tuple.getSize(); ++i) {
         if (tuple.get(i).isVariable()) {
@@ -968,8 +968,8 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     }
     std::string predicate = trim(l.substr(0, posBeginTuple));
     if (predicate.substr(0,1) == "~") {
-	negated = true;
-	predicate = trim(l.substr(1));
+        negated = true;
+        predicate = trim(l.substr(1));
     }
     std::string tuple = l.substr(posBeginTuple + 1, std::string::npos);
     if (tuple[tuple.size() - 1] != ')') {
@@ -1420,6 +1420,19 @@ std::string Program::tostring() const {
     }
     return output;
 }
+
+std::vector<PredId_t> Program::getAllIDBPredicateIds() {
+    std::vector<PredId_t> output;
+    std::vector<std::string> predicateStrings = this->getAllPredicateStrings();
+    for (int i = 0; i < predicateStrings.size(); ++i) {
+        PredId_t pid = this->getPredicate(predicateStrings[i]).getId();
+        if (!kb->doesPredExists(pid)) {
+            output.push_back(pid);
+        }
+    }
+    return output;
+}
+
 
 std::string extractFileName(std::string& filePath) {
     int index = filePath.find_last_of('/');

@@ -3,7 +3,9 @@
 #include <vlog/webinterface.h>
 #include <vlog/materialization.h>
 #include <vlog/seminaiver.h>
+#include <vlog/training.h>
 #include <vlog/utils.h>
+#include <vlog/helper.h>
 
 #include <launcher/vloglayer.h>
 #include <cts/parser/SPARQLLexer.hpp>
@@ -24,6 +26,7 @@
 #include <chrono>
 #include <thread>
 #include <regex>
+#include <csignal>
 
 WebInterface::WebInterface(
         ProgramArgs &vm, std::shared_ptr<SemiNaiver> sn, string htmlfiles,
@@ -127,7 +130,6 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
     string page;
     bool isjson = false;
     int error = 0;
-
     if (Utils::starts_with(req, "POST")) {
         int pos = req.find("HTTP");
         string path = req.substr(5, pos - 6);
@@ -188,6 +190,172 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             //write_json(buf, pt, false);
             page = buf.str();
             isjson = true;
+        } else if (path == "/gentq") {
+            //Get all query
+            string form = req.substr(req.find("application/x-www-form-urlencoded"));
+            string queries = _getValueParam(form, "query");
+            string timeoutStr = _getValueParam(form, "timeout");
+            string repeatQueryStr = _getValueParam(form, "repeatQuery");
+            string maxTrainingStr = _getValueParam(form, "maxTraining");
+            // 1. generate queries and run them and train model
+            EDBConf conf(edbFile);
+            int depth = 5;
+            uint64_t maxTuples = 50;
+            uint8_t vt1 = 1;
+            uint8_t vt2 = 2;
+            uint8_t vt3 = 3;
+            uint8_t vt4 = 4;
+            std::vector<uint8_t> vt;
+            vt.push_back(vt1);
+            vt.push_back(vt2);
+            vt.push_back(vt3);
+            vt.push_back(vt4);
+            LOG(INFOL) << "Generating training queries: ";
+            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+            std::vector<std::pair<std::string,int>> trainingQueries = Training::generateTrainingQueriesAllPaths(conf,
+                    *edb.get(),
+                    *program.get(),
+                    depth,
+                    maxTuples,
+                    vt);
+            std::chrono::duration<double> sec = std::chrono::system_clock::now()- start;
+            int nQueries = trainingQueries.size();
+            LOG(INFOL) << nQueries << " queries generated in " << sec.count() << " seconds";
+            vector<string> trainingQueriesVector;
+            int nMaxTrainingQueries = stoi(maxTrainingStr);//nQueries;
+            if (nMaxTrainingQueries < 0) {
+                nMaxTrainingQueries = nQueries;
+            }
+            LOG(INFOL) << "Max training queries : " << nMaxTrainingQueries;
+            int i = 0;
+            vector<int> queryIndexes(nMaxTrainingQueries);
+            getRandomTupleIndexes(nMaxTrainingQueries, nQueries, queryIndexes);
+            LOG(INFOL) << "query indexes received : " << queryIndexes.size();
+            for (auto qi: queryIndexes) {
+                trainingQueriesVector.push_back(trainingQueries[qi].first);
+            }
+            // Add a few generic queries in training
+            int nIDBpredicates = program->getAllIDBPredicateIds().size();
+            LOG(INFOL) << "# of IDB predicates = " << nIDBpredicates;
+            int nGenericQueries = nIDBpredicates/4;
+            if (nGenericQueries > 100) {
+                nGenericQueries = 100;
+            }
+            //LOG(INFOL) << "# of generic queries that will be added = "<< nGenericQueries;
+            // We know that generic queries are all at the end of trainingQueries vector
+            // because generateNewTrainingQueries() adds them to the end
+            //int cntAdded = 0;
+            //for (int i = trainingQueries.size()-1; i >= 0; --i) {
+            //    // add the generic query only if it is not already present
+            //    if (std::find(trainingQueriesVector.begin(), trainingQueriesVector.end(), trainingQueries[i].first) ==
+            //        trainingQueriesVector.end()) {
+            //        trainingQueriesVector.push_back(trainingQueries[i].first);
+            //    }
+            //    if(++cntAdded > nGenericQueries) {
+            //        break;
+            //    }
+            //}
+            LOG(INFOL) << "training queries ready";
+            // 2. test the model against test queries
+
+            uint64_t timeout = stoull(timeoutStr);
+            uint8_t repeatQuery = stoul(repeatQueryStr);
+            //Decode the query
+            queries = HttpClient::unescape(queries);
+            std::regex e1("\\+");
+            std::string replacedString;
+            std::regex_replace(std::back_inserter(replacedString),
+                    queries.begin(), queries.end(),
+                    e1, "$1 ");
+            queries = replacedString;
+            std::regex e2("\\r\\n");
+            replacedString = "";
+            std::regex_replace(std::back_inserter(replacedString),
+                    queries.begin(), queries.end(), e2, "$1\n");
+            queries = replacedString;
+            vector<string> testQueriesLog;
+            stringstream ss(queries);
+            string logLine;
+
+            while (std::getline(ss, logLine, '\n')) {
+                testQueriesLog.push_back(logLine);
+            }
+            LOG(INFOL) << "test Queries at web interface = " << testQueriesLog.size();
+            double accuracy = 0.0;
+            string logFileName = "training-queries.datalog";
+            if (program) {
+                Training::trainAndTestModel(trainingQueriesVector,
+                        testQueriesLog,
+                        *edb.get(),
+                        *program.get(),
+                        accuracy,
+                        timeout,
+                        repeatQuery,
+                        logFileName);
+            }
+            // 3. Set the output in json
+            JSON node;
+            node.put("accuracy", accuracy);
+            std::ostringstream buf;
+            JSON::write(buf, node);
+            page = buf.str();
+            isjson = true;
+        } else if (path == "/query") {
+
+            //Get all query
+            string form = req.substr(req.find("application/x-www-form-urlencoded"));
+            string queries = _getValueParam(form, "query");
+            string timeoutStr = _getValueParam(form, "timeout");
+            string repeatQueryStr = _getValueParam(form, "repeatQuery");
+
+            uint64_t timeout = stoull(timeoutStr);
+            uint8_t repeatQuery = stoul(repeatQueryStr);
+            //Decode the query
+            queries = HttpClient::unescape(queries);
+            std::regex e1("\\+");
+            std::string replacedString;
+            std::regex_replace(std::back_inserter(replacedString),
+                    queries.begin(), queries.end(),
+                    e1, "$1 ");
+            queries = replacedString;
+            std::regex e2("\\r\\n");
+            replacedString = "";
+            std::regex_replace(std::back_inserter(replacedString),
+                    queries.begin(), queries.end(), e2, "$1\n");
+            queries = replacedString;
+            vector<string> queryVector;
+            stringstream ss(queries);
+            string query;
+
+            while (std::getline(ss, query, '\n')) {
+                queryVector.push_back(query);
+            }
+
+            JSON node;
+            JSON queryResults;
+            JSON queryFeatures;
+            JSON queryQsqrTimes;
+            JSON queryMagicTimes;
+            if (program) {
+                Training::execLiteralQueries(queryVector,
+                        *edb.get(),
+                        *program.get(),
+                        &queryResults,
+                        &queryFeatures,
+                        &queryQsqrTimes,
+                        &queryMagicTimes,
+                        timeout,
+                        repeatQuery);
+            }
+            node.add_child("results", queryResults);
+            node.add_child("features", queryFeatures);
+            node.add_child("qsqrtimes", queryQsqrTimes);
+            node.add_child("magictimes", queryMagicTimes);
+            std::ostringstream buf;
+            JSON::write(buf, node);
+            page = buf.str();
+            isjson = true;
+
         } else if (path == "/lookup") {
             string form = req.substr(req.find("application/x-www-form-urlencoded"));
             string id = _getValueParam(form, "id");

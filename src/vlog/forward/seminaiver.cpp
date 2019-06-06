@@ -1143,7 +1143,6 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 
     LOG(DEBUGL) << "Iteration: " << iteration <<
         " Rule: " << rule.tostring(program, &layer);
-
     //Set up timers
     const std::chrono::system_clock::time_point startRule = std::chrono::system_clock::now();
     std::chrono::duration<double> durationJoin(0);

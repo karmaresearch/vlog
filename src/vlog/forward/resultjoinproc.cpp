@@ -202,8 +202,8 @@ bool InterTableJoinProcessor::isEmpty() const {
 
 void InterTableJoinProcessor::consolidate(const bool isFinished) {
     //Add the segment to the table
-    //LOG(DEBUGL) << "InterTableJoinProcessor::consolidate: currentSegmentSize = " << currentSegmentSize;
-    //LOG(DEBUGL) << "  rowsize = " << (int)rowsize;
+    LOG(DEBUGL) << "InterTableJoinProcessor::consolidate: currentSegmentSize = " << currentSegmentSize;
+    LOG(DEBUGL) << "  rowsize = " << (int)rowsize;
     for (uint32_t i = 0; i < currentSegmentSize; ++i) {
         if (segments[i] != NULL && !segments[i]->isEmpty()) {
             if (table == NULL) {

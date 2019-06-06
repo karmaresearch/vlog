@@ -773,8 +773,9 @@ bool SegmentInserter::isEmpty() const {
         return true;
     }
     if (copyColumns[0] != std::shared_ptr<Column>()) {
-        if (!copyColumns[0]->isEmpty())
+        if (!copyColumns[0]->isEmpty()) {
             return false;
+        }
     }
     return columns[0].isEmpty();
 }
@@ -970,6 +971,7 @@ size_t SegmentInserter::getNRows() const {
 
 void SegmentInserter::addRow(FCInternalTableItr *itr) {
     if (segmentSorted) {
+        assert(nfields > 0);
         if (!isEmpty()) {
             for (uint8_t i = 0; i < nfields; ++i) {
                 if (itr->getCurrentValue(i) < columns[i].lastValue()) {

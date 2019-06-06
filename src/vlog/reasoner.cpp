@@ -780,6 +780,61 @@ TupleIterator *Reasoner::getIteratorWithMaterialization(SemiNaiver *sn, Literal 
     }
 }
 
+int Reasoner::getNumberOfIDBPredicates(Literal &query, Program &program) {
+    int count = 0;
+    std::vector<Rule> rules;
+    int idxRules = 0;
+
+    std::unordered_set<Term_t> setQueries;
+    std::vector<Literal> queries;
+    int idxQueries = 0;
+    queries.push_back(query);
+    Term_t key = (query.getPredicate().getId() << 16) + query.getPredicate().getAdornment();
+    setQueries.insert(key);
+
+    while (idxQueries < queries.size()) {
+        Literal lit = queries[idxQueries];
+
+        //Go through all rules and get the ones which match the query
+        std::vector<Rule> r = program.getAllRulesByPredicate(lit.getPredicate().getId());
+        for (std::vector<Rule>::iterator itr = r.begin(); itr != r.end();
+                ++itr) {
+            rules.push_back(itr->createAdornment(lit.getPredicate().getAdornment()));
+        }
+
+        //Go through all the new rules and get new queries to process
+        while (idxRules < rules.size()) {
+            Rule *r = &rules[idxRules];
+            for (std::vector<Literal>::const_iterator itr = r->getBody().begin();
+                    itr != r->getBody().end(); ++itr) {
+                Predicate pred = itr->getPredicate();
+                if (pred.getType() == IDB) {
+                    count++;
+                    Term_t key = (pred.getId() << 16) + pred.getAdornment();
+                    if (setQueries.find(key) == setQueries.end()) {
+                        setQueries.insert(key);
+                        queries.push_back(*itr);
+                    }
+                }
+            }
+            idxRules++;
+        }
+        idxQueries++;
+    }
+
+    return count;
+}
+
+void Reasoner::getMetrics(Literal &query, std::vector<uint8_t> *posBindings, std::vector<Term_t> *valueBindings,
+	    EDBLayer &layer, Program &program, Metrics &metrics, int maxDepth) {
+    std::unique_ptr<QSQR> evaluator = std::unique_ptr<QSQR>(
+            new QSQR(layer, &program));
+    memset(&metrics, 0, sizeof(Metrics));
+    std::vector<Rule> uniqueRules;
+    evaluator->estimateQuery(metrics, maxDepth, query, uniqueRules);
+    metrics.countUniqueRules = uniqueRules.size();
+}
+
 ReasoningMode Reasoner::chooseMostEfficientAlgo(Literal &query,
         EDBLayer &layer, Program &program,
         std::vector<uint8_t> *posBindings,

@@ -60,6 +60,8 @@ file(GLOB vlog_SRC
     "src/vlog/trigger/*.cpp"
     "src/launcher/vloglayer.cpp"
     "src/launcher/vlogscan.cpp"
+    "src/vlog/prediction/*.cpp"
+    "src/vlog/util/*.cpp"
     )
 
 #ZLIB
@@ -173,8 +175,6 @@ IF(MAPI)
 ENDIF()
 
 IF(SPARQL)
-    find_package(CURL REQUIRED)
-    include_directories(${CURL_INCLUDE_DIR})
     file(GLOB vlog_sparqlSRC "src/vlog/sparql/*.cpp")
     set(vlog_SRC ${vlog_sparqlSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DSPARQL=1")

@@ -8,6 +8,8 @@
 #include <vlog/fcinttable.h>
 #include <vlog/exporter.h>
 #include <vlog/utils.h>
+#include <vlog/ml/training.h>
+#include <vlog/ml/helper.h>
 #include <vlog/ml/ml.h>
 #include <vlog/trigger/detector.h>
 #include <vlog/trigger/tg.h>
@@ -65,6 +67,7 @@ void printHelp(const char *programName, ProgramArgs &desc) {
     cout << "server\t\t starts in server mode." << endl;
     cout << "load\t\t load a Trident KB." << endl;
     cout << "gentq\t\t generate training queries from rules file." << endl;
+    cout << "tat\t\t generate training queries and test them with a model." << endl;
     cout << "lookup\t\t lookup for values in the dictionary." << endl << endl;
     cout << "cycles\t\t try and detect cycles in the rules." << endl << endl;
     cout << "deps\t\t detect dependencies in the database." << endl << endl;
@@ -87,9 +90,11 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
         cmd = argv[1];
     }
 
-    if (cmd != "help" && cmd != "query" && cmd != "lookup" && cmd != "load" && cmd != "queryLiteral"
-            && cmd != "mat" && cmd != "mat_tg" && cmd != "rulesgraph" && cmd != "server" && cmd != "gentq" &&
-            cmd != "cycles" && cmd !="deps" && cmd != "trigger") {
+    if (cmd != "help" && cmd != "query" && cmd != "lookup" && cmd != "load" &&
+            cmd != "queryLiteral"
+            && cmd != "mat" && cmd != "mat_tg" && cmd != "rulesgraph" &&
+            cmd != "server" && cmd != "gentq" && cmd != "tat" &&
+            cmd != "cycles" && cmd != "deps" && cmd != "trigger") {
         printErrorMsg(
                 (string("The command \"") + cmd + string("\" is unknown.")).c_str());
         return false;
@@ -196,6 +201,21 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
                 string path = vm["rules"].as<string>();
                 if (!Utils::exists(path)) {
                     printErrorMsg((string("The rule file ") + path + string(" doe not exists")).c_str());
+                    return false;
+                }
+            }
+        } else if (cmd == "tat") {
+            if (vm["rules"].as<string>().compare("") != 0) {
+                string path = vm["rules"].as<string>();
+                if (!Utils::exists(path)) {
+                    printErrorMsg((string("The rule file ") + path + string(" doe not exists")).c_str());
+                    return false;
+                }
+            }
+            if (vm["testqueries"].as<string>().compare("") != 0) {
+                string path = vm["testqueries"].as<string>();
+                if (!Utils::exists(path)) {
+                    printErrorMsg((string("The test queries file ") + path + string(" doe not exists")).c_str());
                     return false;
                 }
             }
@@ -357,9 +377,14 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "Path to the webpages relative to where the executable is. Default is ../webinterface", false);
 
     ProgramArgs::GroupArgs& generateTraining_options = *vm.newGroup("Options for command <gentq>");
-    generateTraining_options.add<int>("", "maxTuples", 500, "Number of EDB tuples to consider for training", false);
+    generateTraining_options.add<int>("", "maxTuples", 50, "Number of EDB tuples per IDB predicate to consider for training", false);
     generateTraining_options.add<int>("", "depth", 5, "Recursion level of training generation procedure", false);
 
+    ProgramArgs::GroupArgs& trainAndTest_options = *vm.newGroup("Options for command <tat>");
+    trainAndTest_options.add<string>("tq", "testqueries", "",
+            "The path of the file with a log of test queries", false);
+    trainAndTest_options.add<int>("mtq", "maxTrainingQueries", 500, "Number of training queries to train on to train on", false);
+    trainAndTest_options.add<int>("", "timeout", 10000, "Number milliseconds the query should time out after", false);
     ProgramArgs::GroupArgs& detectCycles_options = *vm.newGroup("Options for command <detectCycles>");
     detectCycles_options.add<string>("", "alg", "MFA", "Algorithm to use for cycle detection", false);
 
@@ -954,6 +979,18 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
         LOG(INFOL) << "Selection strategy determined that we go for " << algo;
     }
 
+    if (algo == "onlyMetrics") {
+        Metrics m;
+        std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
+        reasoner.getMetrics(literal, NULL, NULL, edb, p, m, 5);
+        std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
+        LOG(INFOL) << "Query = " << literal.tostring(&p, &edb) << "Vector: " << \
+            m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
+            << ", " << m.countIntermediateQueries;
+        LOG(INFOL) << "Time taken : " << durationMetrics.count() * 1000 << "ms";
+        return;
+    }
+
     TupleIterator *iter;
 
     if (algo == "edb") {
@@ -1006,7 +1043,19 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
         cout.rdbuf(file.rdbuf());
         std::chrono::system_clock::time_point startQ = std::chrono::system_clock::now();
         for (int j = 0; j < times; j++) {
-            TupleIterator *iter = reasoner.getIterator(literal, NULL, NULL, edb, p, true, NULL);
+            TupleIterator *iter;
+            if (algo == "edb") {
+                iter = reasoner.getEDBIterator(literal, NULL, NULL, edb, onlyVars, NULL);
+            } else if (algo == "magic") {
+                iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
+            } else if (algo == "qsqr") {
+                iter = reasoner.getTopDownIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
+            } else if (algo == "mat") {
+                iter = reasoner.getMaterializationIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
+            } else {
+                LOG(ERRORL) << "Unrecognized reasoning algorithm: " << algo;
+                throw 10;
+            }
             int sz = iter->getTupleSize();
             while (iter->hasNext()) {
                 iter->next();
@@ -1026,6 +1075,7 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
                     cout << endl;
                 }
             }
+            delete iter;
         }
         std::chrono::duration<double> durationQ = std::chrono::system_clock::now() - startQ;
         //Restore stdout
@@ -1177,7 +1227,53 @@ int main(int argc, const char** argv) {
         if (cmd == "query") {
             execSPARQLQuery(*layer, vm);
         } else {
-            execLiteralQuery(*layer, vm);
+            string queryFile = vm["query"].as<string>();
+            if (!Utils::exists(queryFile)) {
+                execLiteralQuery(*layer, vm);
+            } else {
+                string rulesFile = vm["rules"].as<string>();
+                Program program(layer);
+                program.readFromFile(rulesFile);
+                vector<string> trainingQueriesVector;
+                // read the file and make the vector of queries
+                ifstream file(queryFile);
+                string line;
+                while (file && getline(file, line)) {
+                    if (line.size() == 0) {
+                        continue;
+                    }
+                    trainingQueriesVector.push_back(line);
+                }
+                //get logfile name from rules file
+                size_t dotIndex = rulesFile.find_last_of(".");
+                string logFileName = rulesFile.substr(0, dotIndex);
+                logFileName += "-training.log";
+                // Run the queries with threshold 10s and repeat queries 3 times
+                // to take average of the running time
+                uint64_t timeout = vm["timeout"].as<unsigned int>();
+                uint8_t repeatQuery = vm["repeatQuery"].as<unsigned int>();
+                string algo = vm["reasoningAlgo"].as<string>();
+                if (algo == "onlyMetrics") {
+                    for (auto query : trainingQueriesVector) {
+                        Dictionary dictVariables;
+                        Literal literal = program.parseLiteral(query, dictVariables);
+                        Reasoner reasoner(vm["reasoningThreshold"].as<int64_t>());
+                        Metrics m;
+                        std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
+                        reasoner.getMetrics(literal, NULL, NULL, *layer, program, m, 5);
+                        std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
+                        LOG(INFOL) << "Query = " << query << "Vector: " << \
+                            m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
+                            << ", " << m.countIntermediateQueries;
+                        LOG(INFOL) << "Time taken : " << durationMetrics.count() * 1000 << "ms";
+                    }
+                } else {
+                    vector<Metrics> featuresVector;
+                    vector<int> decisionVector;
+                    int nMagicQueries = 0;
+                    Training::runQueries(trainingQueriesVector, *layer, program, timeout, repeatQuery, featuresVector, decisionVector,nMagicQueries, logFileName);
+                }
+            }
         }
         delete layer;
     } else if (cmd == "lookup") {
@@ -1329,32 +1425,34 @@ int main(int argc, const char** argv) {
             loader->load(p);
         }
         delete loader;
-    } else if (cmd == "gentq") {
+    } else if (cmd == "gentq" || cmd == "tat") {
         EDBConf conf(edbFile);
         conf.setRootPath(Utils::parentDir(edbFile));
         string rulesFile = vm["rules"].as<string>();
+        uint64_t maxTuples = vm["maxTuples"].as<unsigned int>();
+        string testQueriesLogFileName;
+        if (cmd == "tat") {
+            testQueriesLogFileName = vm["testqueries"].as<string>();
+        }
+        int depth = vm["depth"].as<unsigned int>();
         EDBLayer *layer = new EDBLayer(conf, false);
-        Program p(layer);
-        //uint8_t vt1 = (uint8_t) p.getIDVar("V1");
-        //uint8_t vt2 = (uint8_t) p.getIDVar("V2");
-        //uint8_t vt3 = (uint8_t) p.getIDVar("V3");
-        //uint8_t vt4 = (uint8_t) p.getIDVar("V4");
-        uint8_t vt1 = 0;
-        uint8_t vt2 = 1;
-        uint8_t vt3 = 2;
-        uint8_t vt4 = 3;
+        Program program(layer);
+        uint8_t vt1 = 1;
+        uint8_t vt2 = 2;
+        uint8_t vt3 = 3;
+        uint8_t vt4 = 4;
         std::vector<uint8_t> vt;
         vt.push_back(vt1);
         vt.push_back(vt2);
         vt.push_back(vt3);
         vt.push_back(vt4);
-        std::string s = p.readFromFile(rulesFile);
+        std::string s = program.readFromFile(rulesFile);
         if (s != "") {
             cerr << s << endl;
             return 1;
         }
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-        std::vector<std::pair<std::string,int>> trainingQueries = ML::generateTrainingQueries(*layer, p, vt, vm);
+        std::vector<std::pair<std::string,int>> trainingQueries = ML::generateTrainingQueries(*layer, program, vt, vm);
         std::chrono::duration<double> sec = std::chrono::system_clock::now()- start;
         int nQueries = trainingQueries.size();
         LOG(INFOL) << nQueries << " queries generated in " << sec.count() << " seconds";
@@ -1362,12 +1460,54 @@ int main(int argc, const char** argv) {
         trainingFileName += "-training.log";
         std::ofstream logFile(trainingFileName);
         for (auto it = trainingQueries.begin(); it != trainingQueries.end(); ++it) {
-            logFile << it->first <<":"<<it->second << std::endl;
+            logFile << it->first <<" "<<it->second << std::endl;
         }
         if (logFile.fail()) {
             LOG(INFOL) << "Error writing to the log file";
         }
         logFile.close();
+        if (cmd == "tat") {
+            vector<string> trainingQueriesVector;
+            int nMaxTrainingQueries = vm["maxTrainingQueries"].as<unsigned int>(); // can be an optional argument
+            if (nQueries < nMaxTrainingQueries || nMaxTrainingQueries < 0) {
+                nMaxTrainingQueries = nQueries;
+            }
+            LOG(INFOL) << "Max training queries : " << nMaxTrainingQueries;
+            int i = 0;
+            vector<int> queryIndexes(nMaxTrainingQueries);
+            getRandomTupleIndexes(nMaxTrainingQueries, nQueries, queryIndexes);
+            LOG(INFOL) << "query indexes received : " << queryIndexes.size();
+            for (auto qi: queryIndexes) {
+                trainingQueriesVector.push_back(trainingQueries[qi].first);
+            }
+            // 2. test the model against test queries
+
+            vector<string> testQueriesLog;
+            ifstream ifs(testQueriesLogFileName);
+            string logLine;
+
+            while (ifs && std::getline(ifs, logLine)) {
+                if (logLine.size() == 0) {
+                    continue;
+                }
+                testQueriesLog.push_back(logLine);
+            }
+            LOG(INFOL) << "test Queries in the file = " << testQueriesLog.size();
+            size_t dotIndex = rulesFile.find_last_of(".");
+            string logFileName = rulesFile.substr(0, dotIndex);
+            logFileName += "-training.log";
+            double accuracy = 0.0;
+            uint64_t timeout = vm["timeout"].as<unsigned int>();
+            uint8_t repeatQuery = vm["repeatQuery"].as<unsigned int>();
+            Training::trainAndTestModel(trainingQueriesVector,
+                    testQueriesLog,
+                    *layer,
+                    program,
+                    accuracy,
+                    timeout,
+                    repeatQuery,
+                    logFileName);
+        }
     } else if (cmd == "server") {
 #ifdef WEBINTERFACE
         startServer(argc, argv, full_path, vm);

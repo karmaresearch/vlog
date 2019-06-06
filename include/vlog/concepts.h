@@ -203,7 +203,7 @@ class Predicate {
             return (type >> 1) != 0;
         }
 
-        uint8_t getAdorment() const {
+        uint8_t getAdornment() const {
             return adornment;
         }
 
@@ -286,7 +286,7 @@ class Literal {
         }
 
         size_t getNBoundVariables() const {
-            return pred.getNFields(pred.getAdorment());
+            return pred.getNFields(pred.getAdornment());
         }
 
         bool isNegated() const {
@@ -585,8 +585,12 @@ class Program {
             return cardPredicates[pred];
         }
 
-        // Returns true if stratification succeeded, and then stores the stratification in the parameter.
-        // The result vector is indexed by predicate id, and then gives the stratification class.
+        VLIBEXP std::vector<PredId_t> getAllIDBPredicateIds();
+        //
+        // Returns true if stratification succeeded, and then stores the
+        // stratification in the parameter.
+        // The result vector is indexed by predicate id, and then gives the
+        // stratification class.
         // The number of stratification classes is also returned.
         bool stratify(std::vector<int> &stratification, int &nStatificationClasses);
 
