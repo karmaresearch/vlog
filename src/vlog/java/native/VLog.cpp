@@ -618,8 +618,8 @@ extern "C" {
                 jmethodID getBodyMethod = env->GetMethodID(cls, "getBody", "()[Lkarmaresearch/vlog/Atom;");
 
                 // Get fields: head and body.
-                jobjectArray head = (jobjectArray) env->CallObjectMethod(rule, getHeadMethod); 
-                jobjectArray body = (jobjectArray) env->CallObjectMethod(rule, getBodyMethod); 
+                jobjectArray head = (jobjectArray) env->CallObjectMethod(rule, getHeadMethod);
+                jobjectArray body = (jobjectArray) env->CallObjectMethod(rule, getBodyMethod);
 
                 // Convert them into internal VLog format.
                 std::vector<Literal> vhead = getVectorLiteral(env, f, head, dictVariables);
@@ -690,7 +690,10 @@ extern "C" {
 
         LOG(INFOL) << "Starting full materialization";
         try {
-            f->sn = new SemiNaiver(*(f->layer), f->program, true, true, false, ! (bool) skolem, -1, false, false);
+            f->sn = new SemiNaiver(*(f->layer), f->program, true, true, false,
+                    (bool) skolem ?
+                    TypeChase::SKOLEM_CHASE : TypeChase::RESTRICTED_CHASE,
+                    -1, false, false);
             std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
             unsigned long *p = NULL;
             unsigned long t = (unsigned long) jtimeout;

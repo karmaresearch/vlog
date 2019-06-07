@@ -24,9 +24,8 @@ size_t EDBFCInternalTable::getNRows() const {
 
 bool EDBFCInternalTable::isEmpty() const {
     const Literal l = *query.getLiteral();
-    LOG(DEBUGL) << "isEmpty: literal = " << l.tostring(NULL, layer);
     bool retval = layer->isEmpty(l, NULL, NULL);
-    // LOG(DEBUGL) << "isEmpty(): " << retval;
+    LOG(DEBUGL) << "isEmpty: literal = " << l.tostring(NULL, layer) << ", returns: " << retval;
     return retval;
 }
 

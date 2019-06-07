@@ -17,7 +17,7 @@
 #include <map>
 
 class Column;
-class EDBMemIterator : public EDBIterator {
+class EDBMemIterator final : public EDBIterator {
     private:
         uint8_t nfields = 0;
         bool isFirst = false, hasFirst = false;
@@ -78,7 +78,7 @@ class EDBLayer {
         Factory<EDBMemIterator> memItrFactory;
         std::vector<IndexedTupleTable *>tmpRelations;
 
-        std::unique_ptr<Dictionary> termsDictionary;
+        std::shared_ptr<Dictionary> termsDictionary;
 
         VLIBEXP void addTridentTable(const EDBConf::Table &tableConf, bool multithreaded);
 
@@ -146,6 +146,8 @@ class EDBLayer {
         string getPredName(PredId_t id);
 
         uint8_t getPredArity(PredId_t id);
+
+        void setPredArity(PredId_t id, uint8_t arity);
 
         void addTmpRelation(Predicate &pred, IndexedTupleTable *table);
 

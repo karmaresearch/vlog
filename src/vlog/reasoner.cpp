@@ -918,10 +918,10 @@ TupleIterator *Reasoner::getTopDownIterator(Literal &query,
 
 std::shared_ptr<SemiNaiver> Reasoner::getSemiNaiver(EDBLayer &layer,
         Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
-        bool restrictedChase,
-        int nthreads, int interRuleThreads, bool shuffleRules) {
+        TypeChase typeChase,
+        int nthreads, int interRuleThreads, bool shuffleRules, Program *restrictedCheck) {
     LOG(DEBUGL) << "interRuleThreads = " << interRuleThreads << ", shuffleRules = " << shuffleRules;
-    if (interRuleThreads > 0) {
+    if (interRuleThreads > 0 && restrictedCheck == NULL) {
         std::shared_ptr<SemiNaiver> sn(new SemiNaiverThreaded(
                     layer, p, opt_intersect, opt_filtering,
                     shuffleRules, nthreads, interRuleThreads));
@@ -929,7 +929,7 @@ std::shared_ptr<SemiNaiver> Reasoner::getSemiNaiver(EDBLayer &layer,
     } else {
         std::shared_ptr<SemiNaiver> sn(new SemiNaiver(
                     layer, p, opt_intersect, opt_filtering,
-                    opt_threaded, restrictedChase, nthreads, shuffleRules, false));
+                    opt_threaded, typeChase, nthreads, shuffleRules, false, restrictedCheck));
         return sn;
     }
 }
@@ -942,7 +942,7 @@ std::shared_ptr<TriggerSemiNaiver> Reasoner::getTriggeredSemiNaiver(EDBLayer &la
     return sn;
 }
 
-std::shared_ptr<SemiNaiver> Reasoner::fullMaterialization(EDBLayer &layer,
+/*std::shared_ptr<SemiNaiver> Reasoner::fullMaterialization(EDBLayer &layer,
         Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
         bool restrictedChase, int nthreads, int interRuleThreads, bool shuffleRules) {
     LOG(INFOL) << "Starting full materialization";
@@ -955,4 +955,4 @@ std::shared_ptr<SemiNaiver> Reasoner::fullMaterialization(EDBLayer &layer,
     LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
     sn->printCountAllIDBs("");
     return sn;
-}
+}*/
