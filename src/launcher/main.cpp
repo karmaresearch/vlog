@@ -378,7 +378,7 @@ void writeRuleDependencyGraph(EDBLayer &db, string pathRules, string filegraph) 
         return;
     }
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(db,
-            &p, true, true, false, false, 1, 1, false);
+            &p, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false);
 
     std::vector<int> nodes;
     std::vector<std::pair<int, int>> edges;
@@ -602,7 +602,8 @@ void launchFullMat(int argc,
                 &p, vm["no-intersect"].empty(),
                 vm["no-filtering"].empty(),
                 !vm["multithreaded"].empty(),
-                vm["restrictedChase"].as<bool>(),
+                vm["restrictedChase"].as<bool>()
+                ? TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE,
                 nthreads,
                 interRuleThreads,
                 ! vm["shufflerules"].empty());
@@ -940,8 +941,8 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     runLiteralQuery(edb, p, literal, reasoner, vm);
 }
 
-void checkAcyclicity(std::string ruleFile, std::string alg, EDBLayer &db) {
-    int response = Checker::checkFromFile(ruleFile, alg, db);
+void checkAcyclicity(std::string ruleFile, std::string alg, EDBLayer &db, bool rewriteMultihead) {
+    int response = Checker::checkFromFile(ruleFile, alg, db, rewriteMultihead);
     std::cout << "The response is: ";
     if (response == 0) {
         std::cout << "Unknown";
@@ -1195,12 +1196,14 @@ int main(int argc, const char** argv) {
         EDBLayer *layer = new EDBLayer(conf, false);
         string rulesFile = vm["rules"].as<string>();
         string alg = vm["alg"].as<string>();
-        checkAcyclicity(rulesFile, alg, *layer);
+        checkAcyclicity(rulesFile, alg, *layer, vm["rewriteMultihead"].as<bool>());
+	delete layer;
     } else if (cmd == "deps") {
         EDBConf conf(edbFile);
         EDBLayer *layer = new EDBLayer(conf, false);
         string rulesFile = vm["rules"].as<string>();
         detectDeps(rulesFile, *layer);
+	delete layer;
     }
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Runtime = " << sec.count() * 1000 << " milliseconds";

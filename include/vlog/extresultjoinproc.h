@@ -49,18 +49,20 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
                 uint64_t &sizecolumns,
                 std::vector<std::shared_ptr<Column>> &c);
 
-        bool RMFA_check(uint64_t *row, const Literal &headLiteral,
-                uint64_t *headrow, std::vector<uint8_t> &columnsToCheck);
+        bool blocked_check(uint64_t *row, size_t sizeRow);
 
-        void RMFA_computeBodyAtoms(std::vector<Literal> &output,
-                uint64_t *row);
+        std::vector<uint64_t> blocked_check_computeBodyAtoms(std::vector<Literal> &output,
+                uint64_t *row); // returns row to match for the generated predicate
 
-        void RMFA_enhanceFunctionTerms(std::vector<Literal> &output,
+        // enhanceFunctionTerms is used for RMFA as well as RMFC.
+        void enhanceFunctionTerms(std::vector<Literal> &output,
                 uint64_t &startFreshIDs,
-                size_t startOutput = 0);
+                bool rmfa);
 
-        std::unique_ptr<SemiNaiver> RMFA_saturateInput(
-                std::vector<Literal> &input);
+        std::unique_ptr<SemiNaiver> saturateInput(
+                std::vector<Literal> &input,
+                Program *p,
+                EDBLayer *l);
 
     public:
         ExistentialRuleProcessor(

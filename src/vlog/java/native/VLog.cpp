@@ -138,12 +138,6 @@ std::vector<Literal> getVectorLiteral(JNIEnv *env, VLogInfo *f, jobjectArray h, 
         jmethodID getPredicateMethod = env->GetMethodID(cls, "getPredicate", "()Ljava/lang/String;");
         jstring jpred = (jstring) env->CallObjectMethod(atom, getPredicateMethod);
         std::string predicate = jstring2string(env, jpred);
-        //Check if predicate starts with "neg_".
-        bool negated = false;
-        if (predicate.substr(0,4) == "neg_") {
-            negated = true;
-            predicate = predicate.substr(4);
-        }
 
         // Get the terms
         jmethodID getTermsMethod = env->GetMethodID(cls, "getTerms", "()[Lkarmaresearch/vlog/Term;");
@@ -152,9 +146,7 @@ std::vector<Literal> getVectorLiteral(JNIEnv *env, VLogInfo *f, jobjectArray h, 
         // Get negated
         jmethodID isNegated = env->GetMethodID(cls, "isNegated", "()Z");
         jboolean jnegated = (jboolean) env->CallBooleanMethod(atom, isNegated);
-        if (! negated) {
-            negated = jnegated == JNI_TRUE;
-        }
+        bool negated = jnegated == JNI_TRUE;
 
         jsize vtuplesz = env->GetArrayLength(jterms);
         // Collect conversions from terms
@@ -418,9 +410,6 @@ extern "C" {
 
         //Transform the string into a C++ string
         std::string predName = jstring2string(env, p);
-        if (predName.find("neg_") == 0) {
-            predName = predName.substr(4);
-        }
 
         // TODO: fix this: this might create a new predicate if it does not exist.
         // There should be a way to just do a lookup???
@@ -444,9 +433,6 @@ extern "C" {
 
         //Transform the string into a C++ string
         std::string predName = jstring2string(env, p);
-        if (predName.find("neg_") == 0) {
-            predName = predName.substr(4);
-        }
 
         // TODO: fix this: this might create a new predicate if it does not exist.
         // There should be a way to just do a lookup???
@@ -632,8 +618,8 @@ extern "C" {
                 jmethodID getBodyMethod = env->GetMethodID(cls, "getBody", "()[Lkarmaresearch/vlog/Atom;");
 
                 // Get fields: head and body.
-                jobjectArray head = (jobjectArray) env->CallObjectMethod(rule, getHeadMethod); 
-                jobjectArray body = (jobjectArray) env->CallObjectMethod(rule, getBodyMethod); 
+                jobjectArray head = (jobjectArray) env->CallObjectMethod(rule, getHeadMethod);
+                jobjectArray body = (jobjectArray) env->CallObjectMethod(rule, getBodyMethod);
 
                 // Convert them into internal VLog format.
                 std::vector<Literal> vhead = getVectorLiteral(env, f, head, dictVariables);
@@ -704,7 +690,10 @@ extern "C" {
 
         LOG(INFOL) << "Starting full materialization";
         try {
-            f->sn = new SemiNaiver(*(f->layer), f->program, true, true, false, ! (bool) skolem, -1, false, false);
+            f->sn = new SemiNaiver(*(f->layer), f->program, true, true, false,
+                    (bool) skolem ?
+                    TypeChase::SKOLEM_CHASE : TypeChase::RESTRICTED_CHASE,
+                    -1, false, false);
             std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
             unsigned long *p = NULL;
             unsigned long t = (unsigned long) jtimeout;

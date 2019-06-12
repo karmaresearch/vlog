@@ -8,17 +8,25 @@
 typedef std::pair<PredId_t, uint8_t> vpos;
 typedef std::pair<uint32_t, uint8_t> rpos;
 
-int Checker::checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db) {
+int Checker::checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db, bool rewriteMultihead) {
     //Parse the rules into a program
     Program p(&db);
-    p.readFromFile(ruleFile, false); //we do not rewrite the heads
+    std::string s = p.readFromFile(ruleFile, rewriteMultihead);
+    if (s != "") {
+        LOG(ERRORL) << "Error: " << s;
+        throw 10;
+    }
     return check(p, alg, db);
 }
 
-int Checker::checkFromString(std::string rulesString, std::string alg, EDBLayer &db) {
+int Checker::checkFromString(std::string rulesString, std::string alg, EDBLayer &db, bool rewriteMultihead) {
     //Parse the rules into a program
     Program p(&db);
-    p.readFromString(rulesString, false); //we do not rewrite the heads
+    std::string s = p.readFromString(rulesString, rewriteMultihead);
+    if (s != "") {
+        LOG(ERRORL) << "Error: " << s;
+        throw 10;
+    }
     return check(p, alg, db);
 }
 
@@ -41,10 +49,17 @@ int Checker::check(Program &p, std::string alg, EDBLayer &db) {
         // This one, as the name already suggests, is the other way around: if true, there is a cycle,
         // so we know it won't terminate in some cases.
         return MFC(p) ? 2 : 0;
+    } else if (alg == "RMFC") {
+        // Restricted Model Faithful Cyclic
+        // This one, as the name already suggests, also is the other way around: if true, there is a cycle,
+        // so we know it won't terminate in some cases.
+        return MFC(p, true) ? 2 : 0;
     } else if (alg == "RMFA") {
         return RMFA(p) ? 1 : 0;
+    } else if (alg == "MSA") {
+        // Model Summarisation Acyclic
+        return MSA(p) ? 1 : 0;
     } else {
-        // TODO: MSA, RMSA?
         LOG(ERRORL) << "Unknown algorithm: " << alg;
         throw 10;
         // return 0;
@@ -59,9 +74,16 @@ static void addIDBCritical(Program &p, EDBLayer *db) {
     for (PredId_t v : allPredicates) {
         Predicate pred = p.getPredicate(v);
         if (pred.getType() == IDB) {
+            std::string name = p.getPredicateName(v);
+            LOG(DEBUGL) << "addIDBCritical: " << name;
+            if (name.find("__EXCLUDE_DUMMY__") == 0 || name.find("__GENERATED_PRED__") == 0) {
+                LOG(DEBUGL) << "Continuing";
+                continue;
+            }
             // Add a rule with a dummy EDB predicate
             uint8_t cardinality = pred.getCardinality();
             std::string edbName = "__DUMMY__" + std::to_string(cardinality);
+            LOG(DEBUGL) << "Checking existence of " << edbName;
             if (! hasNewEDB[cardinality]) {
                 PredId_t predId = p.getOrAddPredicate(edbName, cardinality);
                 std::vector<std::vector<string>> facts;
@@ -82,17 +104,16 @@ static void addIDBCritical(Program &p, EDBLayer *db) {
                 }
             }
             rule = rule + paramList + ") :- " + edbName + "(" + paramList + ")";
+            LOG(DEBUGL) << "Adding rule for IDB critical: " << rule;
             p.parseRule(rule, false);
-            LOG(DEBUGL) << "Adding rule: " << rule;
         }
     }
 }
 
-bool Checker::MFA(Program &p) {
-    // Create  the critical instance (cdb)
-    EDBLayer *db = p.getKB();
-    EDBConf conf("", false);
-    EDBLayer layer(conf, false);
+void Checker::createCriticalInstance(Program &newProgram,
+        Program &p,
+        EDBLayer *db,
+        EDBLayer &layer) {
 
     //Populate the critical instance with new facts
     for(auto p : db->getAllPredicateIDs()) {
@@ -103,29 +124,33 @@ bool Checker::MFA(Program &p) {
         }
         facts.push_back(fact);
         layer.addInmemoryTable(db->getPredName(p), facts);
+        LOG(DEBUGL) << "Adding inmemorytable for " << db->getPredName(p);
     }
 
     // Rewrite rules: all constants must be replaced with "*".
-    std::vector<std::string> newRules;
     std::vector<Rule> rules = p.getAllRules();
     for (auto rule : rules) {
         std::string ruleString = rule.toprettystring(&p, p.getKB(), true);
-        LOG(DEBUGL) << "Adding rule: " << ruleString;
-        newRules.push_back(ruleString);
-    }
-
-    Program newProgram(&layer);
-    for (auto rule : newRules) {
-        newProgram.parseRule(rule, false);
+        LOG(DEBUGL) << "Adding rule replacing constants: " << ruleString;
+        newProgram.parseRule(ruleString, false);
     }
 
     // The critical instance should have initial values for ALL predicates,
     // not just the EDB ones ... --Ceriel
     addIDBCritical(newProgram, &layer);
+}
+
+bool Checker::MFA(Program &p) {
+    // Create  the critical instance (cdb)
+    EDBLayer *db = p.getKB();
+    EDBLayer layer(*db, false);
+
+    Program newProgram(&layer);
+    createCriticalInstance(newProgram, p, db, layer);
 
     //Launch the skolem chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, false, 1, 1, false);
+            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false);
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)
     if (sn->isFoundCyclicTerms()) {
@@ -135,44 +160,60 @@ bool Checker::MFA(Program &p) {
     }
 }
 
+bool Checker::MSA(Program &p) {
+    // Create  the critical instance (cdb)
+    EDBLayer *db = p.getKB();
+    EDBLayer layer(*db, false);
+
+    Program newProgram(&layer);
+    createCriticalInstance(newProgram, p, db, layer);
+
+    //Launch a simpler version of the skolem chase with the check for cyclic terms
+    std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
+            &newProgram, true, true, false, TypeChase::SUM_CHASE, 1, 1, false);
+    sn->checkAcyclicity();
+    //if check succeeds then return 0 (we don't know)
+    if (sn->isFoundCyclicTerms()) {
+        return false;   // Not MSA
+    } else {
+        return true;
+    }
+}
+
+// Add special targets that have the head of existential rules as body, but only the non-existential variables in the head.
+// So, for instance, if we have a rule P(X,Y),Q(Y) :- R(X), then we add a rule Z(X) :- P(X,Y),Q(Y). This is for the implementation
+// of the blocked check.
+void Checker::addBlockCheckTargets(Program &p) {
+    std::vector<Rule> rules = p.getAllRules();
+    for (auto rule : rules) {
+        if (rule.isExistential()) {
+            auto newBody = rule.getHeads();
+            std::vector<uint8_t> headvars = rule.getVarsInBody();
+            std::string newPred = "__GENERATED_PRED__" + std::to_string(rule.getId());
+            Predicate newp = p.getPredicate(p.getOrAddPredicate(newPred, headvars.size()));
+            VTuple t(headvars.size());
+            for (int i = 0; i < headvars.size(); i++) {
+                t.set(VTerm(headvars[i], 0), i);
+            }
+            std::vector<Literal> h;
+            h.push_back(Literal(newp, t));
+            p.addRule(h, newBody);
+        }
+    }
+}
+
 bool Checker::RMFA(Program &p) {
     // Create  the critical instance (cdb)
     EDBLayer *db = p.getKB();
-    EDBConf conf("", false);
-    EDBLayer layer(conf, false);
-
-    //Populate the critical instance with new facts
-    for(auto p : db->getAllPredicateIDs()) {
-        std::vector<std::vector<string>> facts;
-        std::vector<string> fact;
-        for (int i = 0; i < db->getPredArity(p); ++i) {
-            fact.push_back("*");
-        }
-        facts.push_back(fact);
-        layer.addInmemoryTable(db->getPredName(p), facts);
-    }
-
-    // Rewrite rules: all constants must be replaced with "*".
-    std::vector<std::string> newRules;
-    std::vector<Rule> rules = p.getAllRules();
-    for (auto rule : rules) {
-        std::string ruleString = rule.toprettystring(&p, p.getKB(), true);
-        LOG(DEBUGL) << "Adding rule: " << ruleString;
-        newRules.push_back(ruleString);
-    }
+    EDBLayer layer(*db, false);
 
     Program newProgram(&layer);
-    for (auto rule : newRules) {
-        newProgram.parseRule(rule, false);
-    }
+    createCriticalInstance(newProgram, p, db, layer);
 
-    // The critical instance should have initial values for ALL predicates,
-    // not just the EDB ones ... --Ceriel
-    addIDBCritical(newProgram, &layer);
-
+    addBlockCheckTargets(newProgram);
     //Launch the (special) restricted chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, true, 1, 0, false);
+            &newProgram, true, true, false, TypeChase::RESTRICTED_CHASE, 1, 0, false);
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)
     if (sn->isFoundCyclicTerms()) {
@@ -182,16 +223,16 @@ bool Checker::RMFA(Program &p) {
     }
 }
 
-static void closure(Program &p, std::vector<std::pair<PredId_t, uint8_t>> &input) {
+static void closure(Program &p, std::map<PredId_t, std::vector<uint32_t>> &occurrences,
+        std::vector<std::pair<PredId_t, uint8_t>> &input) {
     std::vector<std::pair<PredId_t, uint8_t>> toProcess = input;
     while (toProcess.size() > 0) {
         std::vector<std::pair<PredId_t, uint8_t>> newPos;
         // Go through all the rules, checking all bodies. If a <predicate, pos> matches with a variable of the rule,
         // check for this variable in the heads, and add positions.
-        auto rules = p.getAllRules();
         for (auto pos : toProcess) {
-            for (auto rule : rules) {
-                std::vector<uint8_t> vars = rule.getVarsInBody();
+            for (auto ruleId : occurrences[pos.first]) {
+                auto &rule = p.getRule(ruleId);
                 auto body = rule.getBody();
                 for (auto lit : body) {
                     if (lit.getPredicate().getId() == pos.first) {
@@ -242,6 +283,16 @@ static void closure(Program &p, std::vector<std::pair<PredId_t, uint8_t>> &input
 
 static void getAllExtPropagatePositions(Program &p, std::map<rpos, std::vector<vpos>> &allExtVarsPos) {
     auto rules = p.getAllRules();
+    // Create a map, for each predicate, to find out in which rule bodies it occurs.
+    std::map<PredId_t, std::vector<uint32_t>> occurrences;
+
+    for (auto rule : rules) {
+        auto body = rule.getBody();
+        for (auto lit : body) {
+            occurrences[lit.getPredicate().getId()].push_back(rule.getId());
+        }
+    }
+
     for (auto rule : rules) {
         if (rule.isExistential()) {
             // First, get the predicate positions of the existential variables in the head(s)
@@ -264,7 +315,7 @@ static void getAllExtPropagatePositions(Program &p, std::map<rpos, std::vector<v
             for (int i = 0; i < extVars.size(); i++) {
                 auto positions = predPositions[i];
                 // Compute the closures of these position sets: where do they propagate to?
-                closure(p, positions);
+                closure(p, occurrences, positions);
                 // We need the positions sorted to be able to call std::set_intersection later on.
                 std::sort(positions.begin(), positions.end());
                 rpos pos(rule.getId(), i);
@@ -302,12 +353,13 @@ static void generateConstants(Program &p, std::map<PredId_t, std::vector<std::ve
             } else {
                 value.push_back(p.getKB()->getDictText(t.getValue()));
             }
+            LOG(TRACEL) << "i = " << i << ", value = " << value[value.size()-1];
         }
         edbSet[predid].push_back(value);
     }
 }
 
-static bool rja_check(Program &p, const Rule &rulev, const Rule &rulew, uint8_t x, uint8_t v, uint8_t w) {
+static bool rja_check(Program &p, Program &nongen_program, const Rule &rulev, const Rule &rulew, uint8_t x, uint8_t v, uint8_t w) {
     std::map<PredId_t, std::vector<std::vector<std::string>>> edbSet;
     int constantCount = 0;
     std::map<uint8_t, std::string> varConstantMapw;
@@ -323,18 +375,9 @@ static bool rja_check(Program &p, const Rule &rulev, const Rule &rulew, uint8_t 
     generateConstants(p, edbSet, constantCount, varConstantMapv, rulev.getHeads());
     generateConstants(p, edbSet, constantCount, varConstantMapv, rulev.getBody());
 
-    EDBConf conf("", false);
-    EDBLayer layer(conf, false);
+    EDBLayer layer(*(nongen_program.getKB()), true);
 
-    std::vector<std::string> nonGeneratingRules;
-    std::vector<Rule> rules = p.getAllRules();
-    for (auto rule : rules) {
-        if (! rule.isExistential()) {
-            std::string ruleString = rule.toprettystring(&p, p.getKB());
-            LOG(DEBUGL) << "NonGeneratingRule: \"" << ruleString << "\"";
-            nonGeneratingRules.push_back(ruleString);
-        }
-    }
+    Program newProgram(&nongen_program, &layer);
 
     for (auto pair : edbSet) {
         std::string edbName = "__DUMMY__" + std::to_string(pair.first);
@@ -350,6 +393,7 @@ static bool rja_check(Program &p, const Rule &rulev, const Rule &rulew, uint8_t 
         }
         rule = rule + paramList + ") :- " + edbName + "(" + paramList + ")";
         LOG(DEBUGL) << "Adding rule: \"" << rule << "\"";
+        newProgram.parseRule(rule, false);
     }
 
     // Add another rule to the ruleset, to determine if what we are looking for is materialized.
@@ -388,20 +432,18 @@ static bool rja_check(Program &p, const Rule &rulev, const Rule &rulew, uint8_t 
         newRule = newRule + ")";
     }
     LOG(DEBUGL) << "Adding rule: \"" << newRule << "\"";
-    nonGeneratingRules.push_back(newRule);
+    newProgram.parseRule(newRule, false);
 
-    Program newProgram(&layer);
-    for (auto rule : nonGeneratingRules) {
-        newProgram.parseRule(rule, false);
-    }
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, false, 1, 1, false);
+            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false);
     sn->run();
     Reasoner r((uint64_t) 0);
     Dictionary dictVariables;
     Literal query = newProgram.parseLiteral("__TARGET__(W)", dictVariables);
 
     TupleIterator *iter = r.getIteratorWithMaterialization(sn.get(), query, false, NULL);
+    // TupleIterator *iter = r.getTopDownIterator(query, NULL, NULL, layer, newProgram, false, NULL);
+    // TODO: does not work now, because of some unimplemented stuff in inmemorytable.
     bool retval = ! iter->hasNext();
     delete iter;
     return retval;
@@ -409,6 +451,7 @@ static bool rja_check(Program &p, const Rule &rulev, const Rule &rulew, uint8_t 
 
 bool Checker::JA(Program &p, bool restricted) {
     std::map<rpos, std::vector<vpos>> allExtVarsPos;
+    std::string type = restricted ? "RJA" : "JA";
 
     getAllExtPropagatePositions(p, allExtVarsPos);
 
@@ -421,7 +464,7 @@ bool Checker::JA(Program &p, bool restricted) {
             // and add all <pred, varpos> there to a list.
             // These are the values used to compute a value for the existential variable.
             const Rule &rule = p.getRule(it.first.first);
-            LOG(DEBUGL) << "Src = " << src << ", rule " << rule.tostring(&p, p.getKB());
+            LOG(TRACEL) << "Src = " << src << ", rule " << rule.tostring(&p, p.getKB());
             auto body = rule.getBody();
             std::vector<vpos> dependencies;
             // Collect <PredId_t, tuplepos> values on which the existential variables of this rule depend.
@@ -447,21 +490,45 @@ bool Checker::JA(Program &p, bool restricted) {
                 }
                 dest++;
             }
+            // Now check if the graph is cyclic. 
+            // If it is, the ruleset is not JA (Joint Acyclic) (which means that the result is inconclusive).
+            // If the ruleset is JA, we know that the chase will terminate.
+            if (g.isCyclic()) {
+                LOG(DEBUGL) << "Ruleset is not " << type << "!";
+                return false;
+            }
             src++;
         }
     } else {
+        EDBLayer layer(*(p.getKB()), false);
+
+        std::vector<std::string> nonGeneratingRules;
+        std::vector<Rule> rules = p.getAllRules();
+        for (auto rule : rules) {
+            if (! rule.isExistential()) {
+                std::string ruleString = rule.toprettystring(&p, p.getKB());
+                LOG(DEBUGL) << "NonGeneratingRule: \"" << ruleString << "\"";
+                nonGeneratingRules.push_back(ruleString);
+            }
+        }
+        Program newProgram(&layer);
+
+        for (auto rule : nonGeneratingRules) {
+            newProgram.parseRule(rule, false);
+        }
+
         for (auto &it : allExtVarsPos) {
             int dest = 0;
             const Rule &rulev = p.getRule(it.first.first);
             std::vector<uint8_t> extVars = rulev.getVarsNotInBody();
             uint8_t v = extVars[it.first.second];
-            LOG(DEBUGL) << "Src = " << src << ", rule " << rulev.tostring(&p, p.getKB());
+            LOG(TRACEL) << "Src = " << src << ", rule " << rulev.tostring(&p, p.getKB());
             for (auto &it2: allExtVarsPos) {
                 const Rule &rulew = p.getRule(it2.first.first);
                 auto body = rulew.getBody();
                 extVars = rulew.getVarsNotInBody();
                 uint8_t w = extVars[it2.first.second];
-                LOG(DEBUGL) << "Trying " << dest << ", rule " << rulew.tostring(&p, p.getKB());
+                LOG(TRACEL) << "Trying " << dest << ", rule " << rulew.tostring(&p, p.getKB());
                 std::map<uint8_t, std::vector<vpos>> positions;
                 for (auto lit: body) {
                     for (int i = 0; i < lit.getTupleSize(); i++) {
@@ -479,13 +546,13 @@ bool Checker::JA(Program &p, bool restricted) {
                     if (ipos - intersect.begin() == pair.second.size()) {
                         // For this variable, all positions in the right-hand-side occur in the propagations of the existential variable.
                         uint8_t x = pair.first;
-                        LOG(DEBUGL) << "We have a match for variable " << (int) x;
+                        LOG(TRACEL) << "We have a match for variable " << (int) x;
                         // Now try the materialization and the test.
                         // First compute the EDB set to materialize on.
                         // See Definition 4 of the paper
                         // Restricted Chase (Non) Termination for Existential Rules with Disjunctions
                         // by David Carral, Irina Dragoste and Markus Kroetzsch
-                        if (rja_check(p, rulev, rulew, x, v, w)) {
+                        if (rja_check(p, newProgram, rulev, rulew, x, v, w)) {
                             g.addEdge(src,dest);
                             break;
                         }
@@ -493,25 +560,39 @@ bool Checker::JA(Program &p, bool restricted) {
                 }
                 dest++;
             }
+            // Now check if the graph is cyclic. 
+            // If it is, the ruleset is not JA (Joint Acyclic) (which means that the result is inconclusive).
+            // If the ruleset is JA, we know that the chase will terminate.
+            if (g.isCyclic()) {
+                LOG(DEBUGL) << "Ruleset is not " << type << "!";
+                return false;
+            }
             src++;
         }
     }
 
-    // Now check if the graph is cyclic. If it is, the ruleset is not JA (Joint Acyclic) (which means that the result is inconclusive).
-    // If the ruleset is JA, we know that the chase will terminate.
-    std::string type = restricted ? "RJA" : "JA";
-    if (g.isCyclic()) {
-        LOG(DEBUGL) << "Ruleset is not " << type << "!";
-        return false;
-    }
     LOG(DEBUGL) << "RuleSet is " << type << "!";
     return true;
 }
 
-bool Checker::MFC(Program &p) {
+bool Checker::MFC(Program &prg, bool restricted) {
     // First, create a copy of the rules.
-    std::vector<std::string> rules;
+    Program *restrictedProgram = NULL;
+
+    Program p(&prg, prg.getKB());
+    for (auto rule: prg.getAllRules()) {
+        p.addRule(rule.getHeads(), rule.getBody());
+        LOG(DEBUGL) << "MFC: Added rule " << rule.tostring(NULL, NULL);
+    }
+
+    if (restricted) {
+        addBlockCheckTargets(p);
+        restrictedProgram = getProgramForBlockingCheckRMFC(p);
+    }
+
     std::vector<Rule> r = p.getAllRules();
+
+    std::vector<std::string> rules;
     for (auto rule : r) {
         std::string ruleString = rule.toprettystring(&p, p.getKB());
         rules.push_back(ruleString);
@@ -542,13 +623,13 @@ bool Checker::MFC(Program &p) {
                 edbSet[predid].push_back(value);
             }
 
-            EDBConf conf("", false);
-            EDBLayer layer(conf, false);
+            EDBLayer layer(*(p.getKB()), false);
 
             for (auto pair : edbSet) {
                 std::string edbName = "__DUMMY__" + std::to_string(pair.first);
-                layer.addInmemoryTable(edbName, pair.second);
                 int cardinality = pair.second[0].size();
+                PredId_t predId = p.getOrAddPredicate(edbName, cardinality);
+                layer.addInmemoryTable(edbName, predId, pair.second);
                 std::string rule = p.getPredicateName(pair.first) + "(";
                 std::string paramList = "";
                 for (int i = 0; i < cardinality; i++) {
@@ -558,27 +639,158 @@ bool Checker::MFC(Program &p) {
                     }
                 }
                 rule = rule + paramList + ") :- " + edbName + "(" + paramList + ")";
-                LOG(DEBUGL) << "Adding rule: \"" << rule << "\"";
                 newRules.push_back(rule);
             }
 
+            std::vector<PredId_t> predicates = p.getKB()->getAllPredicateIDs();
+            for (auto pred : predicates) {
+                if (!edbSet.count(pred)) {
+                    uint8_t arity = p.getKB()->getPredArity(pred);
+                    std::vector<uint64_t> empty;
+                    layer.addInmemoryTable(pred, arity, empty);
+                }
+            }
+
             // Now create a new program, and materialize. But: don't apply rules to recursive terms.
-            Program newProgram(&layer);
+            Program newProgram(&p, &layer);
             int count = 0;
             for (auto rule : newRules) {
+                LOG(DEBUGL) << "Adding rule: \"" << rule << "\"";
                 newProgram.parseRule(rule, false);
                 count++;
             }
             std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-                    &newProgram, true, true, false, false, 1, 1, false);
+                    &newProgram, true, true, false, restricted ? TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE, 1, 0, false, restrictedProgram);
             sn->checkAcyclicity(ruleCount);
             // If we produce a cyclic term FOR THIS RULE, we have MFC.
             if (sn->isFoundCyclicTerms()) {
-                LOG(INFOL) << "MFC: Cyclic rule: " << rule.toprettystring(&p, p.getKB());
+                LOG(INFOL) << (restricted ? "R" : "") << "MFC: Cyclic rule: " << rule.toprettystring(&p, p.getKB());
+                if (restrictedProgram != NULL) {
+                    delete restrictedProgram->getKB();
+                    delete restrictedProgram;
+                }
                 return true;    // MFC
             }
         }
         ruleCount++;
     }
+    if (restrictedProgram != NULL) {
+        delete restrictedProgram->getKB();
+        delete restrictedProgram;
+    }
     return false;
+}
+
+Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
+    // Create  the critical instance (cdb)
+    EDBLayer *db = p.getKB();
+    // Add "*" to the dictionary of the original program, so that it will not clash with other
+    // generated constants.
+    uint64_t id = 0;
+    db->getOrAddDictNumber("*", 1, id);
+    EDBLayer *layer = new EDBLayer(*db, false);
+
+    //Populate the critical instance with new facts
+    for(auto p : db->getAllPredicateIDs()) {
+        std::vector<std::vector<string>> facts;
+        std::vector<string> fact;
+        for (int i = 0; i < db->getPredArity(p); ++i) {
+            fact.push_back("*");
+        }
+        facts.push_back(fact);
+        layer->addInmemoryTable(db->getPredName(p), facts);
+        LOG(DEBUGL) << "Adding inmemory table for " << db->getPredName(p);
+    }
+
+    // Rewrite rules: all existential variables must be replaced with "*".
+    std::vector<std::string> newRules;
+    std::vector<Rule> rules = p.getAllRules();
+    size_t count = 0;
+    for (auto rule : rules) {
+        std::string output = "";
+        std::vector<uint8_t> existentials = rule.getVarsNotInBody();
+        bool first = true;
+        for(const auto& head : rule.getHeads()) {
+            if (! first) {
+                output += ",";
+            }
+            output += p.getPredicateName(head.getPredicate().getId()) + "(";
+            VTuple tuple = head.getTuple();
+            for (int i = 0; i < tuple.getSize(); ++i) {
+                VTerm term = tuple.get(i);
+                if (term.isVariable()) {
+                    bool present = false;
+                    for (int i = 0; i < existentials.size(); i++) {
+                        if (term.getId() == existentials[i]) {
+                            present = true;
+                            break;
+                        }
+                    }
+                    if (present) {
+                        output += "*";
+                    } else {
+                        output += std::string("A") + std::to_string(tuple.get(i).getId());
+                    }
+                } else {
+                    uint64_t id = tuple.get(i).getValue();
+                    char text[MAX_TERM_SIZE];
+                    if (db->getDictText(id, text)) {
+                        string v = Program::compressRDFOWLConstants(std::string(text));
+                        output += v;
+                    } else {
+                        std::string t = db->getDictText(id);
+                        if (t == std::string("")) {
+                            output += std::to_string(id);
+                        } else {
+                            output += Program::compressRDFOWLConstants(t);
+                        }
+                    }
+                }
+                if (i < tuple.getSize() - 1) {
+                    output += std::string(",");
+                }
+            }
+            output += ")";
+            first = false;
+        }
+        output += " :- ";
+        first = true;
+        for(const auto& bodyAtom : rule.getBody()) {
+            if (! first) {
+                output += ",";
+            }
+            first = false;
+            output += bodyAtom.toprettystring(&p, db, false);
+        }
+        if (existentials.size() > 0) {
+            // Add negated term allowing for exclusion of a specific binding
+            output += ", neg_";
+            output += "__EXCLUDE_DUMMY__" + std::to_string(count) + "(";
+            std::vector<uint8_t> vars = rule.getVarsInBody();
+            bool f = true;
+            for (int i = 0; i < vars.size(); i++) {
+                if (! f) {
+                    output += ",";
+                }
+                f = false;
+                output += std::string("A") + std::to_string(vars[i]);
+            }
+            output += ")";
+        }
+
+        LOG(DEBUGL) << "Adding rule: " << output;
+        newRules.push_back(output);
+        count++;
+    }
+
+    Program *newProgram = new Program(&p, layer);
+    for (auto rule : newRules) {
+        newProgram->parseRule(rule, false);
+    }
+    LOG(DEBUGL) << "New Program: " << newProgram->tostring();
+
+    // The critical instance should have initial values for ALL predicates,
+    // not just the EDB ones ... --Ceriel
+    addIDBCritical(*newProgram, layer);
+    return newProgram;
 }

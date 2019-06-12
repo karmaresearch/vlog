@@ -303,7 +303,7 @@ class Literal {
         static int getSubstitutionsA2B(
                 std::vector<Substitution> &substitutions, const Literal &a, const Literal &b);
 
-        Literal substitutes(std::vector<Substitution> &substitions) const;
+        Literal substitutes(std::vector<Substitution> &substitions, int *nsubs = NULL) const;
 
         bool sameVarSequenceAs(const Literal &l) const;
 
@@ -393,9 +393,9 @@ class Rule {
 
         bool isExistential() const;
 
-        std::vector<uint8_t> getVarsNotInBody() const;
+        std::vector<uint8_t> getVarsNotInBody() const;  // Existential variables.
 
-        std::vector<uint8_t> getVarsInBody() const;
+        std::vector<uint8_t> getVarsInBody() const; // Variables in the head that also occur in the body.
 
         const std::vector<Literal> &getBody() const {
             return body;
@@ -465,6 +465,7 @@ class Program {
         EDBLayer *kb;
         std::vector<std::vector<uint32_t>> rules;
         std::vector<Rule> allrules;
+        int rewriteCounter;
 
         Dictionary dictPredicates;
         std::unordered_map<PredId_t, uint8_t> cardPredicates;
@@ -472,12 +473,16 @@ class Program {
         //Move them to the EDB layer ...
         //Dictionary additionalConstants;
 
-        void rewriteRule(Rule &r);
+        void rewriteRule(std::vector<Literal> &heads, std::vector<Literal> &body);
+
+        void addRule(Rule &rule);
 
         std::string rewriteRDFOWLConstants(std::string input);
 
     public:
         VLIBEXP Program(EDBLayer *kb);
+
+        VLIBEXP Program(Program *p, EDBLayer *kb);
 
         EDBLayer *getKB() {
             return kb;
@@ -546,8 +551,6 @@ class Program {
         std::shared_ptr<Program> cloneNew() const;
 
         void cleanAllRules();
-
-        VLIBEXP void addRule(Rule &rule, bool rewriteMultihead = false);
 
         VLIBEXP void addRule(std::vector<Literal> heads,
                 std::vector<Literal> body, bool rewriteMultihead = false);
