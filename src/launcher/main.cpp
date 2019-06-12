@@ -548,7 +548,7 @@ void launchFullMat(int argc,
 
     if (vm["useParserGenerator"].as<bool>()){
         //use parser generator
-        p.parseRuleFile(pathRules, vm["rewriteMultihead"].as<bool>());
+        p.parseRuleFile(pathRules, vm["useParserGenerator"].as<bool>());
     }
     else {
         //use previous method to parse rules
