@@ -789,7 +789,7 @@ FCInternalTableItr *InmemoryFCInternalTable::sortBy(const std::vector<uint8_t> &
             t_sortby.start();
             sortedValues = values->sortBy(NULL);
             t_sortby.stop();
-            LOG(INFOL) << t_sortby.tostring();
+            LOG(TRACEL) << t_sortby.tostring();
         } else {
             sortedValues = values;
         }
@@ -801,7 +801,7 @@ FCInternalTableItr *InmemoryFCInternalTable::sortBy(const std::vector<uint8_t> &
         t_sort2.start();
         sortedValues = sortedValues->sortBy(&fields);
         t_sort2.stop();
-        LOG(INFOL) << t_sort2.tostring();
+        LOG(TRACEL) << t_sort2.tostring();
     }
 
     InmemoryFCInternalTableItr *tableItr = new InmemoryFCInternalTableItr();

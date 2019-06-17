@@ -39,7 +39,7 @@ void SemiNaiver::createGraphRuleDependency(std::vector<int> &nodes,
                 // Only add "interesting" rules: ones that have an IDB predicate in the RHS.
                 nodes.push_back(i);
                 definedBy[pred].push_back(i);
-                LOG(INFOL) << " Rule " << i << ": " << ri.tostring(program, &layer);
+                LOG(DEBUGL) << " Rule " << i << ": " << ri.tostring(program, &layer);
                 break;
             }
         }
@@ -103,7 +103,7 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
             LOG(ERRORL) << "Program could not be stratified";
             throw std::runtime_error("Program could not be stratified");
         }
-        LOG(INFOL) << "nStratificationClasses = " << nStratificationClasses;
+        LOG(DEBUGL) << "nStratificationClasses = " << nStratificationClasses;
 
         LOG(DEBUGL) << "Running SemiNaiver, opt_intersect = " << opt_intersect << ", opt_filtering = " << opt_filtering << ", multithreading = " << multithreaded << ", shuffle = " << shuffle;
 
@@ -1338,7 +1338,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 std::chrono::duration<double> d =
                     std::chrono::system_clock::now() - start;
                 t_join.stop();
-                LOG(INFOL) << t_join.tostring();
+                LOG(DEBUGL) << t_join.tostring();
                 LOG(DEBUGL) << "Time join: " << d.count() * 1000;
                 durationJoin += d;
             }
@@ -1439,7 +1439,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
     }
 
-    LOG(INFOL) << t_iter.tostring();
+    LOG(DEBUGL) << t_iter.tostring();
 
     return prodDer;
 }

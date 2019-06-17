@@ -316,7 +316,7 @@ std::shared_ptr<Segment> Segment::intsort(
                 t_colsort.start();
                 std::sort(values.begin(), values.end());
                 t_colsort.stop();
-                LOG(INFOL) << t_colsort.tostring();
+                LOG(TRACEL) << t_colsort.tostring();
                 ColumnWriter sortedColumnsInserters[2];
                 for (const auto v : values) {
                     sortedColumnsInserters[0].add(v.first);

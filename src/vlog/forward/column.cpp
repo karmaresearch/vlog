@@ -285,8 +285,8 @@ size_t EDBColumn::size() const {
         std::cerr << "DEBUG column size calls size() via getReader()" << std::endl;
         size_t sz = getReader()->asVector().size();
         if (sz != retval) {
-            LOG(INFOL) << "query " << l.tostring();
-            LOG(INFOL) << "Mismatch between calculated and cached Column " <<
+            LOG(DEBUGL) << "query " << l.tostring();
+            LOG(DEBUGL) << "Mismatch between calculated and cached Column " <<
                 " pred. " << pred_id << " size: " << sz << " vs. " << retval <<
                 " l.getNVars " << static_cast<int>(l.getNVars());
         }
@@ -295,7 +295,7 @@ size_t EDBColumn::size() const {
 #else
     if (layer.hasRemoveLiterals(pred_id)) {
         size_t sz = getReader()->asVector().size();
-        LOG(INFOL) << "column size cached " << retval << " calculated " << sz;
+        LOG(DEBUGL) << "column size cached " << retval << " calculated " << sz;
         retval = sz;
     }
 #endif

@@ -511,7 +511,7 @@ void JoinExecutor::verificativeJoinOneColumn(
         keys.swap(newKeys);
         tableItr.moveNextCount();
         t_iter.stop();
-        LOG(INFOL) << t_iter.tostring();
+        LOG(DEBUGL) << t_iter.tostring();
     }
 #if RESET_SORTED_ITR
     intermediateResults->releaseIterator(itr);
