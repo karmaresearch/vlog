@@ -330,7 +330,9 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
     //Used for statistics
     std::vector<StatIteration> costRules;
 
-    if (typeChase == TypeChase::RESTRICTED_CHASE && program->areExistentialRules()) {
+    if ((typeChase == TypeChase::RESTRICTED_CHASE ||
+                typeChase == TypeChase::SUM_RESTRICTED_CHASE)
+            && program->areExistentialRules()) {
         //Split the program: First execute the rules without existential
         //quantifiers, then all the others
         std::vector<RuleExecutionDetails> originalEDBruleset = allEDBRules;
@@ -475,7 +477,8 @@ bool SemiNaiver::executeUntilSaturation(
                 }
             }
 
-            if (typeChase == TypeChase::RESTRICTED_CHASE &&
+            if ((typeChase == TypeChase::RESTRICTED_CHASE ||
+                        typeChase == TypeChase::SUM_RESTRICTED_CHASE) &&
                     ruleset[currentRule].rule.isExistential()) {
                 return response;
             }

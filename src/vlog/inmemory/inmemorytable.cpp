@@ -340,7 +340,7 @@ bool InmemoryTable::isEmpty(const Literal &q, std::vector<uint8_t> *posToFilter,
     }
 
     t_empty.stop();
-    LOG(INFOL) << t_empty.tostring();
+    LOG(DEBUGL) << t_empty.tostring();
 
     return res;
 }
@@ -396,7 +396,7 @@ size_t InmemoryTable::getCardinality(const Literal &q) {
         res = count;
     }
     t_card.stop();
-    LOG(INFOL) << t_card.tostring();
+    LOG(DEBUGL) << t_card.tostring();
 
     return res;
 }
