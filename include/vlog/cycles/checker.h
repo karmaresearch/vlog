@@ -15,6 +15,8 @@ class Checker {
 
         static bool RMFA(Program &p);
 
+        static bool RMSA(Program &p);
+
         static bool MFC(Program &p, bool restricted = false);
 
         static void createCriticalInstance(Program &newProgram,

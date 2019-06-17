@@ -56,6 +56,8 @@ int Checker::check(Program &p, std::string alg, EDBLayer &db) {
         return MFC(p, true) ? 2 : 0;
     } else if (alg == "RMFA") {
         return RMFA(p) ? 1 : 0;
+    } else if (alg == "RMSA") {
+        return RMSA(p) ? 1 : 0;
     } else if (alg == "MSA") {
         // Model Summarisation Acyclic
         return MSA(p) ? 1 : 0;
@@ -222,6 +224,28 @@ bool Checker::RMFA(Program &p) {
         return true;
     }
 }
+
+bool Checker::RMSA(Program &p) {
+    // Create  the critical instance (cdb)
+    EDBLayer *db = p.getKB();
+    EDBLayer layer(*db, false);
+
+    Program newProgram(&layer);
+    createCriticalInstance(newProgram, p, db, layer);
+
+    addBlockCheckTargets(newProgram);
+    //Launch the (special) restricted chase with the check for cyclic terms
+    std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
+            &newProgram, true, true, false, TypeChase::SUM_RESTRICTED_CHASE, 1, 0, false);
+    sn->checkAcyclicity();
+    //if check succeeds then return 0 (we don't know)
+    if (sn->isFoundCyclicTerms()) {
+        return false;   // Not RMSA
+    } else {
+        return true;
+    }
+}
+
 
 static void closure(Program &p, std::map<PredId_t, std::vector<uint32_t>> &occurrences,
         std::vector<std::pair<PredId_t, uint8_t>> &input) {
@@ -490,7 +514,7 @@ bool Checker::JA(Program &p, bool restricted) {
                 }
                 dest++;
             }
-            // Now check if the graph is cyclic. 
+            // Now check if the graph is cyclic.
             // If it is, the ruleset is not JA (Joint Acyclic) (which means that the result is inconclusive).
             // If the ruleset is JA, we know that the chase will terminate.
             if (g.isCyclic()) {
@@ -560,7 +584,7 @@ bool Checker::JA(Program &p, bool restricted) {
                 }
                 dest++;
             }
-            // Now check if the graph is cyclic. 
+            // Now check if the graph is cyclic.
             // If it is, the ruleset is not JA (Joint Acyclic) (which means that the result is inconclusive).
             // If the ruleset is JA, we know that the chase will terminate.
             if (g.isCyclic()) {

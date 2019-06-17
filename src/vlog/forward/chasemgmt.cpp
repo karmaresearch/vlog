@@ -24,7 +24,7 @@ uint64_t ChaseMgmt::Rows::addRow(uint64_t* row) {
         throw 10;
     }
     auto out = currentcounter;
-    if (typeChase != TypeChase::SUM_CHASE) {
+    if (typeChase != TypeChase::SUM_CHASE && typeChase != TypeChase::SUM_RESTRICTED_CHASE) {
         currentcounter++;
     }
     return out;
