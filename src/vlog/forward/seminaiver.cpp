@@ -427,6 +427,7 @@ bool SemiNaiver::executeUntilSaturation(
         const size_t limitView,
         bool fixpoint, unsigned long *timeout) {
     size_t currentRule = 0;
+    size_t roundNr = 0;
     uint32_t rulesWithoutDerivation = 0;
 
     size_t nRulesOnePass = 0;
@@ -530,9 +531,10 @@ bool SemiNaiver::executeUntilSaturation(
         currentRule = (currentRule + 1) % ruleset.size();
 
         if (currentRule == 0) {
-#ifdef DEBUG
+            LOG(INFOL) << "Round " << roundNr;
+            roundNr++;
             std::chrono::duration<double> sec = std::chrono::system_clock::now() - round_start;
-            LOG(DEBUGL) << "--Time round " << sec.count() * 1000 << " " << iteration;
+            LOG(INFOL) << "--Time round " << sec.count() * 1000 << " " << iteration;
             round_start = std::chrono::system_clock::now();
             //CODE FOR Statistics
             LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". RulesWithDerivation=" <<
@@ -546,7 +548,7 @@ bool SemiNaiver::executeUntilSaturation(
             int n = 0;
             for (const auto &exec : costRules) {
                 if (exec.iteration >= lastIteration) {
-                    if (n < 10 || exec.derived) {
+                    if (n < 10) {
                         out += "Iteration " + to_string(exec.iteration) + " runtime " + to_string(exec.time);
                         out += " " + exec.rule->tostring(program, &layer) + " response " + to_string(exec.derived);
                         out += "\n";
@@ -554,9 +556,10 @@ bool SemiNaiver::executeUntilSaturation(
                     n++;
                 }
             }
-            LOG(DEBUGL) << "Rules with the highest cost\n\n" << out;
+            LOG(INFOL) << "Rules with the highest cost\n\n" << out;
             lastIteration = iteration;
             //END CODE STATISTICS
+#ifdef DEBUG
 #endif
             if (!fixpoint)
                 break;
