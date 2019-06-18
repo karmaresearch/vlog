@@ -764,7 +764,7 @@ Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
         }
         if (existentials.size() > 0) {
             // Add negated term allowing for exclusion of a specific binding
-            output += ", neg_";
+            output += ", ~";
             output += "__EXCLUDE_DUMMY__" + std::to_string(count) + "(";
             std::vector<uint8_t> vars = rule.getVarsInBody();
             bool f = true;
