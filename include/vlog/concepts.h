@@ -29,7 +29,7 @@ inline std::string fields2str(const std::vector<uint8_t> &fields) {
     ostringstream os;
     os << "[" << fields.size() << "]{";
     for (auto f : fields) {
-       os << (int)f << ",";
+        os << (int)f << ",";
     }
     os << "}";
 
@@ -360,8 +360,8 @@ class Rule {
             }
 
         Rule(uint32_t ruleId, Rule &r) : ruleId(ruleId),
-            heads(r.heads), body(r.body), _isRecursive(r._isRecursive),
-            existential(r.existential) {
+        heads(r.heads), body(r.body), _isRecursive(r._isRecursive),
+        existential(r.existential) {
         }
 
         Rule createAdornment(uint8_t headAdornment) const;
@@ -489,9 +489,9 @@ class Program {
             kb = e;
         }
 
-	uint64_t getMaxPredicateId() {
-	    return dictPredicates.getCounter();
-	}
+        uint64_t getMaxPredicateId() {
+            return dictPredicates.getCounter();
+        }
 
         std::string parseRule(std::string rule, bool rewriteMultihead);
 

@@ -152,9 +152,9 @@ std::string Literal::toprettystring(Program *program, EDBLayer *db, bool replace
         if (tuple.get(i).isVariable()) {
             out += std::string("A") + std::to_string(tuple.get(i).getId());
         } else {
-	    if (replaceConstants) {
-		out += "*";
-	    } else if (db == NULL) {
+            if (replaceConstants) {
+                out += "*";
+            } else if (db == NULL) {
                 out += std::to_string(tuple.get(i).getValue());
             } else {
                 uint64_t id = tuple.get(i).getValue();
@@ -713,19 +713,19 @@ std::string Rule::toprettystring(Program * program, EDBLayer *db, bool replaceCo
     std::string output = "";
     bool first = true;
     for(const auto& head : heads) {
-	if (! first) {
-	    output += ",";
-	}
+        if (! first) {
+            output += ",";
+        }
         output += head.toprettystring(program, db, replaceConstants);
-	first = false;
+        first = false;
     }
     output += " :- ";
     first = true;
     for (int i = 0; i < body.size(); ++i) {
-	if (! first) {
-	    output += ",";
-	}
-	first = false;
+        if (! first) {
+            output += ",";
+        }
+        first = false;
         output += body[i].toprettystring(program, db, replaceConstants);
     }
     return output;
@@ -781,7 +781,7 @@ bool Program::stratify(std::vector<int> &stratification, int &nClasses) {
         stratification[i] = -1;
     }
 
-    
+
     int markedCount = 0;
     int count = 0;
     while (count < graphSize) {
@@ -845,7 +845,7 @@ Program::Program(Program *p, EDBLayer *kb) : kb(kb),
     rewriteCounter(0),
     dictPredicates(p->dictPredicates),
     cardPredicates(p->cardPredicates) {
-}
+    }
 
 std::string trim(const std::string& str,
         const std::string& whitespace = "\r \t")
@@ -952,8 +952,8 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     }
     std::string predicate = trim(l.substr(0, posBeginTuple));
     if (predicate.substr(0,1) == "~") {
-	negated = true;
-	predicate = trim(l.substr(1));
+        negated = true;
+        predicate = trim(l.substr(1));
     }
     std::string tuple = l.substr(posBeginTuple + 1, std::string::npos);
     if (tuple[tuple.size() - 1] != ')') {

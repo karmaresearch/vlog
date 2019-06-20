@@ -225,22 +225,125 @@ bool Checker::RMFA(Program &p) {
     }
 }
 
-bool Checker::RMSA(Program &p) {
+bool Checker::RMSA(Program &originalProgram) {
     // Create  the critical instance (cdb)
-    EDBLayer *db = p.getKB();
+    EDBLayer *db = originalProgram.getKB();
     EDBLayer layer(*db, false);
 
     Program newProgram(&layer);
-    createCriticalInstance(newProgram, p, db, layer);
+    createCriticalInstance(newProgram, originalProgram, db, layer);
 
-    addBlockCheckTargets(newProgram);
+    //Add a special predicate to the head of all existential rules to track the dependencies
+    std::string nameSpecialPred = "__S__";
+    auto specialPredId = newProgram.getOrAddPredicate(nameSpecialPred, 2);
+    Predicate specialPred(specialPredId, 0, IDB, 2);
+
+    std::vector<Rule> newRules;
+    size_t ruleCounter = newProgram.getAllRules().size() + 1;
+    for(auto &rule : newProgram.getAllRules()) {
+        if (rule.isExistential()) {
+            std::vector<Literal> newHeads;
+            auto varsInHeadAndBody = rule.getVarsInBody();
+            if (varsInHeadAndBody.size() > 0) {
+                //For each existential var, add a new atom in the head
+                auto varsNotInBody = rule.getVarsNotInBody();
+                for(auto varNotInBody : varsNotInBody) {
+                    //Create a special predicate
+                    std::string nameSpecialPredVar = "__SR_" + std::to_string(rule.getId()) + "_" + std::to_string(varNotInBody) + "__";
+                    auto specialPredVarId = newProgram.getOrAddPredicate(nameSpecialPredVar, varsInHeadAndBody.size() + 1);
+                    Predicate specialPredVar(specialPredVarId, 0, IDB, varsInHeadAndBody.size() + 1);
+                    VTuple t(varsInHeadAndBody.size() + 1);
+                    for(size_t i = 0; i < varsInHeadAndBody.size(); ++i) {
+                        auto varInHeadAndBody = varsInHeadAndBody[i];
+                        t.set(VTerm(varInHeadAndBody, 0), i);
+                    }
+                    t.set(VTerm(varNotInBody, 0), varsInHeadAndBody.size());
+                    Literal specialLiteral = Literal(specialPredVar, t);
+                    newHeads.push_back(specialLiteral);
+
+                    //Add also a new rule (necessary to compute the cycles
+                    for(size_t i = 0; i < varsInHeadAndBody.size(); ++i) {
+                        std::vector<Literal> auxBody;
+                        auxBody.push_back(specialLiteral);
+                        std::vector<Literal> auxHead;
+                        VTuple t(2);
+                        t.set(VTerm(varsInHeadAndBody[i], 0), 0);
+                        t.set(VTerm(varNotInBody, 0), 1);
+                        auxHead.push_back(Literal(specialPred, t));
+                        newRules.push_back(Rule(ruleCounter++, auxHead, auxBody));
+                    }
+                }
+            }
+            auto &heads = rule.getHeads();
+            for (auto &head : heads) {
+                newHeads.push_back(head);
+            }
+            newRules.push_back(Rule(rule.getId(), newHeads, rule.getBody()));
+        } else {
+            newRules.push_back(rule);
+        }
+    }
+
+    //Add a couple of transitive rules for creating the cycles
+    //These rules are
+    //S_TRANS(X,Y) :- S(X,Y)
+    std::string nameSpecialPredTrans = "__S_TRANS__";
+    auto specialPredTransId = newProgram.getOrAddPredicate(nameSpecialPredTrans, 2);
+    Predicate specialPredTrans(specialPredTransId, 0, IDB, 2);
+    VTuple t(2);
+    t.set(VTerm(1, 0), 0);
+    t.set(VTerm(2, 0), 1);
+    std::vector<Literal> auxBody;
+    auxBody.push_back(Literal(specialPred, t));
+    std::vector<Literal> auxHead;
+    auxHead.push_back(Literal(specialPredTrans, t));
+    newRules.push_back(Rule(ruleCounter++, auxHead, auxBody));
+    //S_TRANS(X,Z) :- S_TRANS(X,Y),S(Y,Z)
+    auxBody.clear();
+    auxBody.push_back(Literal(specialPredTrans, t));
+    t.set(VTerm(2, 0), 0);
+    t.set(VTerm(3, 0), 1);
+    auxBody.push_back(Literal(specialPred, t));
+    auxHead.clear();
+    t.set(VTerm(1, 0), 0);
+    t.set(VTerm(3, 0), 1);
+    auxHead.push_back(Literal(specialPredTrans, t));
+    newRules.push_back(Rule(ruleCounter++, auxHead, auxBody));
+
+    Program rewrittenPrg = newProgram.clone();
+    rewrittenPrg.cleanAllRules();
+    rewrittenPrg.addAllRules(newRules);
+    for(auto &r : newRules) {
+        LOG(INFOL) << r.toprettystring(&rewrittenPrg, &layer);
+    }
+
+    addBlockCheckTargets(rewrittenPrg);
+
     //Launch the (special) restricted chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, TypeChase::SUM_RESTRICTED_CHASE, 1, 0, false);
-    sn->checkAcyclicity();
-    //if check succeeds then return 0 (we don't know)
-    if (sn->isFoundCyclicTerms()) {
-        return false;   // Not RMSA
+            &rewrittenPrg, true, true, false, TypeChase::SUM_RESTRICTED_CHASE, 1, 0, false);
+    sn->checkAcyclicity(); //run(0, 1, NULL);
+
+    //Parse the content of the special relation. If we find a cycle, then we stop
+    bool foundCycles = false;
+    auto itr = sn->getTable(specialPredTransId);
+    while (!itr.isEmpty() && !foundCycles) {
+        auto table = itr.getCurrentTable();
+        auto tableItr = table->getIterator();
+        while (tableItr->hasNext()) {
+            tableItr->next();
+            Term_t v1 = tableItr->getCurrentValue(0);
+            Term_t v2 = tableItr->getCurrentValue(1);
+            if (v1 == v2) { //Cycle!
+                foundCycles = true;
+                break;
+            }
+        }
+        table->releaseIterator(tableItr);
+        itr.moveNextCount();
+    }
+    if (foundCycles) {
+        return false;
     } else {
         return true;
     }

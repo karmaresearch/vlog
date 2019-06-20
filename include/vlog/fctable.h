@@ -64,9 +64,9 @@ class FCIterator {
 
         size_t getNTables();
 
-		VLIBEXP bool isEmpty() const;
+        VLIBEXP bool isEmpty() const;
 
-		VLIBEXP std::shared_ptr<const FCInternalTable> getCurrentTable() const;
+        VLIBEXP std::shared_ptr<const FCInternalTable> getCurrentTable() const;
 
         size_t getCurrentIteration() const;
 
@@ -74,7 +74,7 @@ class FCIterator {
 
         const RuleExecutionDetails *getRule() const;
 
-		VLIBEXP void moveNextCount();
+        VLIBEXP void moveNextCount();
 };
 
 typedef std::unordered_map<std::string, FCCacheBlock, std::hash<std::string>, std::equal_to<std::string>> FCCache;
