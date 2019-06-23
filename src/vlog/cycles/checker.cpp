@@ -314,7 +314,7 @@ bool Checker::RMSA(Program &originalProgram) {
     rewrittenPrg.cleanAllRules();
     rewrittenPrg.addAllRules(newRules);
     for(auto &r : newRules) {
-        LOG(INFOL) << r.toprettystring(&rewrittenPrg, &layer);
+        LOG(DEBUGL) << r.toprettystring(&rewrittenPrg, &layer);
     }
 
     addBlockCheckTargets(rewrittenPrg);
