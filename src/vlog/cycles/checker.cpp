@@ -334,6 +334,7 @@ bool Checker::RMSA(Program &originalProgram) {
             tableItr->next();
             Term_t v1 = tableItr->getCurrentValue(0);
             Term_t v2 = tableItr->getCurrentValue(1);
+            //std::cout << v1 <<  " " << v2 << std::endl;
             if (v1 == v2) { //Cycle!
                 foundCycles = true;
                 break;
