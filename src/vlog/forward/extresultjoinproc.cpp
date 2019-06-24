@@ -327,6 +327,12 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     }
 
     if (chaseMgmt->isRestricted()) {
+        size_t nAtomsToCheck = atomTables.size();
+        PredId_t headPredicateToIgnore = -1;
+        if (chaseMgmt->getChaseType() == TypeChase::SUM_RESTRICTED_CHASE) {
+            headPredicateToIgnore = chaseMgmt->getPredicateIgnoreBlocking();
+        }
+
         std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
         int count = 0;
         if (chaseMgmt->isCheckCyclicMode()) {
@@ -347,7 +353,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     tmprow[j] = columnReaders[j]->next();
                 }
 
-                if (blocked_check(tmprow, c.size())) {
+                if (blocked_check(tmprow, c.size(), headPredicateToIgnore)) {
                     blocked[i] = true;
                     blockedCount++;
                 }
@@ -366,7 +372,8 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         } else {
             for(const auto &at : atomTables) {
                 const auto &h = at->getLiteral();
-                FCTable *t = sn->getTable(h.getPredicate().getId(),
+                auto headPredicate = h.getPredicate().getId();
+                FCTable *t = sn->getTable(headPredicate,
                         h.getPredicate().getCardinality());
                 filterDerivations(h, t, row, count, ruleDetails, nKnownColumns,
                         posKnownColumns, c, sizecolumns, filterRows);
@@ -374,7 +381,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
             }
         }
 
-        if (filterRows.size() == sizecolumns * atomTables.size()) {
+        if (filterRows.size() == sizecolumns * nAtomsToCheck) {
             return; //every substitution already exists in the database. Nothing
             //new can be derived.
         }
@@ -519,6 +526,12 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
     }
 
     if (chaseMgmt->isRestricted()) {
+        size_t nAtomsToCheck = atomTables.size();
+        PredId_t headPredicateToIgnore = -1;
+        if (chaseMgmt->getChaseType() == TypeChase::SUM_RESTRICTED_CHASE) {
+            headPredicateToIgnore = chaseMgmt->getPredicateIgnoreBlocking();
+        }
+
         std::vector<uint64_t> filterRows; //The restricted chase might remove some IDs
         int count = 0;
         if (chaseMgmt->isCheckCyclicMode()) {
@@ -539,7 +552,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     tmprow[j] = columnReaders[j]->next();
                 }
 
-                if (blocked_check(tmprow, c.size())) {
+                if (blocked_check(tmprow, c.size(), headPredicateToIgnore)) {
                     //It is blocked
                     blocked[i] = true;
                     blockedCount++;
@@ -559,7 +572,8 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         } else {
             for(const auto &at : atomTables) {
                 const auto &h = at->getLiteral();
-                FCTable *t = sn->getTable(h.getPredicate().getId(),
+                auto headPredicate = h.getPredicate().getId();
+                FCTable *t = sn->getTable(headPredicate,
                         h.getPredicate().getCardinality());
                 filterDerivations(h, t, row, count, ruleDetails, nCopyFromSecond,
                         posFromSecond, c, sizecolumns, filterRows);
@@ -567,7 +581,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
             }
         }
 
-        if (filterRows.size() == sizecolumns * atomTables.size()) {
+        if (filterRows.size() == sizecolumns * nAtomsToCheck) {
             return; //every substitution already exists in the database. Nothing
             //new can be derived.
         }
@@ -695,14 +709,14 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
 
 std::vector<uint64_t> ExistentialRuleProcessor::blocked_check_computeBodyAtoms(
         std::vector<Literal> &output,
-        uint64_t *row) {
+        uint64_t *row, PredId_t headPredicateToIgnore) {
     const RuleExecutionPlan &plan = ruleDetails->orderExecutions[ruleExecOrder];
 #if DEBUG
     LOG(TRACEL) << "Adding body atoms for rule " << ruleDetails->rule.tostring(NULL, NULL);
 #endif
     auto bodyAtoms = plan.plan;
     int idx = 0;
-    std::vector<uint8_t> vars = ruleDetails->rule.getVarsInBody();
+    std::vector<uint8_t> vars = ruleDetails->rule.getVarsInHeadAndBody(headPredicateToIgnore);
     std::vector<uint64_t> toMatch(vars.size());
     std::vector<bool> found(vars.size());
 
@@ -927,7 +941,7 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
 }
 
 bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
-        size_t sizeRow) {
+        size_t sizeRow, PredId_t headPredicateToIgnore) {
     //For RMFC, we need to replace all non-skolem constants with *.
     uint64_t newrow[256];
     Program *rmfc = sn->get_RMFC_program();
@@ -946,7 +960,7 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
 
     std::vector<Literal> input; //"input" corresponds to B_\rho,\sigma in the paper
     //First I need to add to body atoms
-    std::vector<uint64_t> toMatch = blocked_check_computeBodyAtoms(input, row);
+    std::vector<uint64_t> toMatch = blocked_check_computeBodyAtoms(input, row, headPredicateToIgnore);
 
     std::unique_ptr<SemiNaiver> saturation;
 
@@ -993,7 +1007,8 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
             tbItr->next();
             found = true;
             for (int i = 0; i < toMatch.size(); i++) {
-                if (toMatch[i] != tbItr->getCurrentValue(i)) {
+                auto value = tbItr->getCurrentValue(i);
+                if (toMatch[i] != value) {
                     found = false;
                     break;
                 }
@@ -1037,6 +1052,12 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
 
         //If the chase is restricted, we must first remove data
         if (chaseMgmt->isRestricted()) {
+            size_t nAtomsToCheck = atomTables.size();
+            PredId_t headPredicateToIgnore = -1;
+            if (chaseMgmt->getChaseType() == TypeChase::SUM_RESTRICTED_CHASE) {
+                headPredicateToIgnore = chaseMgmt->getPredicateIgnoreBlocking();
+            }
+
             std::vector<uint64_t> filterRows;
             int count = 0;
             if (chaseMgmt->isCheckCyclicMode()) {
@@ -1059,7 +1080,7 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                         }
                         tmprow[j] = segmentReaders[j]->next();
                     }
-                    if (blocked_check(tmprow, segmentSize)) { //Is it blocked?
+                    if (blocked_check(tmprow, segmentSize, headPredicateToIgnore)) { //Is it blocked?
                         blocked[i] = true;
                         blockedCount++;
                     }
@@ -1097,16 +1118,19 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
                             }
                         }
                     }
+
+                    auto headPredicate = h.getPredicate().getId();
                     FCTable *t = sn->getTable(h.getPredicate().getId(),
                             h.getPredicate().getCardinality());
                     filterDerivations(t, tobeRetained,
                             columnsToCheck,
                             filterRows);
+
                     count += h.getTupleSize();
                 }
             }
 
-            if (filterRows.size() == nrows * atomTables.size()) {
+            if (filterRows.size() == nrows * nAtomsToCheck) {
                 tmpRelation = std::unique_ptr<SegmentInserter>();
                 return; //every substitution already exists in the database.
                 // Nothing new can be derived.

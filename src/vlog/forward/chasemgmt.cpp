@@ -75,8 +75,10 @@ bool ChaseMgmt::RuleContainer::containsCyclicTerms() {
 //************** CHASE MGMT ***************
 ChaseMgmt::ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
         const TypeChase typeChase, const bool checkCyclic,
-        const int ruleToCheck) : typeChase(typeChase), checkCyclic(checkCyclic),
-    ruleToCheck(ruleToCheck), cyclic(false) {
+        const int ruleToCheck, const PredId_t predIgnoreBlock) :
+    typeChase(typeChase), checkCyclic(checkCyclic),
+    ruleToCheck(ruleToCheck), cyclic(false),
+    predIgnoreBlock(predIgnoreBlock) {
         this->rules.resize(rules.size());
         for(const auto &r : rules) {
             if (r.rule.getId() >= rules.size()) {

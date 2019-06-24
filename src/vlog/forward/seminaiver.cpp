@@ -305,7 +305,8 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
     }
     chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt(allrules,
                 typeChase, checkCyclicTerms,
-                singleRuleToCheck));
+                singleRuleToCheck,
+                predIgnoreBlock));
 #if DEBUG
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(DEBUGL) << "Runtime ruleset optimization ms = " << sec.count() * 1000;
@@ -313,9 +314,11 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
 }
 
 void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
-        bool checkCyclicTerms, int singleRuleToCheck) {
+        bool checkCyclicTerms, int singleRuleToCheck, PredId_t predIgnoreBlock) {
     this->checkCyclicTerms = checkCyclicTerms;
     this->foundCyclicTerms = false;
+    this->predIgnoreBlock = predIgnoreBlock; //Used in the RMSA
+
     running = true;
     iteration = it;
     startTime = std::chrono::system_clock::now();
@@ -384,7 +387,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
             else
                 resp2 = executeRules(emptyRuleset, tmpExtIDBRules, costRules,
                         iteration == 0 ? 1 : iteration, false, timeout);
-            if ((!resp1 && !resp2) || foundCyclicTerms) {
+            if ((!resp1 && !resp2) || (foundCyclicTerms && typeChase != TypeChase::SUM_RESTRICTED_CHASE)) {
                 break; //Fix-point
             }
             loopNr++;
@@ -1149,6 +1152,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 
     LOG(DEBUGL) << "Iteration: " << iteration <<
         " Rule: " << rule.tostring(program, &layer);
+
     //Set up timers
     const std::chrono::system_clock::time_point startRule = std::chrono::system_clock::now();
     std::chrono::duration<double> durationJoin(0);
