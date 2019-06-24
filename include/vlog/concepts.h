@@ -392,7 +392,7 @@ class Rule {
 
         std::vector<uint8_t> getVarsNotInBody() const;  // Existential variables.
 
-        std::vector<uint8_t> getVarsInBody() const; // Variables in the head that also occur in the body.
+        std::vector<uint8_t> getVarsInHeadAndBody(PredId_t predToIgnore = -1) const; // Variables in the head that also occur in the body.
 
         const std::vector<Literal> &getBody() const {
             return body;

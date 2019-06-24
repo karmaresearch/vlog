@@ -185,12 +185,21 @@ bool Checker::MSA(Program &p) {
 // Add special targets that have the head of existential rules as body, but only the non-existential variables in the head.
 // So, for instance, if we have a rule P(X,Y),Q(Y) :- R(X), then we add a rule Z(X) :- P(X,Y),Q(Y). This is for the implementation
 // of the blocked check.
-void Checker::addBlockCheckTargets(Program &p) {
+void Checker::addBlockCheckTargets(Program &p, PredId_t ignorePredId) {
     std::vector<Rule> rules = p.getAllRules();
     for (auto rule : rules) {
         if (rule.isExistential()) {
-            auto newBody = rule.getHeads();
-            std::vector<uint8_t> headvars = rule.getVarsInBody();
+            auto ruleHeadAtoms = rule.getHeads();
+            //Remove from newBody any atom with the special predicate
+            std::vector<Literal> newBody;
+            for(size_t i = 0; i < ruleHeadAtoms.size(); ++i) {
+                auto &atom = ruleHeadAtoms[i];
+                if (atom.getPredicate().getId() != ignorePredId) {
+                    newBody.push_back(atom);
+                }
+            }
+
+            std::vector<uint8_t> headvars = rule.getVarsInHeadAndBody(ignorePredId);
             std::string newPred = "__GENERATED_PRED__" + std::to_string(rule.getId());
             Predicate newp = p.getPredicate(p.getOrAddPredicate(newPred, headvars.size()));
             VTuple t(headvars.size());
@@ -230,48 +239,50 @@ bool Checker::RMSA(Program &originalProgram) {
     EDBLayer *db = originalProgram.getKB();
     EDBLayer layer(*db, false);
 
-    Program newProgram(&layer);
-    createCriticalInstance(newProgram, originalProgram, db, layer);
 
-    //Add a special predicate to the head of all existential rules to track the dependencies
+    Program programWithCritical(&layer);
+    createCriticalInstance(programWithCritical, originalProgram, db, layer);
+
+    //Add a special predicate to the head of all existential rules to track the
+    //dependencies
     std::string nameSpecialPred = "__S__";
-    auto specialPredId = newProgram.getOrAddPredicate(nameSpecialPred, 2);
+    auto specialPredId = programWithCritical.getOrAddPredicate(nameSpecialPred, 2);
     Predicate specialPred(specialPredId, 0, IDB, 2);
 
     std::vector<Rule> newRules;
-    size_t ruleCounter = newProgram.getAllRules().size() + 1;
-    for(auto &rule : newProgram.getAllRules()) {
+    size_t ruleCounter = programWithCritical.getAllRules().size() + 1;
+    for(auto &rule : programWithCritical.getAllRules()) {
         if (rule.isExistential()) {
             std::vector<Literal> newHeads;
-            auto varsInHeadAndBody = rule.getVarsInBody();
+            auto varsInHeadAndBody = rule.getVarsInHeadAndBody();
             if (varsInHeadAndBody.size() > 0) {
                 //For each existential var, add a new atom in the head
                 auto varsNotInBody = rule.getVarsNotInBody();
                 for(auto varNotInBody : varsNotInBody) {
                     //Create a special predicate
-                    std::string nameSpecialPredVar = "__SR_" + std::to_string(rule.getId()) + "_" + std::to_string(varNotInBody) + "__";
-                    auto specialPredVarId = newProgram.getOrAddPredicate(nameSpecialPredVar, varsInHeadAndBody.size() + 1);
-                    Predicate specialPredVar(specialPredVarId, 0, IDB, varsInHeadAndBody.size() + 1);
-                    VTuple t(varsInHeadAndBody.size() + 1);
+                    //std::string nameSpecialPredVar = "__SR_" + std::to_string(rule.getId()) + "_" + std::to_string(varNotInBody) + "__";
+                    //auto specialPredVarId = programWithCritical.getOrAddPredicate(nameSpecialPredVar, varsInHeadAndBody.size() + 1);
+                    //Predicate specialPredVar(specialPredVarId, 0, IDB, varsInHeadAndBody.size() + 1);
                     for(size_t i = 0; i < varsInHeadAndBody.size(); ++i) {
-                        auto varInHeadAndBody = varsInHeadAndBody[i];
-                        t.set(VTerm(varInHeadAndBody, 0), i);
-                    }
-                    t.set(VTerm(varNotInBody, 0), varsInHeadAndBody.size());
-                    Literal specialLiteral = Literal(specialPredVar, t);
-                    newHeads.push_back(specialLiteral);
-
-                    //Add also a new rule (necessary to compute the cycles
-                    for(size_t i = 0; i < varsInHeadAndBody.size(); ++i) {
-                        std::vector<Literal> auxBody;
-                        auxBody.push_back(specialLiteral);
-                        std::vector<Literal> auxHead;
                         VTuple t(2);
-                        t.set(VTerm(varsInHeadAndBody[i], 0), 0);
+                        auto varInHeadAndBody = varsInHeadAndBody[i];
+                        t.set(VTerm(varInHeadAndBody, 0), 0);
                         t.set(VTerm(varNotInBody, 0), 1);
-                        auxHead.push_back(Literal(specialPred, t));
-                        newRules.push_back(Rule(ruleCounter++, auxHead, auxBody));
+                        Literal specialLiteral = Literal(specialPred, t);
+                        newHeads.push_back(specialLiteral);
                     }
+
+                    /*//Add also a new rule (necessary to compute the cycles
+                      for(size_t i = 0; i < varsInHeadAndBody.size(); ++i) {
+                      std::vector<Literal> auxBody;
+                      auxBody.push_back(specialLiteral);
+                      std::vector<Literal> auxHead;
+                      VTuple t(2);
+                      t.set(VTerm(varsInHeadAndBody[i], 0), 0);
+                      t.set(VTerm(varNotInBody, 0), 1);
+                      auxHead.push_back(Literal(specialPred, t));
+                      newRules.push_back(Rule(ruleCounter++, auxHead, auxBody));
+                      }*/
                 }
             }
             auto &heads = rule.getHeads();
@@ -288,7 +299,7 @@ bool Checker::RMSA(Program &originalProgram) {
     //These rules are
     //S_TRANS(X,Y) :- S(X,Y)
     std::string nameSpecialPredTrans = "__S_TRANS__";
-    auto specialPredTransId = newProgram.getOrAddPredicate(nameSpecialPredTrans, 2);
+    auto specialPredTransId = programWithCritical.getOrAddPredicate(nameSpecialPredTrans, 2);
     Predicate specialPredTrans(specialPredTransId, 0, IDB, 2);
     VTuple t(2);
     t.set(VTerm(1, 0), 0);
@@ -310,19 +321,19 @@ bool Checker::RMSA(Program &originalProgram) {
     auxHead.push_back(Literal(specialPredTrans, t));
     newRules.push_back(Rule(ruleCounter++, auxHead, auxBody));
 
-    Program rewrittenPrg = newProgram.clone();
+    Program rewrittenPrg = programWithCritical.clone();
     rewrittenPrg.cleanAllRules();
     rewrittenPrg.addAllRules(newRules);
-    for(auto &r : newRules) {
+
+    addBlockCheckTargets(rewrittenPrg, specialPredId);
+    for(auto &r : rewrittenPrg.getAllRules()) {
         LOG(DEBUGL) << r.toprettystring(&rewrittenPrg, &layer);
     }
-
-    addBlockCheckTargets(rewrittenPrg);
 
     //Launch the (special) restricted chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
             &rewrittenPrg, true, true, false, TypeChase::SUM_RESTRICTED_CHASE, 1, 0, false);
-    sn->checkAcyclicity(); //run(0, 1, NULL);
+    sn->checkAcyclicity(-1, specialPredId); //run(0, 1, NULL);
 
     //Parse the content of the special relation. If we find a cycle, then we stop
     bool foundCycles = false;
@@ -894,7 +905,7 @@ Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
             // Add negated term allowing for exclusion of a specific binding
             output += ", ~";
             output += "__EXCLUDE_DUMMY__" + std::to_string(count) + "(";
-            std::vector<uint8_t> vars = rule.getVarsInBody();
+            std::vector<uint8_t> vars = rule.getVarsInHeadAndBody();
             bool f = true;
             for (int i = 0; i < vars.size(); i++) {
                 if (! f) {

@@ -24,7 +24,7 @@ class Checker {
                 EDBLayer *db,
                 EDBLayer &layer);
 
-        static void addBlockCheckTargets(Program &p);
+        static void addBlockCheckTargets(Program &p, PredId_t ignorePred = -1);
 
         static Program *getProgramForBlockingCheckRMFC(Program &p);
 

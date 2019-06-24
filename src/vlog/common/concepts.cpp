@@ -668,10 +668,13 @@ std::vector<uint8_t> Rule::getVarsNotInBody() const {
     return out;
 }
 
-std::vector<uint8_t> Rule::getVarsInBody() const {
+std::vector<uint8_t> Rule::getVarsInHeadAndBody(PredId_t predToIgnore) const {
     //Check if every variable in the head appears in the body
     std::vector<uint8_t> out;
     for(const auto& head : heads) {
+        if (head.getPredicate().getId() == predToIgnore)
+            continue;
+
         for(auto var : head.getAllVars()) {
             //Does var appear in the body?
             bool ok = false;

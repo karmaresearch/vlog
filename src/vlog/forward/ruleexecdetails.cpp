@@ -311,7 +311,7 @@ void RuleExecutionDetails::calculateDependencies(const Rule &rule,
     //Calculate the dependencies of the existential variables to the variables in the body
     std::map<uint8_t, std::set<uint8_t>> dependenciesExtVars_tmp;
     auto extvars = rule.getVarsNotInBody();
-    auto othervars = rule.getVarsInBody();
+    auto othervars = rule.getVarsInHeadAndBody();
     for(auto head : rule.getHeads()) {
         auto allvars = head.getAllVars();
         for(auto v : allvars) {
