@@ -100,7 +100,7 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
             LOG(ERRORL) << "Program could not be stratified";
             throw std::runtime_error("Program could not be stratified");
         }
-        LOG(INFOL) << "nStratificationClasses = " << nStratificationClasses;
+        LOG(DEBUGL) << "nStratificationClasses = " << nStratificationClasses;
 
         LOG(DEBUGL) << "Running SemiNaiver, opt_intersect = " << opt_intersect << ", opt_filtering = " << opt_filtering << ", multithreading = " << multithreaded << ", shuffle = " << shuffle;
 
