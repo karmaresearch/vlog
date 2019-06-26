@@ -84,6 +84,7 @@ class EDBLayer {
         };
 
         const EDBConf &conf;
+        bool loadAllData;
 
         std::shared_ptr<Dictionary> predDictionary;
         std::map<PredId_t, EDBInfoTable> dbPredicates;
@@ -130,8 +131,8 @@ class EDBLayer {
         EDBLayer(EDBLayer &db, bool copyTables = false);
 
         EDBLayer(const EDBConf &conf, bool multithreaded,
-                const NamedSemiNaiver &prevSemiNaiver) :
-            conf(conf), prevSemiNaiver(prevSemiNaiver) {
+                const NamedSemiNaiver &prevSemiNaiver, bool loadAllData = true) :
+            conf(conf), prevSemiNaiver(prevSemiNaiver), loadAllData(loadAllData) {
 
                 const std::vector<EDBConf::Table> tables = conf.getTables();
                 rootPath = conf.getRootPath();
@@ -178,8 +179,8 @@ class EDBLayer {
                 }
             }
 
-        EDBLayer(const EDBConf &conf, bool multithreaded) :
-            EDBLayer(conf, multithreaded, NamedSemiNaiver()) {
+        EDBLayer(const EDBConf &conf, bool multithreaded, bool loadAllData = true) :
+            EDBLayer(conf, multithreaded, NamedSemiNaiver(), loadAllData) {
             }
 
         std::vector<PredId_t> getAllEDBPredicates();

@@ -1319,7 +1319,7 @@ int main(int argc, const char** argv) {
     } else if (cmd == "trigger") {
         EDBConf conf(edbFile);
         conf.setRootPath(Utils::parentDir(edbFile));
-        EDBLayer *layer = new EDBLayer(conf, false);
+        EDBLayer *layer = new EDBLayer(conf, false, false);
         computeTriggerGraph(*layer, vm["rules"].as<string>(),
                 vm["trigger_algo"].as<string>(),
                 vm["trigger_paths"].as<string>());

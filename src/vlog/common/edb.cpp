@@ -133,13 +133,13 @@ void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
         if (sep == 't')
             sep = '\t';
         table = new InmemoryTable(repository,
-                tableConf.params[1], infot.id, this, sep);
+                tableConf.params[1], infot.id, this, sep, loadAllData);
     }
     infot.manager = std::shared_ptr<EDBTable>(table);
     infot.arity = table->getArity();
     dbPredicates.insert(make_pair(infot.id, infot));
 
-    LOG(INFOL) << "Imported InmemoryTable " << pn << " id " << infot.id << " size " << table->getSize();
+    LOG(DEBUGL) << "Imported InmemoryTable " << pn << " id " << infot.id << " size " << table->getSize();
     // table->dump(std::cerr);
 }
 

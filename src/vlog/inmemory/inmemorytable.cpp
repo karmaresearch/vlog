@@ -84,7 +84,7 @@ std::string convertString(const char *s, int len) {
 }
 
 InmemoryTable::InmemoryTable(string repository, string tablename,
-        PredId_t predid, EDBLayer *layer, char sep) {
+        PredId_t predid, EDBLayer *layer, char sep, bool loadData) {
     this->layer = layer;
     arity = 0;
     this->predid = predid;
@@ -129,7 +129,10 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
                 layer->getOrAddDictNumber(row[i].c_str(), row[i].size(), val);
                 rowc[i] = val;
             }
-            inserter->addRow(rowc);
+            if (loadData)
+                inserter->addRow(rowc);
+            else
+                break;
         }
         delete ifs;
     } else {
@@ -162,6 +165,10 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
                 std::string sp = convertString(p, lp);
                 const char *o = reader.getCurrentO(lo);
                 std::string so = convertString(o, lo);
+
+                if (!loadData)
+                    break;
+
                 if (inserter == NULL) {
                     inserter = new SegmentInserter(3);
                 }
