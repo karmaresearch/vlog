@@ -95,22 +95,32 @@ std::vector<VTuple> TriggerGraph::linearGetNonIsomorphicTuples(int start, int ar
     return out;
 }
 
-
 void TriggerGraph::linearChase(Program &program,
         Node *node, const std::vector<Literal> &db,
         std::unordered_set<std::string> &out) {
-    std::vector<Literal> lit;
-    linearChase(program, node, db, lit);
+    const std::vector<Literal> *lit = NULL;
+    linearChase(program, node, db, &lit);
     out.clear();
-    for (const auto &l : lit) {
+    for (const auto &l : *lit) {
         out.insert(l.tostring(NULL, NULL));
+    }
+}
+
+
+void TriggerGraph::linearChase(Program &program,
+        Node *node, const std::vector<Literal> &db,
+        std::vector<Literal> &out) {
+    out.clear();
+    const std::vector<Literal> *lit = NULL;
+    linearChase(program, node, db, &lit);
+    for(auto &l : *lit) {
+        out.push_back(l);
     }
 }
 
 void TriggerGraph::linearChase(Program &program,
         Node *node, const std::vector<Literal> &db,
-        std::vector<Literal> &out) {
-
+        const std::vector<Literal> **out) {
     std::string strPointer = std::to_string((uint64_t)&db);
 
     NodeFactSet localDerivations;
@@ -130,18 +140,8 @@ void TriggerGraph::linearChase(Program &program,
     if (!found) {
         const std::vector<Literal> *pointer = NULL;
         if (node->incoming.size() > 0) {
-            std::unordered_set<std::string> lout;
             Node *parentNode = node->incoming[0].get();
-            linearChase(program, parentNode, db, lout);
-            bool found = false;
-            for (const auto &set : parentNode->facts) {
-                if (set.id == strPointer) {
-                    pointer = &(set.facts);
-                    found = true;
-                    break;
-                }
-            }
-            assert(found);
+            linearChase(program, parentNode, db, &pointer);
         } else {
             //Apply the rules on database
             pointer = &db;
@@ -165,7 +165,7 @@ void TriggerGraph::linearChase(Program &program,
             }
             //Annotate the node with the dataset so that we do not recompute it
             node->facts.push_back(localDerivations);
-            outNode = &(localDerivations.facts);
+            outNode = &(node->facts.back().facts);
         } else {
             for(const auto &inputLinear : *pointer) {
                 if (inputLinear.getPredicate().getId()
@@ -175,13 +175,11 @@ void TriggerGraph::linearChase(Program &program,
             }
             //Annotate the node with the dataset so that we do not recompute it
             node->facts.push_back(localDerivations);
-            outNode = &(localDerivations.facts);
+            outNode = &(node->facts.back().facts);
         }
     }
 
-    assert(outNode != NULL);
-    out.clear();
-    std::copy(outNode->begin(), outNode->end(), std::back_inserter(out));
+    *out = outNode;
 }
 
 void TriggerGraph::linearBuild_process(Program &program,
@@ -189,8 +187,6 @@ void TriggerGraph::linearBuild_process(Program &program,
         std::shared_ptr<Node> node,
         std::vector<Literal> &chase,
         std::vector<std::shared_ptr<Node>> &children) {
-
-
 
     //If there is a rule with body compatible with the literal,
     //then create a node
@@ -406,7 +402,6 @@ void TriggerGraph::remove(EDBLayer &db, Program &program,
         remove(db, program, database, child, headPred2nodes);
     }
 
-
     //Then get the list of all nodes descendant from u
     std::vector<std::shared_ptr<Node>> childrenU;
     linearGetAllNodesRootedAt(u, childrenU);
@@ -416,10 +411,9 @@ void TriggerGraph::remove(EDBLayer &db, Program &program,
     }
 
     //Compute the set of all facts we can get from u
-    std::unordered_set<std::string> dbU;
-    linearChase(program, u.get(), database, dbU);
+    const std::vector<Literal> *dbU = NULL;
+    linearChase(program, u.get(), database, &dbU);
 
-    //auto start = std::chrono::system_clock::now();
     bool toBeRemoved = false;
     auto headPred = u->literal->getPredicate().getId();
     if (headPred2nodes.count(headPred)) {
@@ -431,13 +425,20 @@ void TriggerGraph::remove(EDBLayer &db, Program &program,
 
             if (!pointersChildrenU.count((uint64_t)v.get())) {
                 //Check whether u is redundant to v w.r.t. the database
-                std::unordered_set<std::string> dbV;
-                linearChase(program, v.get(), database, dbV);
+                const std::vector<Literal> *dbV = NULL;
+                linearChase(program, v.get(), database, &dbV);
+
                 //If every fact in dbU is in dbV, then we can remove u
                 bool subsumed = true;
-
-                for(const auto &f : dbU) {
-                    if (!dbV.count(f)) {
+                for(const auto &s : *dbU) {
+                    bool contained = false;
+                    for(const auto &v : *dbV) {
+                        if (s == v) {
+                            contained = true;
+                            break;
+                        }
+                    }
+                    if (!contained) {
                         subsumed = false;
                         break;
                     }
@@ -451,341 +452,338 @@ void TriggerGraph::remove(EDBLayer &db, Program &program,
                     break;
                 }
             }
+            }
+        }
+        if (toBeRemoved) {
+            removeNode(u, headPred2nodes);
         }
     }
-    //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    //LOG(INFOL) << "Time all nodes (msec): " << sec.count() * 1000 << " " << allnodes.size();
 
-    if (toBeRemoved) {
-        removeNode(u, headPred2nodes);
-    }
-}
-
-void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
-    //For each extensional predicate, create all non-isomorphic tuples and
-    //chase over them
-    std::vector<Literal> database;
+    void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
+        //For each extensional predicate, create all non-isomorphic tuples and
+        //chase over them
+        std::vector<Literal> database;
 
 #ifdef DEBUG
-    std::ofstream fedges;
-    fedges.open("graph.before.edges");
-    std::ofstream fnodes;
-    fnodes.open("graph.before.nodes");
+        std::ofstream fedges;
+        fedges.open("graph.before.edges");
+        std::ofstream fnodes;
+        fnodes.open("graph.before.nodes");
 #endif
 
-    LOG(DEBUGL) << "Start creation of trigger graphs ...";
+        LOG(DEBUGL) << "Start creation of trigger graphs ...";
 
-    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+        std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
-    //Create a map that associates predicates to rules
-    auto rules = program.getAllRules();
-    int idxp = 0;
-    for (const auto &rule : rules) {
+        //Create a map that associates predicates to rules
+        auto rules = program.getAllRules();
+        int idxp = 0;
+        for (const auto &rule : rules) {
+            const auto &body = rule.getBody();
+            assert(body.size() == 1);
+            const auto &bodyAtom = body[0];
+            PredId_t pred = bodyAtom.getPredicate().getId();
+            if (!pred2bodyrules.count(pred)) {
+                pred2bodyrules.insert(make_pair(pred, std::vector<size_t>()));
+            }
+            pred2bodyrules[pred].push_back(idxp);
+            idxp++;
+        }
+
+        //Create some fake EDB nodes from the canonical instance.
+        int startCounter = 0;
+        for(const PredId_t p : db.getAllEDBPredicates()) {
+            //Get arity
+            int arity = db.getPredArity(p);
+            const auto tuples = linearGetNonIsomorphicTuples(startCounter, arity);
+            startCounter += 10; //number large enough to make sure there are no conflicts
+            for (const VTuple &t : tuples) {
+                std::shared_ptr<Node> n = std::shared_ptr<Node>(new Node(nodecounter));
+                nodecounter += 1;
+                n->ruleID = -1;
+                n->label = "EDB-"+ std::to_string(p);
+                Literal l(program.getPredicate(p), t);
+                database.push_back(l);
+                n->literal = std::unique_ptr<Literal>(new Literal(l));
+
+                //The following is the function build() lines 9--24
+                linearBuild(program, rules, l, n);
+                if (!n->outgoing.empty()) {
+                    nodes.push_back(n);
+                    allnodes.insert(std::make_pair(nodecounter - 1, n));
+                }
+            }
+        }
+
+        std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+        LOG(INFOL) << "Time creating execution graph (msec): " << sec.count() * 1000;
+
+        int n_allnodes = getNNodes();
+        LOG(INFOL) << "Before pruning the graph contains nodes " << n_allnodes;
+
+#ifdef DEBUG
+        dumpGraphToFile(fedges, fnodes, db, program);
+        fedges.close();
+        fnodes.close();
+#endif
+
+#ifdef DEBUG
+        fedges.open("graph.after.edges");
+        fnodes.open("graph.after.nodes");
+#endif
+
+        //Group all the nodes by the head predicate
+        std::unordered_map<size_t, std::vector<std::shared_ptr<Node>>> headPred2nodes;
+        for(const auto pair : allnodes) {
+            auto &v = pair.second;
+            auto headPredicate = v->literal->getPredicate().getId();
+            if (!headPred2nodes.count(headPredicate)) {
+                headPred2nodes.insert(std::make_pair(headPredicate,
+                            std::vector<std::shared_ptr<Node>>()));
+            }
+            headPred2nodes[headPredicate].push_back(v);
+        }
+
+        //*** Prune the graph ***
+        start = std::chrono::system_clock::now();
+        auto nodesToProcess = nodes;
+        int idx = 0;
+        for (auto n : nodesToProcess) {
+            //start = std::chrono::system_clock::now();
+            remove(db, program, database, n, headPred2nodes);
+            //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+            //LOG(INFOL) << "Time pruning " << idx << " of " << nodesToProcess.size() << " (msec): " << sec.count() * 1000;
+            idx++;
+        }
+        sec = std::chrono::system_clock::now() - start;
+        LOG(INFOL) << "Time pruning (msec): " << sec.count() * 1000;
+
+#ifdef DEBUG
+        dumpGraphToFile(fedges, fnodes, db, program);
+        fedges.close();
+        fnodes.close();
+#endif
+
+        n_allnodes = getNNodes();
+        LOG(INFOL) << "After pruning the graph contains nodes " << n_allnodes;
+    }
+
+    void TriggerGraph::applyRule(const Rule &rule,
+            std::vector<Literal> &out,
+            const std::vector<Literal> &bodyAtoms) {
+
         const auto &body = rule.getBody();
         assert(body.size() == 1);
         const auto &bodyAtom = body[0];
-        PredId_t pred = bodyAtom.getPredicate().getId();
-        if (!pred2bodyrules.count(pred)) {
-            pred2bodyrules.insert(make_pair(pred, std::vector<size_t>()));
-        }
-        pred2bodyrules[pred].push_back(idxp);
-        idxp++;
-    }
+        const auto &heads = rule.getHeads();
+        assert(heads.size() == 1);
+        Literal head = heads[0];
 
-    //Create some fake EDB nodes from the canonical instance.
-    int startCounter = 0;
-    for(const PredId_t p : db.getAllEDBPredicates()) {
-        //Get arity
-        int arity = db.getPredArity(p);
-        const auto tuples = linearGetNonIsomorphicTuples(startCounter, arity);
-        startCounter += 10; //number large enough to make sure there are no conflicts
-        for (const VTuple &t : tuples) {
-            std::shared_ptr<Node> n = std::shared_ptr<Node>(new Node(nodecounter));
-            nodecounter += 1;
-            n->ruleID = -1;
-            n->label = "EDB-"+ std::to_string(p);
-            Literal l(program.getPredicate(p), t);
-            database.push_back(l);
-            n->literal = std::unique_ptr<Literal>(new Literal(l));
-
-            //The following is the function build() lines 9--24
-            linearBuild(program, rules, l, n);
-            if (!n->outgoing.empty()) {
-                nodes.push_back(n);
-                allnodes.insert(std::make_pair(nodecounter - 1, n));
-            }
-        }
-    }
-
-    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    LOG(INFOL) << "Time creating execution graph (msec): " << sec.count() * 1000;
-
-    int n_allnodes = getNNodes();
-    LOG(INFOL) << "Before pruning the graph contains nodes " << n_allnodes;
-
-#ifdef DEBUG
-    dumpGraphToFile(fedges, fnodes, db, program);
-    fedges.close();
-    fnodes.close();
-#endif
-
-#ifdef DEBUG
-    fedges.open("graph.after.edges");
-    fnodes.open("graph.after.nodes");
-#endif
-
-    //Group all the nodes by the head predicate
-    std::unordered_map<size_t, std::vector<std::shared_ptr<Node>>> headPred2nodes;
-    for(const auto pair : allnodes) {
-        auto &v = pair.second;
-        auto headPredicate = v->literal->getPredicate().getId();
-        if (!headPred2nodes.count(headPredicate)) {
-            headPred2nodes.insert(std::make_pair(headPredicate,
-                        std::vector<std::shared_ptr<Node>>()));
-        }
-        headPred2nodes[headPredicate].push_back(v);
-    }
-
-    //*** Prune the graph ***
-    start = std::chrono::system_clock::now();
-    auto nodesToProcess = nodes;
-    int idx = 0;
-    for (auto n : nodesToProcess) {
-        //start = std::chrono::system_clock::now();
-        remove(db, program, database, n, headPred2nodes);
-        //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-        //LOG(INFOL) << "Time pruning " << idx << " of " << nodesToProcess.size() << " (msec): " << sec.count() * 1000;
-        idx++;
-    }
-    sec = std::chrono::system_clock::now() - start;
-    LOG(INFOL) << "Time pruning (msec): " << sec.count() * 1000;
-
-#ifdef DEBUG
-    dumpGraphToFile(fedges, fnodes, db, program);
-    fedges.close();
-    fnodes.close();
-#endif
-
-    n_allnodes = getNNodes();
-    LOG(INFOL) << "After pruning the graph contains nodes " << n_allnodes;
-}
-
-void TriggerGraph::applyRule(const Rule &rule,
-        std::vector<Literal> &out,
-        const std::vector<Literal> &bodyAtoms) {
-
-    const auto &body = rule.getBody();
-    assert(body.size() == 1);
-    const auto &bodyAtom = body[0];
-    const auto &heads = rule.getHeads();
-    assert(heads.size() == 1);
-    Literal head = heads[0];
-
-    std::vector<std::pair<uint8_t, uint8_t>> subs;
-    std::vector<int> processedVars;
-    for(int i = 0; i < bodyAtom.getTupleSize(); ++i) {
-        VTerm term = bodyAtom.getTermAtPos(i);
-        bool found = false;
-        for(auto &var : processedVars) {
-            if (term.getId() == var) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            //Check where I should add it in the head
-            for(int j = 0; j < head.getTupleSize(); ++j) {
-                VTerm headTerm = head.getTermAtPos(j);
-                if (headTerm.getId() == term.getId()) {
-                    subs.push_back(make_pair(i, j));
-                }
-            }
-            processedVars.push_back(term.getId());
-        }
-    }
-    bool isExistential = rule.isExistential();
-    std::vector<std::vector<uint8_t>> extpos;
-    if (isExistential) {
-        auto vars = rule.getVarsNotInBody();
-    }
-
-    VTuple headTuple(head.getTupleSize());
-    for(const Literal &bodyAtom : bodyAtoms) {
-        VTuple t = bodyAtom.getTuple();
-        for(auto &s : subs) {
-            headTuple.set(bodyAtom.getTermAtPos(s.first), s.second);
-        }
-        for(auto &positions : extpos) {
-            for(auto position : positions)
-                t.set(VTerm(0, freshIndividualCounter), position);
-            freshIndividualCounter++;
-        }
-        out.push_back(Literal(head.getPredicate(), headTuple));
-    }
-}
-
-bool TriggerGraph::isWitness(Program &program,
-        std::shared_ptr<Node> u,
-        std::shared_ptr<Node> v,
-        std::vector<Literal> &database) {
-    //I apply rule rule(u) on v. If all conclusions are already in u,
-    //then u is witness of v
-    std::unordered_set<std::string> v_of_u;
-    linearChase(program, u.get(), database, v_of_u);
-
-    std::vector<Literal> v_of_v;
-    linearChase(program, v.get(), database, v_of_v);
-
-    //Apply the rule
-    const auto &rule = program.getRule(u->ruleID);
-    std::vector<Literal> ruleOutput;
-    applyRule(rule, ruleOutput, v_of_v);
-
-    //Check whether there is an homomorphism
-    bool hom = true;
-    for(const auto &l : ruleOutput) {
-        std::string sl = l.tostring(NULL, NULL);
-        if (!v_of_u.count(sl)) {
-            hom = false;
-            break;
-        }
-    }
-
-    return hom;
-}
-
-void TriggerGraph::prune(Program &program,
-        std::shared_ptr<Node> u, std::shared_ptr<Node> v,
-        std::vector<Literal> &database) {
-    int idx = 0;
-    std::vector<int> childrenToRemove;
-    for(const auto &u_prime : u->outgoing) {
-        //Check whether u' is a witness of v
-        if (isWitness(program, u_prime, v, database)) {
-            //If there are no other witnesses among the children of v
-            bool foundWitness = false;
-            std::vector<std::shared_ptr<Node>> children_v;
-            linearGetAllNodesRootedAt(v, children_v);
-            for(auto &child_v : children_v) {
-                if (child_v->ruleID == u_prime->ruleID &&
-                        isWitness(program, child_v, v, database)) {
-                    foundWitness = true;
+        std::vector<std::pair<uint8_t, uint8_t>> subs;
+        std::vector<int> processedVars;
+        for(int i = 0; i < bodyAtom.getTupleSize(); ++i) {
+            VTerm term = bodyAtom.getTermAtPos(i);
+            bool found = false;
+            for(auto &var : processedVars) {
+                if (term.getId() == var) {
+                    found = true;
                     break;
                 }
             }
-            if (!foundWitness) {
-                //Move u_prime under v and remove it from u
-                u_prime->incoming.clear();
-                u_prime->incoming.push_back(v);
-                v->outgoing.push_back(u_prime);
-                childrenToRemove.push_back(idx);
+            if (!found) {
+                //Check where I should add it in the head
+                for(int j = 0; j < head.getTupleSize(); ++j) {
+                    VTerm headTerm = head.getTermAtPos(j);
+                    if (headTerm.getId() == term.getId()) {
+                        subs.push_back(make_pair(i, j));
+                    }
+                }
+                processedVars.push_back(term.getId());
             }
         }
-        idx++;
-    }
-    for(int i = childrenToRemove.size() - 1; i >= 0; i--) {
-        u->outgoing.erase(u->outgoing.begin() + i);
+        bool isExistential = rule.isExistential();
+        std::vector<std::vector<uint8_t>> extpos;
+        if (isExistential) {
+            auto vars = rule.getVarsNotInBody();
+        }
+
+        VTuple headTuple(head.getTupleSize());
+        for(const Literal &bodyAtom : bodyAtoms) {
+            VTuple t = bodyAtom.getTuple();
+            for(auto &s : subs) {
+                headTuple.set(bodyAtom.getTermAtPos(s.first), s.second);
+            }
+            for(auto &positions : extpos) {
+                for(auto position : positions)
+                    t.set(VTerm(0, freshIndividualCounter), position);
+                freshIndividualCounter++;
+            }
+            out.push_back(Literal(head.getPredicate(), headTuple));
+        }
     }
 
-    //Process the children of u and v
-    std::vector<std::shared_ptr<Node>> children_v;
-    linearGetAllNodesRootedAt(v, children_v);
-    std::vector<std::shared_ptr<Node>> children_u;
-    linearGetAllNodesRootedAt(v, children_u);
-    for(auto &child_u : children_u) {
-        if (child_u.get() != u.get()) {
-            for (auto &child_v : children_v) {
-                if (child_v.get() != v.get()) {
-                    if (child_u->ruleID == child_v->ruleID && child_u.get() != child_v.get()) {
-                        prune(program, child_u, child_v, database);
+    bool TriggerGraph::isWitness(Program &program,
+            std::shared_ptr<Node> u,
+            std::shared_ptr<Node> v,
+            std::vector<Literal> &database) {
+        //I apply rule rule(u) on v. If all conclusions are already in u,
+        //then u is witness of v
+        std::unordered_set<std::string> v_of_u;
+        linearChase(program, u.get(), database, v_of_u);
+
+        std::vector<Literal> v_of_v;
+        linearChase(program, v.get(), database, v_of_v);
+
+        //Apply the rule
+        const auto &rule = program.getRule(u->ruleID);
+        std::vector<Literal> ruleOutput;
+        applyRule(rule, ruleOutput, v_of_v);
+
+        //Check whether there is an homomorphism
+        bool hom = true;
+        for(const auto &l : ruleOutput) {
+            std::string sl = l.tostring(NULL, NULL);
+            if (!v_of_u.count(sl)) {
+                hom = false;
+                break;
+            }
+        }
+
+        return hom;
+    }
+
+    void TriggerGraph::prune(Program &program,
+            std::shared_ptr<Node> u, std::shared_ptr<Node> v,
+            std::vector<Literal> &database) {
+        int idx = 0;
+        std::vector<int> childrenToRemove;
+        for(const auto &u_prime : u->outgoing) {
+            //Check whether u' is a witness of v
+            if (isWitness(program, u_prime, v, database)) {
+                //If there are no other witnesses among the children of v
+                bool foundWitness = false;
+                std::vector<std::shared_ptr<Node>> children_v;
+                linearGetAllNodesRootedAt(v, children_v);
+                for(auto &child_v : children_v) {
+                    if (child_v->ruleID == u_prime->ruleID &&
+                            isWitness(program, child_v, v, database)) {
+                        foundWitness = true;
+                        break;
+                    }
+                }
+                if (!foundWitness) {
+                    //Move u_prime under v and remove it from u
+                    u_prime->incoming.clear();
+                    u_prime->incoming.push_back(v);
+                    v->outgoing.push_back(u_prime);
+                    childrenToRemove.push_back(idx);
+                }
+            }
+            idx++;
+        }
+        for(int i = childrenToRemove.size() - 1; i >= 0; i--) {
+            u->outgoing.erase(u->outgoing.begin() + i);
+        }
+
+        //Process the children of u and v
+        std::vector<std::shared_ptr<Node>> children_v;
+        linearGetAllNodesRootedAt(v, children_v);
+        std::vector<std::shared_ptr<Node>> children_u;
+        linearGetAllNodesRootedAt(v, children_u);
+        for(auto &child_u : children_u) {
+            if (child_u.get() != u.get()) {
+                for (auto &child_v : children_v) {
+                    if (child_v.get() != v.get()) {
+                        if (child_u->ruleID == child_v->ruleID && child_u.get() != child_v.get()) {
+                            prune(program, child_u, child_v, database);
+                        }
                     }
                 }
             }
         }
+
     }
 
-}
+    void TriggerGraph::removeNode(std::shared_ptr<Node> n,
+            std::unordered_map<size_t,
+            std::vector<std::shared_ptr<Node>>> &headPred2nodes) {
+        //First remove n from any parent
+        for(const auto &parent : n->incoming) {
+            int idx = 0;
+            for(const auto &cp : parent->outgoing) {
+                if (cp->getID() == n->getID()) {
+                    break;
+                }
+                idx++;
+            }
+            if (idx < parent->outgoing.size()) {
+                parent->outgoing.erase(parent->outgoing.begin() + idx);
+            }
+        }
 
-void TriggerGraph::removeNode(std::shared_ptr<Node> n,
-        std::unordered_map<size_t,
-        std::vector<std::shared_ptr<Node>>> &headPred2nodes) {
-    //First remove n from any parent
-    for(const auto &parent : n->incoming) {
+        //Remove it also from the root array
         int idx = 0;
-        for(const auto &cp : parent->outgoing) {
-            if (cp->getID() == n->getID()) {
+        for(const auto &rootNode : nodes) {
+            if (rootNode.get() == n.get()) {
                 break;
             }
             idx++;
         }
-        if (idx < parent->outgoing.size()) {
-            parent->outgoing.erase(parent->outgoing.begin() + idx);
+        if (idx < nodes.size()) {
+            nodes.erase(nodes.begin() + idx);
+        }
+        auto el = allnodes.find(n->getID());
+        assert(el != allnodes.end());
+        allnodes.erase(el);
+        //Remove the node also from the map
+        auto headPred = el->second->literal->getPredicate().getId();
+        if (headPred2nodes.count(headPred)) {
+            auto &nodes = headPred2nodes[headPred];
+            size_t i = 0;
+            for(;i < nodes.size(); ++i) {
+                if (nodes[i].get() == el->second.get())
+                    break;
+            }
+            if (i == nodes.size()) {
+                LOG(ERRORL) << i << " should not happen!";
+            }
+            nodes.erase(nodes.begin() + i);
         }
     }
 
-    //Remove it also from the root array
-    int idx = 0;
-    for(const auto &rootNode : nodes) {
-        if (rootNode.get() == n.get()) {
-            break;
+    void TriggerGraph::createKBound(EDBLayer &db, Program &p) {
+        LOG(ERRORL) << "Not yet implemented";
+    }
+
+    void TriggerGraph::processNode(const Node &n, std::ostream &out) {
+        //Write a line
+        if (n.ruleID != -1) {
+            out << std::to_string(n.ruleID) << "\t";
+            for (const auto child : n.incoming) {
+                out << child->label << "\t";
+            }
+            out << n.label << std::endl;
         }
-        idx++;
-    }
-    if (idx < nodes.size()) {
-        nodes.erase(nodes.begin() + idx);
-    }
-    auto el = allnodes.find(n->getID());
-    assert(el != allnodes.end());
-    allnodes.erase(el);
-    //Remove the node also from the map
-    auto headPred = el->second->literal->getPredicate().getId();
-    if (headPred2nodes.count(headPred)) {
-        auto &nodes = headPred2nodes[headPred];
-        size_t i = 0;
-        for(;i < nodes.size(); ++i) {
-            if (nodes[i].get() == el->second.get())
-                break;
-        }
-        if (i == nodes.size()) {
-            LOG(ERRORL) << i << " should not happen!";
-        }
-        nodes.erase(nodes.begin() + i);
-    }
-}
 
-void TriggerGraph::createKBound(EDBLayer &db, Program &p) {
-    LOG(ERRORL) << "Not yet implemented";
-}
-
-void TriggerGraph::processNode(const Node &n, std::ostream &out) {
-    //Write a line
-    if (n.ruleID != -1) {
-        out << std::to_string(n.ruleID) << "\t";
-        for (const auto child : n.incoming) {
-            out << child->label << "\t";
-        }
-        out << n.label << std::endl;
-    }
-
-    for (const auto child : n.outgoing) {
-        processNode(*child, out);
-    }
-}
-
-void TriggerGraph::saveAllPaths(EDBLayer &edb, std::ostream &out) {
-    LOG(INFOL) << "Saving all paths ...";
-    std::vector<std::shared_ptr<Node>> nns;
-
-    std::vector<std::shared_ptr<Node>> toprocess;
-    for(const auto &n : nodes) {
-        toprocess.push_back(n);
-    }
-    //Sort the nodes by cardinalities
-    sortByCardinalities(toprocess, edb);
-
-    for(const auto &n : toprocess) {
-        if (n->outgoing.size() != 0) {
-            processNode(*n.get(), out);
+        for (const auto child : n.outgoing) {
+            processNode(*child, out);
         }
     }
-}
+
+    void TriggerGraph::saveAllPaths(EDBLayer &edb, std::ostream &out) {
+        LOG(INFOL) << "Saving all paths ...";
+        std::vector<std::shared_ptr<Node>> nns;
+
+        std::vector<std::shared_ptr<Node>> toprocess;
+        for(const auto &n : nodes) {
+            toprocess.push_back(n);
+        }
+        //Sort the nodes by cardinalities
+        sortByCardinalities(toprocess, edb);
+
+        for(const auto &n : toprocess) {
+            if (n->outgoing.size() != 0) {
+                processNode(*n.get(), out);
+            }
+        }
+    }

@@ -93,10 +93,6 @@ class TriggerGraph {
         void linearGetAllGraphNodes(
                 std::vector<std::shared_ptr<Node>> &out);
 
-        /*void linearComputeNodeOutput(Program &program,
-          Node *node, const std::vector<Literal> &db,
-          std::unordered_set<std::string> &out);*/
-
         void linearChase(Program &program,
                 Node *node, const std::vector<Literal> &db,
                 std::unordered_set<std::string> &out);
@@ -104,6 +100,10 @@ class TriggerGraph {
         void linearChase(Program &program,
                 Node *node, const std::vector<Literal> &db,
                 std::vector<Literal> &out);
+
+        void linearChase(Program &program,
+                Node *node, const std::vector<Literal> &db,
+                const std::vector<Literal> **out);
 
         void linearBuild_process(Program &program,
                 std::vector<Rule> &rules,
