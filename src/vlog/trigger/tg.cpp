@@ -511,7 +511,7 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
         }
     }
 
-    sec = std::chrono::system_clock::now() - start;
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Time creating execution graph (msec): " << sec.count() * 1000;
 
     int allnodes = getNNodes();
