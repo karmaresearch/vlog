@@ -55,7 +55,9 @@ class TriggerGraph {
                 std::unordered_map<size_t,
                     std::vector<std::shared_ptr<Node>>> &headPred2nodes);
 
-        void removeNode(std::shared_ptr<Node> n);
+        void removeNode(std::shared_ptr<Node> n,
+                std::unordered_map<size_t,
+                    std::vector<std::shared_ptr<Node>>> &headPred2nodes);
 
         void dumpGraphToFile(std::ofstream &edges, std::ofstream &nodes, EDBLayer &db, Program &p);
 

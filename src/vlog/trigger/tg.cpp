@@ -457,7 +457,7 @@ void TriggerGraph::remove(EDBLayer &db, Program &program,
     //LOG(INFOL) << "Time all nodes (msec): " << sec.count() * 1000 << " " << allnodes.size();
 
     if (toBeRemoved) {
-        removeNode(u);
+        removeNode(u, headPred2nodes);
     }
 }
 
@@ -706,7 +706,9 @@ void TriggerGraph::prune(Program &program,
 
 }
 
-void TriggerGraph::removeNode(std::shared_ptr<Node> n) {
+void TriggerGraph::removeNode(std::shared_ptr<Node> n,
+        std::unordered_map<size_t,
+        std::vector<std::shared_ptr<Node>>> &headPred2nodes) {
     //First remove n from any parent
     for(const auto &parent : n->incoming) {
         int idx = 0;
@@ -735,6 +737,20 @@ void TriggerGraph::removeNode(std::shared_ptr<Node> n) {
     auto el = allnodes.find(n->getID());
     assert(el != allnodes.end());
     allnodes.erase(el);
+    //Remove the node also from the map
+    auto headPred = el->second->literal->getPredicate().getId();
+    if (headPred2nodes.count(headPred)) {
+        auto &nodes = headPred2nodes[headPred];
+        size_t i = 0;
+        for(;i < nodes.size(); ++i) {
+            if (nodes[i].get() == el->second.get())
+                break;
+        }
+        if (i == nodes.size()) {
+            LOG(ERRORL) << i << " should not happen!";
+        }
+        nodes.erase(nodes.begin() + i);
+    }
 }
 
 void TriggerGraph::createKBound(EDBLayer &db, Program &p) {
