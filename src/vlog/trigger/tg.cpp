@@ -255,7 +255,8 @@ void TriggerGraph::linearBuild_process(Program &program,
 
             //(removed because unnecessary) Witness check
             //
-            //I also don't need to check whether r is extensional because I do have fake nodes for the EDB predicates
+            //I also don't need to check whether r is extensional because I do
+            //have fake nodes for the EDB predicates
 
             std::shared_ptr<Node> n = std::shared_ptr<Node>(new Node(nodecounter));
             nodecounter += 1;
@@ -395,15 +396,16 @@ uint64_t TriggerGraph::getNNodes(Node *n, std::set<string> *cache) {
 
 void TriggerGraph::remove(EDBLayer &db, Program &program,
         std::vector<Literal> &database,
-        std::shared_ptr<Node> u) {
+        std::shared_ptr<Node> u,
+        std::unordered_map<size_t,
+        std::vector<std::shared_ptr<Node>>> &headPred2nodes) {
 
     //First process the children of u
     auto children = u->outgoing;
     for (auto child : children) {
-        remove(db, program, database, child);
+        remove(db, program, database, child, headPred2nodes);
     }
 
-    bool toBeRemoved = false;
 
     //Then get the list of all nodes descendant from u
     std::vector<std::shared_ptr<Node>> childrenU;
@@ -417,38 +419,42 @@ void TriggerGraph::remove(EDBLayer &db, Program &program,
     std::unordered_set<std::string> dbU;
     linearChase(program, u.get(), database, dbU);
 
-    auto start = std::chrono::system_clock::now();
-    for(const auto pair : allnodes) {
-        auto &v = pair.second;
-        if (v.get() == u.get()) {
-            continue;
-        }
+    //auto start = std::chrono::system_clock::now();
+    bool toBeRemoved = false;
+    auto headPred = u->literal->getPredicate().getId();
+    if (headPred2nodes.count(headPred)) {
+        auto &similarNodes = headPred2nodes[headPred];
+        for(auto &v : similarNodes) {
+            if (v.get() == u.get()) {
+                continue;
+            }
 
-        if (!pointersChildrenU.count((uint64_t)v.get())) {
-            //Check whether u is redundant to v w.r.t. the database
-            std::unordered_set<std::string> dbV;
-            linearChase(program, v.get(), database, dbV);
-            //If every fact in dbFromU is in dbFromV, then we can remove u
-            bool subsumed = true;
+            if (!pointersChildrenU.count((uint64_t)v.get())) {
+                //Check whether u is redundant to v w.r.t. the database
+                std::unordered_set<std::string> dbV;
+                linearChase(program, v.get(), database, dbV);
+                //If every fact in dbU is in dbV, then we can remove u
+                bool subsumed = true;
 
-            for(const auto &f : dbU) {
-                if (!dbV.count(f)) {
-                    subsumed = false;
+                for(const auto &f : dbU) {
+                    if (!dbV.count(f)) {
+                        subsumed = false;
+                        break;
+                    }
+                }
+
+                //if subsumed = true, then u is redundant w.r.t. v
+                if (subsumed) {
+                    //aux2 on v. This procedure will move away all good children of u
+                    prune(program, u, v, database);
+                    toBeRemoved = true;
                     break;
                 }
             }
-
-            //if subsumed = true, then u is redundant w.r.t. v
-            if (subsumed) {
-                //aux2 on v. This procedure will move away all good children of u
-                prune(program, u, v, database);
-                toBeRemoved = true;
-                break;
-            }
         }
     }
-    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    LOG(INFOL) << "Time all nodes (msec): " << sec.count() * 1000 << " " << allnodes.size();
+    //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    //LOG(INFOL) << "Time all nodes (msec): " << sec.count() * 1000 << " " << allnodes.size();
 
     if (toBeRemoved) {
         removeNode(u);
@@ -514,8 +520,8 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Time creating execution graph (msec): " << sec.count() * 1000;
 
-    int allnodes = getNNodes();
-    LOG(INFOL) << "Before pruning the graph contains nodes " << allnodes;
+    int n_allnodes = getNNodes();
+    LOG(INFOL) << "Before pruning the graph contains nodes " << n_allnodes;
 
 #ifdef DEBUG
     dumpGraphToFile(fedges, fnodes, db, program);
@@ -528,13 +534,25 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
     fnodes.open("graph.after.nodes");
 #endif
 
+    //Group all the nodes by the head predicate
+    std::unordered_map<size_t, std::vector<std::shared_ptr<Node>>> headPred2nodes;
+    for(const auto pair : allnodes) {
+        auto &v = pair.second;
+        auto headPredicate = v->literal->getPredicate().getId();
+        if (!headPred2nodes.count(headPredicate)) {
+            headPred2nodes.insert(std::make_pair(headPredicate,
+                        std::vector<std::shared_ptr<Node>>()));
+        }
+        headPred2nodes[headPredicate].push_back(v);
+    }
+
     //*** Prune the graph ***
     start = std::chrono::system_clock::now();
     auto nodesToProcess = nodes;
     int idx = 0;
     for (auto n : nodesToProcess) {
         //start = std::chrono::system_clock::now();
-        remove(db, program, database, n);
+        remove(db, program, database, n, headPred2nodes);
         //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
         //LOG(INFOL) << "Time pruning " << idx << " of " << nodesToProcess.size() << " (msec): " << sec.count() * 1000;
         idx++;
@@ -548,8 +566,8 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
     fnodes.close();
 #endif
 
-    allnodes = getNNodes();
-    LOG(INFOL) << "After pruning the graph contains nodes " << allnodes;
+    n_allnodes = getNNodes();
+    LOG(INFOL) << "After pruning the graph contains nodes " << n_allnodes;
 }
 
 void TriggerGraph::applyRule(const Rule &rule,

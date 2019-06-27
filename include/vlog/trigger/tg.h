@@ -51,7 +51,9 @@ class TriggerGraph {
 
         void remove(EDBLayer &db, Program &program,
                 std::vector<Literal> &database,
-                std::shared_ptr<Node> u);
+                std::shared_ptr<Node> u,
+                std::unordered_map<size_t,
+                    std::vector<std::shared_ptr<Node>>> &headPred2nodes);
 
         void removeNode(std::shared_ptr<Node> n);
 
