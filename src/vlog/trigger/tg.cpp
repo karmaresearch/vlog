@@ -396,6 +396,7 @@ uint64_t TriggerGraph::getNNodes(Node *n, std::set<string> *cache) {
 void TriggerGraph::remove(EDBLayer &db, Program &program,
         std::vector<Literal> &database,
         std::shared_ptr<Node> u) {
+
     //First process the children of u
     auto children = u->outgoing;
     for (auto child : children) {
@@ -412,13 +413,11 @@ void TriggerGraph::remove(EDBLayer &db, Program &program,
         pointersChildrenU.insert((uint64_t)cu.get());
     }
 
-    //Compute the set of all facts we can get to u
-    std::unordered_set<std::string> dbToU;
-    linearChase(program, u.get(), database, dbToU);
+    //Compute the set of all facts we can get from u
+    std::unordered_set<std::string> dbU;
+    linearChase(program, u.get(), database, dbU);
 
-    //std::vector<std::shared_ptr<Node>> allNodes;
-    //linearGetAllGraphNodes(allNodes);
-
+    auto start = std::chrono::system_clock::now();
     for(const auto pair : allnodes) {
         auto &v = pair.second;
         if (v.get() == u.get()) {
@@ -427,13 +426,13 @@ void TriggerGraph::remove(EDBLayer &db, Program &program,
 
         if (!pointersChildrenU.count((uint64_t)v.get())) {
             //Check whether u is redundant to v w.r.t. the database
-            std::unordered_set<std::string> dbToV;
-            linearChase(program, v.get(), database, dbToV);
+            std::unordered_set<std::string> dbV;
+            linearChase(program, v.get(), database, dbV);
             //If every fact in dbFromU is in dbFromV, then we can remove u
             bool subsumed = true;
 
-            for(const auto &f : dbToU) {
-                if (!dbToV.count(f)) {
+            for(const auto &f : dbU) {
+                if (!dbV.count(f)) {
                     subsumed = false;
                     break;
                 }
@@ -448,11 +447,12 @@ void TriggerGraph::remove(EDBLayer &db, Program &program,
             }
         }
     }
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    LOG(INFOL) << "Time all nodes (msec): " << sec.count() * 1000 << " " << allnodes.size();
 
     if (toBeRemoved) {
         removeNode(u);
     }
-
 }
 
 void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
@@ -533,8 +533,10 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
     auto nodesToProcess = nodes;
     int idx = 0;
     for (auto n : nodesToProcess) {
-        //std::cout << "Pruning node " << idx << " of " << nodesToProcess.size() << std::endl;
+        //start = std::chrono::system_clock::now();
         remove(db, program, database, n);
+        //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+        //LOG(INFOL) << "Time pruning " << idx << " of " << nodesToProcess.size() << " (msec): " << sec.count() * 1000;
         idx++;
     }
     sec = std::chrono::system_clock::now() - start;
