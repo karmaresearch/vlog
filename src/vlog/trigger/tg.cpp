@@ -185,12 +185,15 @@ void TriggerGraph::linearChase(Program &program,
 }
 
 void TriggerGraph::linearBuild_process(Program &program,
+        std::vector<Rule> &rules,
         std::shared_ptr<Node> node,
         std::vector<Literal> &chase,
         std::vector<std::shared_ptr<Node>> &children) {
+
+
+
     //If there is a rule with body compatible with the literal,
     //then create a node
-    const auto &rules = program.getAllRules();
     std::vector<Substitution> subs;
     PredId_t litp = node->literal->getPredicate().getId();
     if (!pred2bodyrules.count(litp)) {
@@ -272,6 +275,7 @@ void TriggerGraph::linearBuild_process(Program &program,
 }
 
 void TriggerGraph::linearBuild(Program &program,
+        std::vector<Rule> &rules,
         const Literal &literal,
         std::shared_ptr<Node> root) {
 
@@ -282,7 +286,7 @@ while (!newNodes.empty()) {
     std::vector<std::shared_ptr<Node>> nodesToProcess;
     nodesToProcess.swap(newNodes);
     for(auto n : nodesToProcess) {
-        linearBuild_process(program, n, chase, newNodes);
+        linearBuild_process(program, rules, n, chase, newNodes);
     }
 }
 }
@@ -463,8 +467,12 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
     fnodes.open("graph.before.nodes");
 #endif
 
+    LOG(DEBUGL) << "Start creation of trigger graphs ...";
+
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+
     //Create a map that associates predicates to rules
-    const auto &rules = program.getAllRules();
+    auto rules = program.getAllRules();
     int idxp = 0;
     for (const auto &rule : rules) {
         const auto &body = rule.getBody();
@@ -477,8 +485,6 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
         pred2bodyrules[pred].push_back(idxp);
         idxp++;
     }
-
-    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
     //Create some fake EDB nodes from the canonical instance.
     int startCounter = 0;
@@ -497,7 +503,7 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
             n->literal = std::unique_ptr<Literal>(new Literal(l));
 
             //The following is the function build() lines 9--24
-            linearBuild(program, l, n);
+            linearBuild(program, rules, l, n);
             if (!n->outgoing.empty()) {
                 nodes.push_back(n);
                 allnodes.insert(std::make_pair(nodecounter - 1, n));
@@ -505,7 +511,7 @@ void TriggerGraph::createLinear(EDBLayer &db, Program &program) {
         }
     }
 
-    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Time creating execution graph (msec): " << sec.count() * 1000;
 
     int allnodes = getNNodes();
@@ -668,13 +674,13 @@ void TriggerGraph::prune(Program &program,
     linearGetAllNodesRootedAt(v, children_u);
     for(auto &child_u : children_u) {
         if (child_u.get() != u.get()) {
-           for (auto &child_v : children_v) {
-               if (child_v.get() != v.get()) {
-                   if (child_u->ruleID == child_v->ruleID && child_u.get() != child_v.get()) {
-                       prune(program, child_u, child_v, database);
-                   }
-               }
-           }
+            for (auto &child_v : children_v) {
+                if (child_v.get() != v.get()) {
+                    if (child_u->ruleID == child_v->ruleID && child_u.get() != child_v.get()) {
+                        prune(program, child_u, child_v, database);
+                    }
+                }
+            }
         }
     }
 

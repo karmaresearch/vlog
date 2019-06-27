@@ -102,11 +102,14 @@ class TriggerGraph {
                 std::vector<Literal> &out);
 
         void linearBuild_process(Program &program,
+                std::vector<Rule> &rules,
                 std::shared_ptr<Node> node,
                 std::vector<Literal> &chase,
                 std::vector<std::shared_ptr<Node>> &children);
 
-        void linearBuild(Program &p, const Literal &l,
+        void linearBuild(Program &p,
+                std::vector<Rule> &rules,
+                const Literal &l,
                 std::shared_ptr<Node> parentNode);
 
         void sortByCardinalities(
