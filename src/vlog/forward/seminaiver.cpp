@@ -328,7 +328,7 @@ void SemiNaiver::axiomatizeCurrentProgram() {
     VTuple t2(2);
     t2.set(VTerm(2,0), 0);
     t2.set(VTerm(3,0), 1);
-    std::string sameAsName = "owl:sameAs";
+    std::string sameAsName = "<http://www.w3.org/2002/07/owl#sameAs>";
     auto sameAsPred = program->getPredicate(sameAsName);
     Literal transHead(sameAsPred, t);
     Literal transBody1(sameAsPred, t1);
@@ -725,7 +725,8 @@ void SemiNaiver::storeOnFiles(std::string path, const bool decompress,
     for (PredId_t i = 0; i < program->getNPredicates(); ++i) {
         FCTable *table = predicatesTables[i];
         if (table != NULL && !table->isEmpty()) {
-            storeOnFile(path + "/" + program->getPredicateName(i), i, decompress, minLevel, csv);
+            std::string name = Program::prettifyName(program->getPredicateName(i));
+            storeOnFile(path + "/" + name, i, decompress, minLevel, csv);
         }
     }
 }

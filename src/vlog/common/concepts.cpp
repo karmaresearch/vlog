@@ -943,6 +943,30 @@ std::string Program::rewriteRDFOWLConstants(std::string input) {
         input = string("<http://www.w3.org/2002/07/owl#") + input.substr(owlPos + 4, std::string::npos) + string(">");
         return input;
     }
+    return input;
+}
+
+std::string Program::prettifyName(std::string input) {
+    std::string rdfprefix = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+    size_t rdfPos = input.find(rdfprefix);
+    if (rdfPos != std::string::npos) {
+        input = string("rdf_") + input.substr(rdfPos + rdfprefix.size(), input.size() - 1 - rdfprefix.size());
+        return input;
+    }
+
+    std::string rdfsprefix = "<http://www.w3.org/2000/01/rdf-schema#";
+    size_t rdfsPos = input.find(rdfsprefix);
+    if (rdfsPos != std::string::npos) {
+        input = string("rdfs_") + input.substr(rdfsPos + rdfsprefix.size(), input.size() - 1 - rdfsprefix.size());
+        return input;
+    }
+
+    std::string owlprefix = "<http://www.w3.org/2002/07/owl#";
+    size_t owlPos = input.find(owlprefix);
+    if (owlPos != std::string::npos) {
+        input = string("owl_") + input.substr(owlPos + owlprefix.size(), input.size() - 1 - owlprefix.size());
+        return input;
+    }
 
     return input;
 }
@@ -1077,6 +1101,7 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     }
 
     //Determine predicate
+    predicate = rewriteRDFOWLConstants(predicate);
     PredId_t predid = (PredId_t) dictPredicates.getOrAdd(predicate);
     if (cardPredicates.find(predid) == cardPredicates.end()) {
         cardPredicates.insert(make_pair(predid, t.size()));
