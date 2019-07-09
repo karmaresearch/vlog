@@ -295,6 +295,8 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     query_options.add<bool>("","no-intersect", false, "Disable intersection optimization.",false);
     query_options.add<string>("","graphfile", "", "Path to store the rule dependency graph",false);
 
+    query_options.add<string>("","sameasAlgo", "NOTHING", "Enable equality algorithm. Techniques: NOTHING (default), AXIOM (axiomatization), SING (singularisation).",false);
+
     ProgramArgs::GroupArgs& load_options = *vm.newGroup("Options for <load>");
     load_options.add<string>("i","input", "",
             "Path to the files that contain the compressed triples. This parameter is REQUIRED if already compressed triples/dict are not provided.", false);
@@ -596,7 +598,9 @@ void launchFullMat(int argc,
                 ? TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE,
                 nthreads,
                 interRuleThreads,
-                ! vm["shufflerules"].empty());
+                ! vm["shufflerules"].empty(),
+                NULL,
+                vm["sameasAlgo"].as<string>());
 
 #ifdef WEBINTERFACE
         //Start the web interface if requested
@@ -1187,13 +1191,13 @@ int main(int argc, const char** argv) {
         string rulesFile = vm["rules"].as<string>();
         string alg = vm["alg"].as<string>();
         checkAcyclicity(rulesFile, alg, *layer, vm["rewriteMultihead"].as<bool>());
-	delete layer;
+        delete layer;
     } else if (cmd == "deps") {
         EDBConf conf(edbFile);
         EDBLayer *layer = new EDBLayer(conf, false);
         string rulesFile = vm["rules"].as<string>();
         detectDeps(rulesFile, *layer);
-	delete layer;
+        delete layer;
     }
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Runtime = " << sec.count() * 1000 << " milliseconds";

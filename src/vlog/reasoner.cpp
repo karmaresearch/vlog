@@ -919,7 +919,8 @@ TupleIterator *Reasoner::getTopDownIterator(Literal &query,
 std::shared_ptr<SemiNaiver> Reasoner::getSemiNaiver(EDBLayer &layer,
         Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
         TypeChase typeChase,
-        int nthreads, int interRuleThreads, bool shuffleRules, Program *restrictedCheck) {
+        int nthreads, int interRuleThreads, bool shuffleRules, Program *restrictedCheck,
+        std::string sameasAlgo) {
     LOG(DEBUGL) << "interRuleThreads = " << interRuleThreads << ", shuffleRules = " << shuffleRules;
     if (interRuleThreads > 0 && restrictedCheck == NULL) {
         std::shared_ptr<SemiNaiver> sn(new SemiNaiverThreaded(
@@ -929,7 +930,7 @@ std::shared_ptr<SemiNaiver> Reasoner::getSemiNaiver(EDBLayer &layer,
     } else {
         std::shared_ptr<SemiNaiver> sn(new SemiNaiver(
                     layer, p, opt_intersect, opt_filtering,
-                    opt_threaded, typeChase, nthreads, shuffleRules, false, restrictedCheck));
+                    opt_threaded, typeChase, nthreads, shuffleRules, false, restrictedCheck, sameasAlgo));
         return sn;
     }
 }
