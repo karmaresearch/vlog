@@ -52,13 +52,16 @@ file(GLOB vlog_SRC
     "src/vlog/backward/*.cpp"
     "src/vlog/forward/*.cpp"
     "src/vlog/magic/*.cpp"
+    "src/vlog/incremental/*.cpp"
     "src/vlog/inmemory/*.cpp"
     "src/vlog/trident/*.cpp"
     "src/vlog/cycles/*.cpp"
     "src/vlog/ml/*.cpp"
-    "src/vlog/deps/*.cpp"
+    "src/vlog/trigger/*.cpp"
     "src/launcher/vloglayer.cpp"
     "src/launcher/vlogscan.cpp"
+    "src/vlog/prediction/*.cpp"
+    "src/vlog/util/*.cpp"
     )
 
 #ZLIB
@@ -87,7 +90,9 @@ ELSE()
         DOWNLOAD_DIR .
         SOURCE_DIR trident
         BUILD_IN_SOURCE 1
-        CMAKE_ARGS "-DSPARQL=1"
+        CMAKE_ARGS 
+		-DSPARQL=1
+		-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
         INSTALL_COMMAND ""
         )
     ExternalProject_Get_Property(git-trident SOURCE_DIR)
@@ -170,8 +175,6 @@ IF(MAPI)
 ENDIF()
 
 IF(SPARQL)
-    find_package(CURL REQUIRED)
-    include_directories(${CURL_INCLUDE_DIR})
     file(GLOB vlog_sparqlSRC "src/vlog/sparql/*.cpp")
     set(vlog_SRC ${vlog_sparqlSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DSPARQL=1")
@@ -216,7 +219,8 @@ endif()
 if((${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang") OR (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU"))
     set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3")
     set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -DDEBUG")
-    set(COMPILE_FLAGS "${COMPILE_FLAGS} -c -fPIC -MD -std=c++11 -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1")
+    set(COMPILE_FLAGS "${COMPILE_FLAGS} -c -fPIC -MD -std=c++11 -DPRUNING_QSQR=1")
+    #set(COMPILE_FLAGS "${COMPILE_FLAGS} -c -fPIC -MD -std=c++11 -DUSE_COMPRESSED_COLUMNS -DPRUNING_QSQR=1")
 endif()
 
 IF (JAVA)

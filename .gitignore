@@ -23,3 +23,9 @@ testOutput
 .classpath
 .project
 .settings
+.*.swp
+**/*.csv
+**/*.datalog
+**/*.ipynb
+**/*.stats
+**/*.conf

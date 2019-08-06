@@ -2,6 +2,7 @@
 #define _TG_GRAPH_PATH_H
 
 #include <vector>
+#include <iterator>
 #include <string>
 #include <inttypes.h>
 

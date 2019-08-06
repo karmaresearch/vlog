@@ -169,4 +169,3 @@ void VLogUtils::execSPARQLQuery(string sparqlquery,
     }
     delete plangen;
 }
-

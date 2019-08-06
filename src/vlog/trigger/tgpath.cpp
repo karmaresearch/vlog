@@ -1,4 +1,4 @@
-#include <vlog/tgpath.h>
+#include <vlog/trigger/tgpath.h>
 #include <fstream>
 #include <sstream>
 #include <iterator>

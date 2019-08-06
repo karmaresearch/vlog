@@ -61,7 +61,7 @@ public:
 	return 0;
     }
 
-    uint8_t getArity() const {
+    virtual uint8_t getArity() const {
 	return arity;
     }
 

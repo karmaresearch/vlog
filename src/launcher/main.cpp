@@ -8,10 +8,18 @@
 #include <vlog/fcinttable.h>
 #include <vlog/exporter.h>
 #include <vlog/utils.h>
+#include <vlog/ml/training.h>
+#include <vlog/ml/helper.h>
 #include <vlog/ml/ml.h>
-#include <vlog/deps/detector.h>
+#include <vlog/trigger/detector.h>
+#include <vlog/trigger/tg.h>
 
 #include <vlog/cycles/checker.h>
+
+//Incremental, will probably move away
+#include <vlog/inmemory/inmemorytable.h>
+#include <vlog/incremental/edb-table-from-idb.h>
+#include <vlog/incremental/incremental-concepts.h>
 
 //Used to load a Trident KB
 #include <vlog/trident/tridenttable.h>
@@ -43,6 +51,8 @@
 #include <thread>
 #include <cmath>
 
+// #include <valgrind/callgrind.h>
+
 using namespace std;
 
 void printHelp(const char *programName, ProgramArgs &desc) {
@@ -51,11 +61,13 @@ void printHelp(const char *programName, ProgramArgs &desc) {
     cout << "help\t\t produce help message." << endl;
     cout << "mat\t\t perform a full materialization." << endl;
     cout << "mat_tg\t\t perform a full materialization guided by a trigger graph." << endl;
+    cout << "trigger\t\t create a trigger graph from a given program." << endl;
     cout << "query\t\t execute a SPARQL query." << endl;
     cout << "queryLiteral\t\t execute a Literal query." << endl;
     cout << "server\t\t starts in server mode." << endl;
     cout << "load\t\t load a Trident KB." << endl;
     cout << "gentq\t\t generate training queries from rules file." << endl;
+    cout << "tat\t\t generate training queries and test them with a model." << endl;
     cout << "lookup\t\t lookup for values in the dictionary." << endl << endl;
     cout << "cycles\t\t try and detect cycles in the rules." << endl << endl;
     cout << "deps\t\t detect dependencies in the database." << endl << endl;
@@ -64,13 +76,12 @@ void printHelp(const char *programName, ProgramArgs &desc) {
 }
 
 inline void printErrorMsg(const char *msg) {
-    cout << endl << "*** ERROR: " << msg << "***" << endl << endl
+    cout << endl << "*** ERROR: " << msg << " ***" << endl << endl
         << "Please type the subcommand \"help\" for instructions (e.g. Vlog help)."
         << endl;
 }
 
 bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
-
     string cmd;
     if (argc < 2) {
         printErrorMsg("Command is missing!");
@@ -79,9 +90,11 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
         cmd = argv[1];
     }
 
-    if (cmd != "help" && cmd != "query" && cmd != "lookup" && cmd != "load" && cmd != "queryLiteral"
-            && cmd != "mat" && cmd != "mat_tg" && cmd != "rulesgraph" && cmd != "server" && cmd != "gentq" &&
-            cmd != "cycles" && cmd !="deps") {
+    if (cmd != "help" && cmd != "query" && cmd != "lookup" && cmd != "load" &&
+            cmd != "queryLiteral"
+            && cmd != "mat" && cmd != "mat_tg" && cmd != "rulesgraph" &&
+            cmd != "server" && cmd != "gentq" && cmd != "tat" &&
+            cmd != "cycles" && cmd != "deps" && cmd != "trigger") {
         printErrorMsg(
                 (string("The command \"") + cmd + string("\" is unknown.")).c_str());
         return false;
@@ -107,6 +120,15 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
                     printErrorMsg((string("The rule file ") + path + string(" doe not exists")).c_str());
                     return false;
                 }
+            }
+        } else if (cmd == "trigger") {
+            if (!vm.count("trigger_algo")) {
+                printErrorMsg("You need to specify an algorithm to use with --trigger_algo");
+                return false;
+            }
+            if (!vm.count("trigger_paths") || vm["trigger_paths"].as<string>().compare("") == 0) {
+                printErrorMsg("You must specify the path of a file to store the result of the trigger graph with --trigger_paths");
+                return false;
             }
         } else if (cmd == "lookup") {
             if (!vm.count("text") && !vm.count("number")) {
@@ -182,6 +204,21 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
                     return false;
                 }
             }
+        } else if (cmd == "tat") {
+            if (vm["rules"].as<string>().compare("") != 0) {
+                string path = vm["rules"].as<string>();
+                if (!Utils::exists(path)) {
+                    printErrorMsg((string("The rule file ") + path + string(" doe not exists")).c_str());
+                    return false;
+                }
+            }
+            if (vm["testqueries"].as<string>().compare("") != 0) {
+                string path = vm["testqueries"].as<string>();
+                if (!Utils::exists(path)) {
+                    printErrorMsg((string("The test queries file ") + path + string(" doe not exists")).c_str());
+                    return false;
+                }
+            }
         } else if (cmd == "mat") {
             string path = vm["rules"].as<string>();
             if (path == "") {
@@ -191,6 +228,15 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
                 printErrorMsg((string("The rule file '") +
                             path + string("' does not exists")).c_str());
                 return false;
+            }
+            if (! vm["rm"].empty()) {
+                std::string filename = vm["rm"].as<string>();
+                if (!Utils::exists(filename)) {
+                    printErrorMsg((string("The remove-literals file ") +
+                                filename +
+                                string(" does not exist")).c_str());
+                    return false;
+                }
             }
         } else if (cmd == "mat_tg") {
             string path = vm["trigger_paths"].as<string>();
@@ -242,6 +288,9 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "This parameter sets a threshold to estimate the reasoning cost of a pattern. This cost can be broadly associated to the cardinality of the pattern. It is used to choose either TopDown or Magic evalution. Default is 1000000 (1M).", false);
     query_options.add<string>("", "reasoningAlgo", "",
             "Determines the reasoning algo (only for <queryLiteral>). Possible values are \"qsqr\", \"magic\", \"auto\".", false);
+    query_options.add<string>("", "trigger_algo", "",
+            "Algorithm to use to create a trigger graph. For now only 'linear' or 'kbound'",
+            false);
     query_options.add<string>("", "trigger_paths", "",
             "Path to the file that contains trigger graph execution paths",
             false);
@@ -267,6 +316,14 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             string("Set maximum number of threads to use when run in multithreaded mode. Default is " + to_string(std::max((unsigned int)1, std::thread::hardware_concurrency() / 2))).c_str(), false);
     query_options.add<int>("", "interRuleThreads", 0,
             "Set maximum number of threads to use for inter-rule parallelism. Default is 0", false);
+    query_options.add<string>("", "rm", "",
+            "File with facts to suppress (remove) from the EDB", false);
+    query_options.add<string>("", "dred", "",
+            "Directory with files with facts to add/remove from the EDB", false);
+    query_options.add<string>("", "dred-rm", "",
+            "file with facts to remove from the EDB", false);
+    query_options.add<string>("", "dred-add", "",
+            "file with facts to add to the EDB", false);
 
     query_options.add<bool>("", "shufflerules", false,
             "shuffle rules randomly instead of using heuristics (only for <mat>, and only when running multithreaded).", false);
@@ -320,9 +377,14 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "Path to the webpages relative to where the executable is. Default is ../webinterface", false);
 
     ProgramArgs::GroupArgs& generateTraining_options = *vm.newGroup("Options for command <gentq>");
-    generateTraining_options.add<int>("", "maxTuples", 500, "Number of EDB tuples to consider for training", false);
+    generateTraining_options.add<int>("", "maxTuples", 50, "Number of EDB tuples per IDB predicate to consider for training", false);
     generateTraining_options.add<int>("", "depth", 5, "Recursion level of training generation procedure", false);
 
+    ProgramArgs::GroupArgs& trainAndTest_options = *vm.newGroup("Options for command <tat>");
+    trainAndTest_options.add<string>("tq", "testqueries", "",
+            "The path of the file with a log of test queries", false);
+    trainAndTest_options.add<int>("mtq", "maxTrainingQueries", 500, "Number of training queries to train on to train on", false);
+    trainAndTest_options.add<int>("", "timeout", 10000, "Number milliseconds the query should time out after", false);
     ProgramArgs::GroupArgs& detectCycles_options = *vm.newGroup("Options for command <detectCycles>");
     detectCycles_options.add<string>("", "alg", "MFA", "Algorithm to use for cycle detection", false);
 
@@ -411,6 +473,54 @@ void startServer(int argc,
 }
 #endif
 
+void computeTriggerGraph(EDBLayer &db,
+        std::string rulefile, std::string algo,
+        std::string fileout_path) {
+    //Load the program
+    Program p(&db);
+    p.readFromFile(rulefile, false);
+
+    TriggerGraph tg;
+    if (algo == "linear") {
+        tg.createLinear(db, p);
+    } else if (algo == "kbound") {
+        tg.createKBound(db, p);
+    } else {
+        LOG(ERRORL) << "The algorithm " << algo << " is not recognized. "
+            "Specify a valid one with --trigger_algo";
+        throw 10;
+    }
+    //Save the graph on a file
+    ofstream fout(fileout_path);
+    tg.saveAllPaths(db, fout);
+    fout.close();
+}
+
+static void store_mat(const std::string &path, ProgramArgs &vm,
+        const std::shared_ptr<SemiNaiver> sn) {
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+
+    Exporter exp(sn);
+
+    string storemat_format = vm["storemat_format"].as<string>();
+
+    if (storemat_format == "files" || storemat_format == "csv") {
+        sn->storeOnFiles(path,
+                vm["decompressmat"].as<bool>(), 0, storemat_format == "csv");
+    } else if (storemat_format == "db") {
+        //I will store the details on a Trident index
+        exp.generateTridentDiffIndex(path);
+    } else if (storemat_format == "nt") {
+        exp.generateNTTriples(path, vm["decompressmat"].as<bool>());
+    } else {
+        LOG(ERRORL) << "Option 'storemat_format' not recognized";
+        throw 10;
+    }
+
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    LOG(INFOL) << "Time to index and store the materialization on disk = " << sec.count() << " seconds";
+}
+
 void launchTriggeredMat(int argc,
         const char** argv,
         string pathExec,
@@ -438,7 +548,7 @@ void launchTriggeredMat(int argc,
     //Prepare the materialization
     std::shared_ptr<TriggerSemiNaiver> sn = Reasoner::getTriggeredSemiNaiver(db,
             &p,
-            vm["restrictedChase"].as<bool>());
+            vm["restrictedChase"].as<bool>() ? TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE);
 
 #ifdef WEBINTERFACE
     //Start the web interface if requested
@@ -469,8 +579,17 @@ void launchTriggeredMat(int argc,
     LOG(INFOL) << "Starting full materialization guided by trigger graphs";
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     sn->run(vm["trigger_paths"].as<std::string>());
-    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
+    std::chrono::duration<double> secMat = std::chrono::system_clock::now() - start;
+    LOG(INFOL) << "Runtime materialization = " << secMat.count() * 1000 << " milliseconds";
+
+    //Remove all duplicates
+    std::chrono::system_clock::time_point startDel = std::chrono::system_clock::now();
+    size_t removedElements = sn->unique();
+    std::chrono::duration<double> secDel = std::chrono::system_clock::now()
+        - startDel;
+    LOG(INFOL) << "Runtime removing duplicates = " << secDel.count() * 1000
+        << " milliseconds. Removed elements = " << removedElements;
+
     sn->printCountAllIDBs("");
 
 #if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
@@ -623,6 +742,13 @@ void launchFullMat(int argc,
                         1, &cv, &mtx, &isFinished));
         }
 #endif
+        if (vm["printRepresentationSize"].as<bool>()) {
+            printRepresentationSize(sn);
+        }
+
+        if (vm["dred"].empty()) {
+            // CALLGRIND_START_INSTRUMENTATION;
+        }
 
         LOG(INFOL) << "Starting full materialization";
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
@@ -630,6 +756,86 @@ void launchFullMat(int argc,
         std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
         LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
         sn->printCountAllIDBs("");
+
+        if (! vm["dred"].empty()) {
+            std::chrono::system_clock::time_point start;
+            std::chrono::duration<double> sec;
+
+            std::vector<std::string> remove_pred_names;
+            if (vm["dred-rm"].empty()) {
+                LOG(INFOL) << "use default remove table TE_remove";
+                remove_pred_names.push_back("TE");
+            } else {
+                remove_pred_names.push_back(vm["dred-rm"].as<string>());
+            }
+            std::vector<std::string> add_pred_names;
+            if (vm["dred-add"].empty()) {
+                LOG(INFOL) << "use default add table TE_add";
+                add_pred_names.push_back("TE");
+            } else {
+                add_pred_names.push_back(vm["dred-add"].as<string>());
+            }
+
+            LOG(INFOL) << "***************** Create Overdelete";
+
+            IncrOverdelete overdelete(vm, sn, remove_pred_names);
+
+            // CALLGRIND_START_INSTRUMENTATION;
+
+            LOG(INFOL) << "Starting overdeletion materialization";
+            start = std::chrono::system_clock::now();
+            overdelete.run();
+            sec = std::chrono::system_clock::now() - start;
+            LOG(INFOL) << "Runtime overdelete = " << sec.count() * 1000 << " milliseconds";
+            overdelete.getSN()->printCountAllIDBs("");
+
+            if (vm["storemat_path"].as<string>() != "") {
+                store_mat(vm["storemat_path"].as<string>() + ".overdelete", vm, overdelete.getSN());
+            }
+
+            if (true) {
+                // Continue same with Rederive
+                // Create a Program, create a SemiNaiver, run...
+                LOG(INFOL) << "***************** Create Rederive";
+
+                IncrRederive rederive(vm, sn, remove_pred_names, overdelete);
+
+                LOG(INFOL) << "Starting rederive materialization";
+                start = std::chrono::system_clock::now();
+                rederive.run();
+                sec = std::chrono::system_clock::now() - start;
+                LOG(INFOL) << "Runtime rederive = " << sec.count() * 1000 << " milliseconds";
+                rederive.getSN()->printCountAllIDBs("");
+
+                if (vm["storemat_path"].as<string>() != "") {
+                    store_mat(vm["storemat_path"].as<string>() + ".rederive", vm, rederive.getSN());
+                }
+
+                if (true) {
+                    // Continue same with Addition
+                    // Create a Program, create a SemiNaiver, run...
+                    LOG(INFOL) << "***************** Create Addition";
+
+                    IncrAdd addition(vm, sn, remove_pred_names, add_pred_names,
+                            overdelete, rederive);
+
+                    LOG(INFOL) << "Starting addition materialization";
+                    start = std::chrono::system_clock::now();
+                    addition.run();
+                    sec = std::chrono::system_clock::now() - start;
+                    LOG(INFOL) << "Runtime addition = " << sec.count() * 1000 << " milliseconds";
+                    addition.getSN()->printCountAllIDBs("");
+
+                    if (vm["storemat_path"].as<string>() != "") {
+                        store_mat(vm["storemat_path"].as<string>() + ".add", vm, addition.getSN());
+                    }
+                } else {
+                    LOG(ERRORL) << "For now, ALSO SKIP ADDITION";
+                }
+            } else {
+                LOG(ERRORL) << "For now, SKIP REDERIVE";
+            }
+        }
 
 #if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
         if (vm["monitorThread"].as<bool>()) {
@@ -645,27 +851,7 @@ void launchFullMat(int argc,
 
 
         if (vm["storemat_path"].as<string>() != "") {
-            std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-
-            Exporter exp(sn);
-
-            string storemat_format = vm["storemat_format"].as<string>();
-
-            if (storemat_format == "files" || storemat_format == "csv") {
-                sn->storeOnFiles(vm["storemat_path"].as<string>(),
-                        vm["decompressmat"].as<bool>(), 0, storemat_format == "csv");
-            } else if (storemat_format == "db") {
-                //I will store the details on a Trident index
-                exp.generateTridentDiffIndex(vm["storemat_path"].as<string>());
-            } else if (storemat_format == "nt") {
-                exp.generateNTTriples(vm["storemat_path"].as<string>(), vm["decompressmat"].as<bool>());
-            } else {
-                LOG(ERRORL) << "Option 'storemat_format' not recognized";
-                throw 10;
-            }
-
-            std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-            LOG(INFOL) << "Time to index and store the materialization on disk = " << sec.count() << " seconds";
+            store_mat(vm["storemat_path"].as<string>(), vm, sn);
         }
 #ifdef WEBINTERFACE
         if (webint) {
@@ -793,6 +979,18 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
         LOG(INFOL) << "Selection strategy determined that we go for " << algo;
     }
 
+    if (algo == "onlyMetrics") {
+        Metrics m;
+        std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
+        reasoner.getMetrics(literal, NULL, NULL, edb, p, m, 5);
+        std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
+        LOG(INFOL) << "Query = " << literal.tostring(&p, &edb) << "Vector: " << \
+            m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
+            << ", " << m.countIntermediateQueries;
+        LOG(INFOL) << "Time taken : " << durationMetrics.count() * 1000 << "ms";
+        return;
+    }
+
     TupleIterator *iter;
 
     if (algo == "edb") {
@@ -845,7 +1043,19 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
         cout.rdbuf(file.rdbuf());
         std::chrono::system_clock::time_point startQ = std::chrono::system_clock::now();
         for (int j = 0; j < times; j++) {
-            TupleIterator *iter = reasoner.getIterator(literal, NULL, NULL, edb, p, true, NULL);
+            TupleIterator *iter;
+            if (algo == "edb") {
+                iter = reasoner.getEDBIterator(literal, NULL, NULL, edb, onlyVars, NULL);
+            } else if (algo == "magic") {
+                iter = reasoner.getMagicIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
+            } else if (algo == "qsqr") {
+                iter = reasoner.getTopDownIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
+            } else if (algo == "mat") {
+                iter = reasoner.getMaterializationIterator(literal, NULL, NULL, edb, p, onlyVars, NULL);
+            } else {
+                LOG(ERRORL) << "Unrecognized reasoning algorithm: " << algo;
+                throw 10;
+            }
             int sz = iter->getTupleSize();
             while (iter->hasNext()) {
                 iter->next();
@@ -865,6 +1075,7 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
                     cout << endl;
                 }
             }
+            delete iter;
         }
         std::chrono::duration<double> durationQ = std::chrono::system_clock::now() - startQ;
         //Restore stdout
@@ -978,12 +1189,13 @@ int main(int argc, const char** argv) {
 
     string cmd = string(argv[1]);
 
+    string execFile = string(argv[0]);
+    string dirExecFile = Utils::parentDir(execFile);
+
     //Get the path to the EDB layer
     string edbFile = vm["edb"].as<string>();
     if (edbFile == "default") {
         //Get current directory
-        string execFile = string(argv[0]);
-        string dirExecFile = Utils::parentDir(execFile);
         edbFile = dirExecFile + DIR_SEP + string("edb.conf");
     }
 
@@ -1012,35 +1224,112 @@ int main(int argc, const char** argv) {
 
     if (cmd == "query" || cmd == "queryLiteral") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, false);
 
         //Execute the query
         if (cmd == "query") {
             execSPARQLQuery(*layer, vm);
         } else {
-            execLiteralQuery(*layer, vm);
+            string queryFile = vm["query"].as<string>();
+            if (!Utils::exists(queryFile)) {
+                execLiteralQuery(*layer, vm);
+            } else {
+                string rulesFile = vm["rules"].as<string>();
+                Program program(layer);
+                program.readFromFile(rulesFile);
+                vector<string> trainingQueriesVector;
+                // read the file and make the vector of queries
+                ifstream file(queryFile);
+                string line;
+                while (file && getline(file, line)) {
+                    if (line.size() == 0) {
+                        continue;
+                    }
+                    trainingQueriesVector.push_back(line);
+                }
+                //get logfile name from rules file
+                size_t dotIndex = rulesFile.find_last_of(".");
+                string logFileName = rulesFile.substr(0, dotIndex);
+                logFileName += "-training.log";
+                // Run the queries with threshold 10s and repeat queries 3 times
+                // to take average of the running time
+                uint64_t timeout = vm["timeout"].as<unsigned int>();
+                uint8_t repeatQuery = vm["repeatQuery"].as<unsigned int>();
+                string algo = vm["reasoningAlgo"].as<string>();
+                if (algo == "onlyMetrics") {
+                    for (auto query : trainingQueriesVector) {
+                        Dictionary dictVariables;
+                        Literal literal = program.parseLiteral(query, dictVariables);
+                        Reasoner reasoner(vm["reasoningThreshold"].as<int64_t>());
+                        Metrics m;
+                        std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
+                        reasoner.getMetrics(literal, NULL, NULL, *layer, program, m, 5);
+                        std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
+                        LOG(INFOL) << "Query = " << query << "Vector: " << \
+                            m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
+                            << ", " << m.countIntermediateQueries;
+                        LOG(INFOL) << "Time taken : " << durationMetrics.count() * 1000 << "ms";
+                    }
+                } else {
+                    vector<Metrics> featuresVector;
+                    vector<int> decisionVector;
+                    int nMagicQueries = 0;
+                    Training::runQueries(trainingQueriesVector, *layer, program, timeout, repeatQuery, featuresVector, decisionVector,nMagicQueries, logFileName);
+                }
+            }
         }
         delete layer;
     } else if (cmd == "lookup") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, false);
         lookup(*layer, vm);
         delete layer;
     } else if (cmd == "mat") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, ! vm["multithreaded"].empty());
+        EDBRemoveLiterals *rm;
+        if (! vm["rm"].empty()) {
+            std::string path(vm["rm"].as<string>());
+            LOG(ERRORL) << "FIXME: currently E has fixed name TE";
+            PredId_t remove_pred = layer->getPredID("TE");
+            InmemoryTable rmTable(Utils::parentDir(path), Utils::filename(path),
+                    remove_pred, layer);
+            rm = new EDBRemoveLiterals(vm["rm"].as<string>(), layer);
+            // rm = new EDBRemoveLiterals(rmTable, remove_pred, layer);
+            // rm->dump(std::cerr, *layer);
+            // Would like to move the thing i.s.o. copy RFHH
+            std::unordered_map<PredId_t, const EDBRemoveLiterals *> rm_map;
+            rm_map[remove_pred] = rm;
+            layer->addRemoveLiterals(rm_map);
+        }
         // EDBLayer layer(conf, false);
         launchFullMat(argc, argv, full_path, *layer, vm,
                 vm["rules"].as<string>());
         delete layer;
+        if (! vm["rm"].empty()) {
+            LOG(ERRORL) << "FIXME: need to delete this RemoveLiterals";
+            // delete rm;
+        }
     } else if (cmd == "mat_tg") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, ! vm["multithreaded"].empty());
         launchTriggeredMat(argc, argv, full_path, *layer, vm,
                 vm["rules"].as<string>(), vm["trigger_paths"].as<string>());
         delete layer;
+    } else if (cmd == "trigger") {
+        EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
+        EDBLayer *layer = new EDBLayer(conf, false, false);
+        computeTriggerGraph(*layer, vm["rules"].as<string>(),
+                vm["trigger_algo"].as<string>(),
+                vm["trigger_paths"].as<string>());
     } else if (cmd == "rulesgraph") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, false);
         writeRuleDependencyGraph(*layer, vm["rules"].as<string>(),
                 vm["graphfile"].as<string>());
@@ -1140,31 +1429,34 @@ int main(int argc, const char** argv) {
             loader->load(p);
         }
         delete loader;
-    } else if (cmd == "gentq") {
+    } else if (cmd == "gentq" || cmd == "tat") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         string rulesFile = vm["rules"].as<string>();
+        uint64_t maxTuples = vm["maxTuples"].as<unsigned int>();
+        string testQueriesLogFileName;
+        if (cmd == "tat") {
+            testQueriesLogFileName = vm["testqueries"].as<string>();
+        }
+        int depth = vm["depth"].as<unsigned int>();
         EDBLayer *layer = new EDBLayer(conf, false);
-        Program p(layer);
-        //uint8_t vt1 = (uint8_t) p.getIDVar("V1");
-        //uint8_t vt2 = (uint8_t) p.getIDVar("V2");
-        //uint8_t vt3 = (uint8_t) p.getIDVar("V3");
-        //uint8_t vt4 = (uint8_t) p.getIDVar("V4");
-        uint8_t vt1 = 0;
-        uint8_t vt2 = 1;
-        uint8_t vt3 = 2;
-        uint8_t vt4 = 3;
+        Program program(layer);
+        uint8_t vt1 = 1;
+        uint8_t vt2 = 2;
+        uint8_t vt3 = 3;
+        uint8_t vt4 = 4;
         std::vector<uint8_t> vt;
         vt.push_back(vt1);
         vt.push_back(vt2);
         vt.push_back(vt3);
         vt.push_back(vt4);
-        std::string s = p.readFromFile(rulesFile);
+        std::string s = program.readFromFile(rulesFile);
         if (s != "") {
             cerr << s << endl;
             return 1;
         }
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-        std::vector<std::pair<std::string,int>> trainingQueries = ML::generateTrainingQueries(*layer, p, vt, vm);
+        std::vector<std::pair<std::string,int>> trainingQueries = ML::generateTrainingQueries(*layer, program, vt, vm);
         std::chrono::duration<double> sec = std::chrono::system_clock::now()- start;
         int nQueries = trainingQueries.size();
         LOG(INFOL) << nQueries << " queries generated in " << sec.count() << " seconds";
@@ -1172,12 +1464,54 @@ int main(int argc, const char** argv) {
         trainingFileName += "-training.log";
         std::ofstream logFile(trainingFileName);
         for (auto it = trainingQueries.begin(); it != trainingQueries.end(); ++it) {
-            logFile << it->first <<":"<<it->second << std::endl;
+            logFile << it->first <<" "<<it->second << std::endl;
         }
         if (logFile.fail()) {
             LOG(INFOL) << "Error writing to the log file";
         }
         logFile.close();
+        if (cmd == "tat") {
+            vector<string> trainingQueriesVector;
+            int nMaxTrainingQueries = vm["maxTrainingQueries"].as<unsigned int>(); // can be an optional argument
+            if (nQueries < nMaxTrainingQueries || nMaxTrainingQueries < 0) {
+                nMaxTrainingQueries = nQueries;
+            }
+            LOG(INFOL) << "Max training queries : " << nMaxTrainingQueries;
+            int i = 0;
+            vector<int> queryIndexes(nMaxTrainingQueries);
+            getRandomTupleIndexes(nMaxTrainingQueries, nQueries, queryIndexes);
+            LOG(INFOL) << "query indexes received : " << queryIndexes.size();
+            for (auto qi: queryIndexes) {
+                trainingQueriesVector.push_back(trainingQueries[qi].first);
+            }
+            // 2. test the model against test queries
+
+            vector<string> testQueriesLog;
+            ifstream ifs(testQueriesLogFileName);
+            string logLine;
+
+            while (ifs && std::getline(ifs, logLine)) {
+                if (logLine.size() == 0) {
+                    continue;
+                }
+                testQueriesLog.push_back(logLine);
+            }
+            LOG(INFOL) << "test Queries in the file = " << testQueriesLog.size();
+            size_t dotIndex = rulesFile.find_last_of(".");
+            string logFileName = rulesFile.substr(0, dotIndex);
+            logFileName += "-training.log";
+            double accuracy = 0.0;
+            uint64_t timeout = vm["timeout"].as<unsigned int>();
+            uint8_t repeatQuery = vm["repeatQuery"].as<unsigned int>();
+            Training::trainAndTestModel(trainingQueriesVector,
+                    testQueriesLog,
+                    *layer,
+                    program,
+                    accuracy,
+                    timeout,
+                    repeatQuery,
+                    logFileName);
+        }
     } else if (cmd == "server") {
 #ifdef WEBINTERFACE
         startServer(argc, argv, full_path, vm);
@@ -1187,17 +1521,19 @@ int main(int argc, const char** argv) {
 #endif
     } else if (cmd == "cycles") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, false);
         string rulesFile = vm["rules"].as<string>();
         string alg = vm["alg"].as<string>();
         checkAcyclicity(rulesFile, alg, *layer, vm["rewriteMultihead"].as<bool>());
-	delete layer;
+        delete layer;
     } else if (cmd == "deps") {
         EDBConf conf(edbFile);
+        conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, false);
         string rulesFile = vm["rules"].as<string>();
         detectDeps(rulesFile, *layer);
-	delete layer;
+        delete layer;
     }
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(INFOL) << "Runtime = " << sec.count() * 1000 << " milliseconds";

@@ -203,7 +203,7 @@ class Predicate {
             return (type >> 1) != 0;
         }
 
-        uint8_t getAdorment() const {
+        uint8_t getAdornment() const {
             return adornment;
         }
 
@@ -286,7 +286,7 @@ class Literal {
         }
 
         size_t getNBoundVariables() const {
-            return pred.getNFields(pred.getAdorment());
+            return pred.getNFields(pred.getAdornment());
         }
 
         bool isNegated() const {
@@ -312,7 +312,12 @@ class Literal {
 
         bool hasRepeatedVars() const;
 
+        // Returns for each variable the position in the tuple.
         std::vector<uint8_t> getPosVars() const;
+
+        // Returns for each position in the tuple the variable number. If the position in the tuple
+        // contains a constant, it gives -1.
+        std::vector<int> getVarnumInLiteral() const;
 
         std::vector<std::pair<uint8_t, uint8_t>> getRepeatedVars() const;
 
@@ -322,9 +327,9 @@ class Literal {
 
         std::vector<uint8_t> getAllVars() const;
 
-        std::string tostring(Program *program, EDBLayer *db) const;
+        std::string tostring(const Program *program, const EDBLayer *db) const;
 
-        std::string toprettystring(Program *program, EDBLayer *db, bool replaceConstants = false) const;
+        std::string toprettystring(const Program *program, const EDBLayer *db, bool replaceConstants = false) const;
 
         std::string tostring() const;
 
@@ -474,14 +479,12 @@ class Program {
 
         void addRule(Rule &rule);
 
-        std::string rewriteRDFOWLConstants(std::string input);
-
     public:
         VLIBEXP Program(EDBLayer *kb);
 
         VLIBEXP Program(Program *p, EDBLayer *kb);
 
-        EDBLayer *getKB() {
+        EDBLayer *getKB() const {
             return kb;
         }
 
@@ -503,17 +506,20 @@ class Program {
 
         VLIBEXP std::string readFromString(std::string rules, bool rewriteMultihead = false);
 
-        PredId_t getPredicateID(std::string &p, const uint8_t card);
+        // Adds predicate if it doesn't exist yet
+        PredId_t getPredicateID(const std::string &p, const uint8_t card);
 
-        VLIBEXP std::string getPredicateName(const PredId_t id);
+        VLIBEXP std::string getPredicateName(const PredId_t id) const;
 
-        VLIBEXP Predicate getPredicate(std::string &p);
+        // Adds predicate if it doesn't exist yet
+        VLIBEXP Predicate getPredicate(const std::string &p);
 
-        VLIBEXP Predicate getPredicate(std::string &p, uint8_t adornment);
+        // Adds predicate if it doesn't exist yet
+        VLIBEXP Predicate getPredicate(const std::string &p, uint8_t adornment);
 
-        VLIBEXP Predicate getPredicate(const PredId_t id);
+        VLIBEXP Predicate getPredicate(const PredId_t id) const;
 
-        VLIBEXP int64_t getOrAddPredicate(std::string &p, uint8_t cardinality);
+        VLIBEXP int64_t getOrAddPredicate(const std::string &p, uint8_t cardinality);
 
         VLIBEXP bool doesPredicateExist(const PredId_t id) const;
 
@@ -535,7 +541,7 @@ class Program {
 
         VLIBEXP void sortRulesByIDBPredicates();
 
-        VLIBEXP std::vector<Rule> getAllRules();
+        VLIBEXP std::vector<Rule> getAllRules() const;
 
         VLIBEXP int getNRules() const;
 
@@ -550,30 +556,41 @@ class Program {
 
         void addAllRules(std::vector<Rule> &rules);
 
-        VLIBEXP bool isPredicateIDB(const PredId_t id);
+        VLIBEXP bool isPredicateIDB(const PredId_t id) const;
 
-        std::string getAllPredicates();
+        std::string getAllPredicates() const;
 
-        std::vector<std::string> getAllPredicateStrings();
+        std::vector<std::string> getAllPredicateStrings() const;
 
-        int getNEDBPredicates();
+        int getNEDBPredicates() const;
 
-        int getNIDBPredicates();
+        int getNIDBPredicates() const;
+
+        std::string tostring() const;
+
+        VLIBEXP bool areExistentialRules() const;
 
         int getNPredicates() {
             return rules.size();
         }
 
-        std::string tostring();
-
-        VLIBEXP bool areExistentialRules();
+        static std::string rewriteRDFOWLConstants(std::string input);
 
         static std::string compressRDFOWLConstants(std::string input);
 
+        // Should be const
         VLIBEXP std::vector<PredId_t> getAllEDBPredicateIds();
 
-        // Returns true if stratification succeeded, and then stores the stratification in the parameter.
-        // The result vector is indexed by predicate id, and then gives the stratification class.
+        uint8_t getPredicateCard(PredId_t pred) {
+            return cardPredicates[pred];
+        }
+
+        VLIBEXP std::vector<PredId_t> getAllIDBPredicateIds();
+        //
+        // Returns true if stratification succeeded, and then stores the
+        // stratification in the parameter.
+        // The result vector is indexed by predicate id, and then gives the
+        // stratification class.
         // The number of stratification classes is also returned.
         bool stratify(std::vector<int> &stratification, int &nStatificationClasses);
 

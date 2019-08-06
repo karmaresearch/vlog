@@ -9,30 +9,35 @@
 using namespace std;
 
 class EDBConf {
-public:
+    public:
 
-    struct Table {
-        string predname;
-        string type;
-        std::vector<string> params;
-        bool encoded;
-        Table() : encoded(true) {}
-        Table(bool encoded) : encoded(encoded) {}
-    };
+        struct Table {
+            string predname;
+            string type;
+            std::vector<string> params;
+            bool encoded;
+            Table() : encoded(true) {}
+            Table(bool encoded) : encoded(encoded) {}
+        };
 
-private:
-    std::vector<Table> tables;
+    protected:
+        std::vector<Table> tables;
+        std::string rootPath;
 
-    void parse(string f);
+        void parse(string f);
 
-public:
-    VLIBEXP EDBConf(string rawcontent, bool isFile);
+    public:
+        VLIBEXP EDBConf(string rawcontent, bool isFile);
 
-    EDBConf(string rawcontent) : EDBConf(rawcontent, true) {}
+        EDBConf(string rawcontent) : EDBConf(rawcontent, true) {}
 
-    const std::vector<Table> &getTables() {
-        return tables;
-    }
+        void setRootPath(std::string path);
+
+        std::string getRootPath() const;
+
+        const std::vector<Table> &getTables() const {
+            return tables;
+        }
 };
 
 #endif

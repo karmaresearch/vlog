@@ -41,11 +41,14 @@ uint8_t InmemoryFCInternalTable::getRowSize() const {
 }
 
 size_t InmemoryFCInternalTable::getRepresentationSize(std::set<uint64_t> &IDs) const {
-    if (this->unmergedSegments.size() > 0) {
-        LOG(ERRORL) << "All tables should not have any unmerged segment ...";
-        throw 10;
-    }
     size_t size = nfields; //Every table can be seen as a meta-fact
+    if (this->unmergedSegments.size() > 0) {
+        //count the unmerged segments as additional meta-facts
+        for (auto &s : this->unmergedSegments) {
+            size += nfields;
+            size += s.values->getRepresentationSize(IDs);
+        }
+    }
     size += values->getRepresentationSize(IDs);
     return size;
 }
@@ -782,7 +785,11 @@ FCInternalTableItr *InmemoryFCInternalTable::sortBy(const std::vector<uint8_t> &
     } else {
         if (primarySort && !isSorted()) {
             LOG(TRACEL) << "InmemoryFCInternalTable::sorting";
+            HiResTimer t_sortby("InmemoryFCInternalTable::sorting");
+            t_sortby.start();
             sortedValues = values->sortBy(NULL);
+            t_sortby.stop();
+            LOG(TRACEL) << t_sortby.tostring();
         } else {
             sortedValues = values;
         }
@@ -790,7 +797,11 @@ FCInternalTableItr *InmemoryFCInternalTable::sortBy(const std::vector<uint8_t> &
 
     if (!primarySort) {
         LOG(TRACEL) << "InmemoryFCInternalTable::sorting2";
+        HiResTimer t_sort2("InmemoryFCInternalTable::sorting2");
+        t_sort2.start();
         sortedValues = sortedValues->sortBy(&fields);
+        t_sort2.stop();
+        LOG(TRACEL) << t_sort2.tostring();
     }
 
     InmemoryFCInternalTableItr *tableItr = new InmemoryFCInternalTableItr();

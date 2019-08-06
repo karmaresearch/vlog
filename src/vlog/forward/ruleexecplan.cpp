@@ -84,16 +84,6 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
         std::vector<std::pair<uint8_t, uint8_t>> ps;
         std::vector<uint8_t> newExistingVariables;
 
-        //Should I copy all the previous variables
-        /*if (copyAllVars) {
-        //Update pf
-        newExistingVariables = existingVariables;
-        int idx = 0;
-        for(const auto &p : existingVariables) {
-        pf.push_back(std::make_pair(idx, idx));
-        idx += 1;
-        }
-        } else */
         if (i == (plan.size() - 1)) {
             //No need to store any new variable. Just copy the old ones in the head
             for (uint8_t m = 0; m < existingVariables.size(); ++m) {
@@ -215,7 +205,6 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
 
                         if (isNew) {
                             ps.push_back(make_pair(newExistingVariables.size(), litVars));
-                            v2p.push_back(std::make_pair(x, newExistingVariables.size()));
                             newExistingVariables.push_back(t.getId());
                             LOG(TRACEL) << "New variable: " << (int) t.getId();
                         }
@@ -275,7 +264,6 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
         posFromFirst.push_back(pf);
         posFromSecond.push_back(ps);
     }
-
 }
 
 bool RuleExecutionPlan::hasCartesian() {

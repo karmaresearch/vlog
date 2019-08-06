@@ -48,12 +48,6 @@ class SemiNaiver {
         bool opt_intersect;
         bool opt_filtering;
         bool multithreaded;
-        TypeChase typeChase;
-        bool checkCyclicTerms;
-        bool foundCyclicTerms;
-        PredId_t predIgnoreBlock; //RMSA
-        bool ignoreExistentialRules;
-        std::shared_ptr<ChaseMgmt> chaseMgmt;
 
         std::chrono::system_clock::time_point startTime;
         bool running;
@@ -71,6 +65,8 @@ class SemiNaiver {
         string currentRule;
         PredId_t currentPredicate;
 #endif
+
+        std::string name;
 
     private:
         FCIterator getTableFromIDBLayer(const Literal & literal,
@@ -129,12 +125,20 @@ class SemiNaiver {
                 const size_t maxIteration);
 
     protected:
+        TypeChase typeChase;
+        bool checkCyclicTerms;
+        bool foundCyclicTerms;
+        PredId_t predIgnoreBlock; //RMSA
+        bool ignoreExistentialRules;
+        std::shared_ptr<ChaseMgmt> chaseMgmt;
+
         std::vector<FCTable *>predicatesTables;
         EDBLayer &layer;
         Program *program;
         std::vector<std::vector<RuleExecutionDetails>> allIDBRules; // one entry for each stratification class
         size_t iteration;
         int nthreads;
+        uint64_t triggers;
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
                 const size_t iteration,
@@ -217,6 +221,36 @@ class SemiNaiver {
         VLIBEXP void storeOnFiles(std::string path, const bool decompress,
                 const int minLevel, const bool csv);
 
+        std::ostream& dumpTables(std::ostream &os) {
+            for (PredId_t i = 0; i < MAX_NPREDS; ++i) {
+                FCTable *table = predicatesTables[i];
+                if (table != NULL && !table->isEmpty()) {
+                    char buffer[MAX_TERM_SIZE];
+
+                    os << "Table " << getProgram()->getPredicateName(i) << std::endl;
+                    FCIterator itr = table->read(0);
+                    const uint8_t sizeRow = table->getSizeRow();
+                    while (!itr.isEmpty()) {
+                        std::shared_ptr<const FCInternalTable> t = itr.getCurrentTable();
+                        FCInternalTableItr *iitr = t->getIterator();
+                        while (iitr->hasNext()) {
+                            iitr->next();
+                            std::string row = "    ";
+                            row += to_string(iitr->getCurrentIteration());
+                            for (uint8_t m = 0; m < sizeRow; ++m) {
+                                row += "\t" + to_string(iitr->getCurrentValue(m));
+                            }
+                            os << row << std::endl;
+                        }
+                        t->releaseIterator(iitr);
+                        itr.moveNextCount();
+                    }
+                }
+            }
+
+            return os;
+        }
+
         FCIterator getTable(const Literal &literal, const size_t minIteration,
                 const size_t maxIteration) {
             return getTable(literal, minIteration, maxIteration, NULL);
@@ -225,6 +259,8 @@ class SemiNaiver {
         VLIBEXP FCIterator getTable(const PredId_t predid);
 
         size_t getSizeTable(const PredId_t predid) const;
+
+        bool isEmpty(const PredId_t predid) const;
 
         std::vector<FCBlock> &getDerivationsSoFar() {
             return listDerivations;
@@ -281,6 +317,14 @@ class SemiNaiver {
 
         std::chrono::system_clock::time_point getStartingTimeMs() {
             return startTime;
+        }
+
+        void setName(const std::string &name) {
+            this->name = name;
+        }
+
+        const std::string &getName() const {
+            return name;
         }
 };
 

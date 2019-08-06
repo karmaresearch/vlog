@@ -11,6 +11,8 @@
 #include <kognac/consts.h>
 #include <kognac/utils.h>
 
+#include <vlog/hi-res-timer.h>
+
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -37,7 +39,7 @@ void SemiNaiver::createGraphRuleDependency(std::vector<int> &nodes,
                 // Only add "interesting" rules: ones that have an IDB predicate in the RHS.
                 nodes.push_back(i);
                 definedBy[pred].push_back(i);
-                LOG(INFOL) << " Rule " << i << ": " << ri.tostring(program, &layer);
+                LOG(DEBUGL) << " Rule " << i << ": " << ri.tostring(program, &layer);
                 break;
             }
         }
@@ -89,6 +91,7 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
     nthreads(nthreads),
     checkCyclicTerms(false),
     ignoreExistentialRules(ignoreExistentialRules),
+    triggers(0),
     RMFC_program(RMFC_check) {
 
         std::vector<Rule> ruleset = program->getAllRules();
@@ -397,7 +400,8 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
     }
 
     running = false;
-    LOG(DEBUGL) << "Finished process. Iterations=" << iteration;
+    LOG(INFOL) << "Finished process. Iterations=" << iteration;
+    LOG(INFOL) << "Triggers: " << triggers;
 
     //DEBUGGING CODE -- needed to see which rules cost the most
     //Sort the iteration costs
@@ -428,6 +432,7 @@ bool SemiNaiver::executeUntilSaturation(
         const size_t limitView,
         bool fixpoint, unsigned long *timeout) {
     size_t currentRule = 0;
+    size_t roundNr = 0;
     uint32_t rulesWithoutDerivation = 0;
 
     size_t nRulesOnePass = 0;
@@ -450,6 +455,7 @@ bool SemiNaiver::executeUntilSaturation(
             }
         }
         std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+
         StatIteration stat;
         stat.iteration = iteration;
         stat.rule = &ruleset[currentRule].rule;
@@ -520,6 +526,8 @@ bool SemiNaiver::executeUntilSaturation(
                         ruleset[currentRule].rule.tostring(program, &layer) <<
                         "  required " << recursiveIterations << " to saturate";
             }
+            //printCountAllIDBs("After step " + to_string(iteration) + ": ");
+            //LOG(INFOL) << "Triggers: " << triggers;
             rulesWithoutDerivation = 0;
             nRulesOnePass++;
         } else {
@@ -529,9 +537,10 @@ bool SemiNaiver::executeUntilSaturation(
         currentRule = (currentRule + 1) % ruleset.size();
 
         if (currentRule == 0) {
-#ifdef DEBUG
+            LOG(INFOL) << "Round " << roundNr;
+            roundNr++;
             std::chrono::duration<double> sec = std::chrono::system_clock::now() - round_start;
-            LOG(DEBUGL) << "--Time round " << sec.count() * 1000 << " " << iteration;
+            LOG(INFOL) << "--Time round " << sec.count() * 1000 << " " << iteration;
             round_start = std::chrono::system_clock::now();
             //CODE FOR Statistics
             LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". RulesWithDerivation=" <<
@@ -545,7 +554,7 @@ bool SemiNaiver::executeUntilSaturation(
             int n = 0;
             for (const auto &exec : costRules) {
                 if (exec.iteration >= lastIteration) {
-                    if (n < 10 || exec.derived) {
+                    if (n < 10) {
                         out += "Iteration " + to_string(exec.iteration) + " runtime " + to_string(exec.time);
                         out += " " + exec.rule->tostring(program, &layer) + " response " + to_string(exec.derived);
                         out += "\n";
@@ -553,9 +562,10 @@ bool SemiNaiver::executeUntilSaturation(
                     n++;
                 }
             }
-            LOG(DEBUGL) << "Rules with the highest cost\n\n" << out;
+            LOG(INFOL) << "Rules with the highest cost\n\n" << out;
             lastIteration = iteration;
             //END CODE STATISTICS
+#ifdef DEBUG
 #endif
             if (!fixpoint)
                 break;
@@ -822,6 +832,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
                         firstHeadLiteral, *bodyLiteral,
                         literalItr.getCurrentBlock())) {
 
+                triggers += table->getNRows();
                 firstEndTable->add(table->cloneWithIteration(iteration),
                         firstHeadLiteral, 0, &ruleDetails,
                         orderExecution, iteration, true, nthreads);
@@ -832,7 +843,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
         }
     } else if (nBodyLiterals == 1) {
         const bool uniqueResults =
-            ! ruleDetails.rule.isExistential()
+            !ruleDetails.rule.isExistential() && opt_filtering
             && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
             && literalItr.getNTables() == 1 && heads.size() == 1;
         while (!literalItr.isEmpty()) {
@@ -1125,6 +1136,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         const size_t iteration,
         const size_t limitView,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
+    HiResTimer t_iter("SemiNaiver iteration " + std::to_string(iteration));
+    t_iter.start();
     Rule rule = ruleDetails.rule;
 
 #ifdef WEBINTERFACE
@@ -1137,7 +1150,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         //set (should be only during the execution of RMFA or RMFC).
     }
 
-    LOG(INFOL) << "Iteration: " << iteration << " Rule: " << rule.tostring(program, &layer);
+    LOG(DEBUGL) << "Iteration: " << iteration <<
+        " Rule: " << rule.tostring(program, &layer);
 
     //Set up timers
     const std::chrono::system_clock::time_point startRule = std::chrono::system_clock::now();
@@ -1319,6 +1333,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             } else {
                 //Perform the join
                 std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+                HiResTimer t_join("join");
+                t_join.start();
                 JoinExecutor::join(this, currentResults.get(),
                         lastLiteral ? &heads: NULL,
                         *bodyLiteral, min, max, filterValueVars,
@@ -1331,6 +1347,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                         multithreaded ? nthreads : -1);
                 std::chrono::duration<double> d =
                     std::chrono::system_clock::now() - start;
+                t_join.stop();
+                LOG(DEBUGL) << t_join.tostring();
                 LOG(DEBUGL) << "Time join: " << d.count() * 1000;
                 durationJoin += d;
             }
@@ -1343,6 +1361,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 std::chrono::duration<double> d =
                     std::chrono::system_clock::now() - startC;
                 durationConsolidation += d;
+                auto t = joinOutput->getTriggers();
+                triggers += t;
             }
 
             //Prepare for the processing of the next atom (if any)
@@ -1386,6 +1406,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         }
     }
 
+    t_iter.stop();
+
     std::chrono::duration<double> totalDuration =
         std::chrono::system_clock::now() - startRule;
     double td = totalDuration.count() * 1000;
@@ -1426,6 +1448,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
             durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
     }
+
+    LOG(DEBUGL) << t_iter.tostring();
 
     return prodDer;
 }
@@ -1567,7 +1591,18 @@ FCIterator SemiNaiver::getTable(const PredId_t predid) {
 }
 
 size_t SemiNaiver::getSizeTable(const PredId_t predid) const {
-    return predicatesTables[predid]->getNAllRows();
+    if (predicatesTables[predid])
+        return predicatesTables[predid]->getNAllRows();
+    else
+        return 0;
+}
+
+bool SemiNaiver::isEmpty(const PredId_t predid) const {
+    if (predicatesTables[predid] == NULL) {
+        return true;
+    } else {
+        return predicatesTables[predid]->getNAllRows() == 0;
+    }
 }
 
 SemiNaiver::~SemiNaiver() {
@@ -1718,22 +1753,3 @@ bool SemiNaiver::isRunning() {
     return running;
 }
 #endif
-
-/*int SemiNaiver::getRuleID(const RuleExecutionDetails *rule) {
-  if (edbRuleset.size() > 0) {
-  RuleExecutionDetails *begin = &(edbRuleset[0]);
-  RuleExecutionDetails *end = &(edbRuleset.back());
-  if (rule >= begin && rule < end) {
-  return rule - begin;
-  }
-  }
-  RuleExecutionDetails *begin = &(ruleset[0]);
-  RuleExecutionDetails *end = &(ruleset.back());
-  if (rule >= begin && rule < end) {
-  return edbRuleset.size() + rule - begin;
-  }
-
-  LOG(ERRORL) << "I cannot recognize the rule and hence cannot give it an ID";
-  LOG(ERRORL) << "Rule: " << rule->rule.tostring(program, &layer);
-  throw 10;
-  }*/

@@ -147,7 +147,7 @@ class CompressedColumn final : public Column {
         }
 
         size_t getRepresentationSize() const {
-            return blocks.size();
+            return blocks.size() * 2;
         }
 
         size_t estimateSize() const {
@@ -692,16 +692,20 @@ class EDBColumn final : public Column {
     private:
         EDBLayer &layer;
         const Literal l;
+        const PredId_t pred_id;
         const uint8_t posColumn;
         const std::vector<uint8_t> presortPos;
         bool unq;
 
         EDBColumn(const EDBColumn &el) : layer(el.layer),
-        l(el.l), posColumn(el.posColumn), presortPos(el.presortPos),
+        l(el.l), pred_id(l.getPredicate().getId()),
+        posColumn(el.posColumn), presortPos(el.presortPos),
         unq(el.unq) {
         }
 
         std::shared_ptr<Column> clone() const;
+
+        bool isEmptyRemovals() const;
 
     public:
         EDBColumn(EDBLayer &layer, const Literal &l, uint8_t posColumn,
@@ -716,7 +720,11 @@ class EDBColumn final : public Column {
         size_t estimateSize() const;
 
         bool isEmpty() const {
-            return layer.isEmpty(l, NULL, NULL);
+            if (layer.hasRemoveLiterals(pred_id)) {
+                return isEmptyRemovals();
+            } else {
+                return size() == 0;
+            }
         }
 
         bool isEDB() const {

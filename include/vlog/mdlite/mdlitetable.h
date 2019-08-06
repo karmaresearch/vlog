@@ -33,7 +33,7 @@ class MDLiteTable : public SQLTable {
     public:
         MDLiteTable(string repository, string tablename);
 
-        uint8_t getArity() const;
+        virtual uint8_t getArity() const;
 
         void query(QSQQuery *query, TupleTable *outputTable,
                 std::vector<uint8_t> *posToFilter,

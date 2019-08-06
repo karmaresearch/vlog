@@ -125,6 +125,10 @@ void InterTableJoinProcessor::processResults(const int blockid,
         row[posFromFirst[i].first] = (*vectors1[posFromFirst[i].second])[i1];
     }
     for (int i = 0; i < nCopyFromSecond; i++) {
+        assert(i < MAX_MAPPINGS);
+        // assert(posFromSecond[i].first < row.size());
+        assert(posFromSecond[i].second < vectors2.size());
+        assert(i2 < (*vectors2[posFromSecond[i].second]).size());
         row[posFromSecond[i].first] = (*vectors2[posFromSecond[i].second])[i2];
     }
     /*//Calculate hashcode from the two arrays.
@@ -198,8 +202,8 @@ bool InterTableJoinProcessor::isEmpty() const {
 
 void InterTableJoinProcessor::consolidate(const bool isFinished) {
     //Add the segment to the table
-    //LOG(DEBUGL) << "InterTableJoinProcessor::consolidate: currentSegmentSize = " << currentSegmentSize;
-    //LOG(DEBUGL) << "  rowsize = " << (int)rowsize;
+    LOG(DEBUGL) << "InterTableJoinProcessor::consolidate: currentSegmentSize = " << currentSegmentSize;
+    LOG(DEBUGL) << "  rowsize = " << (int)rowsize;
     for (uint32_t i = 0; i < currentSegmentSize; ++i) {
         if (segments[i] != NULL && !segments[i]->isEmpty()) {
             if (table == NULL) {

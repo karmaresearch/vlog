@@ -27,7 +27,7 @@ class SparqlTable : public EDBTable {
 	json launchQuery(std::string sparqlQuery);
 
     public:
-        uint8_t getArity() const {
+        virtual uint8_t getArity() const {
             return fieldVars.size();
         }
 

@@ -97,6 +97,7 @@ void ExistentialRuleProcessor::filterDerivations(const Literal &literal,
     std::vector<std::shared_ptr<Column>> tobeRetained;
     std::vector<uint8_t> columnsToCheck;
     const uint8_t rowsize = literal.getTupleSize();
+    LOG(DEBUGL) << "filterDerivations() : rowsize : " << rowsize;
     for (int i = 0; i < rowsize; ++i) {
         auto t = literal.getTermAtPos(i);
         if (!t.isVariable()) {

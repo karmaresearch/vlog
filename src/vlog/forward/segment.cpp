@@ -312,7 +312,11 @@ std::shared_ptr<Segment> Segment::intsort(
                     values.push_back(make_pair(v1, v2));
                 }
                 deleteAllVectors(varColumns, vectors);
+                HiResTimer t_colsort("Segment column sort rows " + std::to_string(allRows));
+                t_colsort.start();
                 std::sort(values.begin(), values.end());
+                t_colsort.stop();
+                LOG(TRACEL) << t_colsort.tostring();
                 ColumnWriter sortedColumnsInserters[2];
                 for (const auto v : values) {
                     sortedColumnsInserters[0].add(v.first);
@@ -769,8 +773,9 @@ bool SegmentInserter::isEmpty() const {
         return true;
     }
     if (copyColumns[0] != std::shared_ptr<Column>()) {
-        if (!copyColumns[0]->isEmpty())
+        if (!copyColumns[0]->isEmpty()) {
             return false;
+        }
     }
     return columns[0].isEmpty();
 }
@@ -966,6 +971,7 @@ size_t SegmentInserter::getNRows() const {
 
 void SegmentInserter::addRow(FCInternalTableItr *itr) {
     if (segmentSorted) {
+        assert(nfields > 0);
         if (!isEmpty()) {
             for (uint8_t i = 0; i < nfields; ++i) {
                 if (itr->getCurrentValue(i) < columns[i].lastValue()) {

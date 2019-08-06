@@ -366,7 +366,6 @@ class SegmentInserter {
     private:
         const uint8_t nfields;
         std::vector<ColumnWriter> columns;
-
         //This contains a copy of the first columns
         std::vector<std::shared_ptr<Column>> copyColumns;
 
