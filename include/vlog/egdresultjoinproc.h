@@ -4,11 +4,26 @@
 #include <vlog/resultjoinproc.h>
 
 class EGDRuleProcessor: public ResultJoinProcessor {
+    private:
+        std::vector<std::pair<uint64_t, uint64_t>> termsToReplace;
+        uint64_t nreplacements;
+        SemiNaiver *sn;
+
+        std::vector<FCBlock> &listDerivations;
+        const uint8_t ruleExecOrder;
+        const size_t iteration;
+
+        FCTable *t;
+        const RuleExecutionDetails *ruleDetails;
+        const Literal literal;
+        const uint8_t posLiteralInRule;
+
     protected:
         void processResults(const int blockid,
                 const bool unique, std::mutex *m);
     public:
-        EGDRuleProcessor(std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
+        EGDRuleProcessor(SemiNaiver *sn,
+                std::vector<std::pair<uint8_t, uint8_t>> &posFromFirst,
                 std::vector<std::pair<uint8_t, uint8_t>> &posFromSecond,
                 std::vector<FCBlock> &listDerivations,
                 FCTable *table,
@@ -53,6 +68,8 @@ class EGDRuleProcessor: public ResultJoinProcessor {
         void addColumn(const int blockid, const uint8_t pos,
                 std::shared_ptr<Column> column,
                 const bool unique, const bool sorted);
+
+        void consolidate(const bool isFinished);
 
         bool isEmpty() const;
 

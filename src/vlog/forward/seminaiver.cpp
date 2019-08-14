@@ -1339,6 +1339,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                     FCTable *table = getTable(heads[0].getPredicate().getId(),
                             heads[0].getPredicate().getCardinality());
                     joinOutput = new EGDRuleProcessor(
+                            this,
                             plan.posFromFirst[optimalOrderIdx],
                             plan.posFromSecond[optimalOrderIdx],
                             listDerivations,

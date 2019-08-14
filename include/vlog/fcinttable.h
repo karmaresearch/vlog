@@ -173,6 +173,8 @@ class FCInternalTable {
             return false;
         }
 
+        virtual void replaceAllTermsWithMap(EGDTermMap &map) = 0;
+
         virtual size_t getNRows() const = 0;
 
         virtual ~FCInternalTable();
@@ -518,6 +520,7 @@ class InmemoryFCInternalTable final : public FCInternalTable {
 
         size_t getNRows() const;
 
+        void replaceAllTermsWithMap(EGDTermMap &map);
 
         size_t getRepresentationSize(std::set<uint64_t> &IDs) const;
 
@@ -626,7 +629,11 @@ class EDBFCInternalTable final : public FCInternalTable {
                     new EDBFCInternalTable(it, nfields, posFields,
                         query, layer, defaultSorting));
             return newtab;
+        }
 
+        void replaceAllTermsWithMap(EGDTermMap &map) {
+            LOG(ERRORL) << "This method should not be called!";
+            throw 10;
         }
 
         uint8_t getRowSize() const;
@@ -792,6 +799,10 @@ class SingletonTable final : public FCInternalTable {
                 const uint8_t *posConstantsToFilter,
                 const Term_t *valuesConstantsToFilter) const {
             return 1;
+        }
+
+        void replaceAllTermsWithMap(EGDTermMap &map) {
+            //Nothing to do here ...
         }
 
         std::shared_ptr<const FCInternalTable> filter(const uint8_t nPosToCopy, const uint8_t *posVarsToCopy,

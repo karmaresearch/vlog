@@ -1310,7 +1310,7 @@ std::string Program::parseRule(std::string rule, bool rewriteMultihead) {
         if (lHeads.size() == 1) {
             auto predId = lHeads[0].getPredicate().getId();
             std::string rawValue = dictPredicates.getRawValue(predId);
-            if (rawValue == "owl::sameAs")
+            if (rawValue == "owl::sameAs" || rawValue == "<http://www.w3.org/2002/07/owl#sameAs>")
                 isEGD = true;
         }
         addRule(lHeads, lBody, rewriteMultihead, isEGD);

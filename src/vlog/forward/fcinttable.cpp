@@ -33,6 +33,8 @@ size_t InmemoryFCInternalTable::getNRows() const {
 }
 
 bool InmemoryFCInternalTable::isEmpty() const {
+    if (nfields == 0)
+        return false;
     return values->isEmpty() && unmergedSegments.size() == 0;
 }
 
@@ -550,6 +552,11 @@ Term_t InmemoryFCInternalTable::getValueConstantColumn(const uint8_t columnid) c
         return itr->values->firstInColumn(columnid);
     }
 
+    throw 10;
+}
+
+void InmemoryFCInternalTable::replaceAllTermsWithMap(EGDTermMap &map) {
+    LOG(ERRORL) << "To implement";
     throw 10;
 }
 
