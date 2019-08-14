@@ -289,7 +289,7 @@ bool Checker::RMSA(Program &originalProgram) {
             for (auto &head : heads) {
                 newHeads.push_back(head);
             }
-            newRules.push_back(Rule(rule.getId(), newHeads, rule.getBody()));
+            newRules.push_back(Rule(rule.getId(), newHeads, rule.getBody(), rule.isEGD()));
         } else {
             newRules.push_back(rule);
         }
@@ -308,7 +308,7 @@ bool Checker::RMSA(Program &originalProgram) {
     auxBody.push_back(Literal(specialPred, t));
     std::vector<Literal> auxHead;
     auxHead.push_back(Literal(specialPredTrans, t));
-    newRules.push_back(Rule(ruleCounter++, auxHead, auxBody));
+    newRules.push_back(Rule(ruleCounter++, auxHead, auxBody, false));
     //S_TRANS(X,Z) :- S_TRANS(X,Y),S(Y,Z)
     auxBody.clear();
     auxBody.push_back(Literal(specialPredTrans, t));
@@ -319,7 +319,7 @@ bool Checker::RMSA(Program &originalProgram) {
     t.set(VTerm(1, 0), 0);
     t.set(VTerm(3, 0), 1);
     auxHead.push_back(Literal(specialPredTrans, t));
-    newRules.push_back(Rule(ruleCounter++, auxHead, auxBody));
+    newRules.push_back(Rule(ruleCounter++, auxHead, auxBody, false));
 
     Program rewrittenPrg = programWithCritical.clone();
     rewrittenPrg.cleanAllRules();

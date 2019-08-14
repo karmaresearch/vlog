@@ -569,7 +569,7 @@ Rule Rule::normalizeVars() const {
             ++itr) {
         newBody.push_back(itr->substitutes(subs));
     }
-    return Rule(ruleId, newheads, newBody);
+    return Rule(ruleId, newheads, newBody, egd);
 }
 
 Rule Rule::createAdornment(uint8_t headAdornment) const {
@@ -643,7 +643,7 @@ Rule Rule::createAdornment(uint8_t headAdornment) const {
     }
     std::vector<Literal> newHeads;
     newHeads.push_back(newHead);
-    return Rule(ruleId, newHeads, newBody);
+    return Rule(ruleId, newHeads, newBody, egd);
 }
 
 std::string Rule::tostring() const {
@@ -1199,11 +1199,12 @@ void Program::addRule(Rule &rule) {
     allrules.push_back(rule);
 }
 
-void Program::addRule(std::vector<Literal> heads, std::vector<Literal> body, bool rewriteMultihead) {
+void Program::addRule(std::vector<Literal> heads, std::vector<Literal> body,
+        bool rewriteMultihead, bool isEGD) {
     if (rewriteMultihead && heads.size() > 1) {
         rewriteRule(heads, body);
     } else {
-        Rule rule(allrules.size(), heads, body);
+        Rule rule(allrules.size(), heads, body, isEGD);
         addRule(rule);
     }
 }
@@ -1305,7 +1306,14 @@ std::string Program::parseRule(std::string rule, bool rewriteMultihead) {
         }
 
         //Add the rule
-        addRule(lHeads, lBody, rewriteMultihead);
+        bool isEGD = false;
+        if (lHeads.size() == 1) {
+            auto predId = lHeads[0].getPredicate().getId();
+            std::string rawValue = dictPredicates.getRawValue(predId);
+            if (rawValue == "owl::sameAs")
+                isEGD = true;
+        }
+        addRule(lHeads, lBody, rewriteMultihead, isEGD);
         return "";
     } catch (std::string e) {
         return "Failed parsing rule '" + rule + "': " + e;

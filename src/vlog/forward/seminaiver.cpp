@@ -6,6 +6,7 @@
 #include <vlog/filterer.h>
 #include <vlog/finalresultjoinproc.h>
 #include <vlog/extresultjoinproc.h>
+#include <vlog/egdresultjoinproc.h>
 #include <vlog/utils.h>
 #include <trident/model/table.h>
 #include <kognac/consts.h>
@@ -36,7 +37,8 @@ void SemiNaiver::createGraphRuleDependency(std::vector<int> &nodes,
         for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end(); ++itr) {
             Predicate p = itr->getPredicate();
             if (p.getType() == IDB) {
-                // Only add "interesting" rules: ones that have an IDB predicate in the RHS.
+                // Only add "interesting" rules: ones that have an IDB
+                // predicate in the RHS.
                 nodes.push_back(i);
                 definedBy[pred].push_back(i);
                 LOG(DEBUGL) << " Rule " << i << ": " << ri.tostring(program, &layer);
@@ -1333,7 +1335,24 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                         plan.posFromSecond[optimalOrderIdx],
                         ! multithreaded ? -1 : nthreads);
             } else {
-                if (ruleDetails.rule.isExistential()) {
+                if (ruleDetails.rule.isEGD()) {
+                    FCTable *table = getTable(heads[0].getPredicate().getId(),
+                            heads[0].getPredicate().getCardinality());
+                    joinOutput = new EGDRuleProcessor(
+                            plan.posFromFirst[optimalOrderIdx],
+                            plan.posFromSecond[optimalOrderIdx],
+                            listDerivations,
+                            table,
+                            heads[0],
+                            0,
+                            &ruleDetails,
+                            (uint8_t) orderExecution,
+                            iteration,
+                            finalResultContainer == NULL,
+                            !multithreaded ? -1 : nthreads,
+                            ignoreDuplicatesElimination);
+
+                } else if (ruleDetails.rule.isExistential()) {
                     joinOutput = new ExistentialRuleProcessor(
                             plan.posFromFirst[optimalOrderIdx],
                             plan.posFromSecond[optimalOrderIdx],
@@ -1346,6 +1365,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                             chaseMgmt,
                             chaseMgmt->hasRuleToCheck(),
                             ignoreDuplicatesElimination);
+
                 } else {
                     if (heads.size() == 1) {
                         FCTable *table = getTable(heads[0].getPredicate().getId(),
@@ -1363,6 +1383,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                                 finalResultContainer == NULL,
                                 !multithreaded ? -1 : nthreads,
                                 ignoreDuplicatesElimination);
+
                     } else {
                         joinOutput = new FinalRuleProcessor(
                                 plan.posFromFirst[optimalOrderIdx],

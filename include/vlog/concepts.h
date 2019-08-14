@@ -347,6 +347,7 @@ class Rule {
         const std::vector<Literal> body;
         const bool _isRecursive;
         const bool existential;
+        const bool egd;
 
         static bool checkRecursion(const std::vector<Literal> &head,
                 const std::vector<Literal> &body);
@@ -355,18 +356,19 @@ class Rule {
         bool doesVarAppearsInFollowingPatterns(int startingPattern, uint8_t value) const;
 
         Rule(uint32_t ruleId, const std::vector<Literal> heads,
-                std::vector<Literal> body) :
+                std::vector<Literal> body, bool egd) :
             ruleId(ruleId),
             heads(heads),
             body(body),
             _isRecursive(checkRecursion(heads, body)),
-            existential(!getVarsNotInBody().empty()) {
+            existential(!getVarsNotInBody().empty()),
+            egd(egd) {
                 checkRule();
             }
 
         Rule(uint32_t ruleId, Rule &r) : ruleId(ruleId),
         heads(r.heads), body(r.body), _isRecursive(r._isRecursive),
-        existential(r.existential) {
+        existential(r.existential), egd(r.egd) {
         }
 
         Rule createAdornment(uint8_t headAdornment) const;
@@ -377,6 +379,10 @@ class Rule {
 
         uint32_t getId() const {
             return ruleId;
+        }
+
+        bool isEGD() const {
+            return egd;
         }
 
         const std::vector<Literal> &getHeads() const {
@@ -479,8 +485,6 @@ class Program {
 
         void addRule(Rule &rule);
 
-        static std::string rewriteRDFOWLConstants(std::string input);
-
     public:
         VLIBEXP Program(EDBLayer *kb);
 
@@ -556,7 +560,12 @@ class Program {
         void cleanAllRules();
 
         VLIBEXP void addRule(std::vector<Literal> heads,
-                std::vector<Literal> body, bool rewriteMultihead = false);
+                std::vector<Literal> body) {
+            addRule(heads, body, false, false);
+        }
+
+        VLIBEXP void addRule(std::vector<Literal> heads,
+                std::vector<Literal> body, bool rewriteMultihead, bool isEGD);
 
         void addAllRules(std::vector<Rule> &rules);
 
