@@ -69,7 +69,7 @@ class EGDRuleProcessor: public ResultJoinProcessor {
                 std::shared_ptr<Column> column,
                 const bool unique, const bool sorted);
 
-        void consolidate(const bool isFinished);
+        bool consolidate(const bool isFinished);
 
         bool isEmpty() const;
 

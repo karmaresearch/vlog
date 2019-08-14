@@ -150,11 +150,11 @@ class SingleHeadFinalRuleProcessor: public ResultJoinProcessor {
 
         //uint32_t getRowsInBlock(const int blockId, const bool unique) const;
 
-        void consolidate(const bool isFinished) {
-            consolidate(isFinished, false);
+        bool consolidate(const bool isFinished) {
+            return consolidate(isFinished, false);
         }
 
-        void consolidate(const bool isFinished, const bool forceCheck);
+        bool consolidate(const bool isFinished, const bool forceCheck);
 
         void consolidateSegment(std::shared_ptr<const Segment> seg);
 
@@ -231,7 +231,7 @@ class FinalRuleProcessor: public ResultJoinProcessor {
 
         bool isBlockEmpty(const int blockId, const bool unique) const;
 
-        virtual void consolidate(const bool isFinished);
+        virtual bool consolidate(const bool isFinished);
 
         ~FinalRuleProcessor() {}
 };

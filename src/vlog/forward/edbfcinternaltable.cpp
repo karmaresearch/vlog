@@ -29,6 +29,30 @@ bool EDBFCInternalTable::isEmpty() const {
     return retval;
 }
 
+std::shared_ptr<const Segment>
+EDBFCInternalTable::replaceAllTermsWithMap(EGDTermMap &map) const {
+    bool changed = false;
+    SegmentInserter ins(nfields);
+
+    auto itr = getSortedIterator();
+    Term_t row[nfields];
+    while (itr->hasNext()) {
+        itr->next();
+        for(size_t i = 0; i < nfields; ++i) {
+            auto v = itr->getCurrentValue(i);
+            row[i] = v;
+        }
+        changed |= replaceRow(ins, row, 0, nfields, map);
+    }
+    releaseIterator(itr);
+
+    if (changed) {
+        return ins.getSortedAndUniqueSegment();
+    } else {
+        return std::shared_ptr<const Segment>();
+    }
+
+}
 
 uint8_t EDBFCInternalTable::getRowSize() const {
     return nfields;

@@ -181,7 +181,7 @@ class ResultJoinProcessor {
             return posFromFirst;
         }
 
-        virtual void consolidate(const bool isFinished) {}
+        virtual bool consolidate(const bool isFinished) { return false; }
 
         virtual ~ResultJoinProcessor() {
             if (deleteRow)
@@ -277,7 +277,7 @@ class InterTableJoinProcessor: public ResultJoinProcessor {
             throw 10;
         }
 
-        void consolidate(const bool isFinished);
+        bool consolidate(const bool isFinished);
 
         bool isBlockEmpty(const int blockId, const bool unique) const;
 

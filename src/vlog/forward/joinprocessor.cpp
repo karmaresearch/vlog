@@ -538,7 +538,7 @@ void JoinExecutor::verificativeJoin(
 
     // If the index of the result in the intermediate is equal to the index of the join in the intermediate...
     if (hv.posFromFirst[currentLiteral].size() > 0 &&
-	    hv.posFromFirst[currentLiteral][0].second ==
+            hv.posFromFirst[currentLiteral][0].second ==
             hv.joinCoordinates[currentLiteral][0].first &&
             hv.sizeOutputRelation[currentLiteral] == 1 &&
             currentLiteral == hv.posFromFirst.size() - 1) { //The last literal checks that this is the last join we execute
@@ -577,7 +577,7 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
     if (literal.isNegated()) {
         LOG(TRACEL) << "Calling leftjoin";
         leftjoin(t1, naiver, outputLiterals, literal, min, max,
-                 joinsCoordinates, output, nthreads);
+                joinsCoordinates, output, nthreads);
     }
     //First I calculate whether the join is verificative or explorative.
     else if (JoinExecutor::isJoinVerificative(t1, hv, currentLiteral)) {
@@ -987,14 +987,14 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
             if (filterRowsInhashMap) {
                 filterRowsPosJoin = joinsCoordinates[0].first;
                 FinalRuleProcessor* o = (FinalRuleProcessor*)output;
-		if (o->getNCopyFromFirst() != 1) {
-		    filterRowsInhashMap = false;
-		} else {
-		    filterRowsPosOther = o->getPosFromFirst()[0].second;
-		    if (filterRowsPosJoin == filterRowsPosOther) {
-			filterRowsInhashMap = false;
-		    }
-		}
+                if (o->getNCopyFromFirst() != 1) {
+                    filterRowsInhashMap = false;
+                } else {
+                    filterRowsPosOther = o->getPosFromFirst()[0].second;
+                    if (filterRowsPosJoin == filterRowsPosOther) {
+                        filterRowsInhashMap = false;
+                    }
+                }
             }
 
             while (t2->hasNext()) {
@@ -1074,7 +1074,7 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
     } else {
         LOG(DEBUGL) << "Hashmap size = " << doublemap.size();
     }
-    
+
     //Perform as many joins as the rows in the hashmap
     execSelectiveHashJoin(ruleDetails, naiver, map, doublemap, output, (uint8_t) joinsCoordinates.size(),
             (joinsCoordinates.size() > 0) ? joinsCoordinates[0].second : 0,

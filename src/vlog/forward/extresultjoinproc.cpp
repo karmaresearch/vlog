@@ -1029,7 +1029,7 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
     return found;
 }
 
-void ExistentialRuleProcessor::consolidate(const bool isFinished) {
+bool ExistentialRuleProcessor::consolidate(const bool isFinished) {
     if (replaceExtColumns && tmpRelation != NULL) {
         //Populate the allColumns vector with known columns and constants
         std::vector<std::shared_ptr<Column>> allColumns;
@@ -1037,7 +1037,7 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
         auto unfilterdSegment = tmpRelation->getSegment();
         uint64_t nrows = unfilterdSegment->getNRows();
         if (nrows == 0) {
-            return;
+            return false;
         }
         for(uint8_t i = 0; i < nKnownColumns; ++i) {
             allColumns[posKnownColumns[i]] = unfilterdSegment->getColumn(
@@ -1088,7 +1088,7 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
 
                 if (blockedCount == nrows) {
                     tmpRelation = std::unique_ptr<SegmentInserter>();
-                    return;
+                    return false;
                 }
                 for (size_t i = 0; i < nrows; i++) {
                     if (blocked[i]) {
@@ -1132,7 +1132,7 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
 
             if (filterRows.size() == nrows * nAtomsToCheck) {
                 tmpRelation = std::unique_ptr<SegmentInserter>();
-                return; //every substitution already exists in the database.
+                return false; //every substitution already exists in the database.
                 // Nothing new can be derived.
             }
             //Filter out only valid subs
@@ -1153,7 +1153,7 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
         }
 
         if (nrows == 0) {
-            return;
+            return false;
         }
 
         for(auto &el : posExtColumns) {
@@ -1193,5 +1193,5 @@ void ExistentialRuleProcessor::consolidate(const bool isFinished) {
         replaceExtColumns = false;
         tmpRelation = std::unique_ptr<SegmentInserter>();
     }
-    FinalRuleProcessor::consolidate(isFinished);
+    return FinalRuleProcessor::consolidate(isFinished);
 }

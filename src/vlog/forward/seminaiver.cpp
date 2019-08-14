@@ -1245,15 +1245,6 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     std::chrono::duration<double> durationConsolidation(0);
     std::chrono::duration<double> durationFirstAtom(0);
 
-    //Get table corresponding to the head predicate
-    //FCTable *endTable = getTable(idHeadPredicate, headLiteral.
-    //        getPredicate().getCardinality());
-
-    //if (headLiteral.getNVars() == 0 && !endTable->isEmpty()) {
-    //    LOG(DEBUGL) << "No variables and endtable not empty, so cannot find new derivations";
-    //    return false;
-    //}
-
     //In case the rule has many IDBs predicates, I calculate several
     //combinations of countings.
     const std::vector<RuleExecutionPlan> *orderExecutions =
@@ -1268,6 +1259,9 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     const bool failEmpty = ruleDetails.failedBecauseEmpty;
     const Literal *atomFail = ruleDetails.atomFailure;
     ruleDetails.failedBecauseEmpty = false;
+
+    //Is true if consolidation returns new tuples
+    bool newDerivations = false;
 
     LOG(DEBUGL) << "orderExecutions.size() = " << orderExecutions->size();
 
@@ -1463,7 +1457,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             std::chrono::system_clock::time_point startC =
                 std::chrono::system_clock::now();
             if (! first) {
-                joinOutput->consolidate(true);
+                newDerivations |= joinOutput->consolidate(true);
                 std::chrono::duration<double> d =
                     std::chrono::system_clock::now() - startC;
                 durationConsolidation += d;
@@ -1498,7 +1492,6 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         }
     }
 
-    bool prodDer = false;
     for (auto &h : heads) {
         auto idHeadPredicate = h.getPredicate().getId();
         FCTable *t = getTable(idHeadPredicate, h.
@@ -1508,7 +1501,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             if (block.iteration == iteration) {
                 listDerivations.push_back(block);
             }
-            prodDer |= true;
+            newDerivations |= true;
         }
     }
 
@@ -1522,7 +1515,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     StatsRule stats;
     stats.iteration = iteration;
     stats.idRule = ruleDetails.ruleid;
-    if (!prodDer) {
+    if (!newDerivations) {
         stats.derivation = 0;
     } else {
         stats.derivation = getNLastDerivationsFromList();
@@ -1543,7 +1536,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         stream << td << "ms";
     }
 
-    if (prodDer) {
+    if (newDerivations) {
         LOG(DEBUGL) << "Iteration " << iteration << ". Rule derived new tuples. Combinations " << orderExecution << ", Processed IDB Tables=" <<
             processedTables << ", Total runtime " << stream.str()
             << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
@@ -1557,7 +1550,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 
     LOG(DEBUGL) << t_iter.tostring();
 
-    return prodDer;
+    return newDerivations;
 }
 
 long SemiNaiver::getNLastDerivationsFromList() {

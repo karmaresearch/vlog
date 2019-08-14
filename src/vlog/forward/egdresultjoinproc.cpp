@@ -56,8 +56,14 @@ void EGDRuleProcessor::processResults(const int blockid,
         const std::vector<
         const std::vector<Term_t> *> &vectors2, size_t i2,
         const bool unique) {
-    LOG(ERRORL) << "Not implemented";
-    throw 10;
+
+    for (int i = 0; i < nCopyFromFirst; i++) {
+        row[posFromFirst[i].first] = (*vectors1[posFromFirst[i].second])[i1];
+    }
+    for (int i = 0; i < nCopyFromSecond; i++) {
+        row[posFromSecond[i].first] = (*vectors2[posFromSecond[i].second])[i2];
+    }
+    processResults(blockid, unique || ignoreDupElimin, NULL);
 }
 
 void EGDRuleProcessor::processResults(std::vector<int> &blockid,
@@ -93,8 +99,24 @@ bool EGDRuleProcessor::isBlockEmpty(const int blockId, const bool unique) const 
 void EGDRuleProcessor::addColumns(const int blockid,
         std::vector<std::shared_ptr<Column>> &columns,
         const bool unique, const bool sorted) {
-    LOG(ERRORL) << "Not implemented";
-    throw 10;
+    assert(columns.size() == 2);
+    uint64_t nrows = 0;
+    nrows = columns[0]->size();
+
+    std::vector<std::unique_ptr<ColumnReader>> columnReaders;
+    for(uint8_t i = 0; i < columns.size(); ++i) {
+        columnReaders.push_back(columns[i]->getReader());
+    }
+    //Fill the row
+    for (size_t rowid = 0; rowid < nrows; ++rowid) {
+        for (uint8_t j = 0; j < 2; ++j) {
+            if (!columnReaders[j]->hasNext()) {
+                LOG(ERRORL) << "This should not happen";
+            }
+            row[j] = columnReaders[j]->next();
+        }
+        processResults(blockid, unique, NULL);
+    }
 }
 
 void EGDRuleProcessor::addColumns(const int blockid, FCInternalTableItr *itr,
@@ -115,7 +137,7 @@ bool EGDRuleProcessor::isEmpty() const {
     return nreplacements == 0;
 }
 
-void EGDRuleProcessor::consolidate(const bool isFinished) {
+bool EGDRuleProcessor::consolidate(const bool isFinished) {
     if (termsToReplace.size() > 0) {
         //Remove duplicates
         std::sort(termsToReplace.begin(), termsToReplace.end());
@@ -130,38 +152,56 @@ void EGDRuleProcessor::consolidate(const bool isFinished) {
             uint64_t value = pair.second;
             if (key == value)
                 continue;
-            if (!map.count(key)) {
-                map.insert(std::make_pair(key,std::vector<uint64_t>()));
+
+            if (((key & RULEVARMASK) == 0) && ((value & RULEVARMASK) == 0)) {
+                LOG(ERRORL) << "Due to UNA, the chase does not exist (" <<
+                    key << "," << value << ")";
+                throw 10;
             }
-            map[key].push_back(value);
+            uint64_t tmp;
+            if ((key & RULEVARMASK) == 0) {
+                //Swap the elements
+                tmp = key;
+                key = value;
+                value = tmp;
+            }
+
+            if (!map.count(key)) {
+                map.insert(std::make_pair(key,value));
+            }
+            map[key] = value;
         }
 
         //Replace all the terms in the database
+        bool replaced = false;
         if (map.size() > 0) {
             //Go through all the derivations in listDerivations.
             for(auto &block : listDerivations) {
                 assert(block.isCompleted);
                 auto table = block.table;
-                auto newtable = table->replaceAllTermsWithMap(map);
-                if (newtable != NULL) {
-                    block.table = newtable;
-                    //Replace it also in fctable
+                auto newSegment = table->replaceAllTermsWithMap(map);
+                if (newSegment.get() != NULL && !newSegment->isEmpty()) {
                     auto predId = block.query.getPredicate().getId();
                     auto fctable = sn->getTable(predId, block.query.getTupleSize());
+                    //Some of the replaced rows might be duplicates ...
+                    //Retain up to iteration;
+                    auto filteredSegment = fctable->retainFrom(newSegment,
+                            false, nthreads, block.iteration);
+                    std::shared_ptr<const FCInternalTable> newtable =
+                        std::shared_ptr<const FCInternalTable>(
+                                new InmemoryFCInternalTable(table->getRowSize(),
+                                    block.iteration,
+                                    true,
+                                    filteredSegment));
+                    block.table = newtable;
+                    //Replace it also in fctable
                     fctable->replaceInternalTable(block.iteration, newtable);
+                    replaced = true;
                 }
             }
         }
         termsToReplace.clear();
-
-        //Add a table with zero elements
-        std::shared_ptr<const FCInternalTable> ptrTable(
-                //The table has zero columns. So it is non-empty even if there
-                //are no subs in it
-                new InmemoryFCInternalTable(0,
-                    iteration, true, NULL));
-        t->add(ptrTable, literal,
-               posLiteralInRule, ruleDetails, ruleExecOrder,
-               iteration, isFinished, nthreads);
+        return replaced;
     }
+    return false;
 }

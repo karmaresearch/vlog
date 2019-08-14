@@ -555,23 +555,7 @@ Term_t InmemoryFCInternalTable::getValueConstantColumn(const uint8_t columnid) c
     throw 10;
 }
 
-bool replaceRow(SegmentInserter &ins, Term_t *row, size_t begin,
-        size_t end, EGDTermMap &map) {
-    bool changed = false;
-    for(size_t i = begin; i < end; ++i) {
-        auto v = row[i];
-        if (map.count(v)) {
-            auto &replacements = map[v];
-            assert(replacements.size() == 1);
-            row[i] = replacements[0];
-            changed = true;
-        }
-    }
-    ins.addRow(row);
-    return changed;
-}
-
-std::shared_ptr<const FCInternalTable>
+std::shared_ptr<const Segment>
 InmemoryFCInternalTable::replaceAllTermsWithMap(EGDTermMap &map) const {
     assert(unmergedSegments.size() == 0);
     SegmentInserter ins(nfields);
@@ -588,11 +572,9 @@ InmemoryFCInternalTable::replaceAllTermsWithMap(EGDTermMap &map) const {
     }
 
     if (changed) {
-        return std::shared_ptr<const FCInternalTable>(
-                new InmemoryFCInternalTable(iteration, nfields,
-                    sorted, ins.getSegment()));
+        return ins.getSortedAndUniqueSegment();
     } else {
-        return std::shared_ptr<const FCInternalTable>();
+        return std::shared_ptr<const Segment>();
     }
 }
 
@@ -1005,3 +987,19 @@ bool MITISorter::operator ()(const size_t i1, const size_t i2) const {
     }
     return false;
 }
+
+bool FCInternalTable::replaceRow(SegmentInserter &ins, Term_t *row, size_t begin,
+        size_t end, EGDTermMap &map) const {
+    bool changed = false;
+    for(size_t i = begin; i < end; ++i) {
+        auto v = row[i];
+        if (map.count(v)) {
+            auto replacement = map[v];
+            row[i] = replacement;
+            changed = true;
+        }
+    }
+    ins.addRow(row);
+    return changed;
+}
+

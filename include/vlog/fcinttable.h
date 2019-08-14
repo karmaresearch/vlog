@@ -113,6 +113,10 @@ class FCInternalTable {
     private:
         //    int references;
 
+    protected:
+        bool replaceRow(SegmentInserter &ins, Term_t *row, size_t begin,
+                size_t end, EGDTermMap &map) const;
+
     public:
 
         virtual bool isEmpty() const = 0;
@@ -173,7 +177,7 @@ class FCInternalTable {
             return false;
         }
 
-        virtual std::shared_ptr<const FCInternalTable>
+        virtual std::shared_ptr<const Segment>
             replaceAllTermsWithMap(EGDTermMap &map) const = 0;
 
         virtual size_t getNRows() const = 0;
@@ -521,7 +525,7 @@ class InmemoryFCInternalTable final : public FCInternalTable {
 
         size_t getNRows() const;
 
-        std::shared_ptr<const FCInternalTable> replaceAllTermsWithMap(EGDTermMap &map) const;
+        std::shared_ptr<const Segment> replaceAllTermsWithMap(EGDTermMap &map) const;
 
         size_t getRepresentationSize(std::set<uint64_t> &IDs) const;
 
@@ -632,10 +636,8 @@ class EDBFCInternalTable final : public FCInternalTable {
             return newtab;
         }
 
-        std::shared_ptr<const FCInternalTable> replaceAllTermsWithMap(EGDTermMap &map) const {
-            LOG(ERRORL) << "This method should not be called!";
-            throw 10;
-        }
+        std::shared_ptr<const Segment> replaceAllTermsWithMap(
+                EGDTermMap &map) const;
 
         uint8_t getRowSize() const;
 
@@ -802,9 +804,9 @@ class SingletonTable final : public FCInternalTable {
             return 1;
         }
 
-        std::shared_ptr<const FCInternalTable> replaceAllTermsWithMap(EGDTermMap &map) const {
+        std::shared_ptr<const Segment> replaceAllTermsWithMap(EGDTermMap &map) const {
             //Nothing to do here ...
-            return std::shared_ptr<const FCInternalTable>();
+            return std::shared_ptr<const Segment>();
         }
 
         std::shared_ptr<const FCInternalTable> filter(const uint8_t nPosToCopy, const uint8_t *posVarsToCopy,

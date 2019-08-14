@@ -147,7 +147,8 @@ class FCTable {
         std::shared_ptr<const Segment> retainFrom(
                 std::shared_ptr<const Segment> t,
                 const bool dupl,
-                int nthreads) const;
+                int nthreads,
+                size_t lastIteration = ~0lu) const;
 
         void addBlock(FCBlock block);
 

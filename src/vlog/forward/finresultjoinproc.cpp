@@ -500,11 +500,11 @@ void SingleHeadFinalRuleProcessor::consolidateSegment(std::shared_ptr<const Segm
             iteration, true, nthreads);
 }
 
-void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
+bool SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
         const bool forceCheck) {
     if (!addToEndTable) {
         //do nothing. We'll consolidate later on.
-        return;
+        return false;
     }
 
     if (t->nBlocks() > 32) {
@@ -641,6 +641,7 @@ void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
         }
     }
 #endif
+    return newDerivation;
 }
 
 std::vector<std::shared_ptr<const Segment>> SingleHeadFinalRuleProcessor::getAllSegments() {
@@ -877,12 +878,14 @@ bool FinalRuleProcessor::isBlockEmpty(const int blockId, const bool unique) cons
     return out;
 }
 
-void FinalRuleProcessor::consolidate(const bool isFinished) {
+bool FinalRuleProcessor::consolidate(const bool isFinished) {
     if (!addToEndTable) {
         //do nothing. We'll consolidate later on.
-        return;
+        return false;
     }
+    bool out = false;
     for(auto &t : atomTables) {
-        t->consolidate(isFinished);
+        out |= t->consolidate(isFinished);
     }
+    return out;
 }

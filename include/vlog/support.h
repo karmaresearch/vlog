@@ -16,7 +16,7 @@ struct vlog_eqstr {
 typedef google::dense_hash_map<const std::string,
         Term_t, std::hash<std::string>, vlog_eqstr> SimpleHashmap;
 typedef google::dense_hash_map<Term_t, const std::string> SimpleInverseHashMap;
-typedef google::dense_hash_map<uint64_t, std::vector<uint64_t>> EGDTermMap;
+typedef google::dense_hash_map<uint64_t, uint64_t> EGDTermMap;
 
 class Dictionary {
     private:
