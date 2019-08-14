@@ -80,7 +80,8 @@ string set_to_string(std::unordered_set<int> s) {
 SemiNaiver::SemiNaiver(EDBLayer &layer,
         Program *program, bool opt_intersect, bool opt_filtering,
         bool multithreaded, TypeChase typeChase, int nthreads, bool shuffle,
-        bool ignoreExistentialRules, Program *RMFC_check) :
+        bool ignoreExistentialRules, Program *RMFC_check,
+        std::string sameasAlgo) :
     opt_intersect(opt_intersect),
     opt_filtering(opt_filtering),
     multithreaded(multithreaded),
@@ -92,7 +93,13 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
     checkCyclicTerms(false),
     ignoreExistentialRules(ignoreExistentialRules),
     triggers(0),
-    RMFC_program(RMFC_check) {
+    RMFC_program(RMFC_check),
+    sameasAlgo(sameasAlgo) {
+
+        if (sameasAlgo == "AXIOM") {
+            //Rewrite the rules to add the equality axioms
+            axiomatizeCurrentProgram();
+        }
 
         std::vector<Rule> ruleset = program->getAllRules();
         predicatesTables.resize(program->getMaxPredicateId());
@@ -311,6 +318,82 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(DEBUGL) << "Runtime ruleset optimization ms = " << sec.count() * 1000;
 #endif
+}
+
+void SemiNaiver::axiomatizeCurrentProgram() {
+    //Add transitive rule
+    VTuple t(2);
+    t.set(VTerm(1,0), 0);
+    t.set(VTerm(3,0), 1);
+    VTuple t1(2);
+    t1.set(VTerm(1,0), 0);
+    t1.set(VTerm(2,0), 1);
+    VTuple t2(2);
+    t2.set(VTerm(2,0), 0);
+    t2.set(VTerm(3,0), 1);
+    std::string sameAsName = "<http://www.w3.org/2002/07/owl#sameAs>";
+    auto sameAsPred = program->getPredicate(sameAsName);
+    Literal transHead(sameAsPred, t);
+    Literal transBody1(sameAsPred, t1);
+    Literal transBody2(sameAsPred, t2);
+    std::vector<Literal> head;
+    head.push_back(transHead);
+    std::vector<Literal> body;
+    body.push_back(transBody1);
+    body.push_back(transBody2);
+    program->addRule(head, body);
+
+    //Add symmetric rule
+    VTuple t3(2);
+    t3.set(VTerm(3,0), 0);
+    t3.set(VTerm(1,0), 1);
+    body.clear();
+    body.push_back(Literal(sameAsPred, t3));
+    program->addRule(head, body);
+
+    for(auto pid : program->getAllPredicateIDs()) {
+        if (pid != sameAsPred.getId() && program->isPredicateIDB(pid)) {
+            auto p = program->getPredicate(pid);
+            auto card = p.getCardinality();
+            VTuple t(card);
+            for(size_t i = 0; i < card; ++i) {
+                t.set(VTerm(i+1, 0), i);
+            }
+            Literal lp(p, t);
+
+            for(size_t i = 0; i < card; ++i) {
+                //Congruence body
+                std::vector<Literal> body;
+                body.push_back(lp);
+                VTuple tp(2);
+                tp.set(VTerm(i + 1, 0), 0);
+                tp.set(VTerm(card+1, 0), 1);
+                body.push_back(Literal(sameAsPred, tp));
+                //Congruence head
+                std::vector<Literal> head;
+                VTuple tnew(card);
+                for(size_t j = 0; j < card; ++j) {
+                    tnew.set(VTerm(j+1, 0), j);
+                }
+                tnew.set(VTerm(card+1, 0), i);
+                head.push_back(Literal(p, tnew));
+                program->addRule(head, body);
+
+                //Reflexivity
+                body.clear();
+                body.push_back(lp);
+                head.clear();
+                tp.set(VTerm(i + 1, 0), 1);
+                head.push_back(Literal(sameAsPred, tp));
+                program->addRule(head, body);
+            }
+        }
+    }
+
+    for(auto &r : program->getAllRules()) {
+        LOG(DEBUGL) << "After AXIOM " << r.tostring(program, &layer);
+    }
+
 }
 
 void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
@@ -652,7 +735,8 @@ void SemiNaiver::storeOnFiles(std::string path, const bool decompress,
     for (PredId_t i = 0; i < program->getNPredicates(); ++i) {
         FCTable *table = predicatesTables[i];
         if (table != NULL && !table->isEmpty()) {
-            storeOnFile(path + "/" + program->getPredicateName(i), i, decompress, minLevel, csv);
+            std::string name = Program::prettifyName(program->getPredicateName(i));
+            storeOnFile(path + "/" + name, i, decompress, minLevel, csv);
         }
     }
 }

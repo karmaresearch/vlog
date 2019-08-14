@@ -59,6 +59,7 @@ class SemiNaiver {
         std::vector<int> stratification;
         int nStratificationClasses;
         Program *RMFC_program;
+        std::string sameasAlgo;
 
 #ifdef WEBINTERFACE
         long statsLastIteration;
@@ -109,7 +110,8 @@ class SemiNaiver {
                 const std::vector<Literal> &heads);
 
         bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
-                std::vector<std::vector<RuleExecutionDetails>> &allIDBRules,    // one entry for each stratification class
+                std::vector<std::vector<RuleExecutionDetails>> &allIDBRules,
+                // one entry for each stratification class
                 std::vector<StatIteration> &costRules,
                 const size_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
@@ -124,6 +126,8 @@ class SemiNaiver {
                 const size_t minIteration,
                 const size_t maxIteration);
 
+        void axiomatizeCurrentProgram();
+
     protected:
         TypeChase typeChase;
         bool checkCyclicTerms;
@@ -135,7 +139,8 @@ class SemiNaiver {
         std::vector<FCTable *>predicatesTables;
         EDBLayer &layer;
         Program *program;
-        std::vector<std::vector<RuleExecutionDetails>> allIDBRules; // one entry for each stratification class
+        std::vector<std::vector<RuleExecutionDetails>> allIDBRules;
+        // one entry for each stratification class
         size_t iteration;
         int nthreads;
         uint64_t triggers;
@@ -172,7 +177,8 @@ class SemiNaiver {
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 TypeChase chase, int nthreads, bool shuffleRules,
-                bool ignoreExistentialRule, Program *RMFC_check = NULL);
+                bool ignoreExistentialRule, Program *RMFC_check = NULL,
+                std::string sameasAlgo = "");
 
         //disable restricted chase
         VLIBEXP SemiNaiver(EDBLayer &layer,

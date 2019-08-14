@@ -479,6 +479,8 @@ class Program {
 
         void addRule(Rule &rule);
 
+        static std::string rewriteRDFOWLConstants(std::string input);
+
     public:
         VLIBEXP Program(EDBLayer *kb);
 
@@ -495,6 +497,8 @@ class Program {
         uint64_t getMaxPredicateId() {
             return dictPredicates.getCounter();
         }
+
+        static std::string prettifyName(std::string name);
 
         std::string parseRule(std::string rule, bool rewriteMultihead);
 
