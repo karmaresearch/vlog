@@ -280,6 +280,20 @@ bool FCTable::isEmpty(size_t count) const {
     return true;
 }
 
+void FCTable::replaceInternalTable(const size_t iteration,
+        std::shared_ptr<const FCInternalTable> t) {
+    if (blocks.size() > 10) {
+        LOG(WARNL) << "Linear scan over " << blocks.size() << " internal tables. Binary search?";
+    }
+    for (auto &block : blocks) {
+        if (block.iteration == iteration) {
+            block.table = t;
+            cache.clear(); //Invalidate the cache over this table 
+            break;
+        }
+    }
+}
+
 std::shared_ptr<const Segment> FCTable::retainFrom(
         std::shared_ptr<const Segment> t,
         const bool dupl,

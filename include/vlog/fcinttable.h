@@ -174,7 +174,7 @@ class FCInternalTable {
         }
 
         virtual std::shared_ptr<const FCInternalTable>
-            replaceAllTermsWithMap(EGDTermMap &map) = 0;
+            replaceAllTermsWithMap(EGDTermMap &map) const = 0;
 
         virtual size_t getNRows() const = 0;
 
@@ -521,7 +521,7 @@ class InmemoryFCInternalTable final : public FCInternalTable {
 
         size_t getNRows() const;
 
-        std::shared_ptr<const FCInternalTable> replaceAllTermsWithMap(EGDTermMap &map);
+        std::shared_ptr<const FCInternalTable> replaceAllTermsWithMap(EGDTermMap &map) const;
 
         size_t getRepresentationSize(std::set<uint64_t> &IDs) const;
 
@@ -632,7 +632,7 @@ class EDBFCInternalTable final : public FCInternalTable {
             return newtab;
         }
 
-        std::shared_ptr<const FCInternalTable> replaceAllTermsWithMap(EGDTermMap &map) {
+        std::shared_ptr<const FCInternalTable> replaceAllTermsWithMap(EGDTermMap &map) const {
             LOG(ERRORL) << "This method should not be called!";
             throw 10;
         }
@@ -802,7 +802,7 @@ class SingletonTable final : public FCInternalTable {
             return 1;
         }
 
-        std::shared_ptr<const FCInternalTable> replaceAllTermsWithMap(EGDTermMap &map) {
+        std::shared_ptr<const FCInternalTable> replaceAllTermsWithMap(EGDTermMap &map) const {
             //Nothing to do here ...
             return std::shared_ptr<const FCInternalTable>();
         }

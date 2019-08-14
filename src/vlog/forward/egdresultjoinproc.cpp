@@ -1,4 +1,5 @@
 #include <vlog/egdresultjoinproc.h>
+#include <vlog/seminaiver.h>
 
 #include <google/dense_hash_map>
 
@@ -141,7 +142,14 @@ void EGDRuleProcessor::consolidate(const bool isFinished) {
             for(auto &block : listDerivations) {
                 assert(block.isCompleted);
                 auto table = block.table;
-                table->replaceAllTermsWithMap(map);
+                auto newtable = table->replaceAllTermsWithMap(map);
+                if (newtable != NULL) {
+                    block.table = newtable;
+                    //Replace it also in fctable
+                    auto predId = block.query.getPredicate().getId();
+                    auto fctable = sn->getTable(predId, block.query.getTupleSize());
+                    fctable->replaceInternalTable(block.iteration, newtable);
+                }
             }
         }
         termsToReplace.clear();
@@ -153,7 +161,7 @@ void EGDRuleProcessor::consolidate(const bool isFinished) {
                 new InmemoryFCInternalTable(0,
                     iteration, true, NULL));
         t->add(ptrTable, literal,
-                posLiteralInRule, ruleDetails, ruleExecOrder,
-                iteration, isFinished, nthreads);
+               posLiteralInRule, ruleDetails, ruleExecOrder,
+               iteration, isFinished, nthreads);
     }
 }
