@@ -187,6 +187,7 @@ json SparqlTable::launchQuery(std::string sparqlQuery) {
     curl_easy_setopt(curl, CURLOPT_HEADERDATA, &rheaders);
     struct curl_slist *headers = NULL;
     headers = curl_slist_append(headers, "Accept: application/sparql-results+json");
+    headers = curl_slist_append(headers, "User-Agent: VLog-v1.2.1");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
     CURLcode resp = curl_easy_perform(curl);
