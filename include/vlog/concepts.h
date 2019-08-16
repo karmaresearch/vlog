@@ -469,7 +469,6 @@ class Rule {
 
 class Program {
     private:
-        //const uint64_t assignedIds;
         EDBLayer *kb;
         std::vector<std::vector<uint32_t>> rules;
         std::vector<Rule> allrules;
@@ -477,9 +476,6 @@ class Program {
 
         Dictionary dictPredicates;
         std::unordered_map<PredId_t, uint8_t> cardPredicates;
-
-        //Move them to the EDB layer ...
-        //Dictionary additionalConstants;
 
         void rewriteRule(std::vector<Literal> &heads, std::vector<Literal> &body);
 
@@ -539,14 +535,6 @@ class Program {
 
         const Rule &getRule(uint32_t ruleid) const;
 
-        /*std::string getFromAdditional(Term_t val) {
-          return additionalConstants.getRawValue(val);
-          }
-
-          uint64_t getOrAddToAdditional(std::string term) {
-          return additionalConstants.getOrAdd(term);
-          }*/
-
         VLIBEXP void sortRulesByIDBPredicates();
 
         VLIBEXP std::vector<Rule> getAllRules() const;
@@ -588,6 +576,10 @@ class Program {
         }
 
         static std::string rewriteRDFOWLConstants(std::string input);
+
+        void axiomatizeEquality();
+
+        void singulariseEquality();
 
         static std::string compressRDFOWLConstants(std::string input);
 

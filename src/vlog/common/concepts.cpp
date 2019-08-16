@@ -750,6 +750,203 @@ std::string Rule::toprettystring(Program * program, EDBLayer *db, bool replaceCo
     return output;
 }
 
+void Program::singulariseEquality() {
+    std::vector<Rule> oldrules = allrules;
+    allrules.clear();
+
+    std::string sameAsName = "<http://www.w3.org/2002/07/owl#sameAs>";
+    auto sameAsPred = getPredicate(sameAsName);
+
+    //Rewrite the rules if there are multiple variable occurrences
+    for(size_t i = 0; i < oldrules.size(); ++i) {
+        Rule &r = oldrules[i];
+        LOG(DEBUGL) << "Processing rule " << r.tostring(this, kb);
+        //First get the largest var ID used in the rule
+        uint8_t largestVarID = 0;
+        for(auto &l : r.getBody()) {
+            for (size_t j = 0; j < l.getTupleSize(); ++j) {
+                const auto &term = l.getTermAtPos(j);
+                if (term.isVariable()) {
+                    if (term.getId() > largestVarID)
+                        largestVarID = term.getId();
+                }
+            }
+        }
+        for(auto &l : r.getHeads()) {
+            for (size_t j = 0; j < l.getTupleSize(); ++j) {
+                const auto &term = l.getTermAtPos(j);
+                if (term.isVariable()) {
+                    if (term.getId() > largestVarID)
+                        largestVarID = term.getId();
+                }
+            }
+        }
+        largestVarID++;
+
+        //Process the variables that appear more than once. Replace the
+        //body atoms.
+        std::map<uint8_t, std::vector<uint8_t>> multipleOccurrences;
+        std::vector<Literal> newBody;
+        for(auto &l : r.getBody()) {
+            VTuple newTuple(l.getTupleSize());
+            for (size_t j = 0; j < l.getTupleSize(); ++j) {
+                const auto &term = l.getTermAtPos(j);
+                if (term.isVariable()) {
+                    if (!multipleOccurrences.count(term.getId())) {
+                        multipleOccurrences.insert(std::make_pair(term.getId(),
+                                    std::vector<uint8_t>()));
+                        newTuple.set(term, j);
+                    } else {
+                        //Replace the variable with a new one
+                        newTuple.set(VTerm(largestVarID, 0), j);
+                        multipleOccurrences[term.getId()].push_back(largestVarID);
+                        largestVarID++;
+                    }
+                } else {
+                    newTuple.set(term, j);
+                }
+            }
+            newBody.push_back(Literal(l.getPredicate(), newTuple));
+        }
+        //Add equality atoms to the body of the rule
+        VTuple t(2);
+        for(auto &pair : multipleOccurrences) {
+            if (pair.second.size() > 0) {
+                t.set(VTerm(pair.first, 0), 0);
+                for(auto m : pair.second) {
+                    t.set(VTerm(m, 0), 1);
+                    Literal l(sameAsPred, t);
+                    newBody.push_back(l);
+                }
+            }
+        }
+
+        //Create a new rule
+        allrules.push_back(Rule(r.getId(), r.getHeads(), newBody));
+    }
+
+    //Add transitive rule
+    VTuple t(2);
+    t.set(VTerm(1,0), 0);
+    t.set(VTerm(3,0), 1);
+    VTuple t1(2);
+    t1.set(VTerm(1,0), 0);
+    t1.set(VTerm(2,0), 1);
+    VTuple t2(2);
+    t2.set(VTerm(2,0), 0);
+    t2.set(VTerm(3,0), 1);
+    Literal transHead(sameAsPred, t);
+    Literal transBody1(sameAsPred, t1);
+    Literal transBody2(sameAsPred, t2);
+    std::vector<Literal> head;
+    head.push_back(transHead);
+    std::vector<Literal> body;
+    body.push_back(transBody1);
+    body.push_back(transBody2);
+    addRule(head, body);
+
+    //Add symmetric rule
+    VTuple t3(2);
+    t3.set(VTerm(3,0), 0);
+    t3.set(VTerm(1,0), 1);
+    body.clear();
+    body.push_back(Literal(sameAsPred, t3));
+    addRule(head, body);
+
+    for(auto pid : getAllPredicateIDs()) {
+        if (pid != sameAsPred.getId() && isPredicateIDB(pid)) {
+            auto p = getPredicate(pid);
+            auto card = p.getCardinality();
+            VTuple t(card);
+            for(size_t i = 0; i < card; ++i) {
+                t.set(VTerm(i+1, 0), i);
+            }
+            Literal lp(p, t);
+            for(size_t i = 0; i < card; ++i) {
+                //Reflexivity
+                VTuple tp(2);
+                body.clear();
+                body.push_back(lp);
+                head.clear();
+                tp.set(VTerm(i + 1, 0), 1);
+                head.push_back(Literal(sameAsPred, tp));
+                addRule(head, body);
+            }
+        }
+    }
+}
+
+void Program::axiomatizeEquality() {
+    //Add transitive rule
+    VTuple t(2);
+    t.set(VTerm(1,0), 0);
+    t.set(VTerm(3,0), 1);
+    VTuple t1(2);
+    t1.set(VTerm(1,0), 0);
+    t1.set(VTerm(2,0), 1);
+    VTuple t2(2);
+    t2.set(VTerm(2,0), 0);
+    t2.set(VTerm(3,0), 1);
+    std::string sameAsName = "<http://www.w3.org/2002/07/owl#sameAs>";
+    auto sameAsPred = getPredicate(sameAsName);
+    Literal transHead(sameAsPred, t);
+    Literal transBody1(sameAsPred, t1);
+    Literal transBody2(sameAsPred, t2);
+    std::vector<Literal> head;
+    head.push_back(transHead);
+    std::vector<Literal> body;
+    body.push_back(transBody1);
+    body.push_back(transBody2);
+    addRule(head, body);
+
+    //Add symmetric rule
+    VTuple t3(2);
+    t3.set(VTerm(3,0), 0);
+    t3.set(VTerm(1,0), 1);
+    body.clear();
+    body.push_back(Literal(sameAsPred, t3));
+    addRule(head, body);
+
+    for(auto pid : getAllPredicateIDs()) {
+        if (pid != sameAsPred.getId() && isPredicateIDB(pid)) {
+            auto p = getPredicate(pid);
+            auto card = p.getCardinality();
+            VTuple t(card);
+            for(size_t i = 0; i < card; ++i) {
+                t.set(VTerm(i+1, 0), i);
+            }
+            Literal lp(p, t);
+
+            for(size_t i = 0; i < card; ++i) {
+                //Congruence body
+                std::vector<Literal> body;
+                body.push_back(lp);
+                VTuple tp(2);
+                tp.set(VTerm(i + 1, 0), 0);
+                tp.set(VTerm(card+1, 0), 1);
+                body.push_back(Literal(sameAsPred, tp));
+                //Congruence head
+                std::vector<Literal> head;
+                VTuple tnew(card);
+                for(size_t j = 0; j < card; ++j) {
+                    tnew.set(VTerm(j+1, 0), j);
+                }
+                tnew.set(VTerm(card+1, 0), i);
+                head.push_back(Literal(p, tnew));
+                addRule(head, body);
+
+                //Reflexivity
+                body.clear();
+                body.push_back(lp);
+                head.clear();
+                tp.set(VTerm(i + 1, 0), 1);
+                head.push_back(Literal(sameAsPred, tp));
+                addRule(head, body);
+            }
+        }
+    }
+}
+
 bool Program::stratify(std::vector<int> &stratification, int &nClasses) {
     // First check if the rules can be stratified.
     std::set<std::pair<uint64_t, uint64_t>> usedNegated;

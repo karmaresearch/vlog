@@ -126,7 +126,6 @@ class SemiNaiver {
                 const size_t minIteration,
                 const size_t maxIteration);
 
-        void axiomatizeCurrentProgram();
 
     protected:
         TypeChase typeChase;
