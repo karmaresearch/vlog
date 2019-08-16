@@ -13,6 +13,8 @@ class Checker {
 
         static bool MSA(Program &p);
 
+        static bool EMFA(Program &p);
+
         static bool RMFA(Program &p);
 
         static bool RMSA(Program &p);

@@ -172,6 +172,8 @@ bool EGDRuleProcessor::consolidate(const bool isFinished) {
             map[key] = value;
         }
 
+        //TODO: must do the closure to ensure all terms are mapped correctly. (e.g., v1->v2, v2->v3, v3->v4)
+
         //Replace all the terms in the database
         bool replaced = false;
         if (map.size() > 0) {

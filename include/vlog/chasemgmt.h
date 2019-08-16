@@ -20,7 +20,7 @@
 #define RULEVARMASK (RULE_MASK|VAR_MASK)
 #define COUNTER(v) (v & 0xFFFFFFFF)
 
-typedef enum TypeChase {RESTRICTED_CHASE, SKOLEM_CHASE, SUM_CHASE, SUM_RESTRICTED_CHASE } TypeChase;
+typedef enum TypeChase {RESTRICTED_CHASE, SKOLEM_CHASE, SUM_CHASE, SUM_RESTRICTED_CHASE, EMFA } TypeChase;
 
 struct ChaseRow {
     uint8_t sz;
