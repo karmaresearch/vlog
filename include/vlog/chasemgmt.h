@@ -20,7 +20,7 @@
 #define RULEVARMASK (RULE_MASK|VAR_MASK)
 #define COUNTER(v) (v & 0xFFFFFFFF)
 
-typedef enum TypeChase {RESTRICTED_CHASE, SKOLEM_CHASE, SUM_CHASE, SUM_RESTRICTED_CHASE, EMFA } TypeChase;
+typedef enum TypeChase {RESTRICTED_CHASE, SKOLEM_CHASE, SUM_CHASE, SUM_RESTRICTED_CHASE } TypeChase;
 
 struct ChaseRow {
     uint8_t sz;
@@ -156,6 +156,8 @@ class ChaseMgmt {
         bool checkCyclicTerms(uint32_t ruleid);
 
         bool checkRecursive(uint64_t rv);
+
+        uint64_t countDepth(uint64_t id, uint64_t depth = 0);
 
         RuleContainer *getRuleContainer(size_t id) const {
             if (id < rules.size()) {

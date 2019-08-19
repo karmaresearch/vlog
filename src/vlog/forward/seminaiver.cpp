@@ -83,7 +83,7 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
         Program *program, bool opt_intersect, bool opt_filtering,
         bool multithreaded, TypeChase typeChase, int nthreads, bool shuffle,
         bool ignoreExistentialRules, Program *RMFC_check,
-        std::string sameasAlgo) :
+        std::string sameasAlgo, bool UNA) :
     opt_intersect(opt_intersect),
     opt_filtering(opt_filtering),
     multithreaded(multithreaded),
@@ -96,7 +96,8 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
     ignoreExistentialRules(ignoreExistentialRules),
     triggers(0),
     RMFC_program(RMFC_check),
-    sameasAlgo(sameasAlgo) {
+    sameasAlgo(sameasAlgo),
+    UNA(UNA) {
 
         if (sameasAlgo == "AXIOM") {
             //Rewrite the rules to add the equality axioms
@@ -109,6 +110,9 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
             for(auto &r : program->getAllRules()) {
                 LOG(DEBUGL) << "After SING " << r.tostring(program, &layer);
             }
+        } else if (sameasAlgo != "NOTHING") {
+            LOG(ERRORL) << "Type of equality algorithm not recognized";
+            throw 10;
         }
 
         std::vector<Rule> ruleset = program->getAllRules();
@@ -122,8 +126,9 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
         }
         LOG(DEBUGL) << "nStratificationClasses = " << nStratificationClasses;
 
-        LOG(DEBUGL) << "Running SemiNaiver, opt_intersect = " << opt_intersect << ", opt_filtering = " << opt_filtering << ", multithreading = " << multithreaded << ", shuffle = " << shuffle;
-
+        LOG(DEBUGL) << "Running SemiNaiver, opt_intersect = " << opt_intersect
+            << ", opt_filtering = " << opt_filtering << ", multithreading = "
+            << multithreaded << ", shuffle = " << shuffle;
 
         uint32_t ruleid = 0;
         this->allIDBRules.resize(nStratificationClasses);
@@ -1277,7 +1282,9 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                             iteration,
                             finalResultContainer == NULL,
                             !multithreaded ? -1 : nthreads,
-                            ignoreDuplicatesElimination);
+                            ignoreDuplicatesElimination,
+                            UNA,
+                            checkCyclicTerms && typeChase == TypeChase::SKOLEM_CHASE);
 
                 } else if (ruleDetails.rule.isExistential()) {
                     joinOutput = new ExistentialRuleProcessor(

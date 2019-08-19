@@ -333,10 +333,6 @@ class Literal {
 
         std::string tostring() const;
 
-        /*Literal operator=(const Literal &other) {
-          return Literal(other.pred,other.tuple);
-          }*/
-
         bool operator ==(const Literal &other) const;
 };
 

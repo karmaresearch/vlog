@@ -114,7 +114,8 @@ class FCInternalTable {
         //    int references;
 
     protected:
-        bool replaceRow(SegmentInserter &ins, Term_t *row, size_t begin,
+        void replaceRow(SegmentInserter &oldtuples, bool replace,
+                SegmentInserter &newtuples, Term_t *row, size_t begin,
                 size_t end, EGDTermMap &map) const;
 
     public:
@@ -177,8 +178,9 @@ class FCInternalTable {
             return false;
         }
 
-        virtual std::shared_ptr<const Segment>
-            replaceAllTermsWithMap(EGDTermMap &map) const = 0;
+        virtual std::pair<std::shared_ptr<const Segment>,
+                std::shared_ptr<const Segment>>
+                    replaceAllTermsWithMap(EGDTermMap &map, bool replace) const = 0;
 
         virtual size_t getNRows() const = 0;
 
@@ -525,7 +527,9 @@ class InmemoryFCInternalTable final : public FCInternalTable {
 
         size_t getNRows() const;
 
-        std::shared_ptr<const Segment> replaceAllTermsWithMap(EGDTermMap &map) const;
+        std::pair<std::shared_ptr<const Segment>,
+            std::shared_ptr<const Segment>>
+                replaceAllTermsWithMap(EGDTermMap &map, bool replace) const;
 
         size_t getRepresentationSize(std::set<uint64_t> &IDs) const;
 
@@ -636,8 +640,9 @@ class EDBFCInternalTable final : public FCInternalTable {
             return newtab;
         }
 
-        std::shared_ptr<const Segment> replaceAllTermsWithMap(
-                EGDTermMap &map) const;
+        std::pair<std::shared_ptr<const Segment>,
+            std::shared_ptr<const Segment>>
+                replaceAllTermsWithMap(EGDTermMap &map, bool replace) const;
 
         uint8_t getRowSize() const;
 
@@ -804,10 +809,13 @@ class SingletonTable final : public FCInternalTable {
             return 1;
         }
 
-        std::shared_ptr<const Segment> replaceAllTermsWithMap(EGDTermMap &map) const {
-            //Nothing to do here ...
-            return std::shared_ptr<const Segment>();
-        }
+        std::pair<std::shared_ptr<const Segment>,
+            std::shared_ptr<const Segment>>
+                replaceAllTermsWithMap(EGDTermMap &map, bool replace) const {
+                    //Nothing to do here ...
+                    return std::make_pair(std::shared_ptr<const Segment>(),
+                            std::shared_ptr<const Segment>());
+                }
 
         std::shared_ptr<const FCInternalTable> filter(const uint8_t nPosToCopy, const uint8_t *posVarsToCopy,
                 const uint8_t nPosToFilter, const uint8_t *posConstantsToFilter,

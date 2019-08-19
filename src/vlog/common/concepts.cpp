@@ -822,7 +822,7 @@ void Program::singulariseEquality() {
         }
 
         //Create a new rule
-        allrules.push_back(Rule(r.getId(), r.getHeads(), newBody));
+        allrules.push_back(Rule(r.getId(), r.getHeads(), newBody, r.isEGD()));
     }
 
     //Add transitive rule

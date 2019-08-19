@@ -6,7 +6,6 @@
 class EGDRuleProcessor: public ResultJoinProcessor {
     private:
         std::vector<std::pair<uint64_t, uint64_t>> termsToReplace;
-        uint64_t nreplacements;
         SemiNaiver *sn;
 
         std::vector<FCBlock> &listDerivations;
@@ -17,6 +16,9 @@ class EGDRuleProcessor: public ResultJoinProcessor {
         const RuleExecutionDetails *ruleDetails;
         const Literal literal;
         const uint8_t posLiteralInRule;
+
+        const bool UNA;
+        const bool emfa;
 
     protected:
         void processResults(const int blockid,
@@ -33,7 +35,9 @@ class EGDRuleProcessor: public ResultJoinProcessor {
                 const size_t iteration,
                 const bool addToEndTable,
                 const int nthreads,
-                const bool ignoreDuplicatesElimination);
+                const bool ignoreDuplicatesElimination,
+                const bool UNA,
+                const bool emfa);
 
         void processResults(const int blockid, const Term_t *first,
                 FCInternalTableItr* second, const bool unique);

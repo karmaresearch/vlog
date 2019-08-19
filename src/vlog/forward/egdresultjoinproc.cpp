@@ -15,7 +15,9 @@ EGDRuleProcessor::EGDRuleProcessor(
         const size_t iteration,
         const bool addToEndTable,
         const int nthreads,
-        const bool ignoreDuplicatesElimination) :
+        const bool ignoreDuplicatesElimination,
+        const bool UNA,
+        const bool emfa):
     ResultJoinProcessor(head.getPredicate().getCardinality(),
             new Term_t[head.getPredicate().getCardinality()], true,
             (uint8_t) posFromFirst.size(),
@@ -23,7 +25,6 @@ EGDRuleProcessor::EGDRuleProcessor(
             posFromFirst.size() > 0 ? & (posFromFirst[0]) : NULL,
             posFromSecond.size() > 0 ? & (posFromSecond[0]) : NULL, nthreads,
             ignoreDuplicatesElimination),
-    nreplacements(0),
     sn(sn),
     listDerivations(listDerivations),
     ruleExecOrder(ruleExecOrder),
@@ -31,7 +32,9 @@ EGDRuleProcessor::EGDRuleProcessor(
     t(table),
     ruleDetails(detailsRule),
     literal(head),
-    posLiteralInRule(posHeadInRule ){
+    posLiteralInRule(posHeadInRule),
+    UNA(UNA),
+    emfa(emfa) {
         assert(addToEndTable);
         assert(!ignoreDuplicatesElimination); //Not sure about what would happen
     }
@@ -134,7 +137,7 @@ void EGDRuleProcessor::addColumn(const int blockid, const uint8_t pos,
 }
 
 bool EGDRuleProcessor::isEmpty() const {
-    return nreplacements == 0;
+    return termsToReplace.empty();
 }
 
 bool EGDRuleProcessor::consolidate(const bool isFinished) {
@@ -153,26 +156,62 @@ bool EGDRuleProcessor::consolidate(const bool isFinished) {
             if (key == value)
                 continue;
 
-            if (((key & RULEVARMASK) == 0) && ((value & RULEVARMASK) == 0)) {
+            if (UNA && ((key & RULEVARMASK) == 0) && ((value & RULEVARMASK) == 0)) {
                 LOG(ERRORL) << "Due to UNA, the chase does not exist (" <<
                     key << "," << value << ")";
                 throw 10;
             }
             uint64_t tmp;
-            if ((key & RULEVARMASK) == 0) {
-                //Swap the elements
-                tmp = key;
-                key = value;
-                value = tmp;
+            if (!emfa) {
+                //The swap depends on the depth of the terms
+                uint64_t depthKey = 0;
+                if ((key & RULEVARMASK) != 0) {
+                    depthKey = sn->getChaseManager()->countDepth(key);
+                }
+                uint64_t depthValue = 0;
+                if ((value & RULEVARMASK) != 0) {
+                    depthValue = sn->getChaseManager()->countDepth(value);
+                }
+                if (depthKey >= depthValue) {
+                    if (!map.count(key)) {
+                        map.insert(std::make_pair(key,value));
+                    }
+                    map[key] = value;
+                }
+                if (depthValue >= depthKey) {
+                    if (!map.count(value)) {
+                        map.insert(std::make_pair(value, key));
+                    }
+                    map[value] = key;
+                }
+            } else {
+                //Swap them according to standard EGD semantics
+                if ((key & RULEVARMASK) == 0) {
+                    //Swap the elements
+                    tmp = key;
+                    key = value;
+                    value = tmp;
+                }
+                if (!map.count(key)) {
+                    map.insert(std::make_pair(key,value));
+                }
+                map[key] = value;
             }
-
-            if (!map.count(key)) {
-                map.insert(std::make_pair(key,value));
-            }
-            map[key] = value;
         }
 
-        //TODO: must do the closure to ensure all terms are mapped correctly. (e.g., v1->v2, v2->v3, v3->v4)
+        if (!emfa) {
+            bool checkCycles = false;
+            for(auto pair : map) {
+                if (map.count(pair.second)) {
+                    checkCycles = true;
+                    break;
+                }
+            }
+            if (checkCycles) {
+                LOG(ERRORL) << "Must implement EGD closure to reason on this ...";
+                throw 10; //For now, I don't implement it.
+            }
+        }
 
         //Replace all the terms in the database
         bool replaced = false;
@@ -181,25 +220,50 @@ bool EGDRuleProcessor::consolidate(const bool isFinished) {
             for(auto &block : listDerivations) {
                 assert(block.isCompleted);
                 auto table = block.table;
-                auto newSegment = table->replaceAllTermsWithMap(map);
+                //Remove replaced facts?
+                bool removedReplaced = !emfa;
+                std::pair<std::shared_ptr<const Segment>,
+                    std::shared_ptr<const Segment>> out =
+                        table->replaceAllTermsWithMap(map, removedReplaced);
+                auto oldSegment = out.first;
+                auto newSegment = out.second;
+
+                auto predId = block.query.getPredicate().getId();
+                auto fctable
+                    = sn->getTable(predId, block.query.getTupleSize());
                 if (newSegment.get() != NULL && !newSegment->isEmpty()) {
-                    auto predId = block.query.getPredicate().getId();
-                    auto fctable = sn->getTable(predId, block.query.getTupleSize());
                     //Some of the replaced rows might be duplicates ...
-                    //Retain up to iteration;
                     auto filteredSegment = fctable->retainFrom(newSegment,
-                            false, nthreads, block.iteration);
+                            false, nthreads);
+                    if (filteredSegment->getNRows() > 0) {
+                        //Create a new block
+                        std::shared_ptr<const FCInternalTable> newtable =
+                            std::shared_ptr<const FCInternalTable>(
+                                    new InmemoryFCInternalTable(table->getRowSize(),
+                                        block.iteration,
+                                        true,
+                                        newSegment));
+
+                        t->add(newtable, block.query, 0, ruleDetails, ruleExecOrder,
+                                iteration, true, nthreads);
+                        replaced = true;
+                    }
+                }
+
+                if (removedReplaced) {
+                    if (oldSegment.get() == NULL || oldSegment->isEmpty()) {
+                        LOG(ERRORL) << "Substituting a table with NULL or empty table. Not tested!";
+                        throw 10;
+                    }
                     std::shared_ptr<const FCInternalTable> newtable =
                         std::shared_ptr<const FCInternalTable>(
                                 new InmemoryFCInternalTable(table->getRowSize(),
                                     block.iteration,
                                     true,
-                                    filteredSegment));
+                                    oldSegment));
                     block.table = newtable;
                     //Replace it also in fctable
-                    fctable->replaceInternalTable(block.iteration, newtable);
-                    replaced = true;
-                }
+                    fctable->replaceInternalTable(block.iteration, newtable);}
             }
         }
         termsToReplace.clear();

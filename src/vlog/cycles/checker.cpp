@@ -62,8 +62,7 @@ int Checker::check(Program &p, std::string alg, EDBLayer &db) {
         // Model Summarisation Acyclic
         return MSA(p) ? 1 : 0;
     } else if (alg == "EMFA") {
-        return EFMA(p) ? 1 : 0;
-    }
+        return EMFA(p) ? 1 : 0;
     } else {
         LOG(ERRORL) << "Unknown algorithm: " << alg;
         throw 10;
@@ -185,19 +184,17 @@ bool Checker::MSA(Program &p) {
     }
 }
 
-static bool Checker::EMFA(Program &p) {
+bool Checker::EMFA(Program &p) {
    // Create  the critical instance (cdb)
     EDBLayer *db = p.getKB();
     EDBLayer layer(*db, false);
-
-    //Singularise the program. Set up the program to use Non-UNA, etc.
 
     Program newProgram(&layer);
     createCriticalInstance(newProgram, p, db, layer);
 
     //Launch a simpler version of the skolem chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, TypeChase::EMFA, 1, 1, false, NULL,
+            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false, NULL,
             "SING");
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)

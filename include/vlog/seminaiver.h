@@ -60,6 +60,7 @@ class SemiNaiver {
         int nStratificationClasses;
         Program *RMFC_program;
         std::string sameasAlgo;
+        const bool UNA;
 
 #ifdef WEBINTERFACE
         long statsLastIteration;
@@ -177,7 +178,8 @@ class SemiNaiver {
                 bool opt_filtering, bool multithreaded,
                 TypeChase chase, int nthreads, bool shuffleRules,
                 bool ignoreExistentialRule, Program *RMFC_check = NULL,
-                std::string sameasAlgo = "");
+                std::string sameasAlgo = "",
+                bool UNA = false);
 
         //disable restricted chase
         VLIBEXP SemiNaiver(EDBLayer &layer,
