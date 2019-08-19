@@ -1,45 +1,44 @@
 package karmaresearch.vlog;
 
 /**
- * This exception gets thrown when an attempt is made to do something with VLog
- * when it is not started yet.
+ * This exception gets thrown when an attempt is made to perform a query with a non-existing predicate.
  */
 
-public class NotStartedException extends Exception {
+public class NonExistingPredicateException extends Exception {
 
     private static final long serialVersionUID = 877780226511090797L;
 
     /**
-     * Constructs an <code>NotStartedException</code> with <code>null</code> as
+     * Constructs an <code>NonExistingPredicateException</code> with <code>null</code> as
      * its error detail message.
      */
-    public NotStartedException() {
+    public NonExistingPredicateException() {
         super();
     }
 
     /**
-     * Constructs an <code>NotStartedException</code> with the specified detail
+     * Constructs an <code>NonExistingPredicateException</code> with the specified detail
      * message.
      *
      * @param message
      *            the detail message
      */
-    public NotStartedException(String message) {
+    public NonExistingPredicateException(String message) {
         super(message);
     }
 
     /**
-     * Constructs an <code>NotStartedException</code> with the specified cause.
+     * Constructs an <code>NonExistingPredicateException</code> with the specified cause.
      *
      * @param cause
      *            the cause
      */
-    public NotStartedException(Throwable cause) {
+    public NonExistingPredicateException(Throwable cause) {
         super(cause);
     }
 
     /**
-     * Constructs an <code>NotStartedException</code> with the specified detail
+     * Constructs an <code>NonExistingPredicateException</code> with the specified detail
      * message and cause.
      *
      * @param message
@@ -47,7 +46,7 @@ public class NotStartedException extends Exception {
      * @param cause
      *            the cause
      */
-    public NotStartedException(String message, Throwable cause) {
+    public NonExistingPredicateException(String message, Throwable cause) {
         super(message, cause);
     }
 }
