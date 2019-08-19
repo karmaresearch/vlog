@@ -863,7 +863,7 @@ void Program::singulariseEquality() {
     addRule(head, body);
 
     for(auto pid : getAllPredicateIDs()) {
-        if (pid != sameAsPred.getId() && pid != mySameAsPred.getId() && isPredicateIDB(pid)) {
+        if (pid != sameAsPred.getId() && pid != mySameAsPred.getId()) {
             auto p = getPredicate(pid);
             auto card = p.getCardinality();
             VTuple t(card);
@@ -877,6 +877,7 @@ void Program::singulariseEquality() {
                 body.clear();
                 body.push_back(lp);
                 head.clear();
+                tp.set(VTerm(i + 1, 0), 0);
                 tp.set(VTerm(i + 1, 0), 1);
                 head.push_back(Literal(mySameAsPred, tp));
                 addRule(head, body);
@@ -1643,7 +1644,7 @@ void Program::axiomatizeEquality() {
     addRule(head, body);
 
     for(auto pid : getAllPredicateIDs()) {
-        if (pid != sameAsPred.getId() && pid != mySameAsPred.getId() && isPredicateIDB(pid)) {
+        if (pid != sameAsPred.getId() && pid != mySameAsPred.getId()) {
             auto p = getPredicate(pid);
             auto card = p.getCardinality();
             VTuple t(card);
@@ -1653,22 +1654,25 @@ void Program::axiomatizeEquality() {
             Literal lp(p, t);
 
             for(size_t i = 0; i < card; ++i) {
-                //Congruence body
-                std::vector<Literal> body;
-                body.push_back(lp);
                 VTuple tp(2);
                 tp.set(VTerm(i + 1, 0), 0);
-                tp.set(VTerm(card+1, 0), 1);
-                body.push_back(Literal(mySameAsPred, tp));
-                //Congruence head
-                std::vector<Literal> head;
-                VTuple tnew(card);
-                for(size_t j = 0; j < card; ++j) {
-                    tnew.set(VTerm(j+1, 0), j);
+
+                if (isPredicateIDB(pid)) {
+                    //Congruence body
+                    std::vector<Literal> body;
+                    body.push_back(lp);
+                    tp.set(VTerm(card+1, 0), 1);
+                    body.push_back(Literal(mySameAsPred, tp));
+                    //Congruence head
+                    std::vector<Literal> head;
+                    VTuple tnew(card);
+                    for(size_t j = 0; j < card; ++j) {
+                        tnew.set(VTerm(j+1, 0), j);
+                    }
+                    tnew.set(VTerm(card+1, 0), i);
+                    head.push_back(Literal(p, tnew));
+                    addRule(head, body);
                 }
-                tnew.set(VTerm(card+1, 0), i);
-                head.push_back(Literal(p, tnew));
-                addRule(head, body);
 
                 //Reflexivity
                 body.clear();
@@ -1687,7 +1691,7 @@ void Program::axiomatizeEquality() {
             //Replace the head of the rule with the new predicate
             std::vector<Literal> head;
             head.push_back(Literal(mySameAsPred, r.getHeads()[0].getTuple()));
-            addRule(head, r.getBody(), false, true);
+            addRule(head, r.getBody());
         } else {
             addRule(r.getHeads(), r.getBody());
         }

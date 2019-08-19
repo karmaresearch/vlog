@@ -161,13 +161,36 @@ bool Checker::MFA(Program &p, std::string sameasAlgo) {
     EDBLayer *db = p.getKB();
     EDBLayer layer(*db, false);
 
+    //I must rewrite the algorithms to support equality reasoning here and not
+    //later because dummy rules are added during the computation of the
+    //critical instance
+    if (sameasAlgo == "AXIOM") {
+        //Rewrite the rules to add the equality axioms
+        p.axiomatizeEquality();
+#if DEBUG
+        for(auto &r : p.getAllRules()) {
+            LOG(INFOL) << "After AXIOM " << r.tostring(&p, &layer);
+        }
+#endif
+    } else if (sameasAlgo == "SING") {
+        p.singulariseEquality();
+#if DEBUG
+        for(auto &r : p.getAllRules()) {
+            LOG(INFOL) << "After SING " << r.tostring(&p, &layer);
+        }
+#endif
+    } else if (sameasAlgo != "" && sameasAlgo != "NOTHING") {
+        LOG(ERRORL) << "Type of equality algorithm not recognized";
+        throw 10;
+    }
+
     Program newProgram(&layer);
     createCriticalInstance(newProgram, p, db, layer);
 
     //Launch the skolem chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
             &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 0, false,
-            NULL, sameasAlgo);
+            NULL, "");
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)
     if (sn->isFoundCyclicTerms()) {
@@ -198,7 +221,7 @@ bool Checker::MSA(Program &p) {
 }
 
 bool Checker::EMFA(Program &p) {
-   // Create  the critical instance (cdb)
+    // Create  the critical instance (cdb)
     EDBLayer *db = p.getKB();
     EDBLayer layer(*db, false);
 
@@ -207,8 +230,7 @@ bool Checker::EMFA(Program &p) {
 
     //Launch a simpler version of the skolem chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 0, false, NULL,
-            "SING");
+            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 0, false, NULL);
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)
     if (sn->isFoundCyclicTerms()) {
