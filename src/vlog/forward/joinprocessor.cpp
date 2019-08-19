@@ -2350,7 +2350,17 @@ void JoinExecutor::left_join(const FCInternalTable * filteredT1,
     processedTables++;
     for (int i = 1; i < tables2.size(); i++) {
         processedTables++;
-        t2 = t2->merge(tables2[i], nthreads);
+		if (! t2->supportsMerge()) {
+			if (tables2[i]->supportsMerge()) {
+				t2 = tables2[i]->merge(t2, nthreads);
+			} else {
+				std::shared_ptr<const FCInternalTable> pt(new InmemoryFCInternalTable(t2->getRowSize(), 0));
+				t2 = pt->merge(t2, nthreads);
+				t2 = t2->merge(tables2[i], nthreads);
+			}
+		} else {
+			t2 = t2->merge(tables2[i], nthreads);
+		}
     }
 
     //Sort t2
