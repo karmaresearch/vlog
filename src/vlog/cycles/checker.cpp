@@ -154,7 +154,7 @@ bool Checker::MFA(Program &p) {
 
     //Launch the skolem chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false);
+            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 0, false);
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)
     if (sn->isFoundCyclicTerms()) {
@@ -194,7 +194,7 @@ bool Checker::EMFA(Program &p) {
 
     //Launch a simpler version of the skolem chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false, NULL,
+            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 0, false, NULL,
             "SING");
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)
