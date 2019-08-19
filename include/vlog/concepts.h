@@ -571,6 +571,8 @@ class Program {
         // The number of stratification classes is also returned.
         bool stratify(std::vector<int> &stratification, int &nStatificationClasses);
 
+        VLIBEXP void axiomatizeEquality();
+
         ~Program() {
         }
 };
