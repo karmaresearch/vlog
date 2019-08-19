@@ -573,10 +573,6 @@ class Program {
 
         static std::string rewriteRDFOWLConstants(std::string input);
 
-        void axiomatizeEquality();
-
-        void singulariseEquality();
-
         static std::string compressRDFOWLConstants(std::string input);
 
         // Should be const
@@ -594,6 +590,10 @@ class Program {
         // stratification class.
         // The number of stratification classes is also returned.
         bool stratify(std::vector<int> &stratification, int &nStatificationClasses);
+
+        VLIBEXP void axiomatizeEquality();
+
+        VLIBEXP void singulariseEquality();
 
         ~Program() {
         }

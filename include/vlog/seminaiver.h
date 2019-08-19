@@ -127,7 +127,6 @@ class SemiNaiver {
                 const size_t minIteration,
                 const size_t maxIteration);
 
-
     protected:
         TypeChase typeChase;
         bool checkCyclicTerms;
