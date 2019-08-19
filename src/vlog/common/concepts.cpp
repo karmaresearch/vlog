@@ -756,17 +756,19 @@ void Program::singulariseEquality() {
 
     std::string sameAsName = "<http://www.w3.org/2002/07/owl#sameAs>";
     auto sameAsPred = getPredicate(sameAsName);
-
     std::string mySameAsName = "VlogAxiomEq";
     auto mySameAsPred = getPredicate(mySameAsName);
 
     //Rewrite the rules if there are multiple variable occurrences
     for(size_t i = 0; i < oldrules.size(); ++i) {
         Rule &r = oldrules[i];
+        LOG(DEBUGL) << "Processing rule " << r.tostring(this, kb);
         if (r.isEGD()) {
-            //TODO
+            //Replace the head of the rule with the new predicate
+            std::vector<Literal> head;
+            head.push_back(Literal(mySameAsPred, r.getHeads()[0].getTuple()));
+            addRule(head, r.getBody(), false, true);
         } else {
-            LOG(DEBUGL) << "Processing rule " << r.tostring(this, kb);
             //First get the largest var ID used in the rule
             uint8_t largestVarID = 0;
             for(auto &l : r.getBody()) {
@@ -828,7 +830,7 @@ void Program::singulariseEquality() {
             }
 
             //Create a new rule
-            allrules.push_back(Rule(r.getId(), r.getHeads(), newBody, r.isEGD()));
+            addRule(r.getHeads(), newBody);
         }
     }
 
@@ -861,7 +863,7 @@ void Program::singulariseEquality() {
     addRule(head, body);
 
     for(auto pid : getAllPredicateIDs()) {
-        if (pid != mySameAsPred.getId() && isPredicateIDB(pid)) {
+        if (pid != sameAsPred.getId() && pid != mySameAsPred.getId() && isPredicateIDB(pid)) {
             auto p = getPredicate(pid);
             auto card = p.getCardinality();
             VTuple t(card);
@@ -1606,6 +1608,11 @@ void Program::axiomatizeEquality() {
     std::vector<Rule> oldrules = allrules;
     cleanAllRules();
 
+    std::string sameAsName = "<http://www.w3.org/2002/07/owl#sameAs>";
+    auto sameAsPred = getPredicate(sameAsName);
+    std::string mySameAsName = "VlogAxiomEq";
+    auto mySameAsPred = getPredicate(mySameAsName);
+
     //Add transitive rule
     VTuple t(2);
     t.set(VTerm(1,0), 0);
@@ -1616,10 +1623,6 @@ void Program::axiomatizeEquality() {
     VTuple t2(2);
     t2.set(VTerm(2,0), 0);
     t2.set(VTerm(3,0), 1);
-    std::string sameAsName = "<http://www.w3.org/2002/07/owl#sameAs>";
-    auto sameAsPred = getPredicate(sameAsName);
-    std::string mySameAsName = "VlogAxiomEq";
-    auto mySameAsPred = getPredicate(mySameAsName);
 
     Literal transHead(mySameAsPred, t);
     Literal transBody1(mySameAsPred, t1);
@@ -1640,7 +1643,7 @@ void Program::axiomatizeEquality() {
     addRule(head, body);
 
     for(auto pid : getAllPredicateIDs()) {
-        if (pid != sameAsPred.getId() && isPredicateIDB(pid)) {
+        if (pid != sameAsPred.getId() && pid != mySameAsPred.getId() && isPredicateIDB(pid)) {
             auto p = getPredicate(pid);
             auto card = p.getCardinality();
             VTuple t(card);
@@ -1680,11 +1683,11 @@ void Program::axiomatizeEquality() {
 
     //Replace the \approx predicate
     for(auto &r : oldrules) {
-        if (r.isExistential()) {
+        if (r.isEGD()) {
             //Replace the head of the rule with the new predicate
             std::vector<Literal> head;
             head.push_back(Literal(mySameAsPred, r.getHeads()[0].getTuple()));
-            addRule(head, r.getBody());
+            addRule(head, r.getBody(), false, true);
         } else {
             addRule(r.getHeads(), r.getBody());
         }
