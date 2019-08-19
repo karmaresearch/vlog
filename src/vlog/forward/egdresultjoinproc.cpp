@@ -125,8 +125,38 @@ void EGDRuleProcessor::addColumns(const int blockid,
 void EGDRuleProcessor::addColumns(const int blockid, FCInternalTableItr *itr,
         const bool unique, const bool sorted,
         const bool lastInsert) {
-    LOG(ERRORL) << "Not implemented";
-    throw 10;
+
+    assert(itr->getNColumns() == 2);
+    assert(rowsize == 2);
+
+    uint8_t columns[256];
+    for (uint32_t i = 0; i < nCopyFromSecond; ++i) {
+        columns[i] = posFromSecond[i].second;
+    }
+    std::vector<std::shared_ptr<Column>> c = itr->getColumn(nCopyFromSecond, columns);
+    assert(c.size() == rowsize);
+
+    if (nCopyFromSecond > 1) {
+        std::vector<std::shared_ptr<Column>> c2;
+        int rowID = 0;
+        int largest = -1;
+        for (int i = 0; i < nCopyFromSecond; ++i) {
+            //Get the row with the smallest ID
+            int minID = INT_MAX;
+            for (int j = 0; j <  nCopyFromSecond; ++j) {
+                if (posFromSecond[j].first > largest &&
+                        posFromSecond[j].first < minID) {
+                    rowID = j;
+                    minID = posFromSecond[j].first;
+                }
+            }
+            c2.push_back(c[rowID]);
+            largest = posFromSecond[rowID].first;
+        }
+        assert(c2.size() == c.size());
+        c = c2;
+    }
+    addColumns(blockid, c, unique, sorted);
 }
 
 void EGDRuleProcessor::addColumn(const int blockid, const uint8_t pos,

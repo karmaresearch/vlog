@@ -826,7 +826,7 @@ int Reasoner::getNumberOfIDBPredicates(Literal &query, Program &program) {
 }
 
 void Reasoner::getMetrics(Literal &query, std::vector<uint8_t> *posBindings, std::vector<Term_t> *valueBindings,
-	    EDBLayer &layer, Program &program, Metrics &metrics, int maxDepth) {
+        EDBLayer &layer, Program &program, Metrics &metrics, int maxDepth) {
     std::unique_ptr<QSQR> evaluator = std::unique_ptr<QSQR>(
             new QSQR(layer, &program));
     memset(&metrics, 0, sizeof(Metrics));
@@ -980,7 +980,7 @@ std::shared_ptr<SemiNaiver> Reasoner::getSemiNaiver(EDBLayer &layer,
     if (interRuleThreads > 0 && restrictedCheck == NULL) {
         std::shared_ptr<SemiNaiver> sn(new SemiNaiverThreaded(
                     layer, p, opt_intersect, opt_filtering,
-                    shuffleRules, nthreads, interRuleThreads));
+                    shuffleRules, nthreads, interRuleThreads, sameasAlgo));
         return sn;
     } else {
         std::shared_ptr<SemiNaiver> sn(new SemiNaiver(
@@ -999,16 +999,16 @@ std::shared_ptr<TriggerSemiNaiver> Reasoner::getTriggeredSemiNaiver(EDBLayer &la
 }
 
 /*std::shared_ptr<SemiNaiver> Reasoner::fullMaterialization(EDBLayer &layer,
-        Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
-        bool restrictedChase, int nthreads, int interRuleThreads, bool shuffleRules) {
-    LOG(INFOL) << "Starting full materialization";
-    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    std::shared_ptr<SemiNaiver> sn = getSemiNaiver(layer,
-            p, opt_intersect, opt_filtering, opt_threaded,
-            restrictedChase, nthreads, interRuleThreads, shuffleRules);
-    sn->run();
-    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
-    sn->printCountAllIDBs("");
-    return sn;
-}*/
+  Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
+  bool restrictedChase, int nthreads, int interRuleThreads, bool shuffleRules) {
+  LOG(INFOL) << "Starting full materialization";
+  std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+  std::shared_ptr<SemiNaiver> sn = getSemiNaiver(layer,
+  p, opt_intersect, opt_filtering, opt_threaded,
+  restrictedChase, nthreads, interRuleThreads, shuffleRules);
+  sn->run();
+  std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+  LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
+  sn->printCountAllIDBs("");
+  return sn;
+  }*/

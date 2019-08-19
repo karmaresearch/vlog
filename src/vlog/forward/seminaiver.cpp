@@ -110,7 +110,7 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
             for(auto &r : program->getAllRules()) {
                 LOG(DEBUGL) << "After SING " << r.tostring(program, &layer);
             }
-        } else if (sameasAlgo != "NOTHING") {
+        } else if (sameasAlgo != "" && sameasAlgo != "NOTHING") {
             LOG(ERRORL) << "Type of equality algorithm not recognized";
             throw 10;
         }

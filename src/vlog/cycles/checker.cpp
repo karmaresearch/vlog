@@ -8,7 +8,9 @@
 typedef std::pair<PredId_t, uint8_t> vpos;
 typedef std::pair<uint32_t, uint8_t> rpos;
 
-int Checker::checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db, bool rewriteMultihead) {
+int Checker::checkFromFile(std::string ruleFile, std::string alg,
+        std::string sameasAlgo,
+        EDBLayer &db, bool rewriteMultihead) {
     //Parse the rules into a program
     Program p(&db);
     std::string s = p.readFromFile(ruleFile, rewriteMultihead);
@@ -16,10 +18,12 @@ int Checker::checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db, 
         LOG(ERRORL) << "Error: " << s;
         throw 10;
     }
-    return check(p, alg, db);
+    return check(p, alg, sameasAlgo, db);
 }
 
-int Checker::checkFromString(std::string rulesString, std::string alg, EDBLayer &db, bool rewriteMultihead) {
+int Checker::checkFromString(std::string rulesString, std::string alg,
+        std::string sameasAlgo,
+        EDBLayer &db, bool rewriteMultihead) {
     //Parse the rules into a program
     Program p(&db);
     std::string s = p.readFromString(rulesString, rewriteMultihead);
@@ -27,17 +31,25 @@ int Checker::checkFromString(std::string rulesString, std::string alg, EDBLayer 
         LOG(ERRORL) << "Error: " << s;
         throw 10;
     }
-    return check(p, alg, db);
+    return check(p, alg, sameasAlgo, db);
 }
 
-int Checker::check(Program &p, std::string alg, EDBLayer &db) {
+int Checker::check(Program &p, std::string alg, std::string sameasAlgo,
+        EDBLayer &db) {
     if (! p.areExistentialRules()) {
         LOG(INFOL) << "No existential rules, termination detection not run";
         return 1;
     }
+
+    if (sameasAlgo != "" && alg != "MFA" && alg != "EMFA") {
+        LOG(ERRORL) << "The only acyclicity conditions that support equality"
+            "reasoning are MFA and EMFA";
+        throw 10;
+    }
+
     if (alg == "MFA") {
         // Model Faithful Acyclic
-        return MFA(p) ? 1 : 0;
+        return MFA(p, sameasAlgo) ? 1 : 0;
     } else if (alg == "JA") {
         // Joint Acyclic
         return JA(p, false) ? 1 : 0;
@@ -144,7 +156,7 @@ void Checker::createCriticalInstance(Program &newProgram,
     addIDBCritical(newProgram, &layer);
 }
 
-bool Checker::MFA(Program &p) {
+bool Checker::MFA(Program &p, std::string sameasAlgo) {
     // Create  the critical instance (cdb)
     EDBLayer *db = p.getKB();
     EDBLayer layer(*db, false);
@@ -154,7 +166,8 @@ bool Checker::MFA(Program &p) {
 
     //Launch the skolem chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 0, false);
+            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 0, false,
+            NULL, sameasAlgo);
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)
     if (sn->isFoundCyclicTerms()) {
@@ -174,7 +187,7 @@ bool Checker::MSA(Program &p) {
 
     //Launch a simpler version of the skolem chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, TypeChase::SUM_CHASE, 1, 1, false);
+            &newProgram, true, true, false, TypeChase::SUM_CHASE, 1, 0, false);
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)
     if (sn->isFoundCyclicTerms()) {

@@ -186,10 +186,11 @@ class SemiNaiver {
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 int nthreads, bool shuffleRules,
-                bool ignoreExistentialRules) :
+                bool ignoreExistentialRules,
+                std::string sameasAlgo = "") :
             SemiNaiver(layer, program, opt_intersect, opt_filtering,
                     multithreaded, TypeChase::SKOLEM_CHASE, nthreads, shuffleRules,
-                    ignoreExistentialRules) {
+                    ignoreExistentialRules, NULL, sameasAlgo, false) {
             }
 
         VLIBEXP void run(unsigned long *timeout = NULL,

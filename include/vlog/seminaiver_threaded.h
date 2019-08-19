@@ -77,9 +77,10 @@ class SemiNaiverThreaded: public SemiNaiver {
                 bool opt_filtering,
                 bool shuffleRules,
                 const int nthreads,
-                const int interRuleThreads) : SemiNaiver(layer,
+                const int interRuleThreads,
+                std::string sameasAlgo) : SemiNaiver(layer,
                     program, opt_intersect, opt_filtering, true,
-                    nthreads, shuffleRules, false),
+                    nthreads, shuffleRules, false, sameasAlgo),
                 interRuleThreads(interRuleThreads) {
                     // Marks for parallel version
                     for (int i = 0; i < program->getNPredicates(); i++) {

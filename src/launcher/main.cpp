@@ -1146,10 +1146,12 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     runLiteralQuery(edb, p, literal, reasoner, vm);
 }
 
-void checkAcyclicity(std::string ruleFile, std::string alg, EDBLayer &db, bool rewriteMultihead) {
-	std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    int response = Checker::checkFromFile(ruleFile, alg, db, rewriteMultihead);
-	std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+void checkAcyclicity(std::string ruleFile, std::string alg,
+        std::string sameasAlgo, EDBLayer &db, bool rewriteMultihead) {
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+    int response = Checker::checkFromFile(ruleFile, alg, sameasAlgo,
+            db, rewriteMultihead);
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     std::cout << "The response is: ";
     if (response == 0) {
         std::cout << "Unknown";
@@ -1159,8 +1161,8 @@ void checkAcyclicity(std::string ruleFile, std::string alg, EDBLayer &db, bool r
         std::cout << "Does not always terminate.";
     }
     std::cout << std::endl;
-	std::cout << "Runtime " << alg << " check = " <<
-                sec.count() * 1000 << " milliseconds" << std::endl;
+    std::cout << "Runtime " << alg << " check = " <<
+        sec.count() * 1000 << " milliseconds" << std::endl;
 }
 
 void detectDeps(std::string ruleFile, EDBLayer &db) {
@@ -1529,7 +1531,8 @@ int main(int argc, const char** argv) {
         EDBLayer *layer = new EDBLayer(conf, false);
         string rulesFile = vm["rules"].as<string>();
         string alg = vm["alg"].as<string>();
-        checkAcyclicity(rulesFile, alg, *layer, vm["rewriteMultihead"].as<bool>());
+        checkAcyclicity(rulesFile, alg, vm["sameasAlgo"].as<std::string>(),
+                *layer, vm["rewriteMultihead"].as<bool>());
         delete layer;
     } else if (cmd == "deps") {
         EDBConf conf(edbFile);
