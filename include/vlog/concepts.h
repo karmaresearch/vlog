@@ -558,10 +558,6 @@ class Program {
 
         VLIBEXP bool areExistentialRules();
 
-        void axiomatizeEquality();
-
-        void singulariseEquality();
-
         static std::string compressRDFOWLConstants(std::string input);
 
         VLIBEXP std::vector<PredId_t> getAllEDBPredicateIds();
@@ -572,6 +568,8 @@ class Program {
         bool stratify(std::vector<int> &stratification, int &nStatificationClasses);
 
         VLIBEXP void axiomatizeEquality();
+
+        VLIBEXP void singulariseEquality();
 
         ~Program() {
         }
