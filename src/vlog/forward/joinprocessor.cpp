@@ -2457,7 +2457,7 @@ void JoinExecutor::do_left_join(
         // LOG(TRACEL) << "    L. XXXXXX";
         // LOG(TRACEL) << "    L. l1: "<< l1;
         // LOG(TRACEL) << "    L. u1: "<< u1;
-        // LOG(TRACEL) << "    L. l2: "<< l1;
+        // LOG(TRACEL) << "    L. l2: "<< l2;
         // LOG(TRACEL) << "    L. u2: "<< u2;
 
         if (l1 == u1)
@@ -2465,7 +2465,7 @@ void JoinExecutor::do_left_join(
 
         if (l2 == u2){
             while (l1 < u1){
-                output->processResults(0, vectors1, l1, vectors2, u2, false);
+                output->processResults(0, vectors1, l1, vectors2, l2, false);
                 ++l1;
             }
             break;
@@ -2481,7 +2481,7 @@ void JoinExecutor::do_left_join(
             l2++;
         } else /* if (res < 0) */ {
             LOG(TRACEL) << "  L. res < 0";
-            output->processResults(0, vectors1, l1, vectors2, u2, false);
+            output->processResults(0, vectors1, l1, vectors2, l2, false);
             ++l1;
         }
     }
