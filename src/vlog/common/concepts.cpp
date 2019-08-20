@@ -1242,6 +1242,13 @@ std::string Program::parseRule(std::string rule, bool rewriteMultihead) {
             }
             LOG(DEBUGL) << "headliteral = \"" << headLiteral << "\"";
             Literal h = parseLiteral(headLiteral, dictVariables);
+			if (h.isNegated()) {
+				throw "head literal cannot be negated";
+			}
+			Predicate pred = h.getPredicate();
+			if (pred.getType() == EDB) {
+				throw "predicate in head cannot be EDB";
+			}
             lHeads.push_back(h);
         }
 

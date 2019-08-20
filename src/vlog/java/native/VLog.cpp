@@ -632,6 +632,18 @@ extern "C" {
                     return;
                 }
 
+				for (auto lit : vhead) {
+					if (lit.getPredicate().getType() == EDB) {
+						std::string pred = f->program->getPredicateName(lit.getPredicate().getId());
+						if (pred == std::string("")) {
+							throwIllegalArgumentException(env, "Rule head cannot contain EDB predicate");
+						} else {
+							throwIllegalArgumentException(env, ("Rule head cannot contain EDB predicate " + pred).c_str());
+						}
+						return;
+					}
+				}
+
                 // And add the rule.
                 f->program->addRule(vhead, vbody, rewrite != 0);
             }
