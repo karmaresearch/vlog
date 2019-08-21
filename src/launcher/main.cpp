@@ -258,7 +258,8 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     query_options.add<int64_t>("", "reasoningThreshold", 1000000,
             "This parameter sets a threshold to estimate the reasoning cost of a pattern. This cost can be broadly associated to the cardinality of the pattern. It is used to choose either TopDown or Magic evalution. Default is 1000000 (1M).", false);
     query_options.add<string>("", "reasoningAlgo", "",
-            "Determines the reasoning algo (only for <queryLiteral>). Possible values are \"qsqr\", \"magic\", \"auto\".", false);
+            "Determines the reasoning algo (only for <queryLiteral>). Possible values are \"qsqr\", \"magic\", \"onlyMetrics\", \"auto\".", false);
+    query_options.add<int>("", "featureDepth", 5, "Recursion level of feature generation procedure", false);
     query_options.add<string>("", "trigger_paths", "",
             "Path to the file that contains trigger graph execution paths",
             false);
@@ -817,7 +818,8 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
     if (algo == "onlyMetrics") {
         Metrics m;
         std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
-        reasoner.getMetrics(literal, NULL, NULL, edb, p, m, 5);
+        int depth = vm["featureDepth"].as<int>();
+        reasoner.getMetrics(literal, NULL, NULL, edb, p, m, depth);
         std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
         LOG(INFOL) << "Query = " << literal.tostring(&p, &edb) << "Vector: " << \
         m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
@@ -1086,6 +1088,7 @@ int main(int argc, const char** argv) {
                 uint64_t timeout = vm["timeout"].as<unsigned int>();
                 uint8_t repeatQuery = vm["repeatQuery"].as<unsigned int>();
                 string algo = vm["reasoningAlgo"].as<string>();
+                int featureDepth = vm["featureDepth"].as<int>();
                 if (algo == "onlyMetrics") {
                     for (auto query : trainingQueriesVector) {
                         Dictionary dictVariables;
@@ -1093,7 +1096,7 @@ int main(int argc, const char** argv) {
                         Reasoner reasoner(vm["reasoningThreshold"].as<int64_t>());
                         Metrics m;
                         std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
-                        reasoner.getMetrics(literal, NULL, NULL, *layer, program, m, 5);
+                        reasoner.getMetrics(literal, NULL, NULL, *layer, program, m, featureDepth);
                         std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
                         LOG(INFOL) << "Query = " << query << "Vector: " << \
                         m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
@@ -1104,7 +1107,7 @@ int main(int argc, const char** argv) {
                     vector<Metrics> featuresVector;
                     vector<int> decisionVector;
                     int nMagicQueries = 0;
-                    Training::runQueries(trainingQueriesVector, *layer, program, timeout, repeatQuery, featuresVector, decisionVector,nMagicQueries, logFileName);
+                    Training::runQueries(trainingQueriesVector, *layer, program, timeout, repeatQuery, featuresVector, decisionVector,nMagicQueries, logFileName, featureDepth);
                 }
             }
         }
@@ -1301,6 +1304,7 @@ int main(int argc, const char** argv) {
             double accuracy = 0.0;
             uint64_t timeout = vm["timeout"].as<unsigned int>();
             uint8_t repeatQuery = vm["repeatQuery"].as<unsigned int>();
+            int featureDepth = vm["featureDepth"].as<int>();
             Training::trainAndTestModel(trainingQueriesVector,
                     testQueriesLog,
                     *layer,
@@ -1308,7 +1312,8 @@ int main(int argc, const char** argv) {
                     accuracy,
                     timeout,
                     repeatQuery,
-                    logFileName);
+                    logFileName,
+                    featureDepth);
         }
     } else if (cmd == "server") {
 #ifdef WEBINTERFACE

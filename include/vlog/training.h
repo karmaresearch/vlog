@@ -67,6 +67,7 @@ class Training {
         string& strMagicTime,
         uint64_t timeout,
         uint8_t repeatQuery,
+        int featureDepth,
         vector<Metrics>& featuresVector,
         vector<int>& decisionVector);
 
@@ -88,7 +89,8 @@ class Training {
         vector<Metrics>& featuresVector,
         vector<int>& decisionVector,
         int& nMagicQueries,
-        string& logFileName);
+        string& logFileName,
+        int featureDepth);
 
     static void trainAndTestModel(vector<string>& trainingQueriesVector,
         vector<string>& testQueriesLog,
@@ -97,7 +99,8 @@ class Training {
         double& accuracy,
         uint64_t timeout,
         uint8_t repeatQuery,
-        string& logFileName);
+        string& logFileName,
+        int featureDepth);
 };
 
 #endif

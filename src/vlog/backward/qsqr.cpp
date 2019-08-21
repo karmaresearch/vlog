@@ -213,7 +213,8 @@ void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Ru
 	vector<Substitution> filteredSubstitutions;
 	for (int i = 0; i < nSubs; i++) {
 	    if (! substitutions[i].destination.isVariable()) {
-		 filteredSubstitutions[filterednSubs++] = substitutions[i];
+		 filteredSubstitutions.push_back(substitutions[i]);
+         ++filterednSubs;
 	    }
 	}
 
