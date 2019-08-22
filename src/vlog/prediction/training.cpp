@@ -1020,6 +1020,7 @@ void Training::runQueries(vector<string>& trainingQueriesVector,
         uint8_t repeatQuery,
         vector<Metrics>& featuresVector,
         vector<int>& decisionVector,
+        vector<double>& featuresTimesVector,
         int& nMagicQueries,
         string& logFileName,
         int featureDepth) {
@@ -1053,12 +1054,13 @@ void Training::runQueries(vector<string>& trainingQueriesVector,
                     repeatQuery,
                     featureDepth,
                     featuresVector,
-                    decisionVector);
-            features += ",0";
+                    decisionVector,
+                    featuresTimesVector);
             strResults.push_back(results);
             strFeatures.push_back(features);
             strQsqrTime.push_back(qsqrTime);
             logTraining << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back() << endl;
+            LOG(INFOL) << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back();
             if (stoull(qsqrTime) == time && stoull(magicTime) == time) {
                 LOG(INFOL) << "Query timed out : " << q;
                 timedOutQueries.push_back(q);
@@ -1089,9 +1091,14 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
 
     vector<Metrics> featuresVector;
     vector<int> decisionVector;
+    vector<double> featuresTimesVector;
     int nMagicQueries = 0;
-    Training::runQueries(trainingQueriesVector, edb, p, timeout, repeatQuery, featuresVector, decisionVector,nMagicQueries, logFileName, featureDepth);
+    Training::runQueries(trainingQueriesVector, edb, p, timeout, repeatQuery, featuresVector, decisionVector, featuresTimesVector, nMagicQueries, logFileName, featureDepth);
 
+    double totalFeaturesTime = accumulate(featuresTimesVector.begin(), featuresTimesVector.end(), 0.0);
+    LOG(INFOL) << "Total time to generate features : " << totalFeaturesTime;
+    //TODO: do not test in cpp
+    return;
     vector<Metrics> balancedFeaturesVector;
     vector<int> balancedDecisionVector;
     vector<string> balancedTrainingQueriesVector;
@@ -1188,7 +1195,6 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         Instance instance(label, features);
         testInst.push_back(instance);
     }
-
     for (int i =0; i < testInst.size(); ++i) {
         testInst[i].x[0] = std::log1p(testInst[i].x[0]);
         testInst[i].x[1] = std::log1p(testInst[i].x[1]);
@@ -1236,6 +1242,7 @@ void Training::execLiteralQueries(vector<string>& queryVector,
 
     vector<Metrics> featuresVector;
     vector<int> decisionVector;
+    vector<double> featuresTimesVector;
     int i = 1;
     vector<string> strResults;
     vector<string> strFeatures;
@@ -1266,8 +1273,8 @@ void Training::execLiteralQueries(vector<string>& queryVector,
                     repeatQuery,
                     featureDepth,
                     featuresVector,
-                    decisionVector);
-            features += ",0";
+                    decisionVector,
+                    featuresTimesVector);
             strResults.push_back(results);
             strFeatures.push_back(features);
             strQsqrTime.push_back(qsqrTime);
@@ -1305,14 +1312,22 @@ void Training::execLiteralQuery(string& literalquery,
         uint8_t repeatQuery,
         int featureDepth,
         vector<Metrics>& featuresVector,
-        vector<int>& decisionVector) {
+        vector<int>& decisionVector,
+        vector<double>& featuresTimesVector) {
 
     Dictionary dictVariables;
     Literal literal = p.parseLiteral(literalquery, dictVariables);
     Reasoner reasoner(1000000);
 
     Metrics metrics;
+    std::chrono::duration<double> durationMetrics;
+    std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
     reasoner.getMetrics(literal, NULL, NULL, edb, p, metrics, featureDepth);
+    std::chrono::system_clock::time_point endMetrics = std::chrono::system_clock::now();
+
+    durationMetrics = endMetrics - startMetrics;
+    featuresTimesVector.push_back(durationMetrics.count() * 1000);
+
     featuresVector.push_back(metrics);
     stringstream strMetrics;
     strMetrics  << std::to_string(metrics.cost) << ","

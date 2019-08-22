@@ -69,7 +69,8 @@ class Training {
         uint8_t repeatQuery,
         int featureDepth,
         vector<Metrics>& featuresVector,
-        vector<int>& decisionVector);
+        vector<int>& decisionVector,
+        vector<double>& featuresTimesVector);
 
     static void execLiteralQueries(vector<string>& literalquery,
         EDBLayer& edb,
@@ -88,6 +89,7 @@ class Training {
         uint8_t repeatQuery,
         vector<Metrics>& featuresVector,
         vector<int>& decisionVector,
+        vector<double>& featuresTimesVector,
         int& nMagicQueries,
         string& logFileName,
         int featureDepth);
