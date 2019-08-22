@@ -191,6 +191,7 @@ void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Ru
 	metrics.estimate += result;
 	metrics.intermediateResults += result;
 	metrics.cost += result;
+	return;
     }
 
     std::vector<Rule> r = program->getAllRulesByPredicate(pred.getId());
@@ -230,52 +231,58 @@ void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Ru
 void QSQR::estimateRule(Metrics &metrics, int depth, Rule &rule, vector<Substitution>& subs, int nSubs, std::vector<Rule> &execRules) {
     bool exists = false;
     for (std::vector<Rule>::iterator itr = execRules.begin(); itr != execRules.end() && ! exists; itr++) {
-	exists = itr->getHead(0) == rule.getHead(0) && itr->getBody() == rule.getBody();
+	exists = itr->getId() == rule.getId();
     }
     if (!exists) {
 	LOG(DEBUGL) << "Adding rule " << rule.tostring(program, &layer);
 	execRules.push_back(rule);
     }
     metrics.countRules++;
-    std::vector<Literal> body = rule.getBody();
-    Literal substitutedHead = rule.getHead(0).substitutes(subs);
-    std::vector<uint8_t> headVars = substitutedHead.getAllVars();
-    std::vector<uint8_t> allVars;
     bool noAnswers = false;
-    for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end(); ++itr) {
-	Metrics m;
-	memset(&m, 0, sizeof(Metrics));
-	Literal substituted = itr->substitutes(subs);
-	LOG(DEBUGL) << "Substituted literal = " << substituted.tostring(program, &layer);
-	estimateQuery(m, depth, substituted, execRules);
-	metrics.countRules += m.countRules;
-	metrics.countIntermediateQueries += m.countIntermediateQueries;
-	metrics.cost += m.cost;
-	metrics.cost += m.intermediateResults * metrics.intermediateResults;
+    std::vector<Literal> body = rule.getBody();
+    if (depth > 0) {
+	Literal substitutedHead = rule.getHead(0).substitutes(subs);
+	std::vector<uint8_t> headVars = substitutedHead.getAllVars();
+	std::vector<uint8_t> allVars;
+	for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end(); ++itr) {
+	    Metrics m;
+	    memset(&m, 0, sizeof(Metrics));
+	    Literal substituted = itr->substitutes(subs);
+	    LOG(DEBUGL) << "Substituted literal = " << substituted.tostring(program, &layer);
+	    estimateQuery(m, depth, substituted, execRules);
+	    metrics.countRules += m.countRules;
+	    metrics.countIntermediateQueries += m.countIntermediateQueries;
+	    metrics.cost += m.cost;
+	    metrics.cost += m.intermediateResults * metrics.intermediateResults;
 
-	if (m.estimate == 0) {
-	    // Should only be the case when we are sure...
-	    noAnswers = true;
-	    break;
-	}
+	    if (m.estimate == 0) {
+		// Should only be the case when we are sure...
+		noAnswers = true;
+		break;
+	    }
 
-	// Check for filtering join ...
-	std::vector<uint8_t> newAllVars = substituted.getNewVars(allVars);
-	bool contribution = newAllVars.size() > 0;
-	for (int i = 0; i < newAllVars.size(); i++) {
-	    allVars.push_back(newAllVars[i]);
-	}
-	if (contribution) {
-	    metrics.intermediateResults += m.intermediateResults;
-	    // check if the literal has variables in common with the LHS. If not, no contribution to estimate?
-	    std::vector<uint8_t> shared = substituted.getSharedVars(headVars);
-	    if (shared.size() == 0) {
-		contribution = false;
+	    // Check for filtering join ...
+	    std::vector<uint8_t> newAllVars = substituted.getNewVars(allVars);
+	    bool contribution = newAllVars.size() > 0;
+	    for (int i = 0; i < newAllVars.size(); i++) {
+		allVars.push_back(newAllVars[i]);
+	    }
+	    if (contribution) {
+		metrics.intermediateResults += m.intermediateResults;
+		// check if the literal has variables in common with the LHS. If not, no contribution to estimate?
+		std::vector<uint8_t> shared = substituted.getSharedVars(headVars);
+		if (shared.size() == 0) {
+		    contribution = false;
+		}
+	    }
+	    if (contribution) {
+		metrics.estimate += m.estimate;
 	    }
 	}
-	if (contribution) {
-	    metrics.estimate += m.estimate;
-	}
+    } else {
+	metrics.cost += body.size();
+	metrics.estimate += body.size();
+	metrics.intermediateResults += body.size();
     }
     if (noAnswers) {
 	metrics.estimate = 0;
