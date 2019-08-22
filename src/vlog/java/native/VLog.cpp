@@ -796,6 +796,7 @@ extern "C" {
 		}
 		TupleIterator *iter = getQueryIter(env, obj, (PredId_t) pred, q, (jboolean) true);
 		if (iter == NULL) {
+			streamout.close();
 			return;
 		}
 		size_t sz = iter->getTupleSize();
@@ -834,6 +835,9 @@ extern "C" {
 	 */
 	JNIEXPORT jboolean JNICALL Java_karmaresearch_vlog_QueryResultIterator_hasNext(JNIEnv *env, jobject obj, jlong ref) {
 		TupleIterator *iter = (TupleIterator *) ref;
+		if (iter == NULL) {
+			return (jboolean) false;
+		}
 		return (jboolean) iter->hasNext();
 	}
 
@@ -844,6 +848,9 @@ extern "C" {
 	 */
 	JNIEXPORT jlongArray JNICALL Java_karmaresearch_vlog_QueryResultIterator_next(JNIEnv *env, jobject obj, jlong ref) {
 		TupleIterator *iter = (TupleIterator *) ref;
+		if (iter == NULL) {
+			return NULL;
+		}
 		size_t sz = iter->getTupleSize();
 		iter->next();
 		jlong res[256];
@@ -863,7 +870,9 @@ extern "C" {
 	 */
 	JNIEXPORT void JNICALL Java_karmaresearch_vlog_QueryResultIterator_cleanup(JNIEnv *env, jobject obj, jlong ref) {
 		TupleIterator *iter = (TupleIterator *) ref;
-		delete iter;
+		if (iter != NULL) {
+			delete iter;
+		}
 	}
 
 	/*
