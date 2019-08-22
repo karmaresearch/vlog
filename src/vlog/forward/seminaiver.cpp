@@ -77,18 +77,19 @@ string set_to_string(std::unordered_set<int> s) {
 
 SemiNaiver::SemiNaiver(EDBLayer &layer,
         Program *program, bool opt_intersect, bool opt_filtering,
-        bool multithreaded, bool restrictedChase, int nthreads, bool shuffle,
-        bool ignoreExistentialRules) :
+        bool multithreaded, TypeChase typeChase, int nthreads, bool shuffle,
+        bool ignoreExistentialRules, Program *RMFC_check) :
     opt_intersect(opt_intersect),
     opt_filtering(opt_filtering),
     multithreaded(multithreaded),
-    restrictedChase(restrictedChase),
+    typeChase(typeChase),
     running(false),
     layer(layer),
     program(program),
     nthreads(nthreads),
     checkCyclicTerms(false),
-    ignoreExistentialRules(ignoreExistentialRules) {
+    ignoreExistentialRules(ignoreExistentialRules),
+    RMFC_program(RMFC_check) {
 
         std::vector<Rule> ruleset = program->getAllRules();
         predicatesTables.resize(program->getMaxPredicateId());
@@ -99,13 +100,16 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
             LOG(ERRORL) << "Program could not be stratified";
             throw std::runtime_error("Program could not be stratified");
         }
-        LOG(INFOL) << "nStratificationClasses = " << nStratificationClasses;
+        LOG(DEBUGL) << "nStratificationClasses = " << nStratificationClasses;
 
         LOG(DEBUGL) << "Running SemiNaiver, opt_intersect = " << opt_intersect << ", opt_filtering = " << opt_filtering << ", multithreading = " << multithreaded << ", shuffle = " << shuffle;
 
 
         uint32_t ruleid = 0;
         this->allIDBRules.resize(nStratificationClasses);
+        for (int i = 0; i < nStratificationClasses; i++) {
+            this->allIDBRules[i].reserve(ruleset.size());
+        }
         for (std::vector<Rule>::iterator itr = ruleset.begin(); itr != ruleset.end();
                 ++itr) {
             RuleExecutionDetails *d = new RuleExecutionDetails(*itr, ruleid++);
@@ -117,10 +121,13 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
             }
             if (d->nIDBs != 0) {
                 PredId_t id = itr->getFirstHead().getPredicate().getId();
-                this->allIDBRules[stratification[id]].push_back(*d);
+                this->allIDBRules[nStratificationClasses == 1 ? 0 : stratification[id]].push_back(*d);
             } else
                 this->allEDBRules.push_back(*d);
             delete d;
+        }
+        for (int i = 0; i < nStratificationClasses; i++) {
+            this->allIDBRules[i].reserve(this->allIDBRules[i].size());
         }
 
 #if 0
@@ -216,7 +223,7 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
 bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
         std::vector<std::vector<RuleExecutionDetails>> &ruleset,
         std::vector<StatIteration> &costRules,
-        const uint32_t limitView,
+        const size_t limitView,
         bool fixpoint, unsigned long *timeout) {
 #if DEBUG
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
@@ -254,15 +261,19 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     LOG(DEBUGL) << "Optimizing ruleset...";
 #endif
+    size_t allRulesSize = 0;
     for (int k = 0; k < allIDBRules.size(); k++) {
         for (std::vector<RuleExecutionDetails>::iterator itr = allIDBRules[k].begin();
                 itr != allIDBRules[k].end();
                 ++itr) {
+#if DEBUG
             LOG(DEBUGL) << "Optimizing rule " << itr->rule.tostring(NULL, NULL);
+#endif
             itr->createExecutionPlans(checkCyclicTerms);
             itr->calculateNVarsInHeadFromEDB();
             itr->lastExecution = lastExecution;
 
+#if DEBUG
             for (int i = 0; i < itr->orderExecutions.size(); ++i) {
                 string plan = "";
                 for (int j = 0; j < itr->orderExecutions[i].plan.size(); ++j) {
@@ -272,6 +283,8 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
                 LOG(DEBUGL) << "-->" << plan;
             }
             LOG(DEBUGL) << itr->rule.tostring(program, &layer);
+#endif
+            allRulesSize += allIDBRules[k].size();
         }
     }
     for (std::vector<RuleExecutionDetails>::iterator itr = allEDBRules.begin();
@@ -279,6 +292,8 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
             ++itr) {
         itr->createExecutionPlans(checkCyclicTerms);
     }
+    allRulesSize += allEDBRules.size();
+    allrules.reserve(allRulesSize);
 
     //Setup the datastructures to handle the chase
     std::copy(allEDBRules.begin(), allEDBRules.end(), std::back_inserter(allrules));
@@ -286,7 +301,9 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
         std::copy(allIDBRules[k].begin(), allIDBRules[k].end(), std::back_inserter(allrules));
     }
     chaseMgmt = std::shared_ptr<ChaseMgmt>(new ChaseMgmt(allrules,
-                restrictedChase, checkCyclicTerms, singleRuleToCheck));
+                typeChase, checkCyclicTerms,
+                singleRuleToCheck,
+                predIgnoreBlock));
 #if DEBUG
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     LOG(DEBUGL) << "Runtime ruleset optimization ms = " << sec.count() * 1000;
@@ -294,9 +311,11 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
 }
 
 void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
-        bool checkCyclicTerms, int singleRuleToCheck) {
+        bool checkCyclicTerms, int singleRuleToCheck, PredId_t predIgnoreBlock) {
     this->checkCyclicTerms = checkCyclicTerms;
     this->foundCyclicTerms = false;
+    this->predIgnoreBlock = predIgnoreBlock; //Used in the RMSA
+
     running = true;
     iteration = it;
     startTime = std::chrono::system_clock::now();
@@ -311,7 +330,9 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
     //Used for statistics
     std::vector<StatIteration> costRules;
 
-    if (restrictedChase && program->areExistentialRules()) {
+    if ((typeChase == TypeChase::RESTRICTED_CHASE ||
+                typeChase == TypeChase::SUM_RESTRICTED_CHASE)
+            && program->areExistentialRules()) {
         //Split the program: First execute the rules without existential
         //quantifiers, then all the others
         std::vector<RuleExecutionDetails> originalEDBruleset = allEDBRules;
@@ -363,7 +384,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
             else
                 resp2 = executeRules(emptyRuleset, tmpExtIDBRules, costRules,
                         iteration == 0 ? 1 : iteration, false, timeout);
-            if ((!resp1 && !resp2) || foundCyclicTerms) {
+            if ((!resp1 && !resp2) || (foundCyclicTerms && typeChase != TypeChase::SUM_RESTRICTED_CHASE)) {
                 break; //Fix-point
             }
             loopNr++;
@@ -404,7 +425,7 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
 bool SemiNaiver::executeUntilSaturation(
         std::vector<RuleExecutionDetails> &ruleset,
         std::vector<StatIteration> &costRules,
-        const uint32_t limitView,
+        const size_t limitView,
         bool fixpoint, unsigned long *timeout) {
     size_t currentRule = 0;
     uint32_t rulesWithoutDerivation = 0;
@@ -444,14 +465,6 @@ bool SemiNaiver::executeUntilSaturation(
         }
         iteration++;
 
-        if (timeout != NULL && *timeout != 0) {
-            std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
-            if (s.count() > *timeout) {
-                *timeout = 0;   // To indicate materialization was stopped because of timeout.
-                return newDer;
-            }
-        }
-
         if (response) {
             if (checkCyclicTerms) {
                 foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
@@ -459,6 +472,12 @@ bool SemiNaiver::executeUntilSaturation(
                     LOG(DEBUGL) << "Found a cyclic term";
                     return newDer;
                 }
+            }
+
+            if ((typeChase == TypeChase::RESTRICTED_CHASE ||
+                        typeChase == TypeChase::SUM_RESTRICTED_CHASE) &&
+                    ruleset[currentRule].rule.isExistential()) {
+                return response;
             }
 
             //I disable this...
@@ -639,23 +658,28 @@ void SemiNaiver::addDataToIDBRelation(const Predicate pred,
     table->addBlock(block);
 }
 
-bool SemiNaiver::bodyChangedSince(Rule &rule, uint32_t iteration) {
-    LOG(DEBUGL) << "bodyChangedSince, iteration = " << iteration;
+bool SemiNaiver::bodyChangedSince(Rule &rule, size_t iteration) {
+    LOG(DEBUGL) << "bodyChangedSince, iteration = " << iteration <<
+        " Rule: " << rule.tostring(program, &layer);
     const std::vector<Literal> &body = rule.getBody();
     const int nBodyLiterals = body.size();
     for (int i = 0; i < nBodyLiterals; ++i) {
         if (body[i].getPredicate().getType() == EDB) {
             if (iteration == 0) {
+                LOG(DEBUGL) << "Returns true";
                 return true;
             }
             continue;
         }
-        
+
         PredId_t id = body[i].getPredicate().getId();
         FCTable *table = predicatesTables[id];
-        if (table == NULL || table->isEmpty() || table->getMaxIteration() < iteration) {
-        // if (iteration > 0 && (table == NULL || table->isEmpty() || table->getMaxIteration() < iteration)) {
-            LOG(DEBUGL) << "Continuing: old table or empty";
+        if (table == NULL || table->isEmpty()) {
+            LOG(DEBUGL) << "Continuing: empty table";
+            continue;
+        }
+        if (table->getMaxIteration() < iteration) {
+            LOG(DEBUGL) << "Continuing: old table";
             continue;
         }
         LOG(DEBUGL) << "Returns true";
@@ -667,7 +691,7 @@ bool SemiNaiver::bodyChangedSince(Rule &rule, uint32_t iteration) {
 
 bool SemiNaiver::checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
         const RuleExecutionPlan &plan,
-        uint32_t limitView,
+        size_t limitView,
         std::vector<size_t> &cards) {
     const uint8_t nBodyLiterals = (uint8_t) plan.plan.size();
     bool isOneRelEmpty = false;
@@ -761,7 +785,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
         const size_t max,
         int &processedTables,
         const bool lastLiteral,
-        const uint32_t iteration,
+        const size_t iteration,
         const RuleExecutionDetails &ruleDetails,
         const uint8_t orderExecution,
         std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
@@ -970,7 +994,7 @@ void SemiNaiver::reorderPlanForNegatedLiterals(RuleExecutionPlan &plan, const st
 
             c1 = literal_i->isNegated();
             c2 = std::includes(std::begin(bounded_vars), std::end(bounded_vars),
-                               std::begin(s_vars_i), std::end(s_vars_i));
+                    std::begin(s_vars_i), std::end(s_vars_i));
             if (!c1 || (c1 && c2))
                 break;
         }
@@ -1082,7 +1106,7 @@ void SemiNaiver::saveStatistics(StatsRule &stats) {
 }
 
 bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
-        const uint32_t iteration, const uint32_t limitView,
+        const size_t iteration, const size_t limitView,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
     if (! bodyChangedSince(rule, ruleDetails.lastExecution)) {
@@ -1098,8 +1122,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 
 bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         std::vector<Literal> &heads,
-        const uint32_t iteration,
-        const uint32_t limitView,
+        const size_t iteration,
+        const size_t limitView,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
 
@@ -1110,11 +1134,11 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 
     if (ignoreExistentialRules && rule.isExistential()) {
         return false; //Skip the execution of existential rules if the flag is
-        //set (should be only during the execution of RMFA
+        //set (should be only during the execution of RMFA or RMFC).
     }
 
-    LOG(DEBUGL) << "Iteration: " << iteration <<
-        " Rule: " << rule.tostring(program, &layer);
+    LOG(INFOL) << "Iteration: " << iteration << " Rule: " << rule.tostring(program, &layer);
+
     //Set up timers
     const std::chrono::system_clock::time_point startRule = std::chrono::system_clock::now();
     std::chrono::duration<double> durationJoin(0);
@@ -1273,6 +1297,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 }
             }
             if (min > max) {
+                optimalOrderIdx++;
                 continue;
             }
             LOG(DEBUGL) << "Evaluating atom " << optimalOrderIdx << " " << bodyLiteral->tostring() <<

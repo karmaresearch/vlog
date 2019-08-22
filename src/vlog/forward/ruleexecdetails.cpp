@@ -311,7 +311,7 @@ void RuleExecutionDetails::calculateDependencies(const Rule &rule,
     //Calculate the dependencies of the existential variables to the variables in the body
     std::map<uint8_t, std::set<uint8_t>> dependenciesExtVars_tmp;
     auto extvars = rule.getVarsNotInBody();
-    auto othervars = rule.getVarsInBody();
+    auto othervars = rule.getVarsInHeadAndBody();
     for(auto head : rule.getHeads()) {
         auto allvars = head.getAllVars();
         for(auto v : allvars) {
@@ -386,6 +386,7 @@ void RuleExecutionDetails::createExecutionPlans(bool copyAllVars) {
         std::vector<uint8_t> posMagicAtoms;
         std::vector<uint8_t> posIdbLiterals;
         uint8_t i = 0;
+        orderExecutions.resize(nIDBs);
 
         for (std::vector<Literal>::const_iterator itr = bodyLiterals.begin();
                 itr != bodyLiterals.end();
@@ -403,22 +404,22 @@ void RuleExecutionDetails::createExecutionPlans(bool copyAllVars) {
         for (std::vector<uint8_t>::iterator itr = posIdbLiterals.begin();
                 itr != posIdbLiterals.end();
                 ++itr) {
-            RuleExecutionPlan p;
-            p.filterLastHashMap = false;
-            p.dependenciesExtVars = dependenciesExtVars;
+            RuleExecutionPlan *p = &orderExecutions[order];
+            p->filterLastHashMap = false;
+            p->dependenciesExtVars = dependenciesExtVars;
             size_t idx = 0;
 
             if (posMagicAtoms.size() > 0) {
                 assert(posMagicAtoms.size() == 1);
-                p.plan.push_back(&bodyLiterals[posMagicAtoms[0]]);
-                extractAllEDBPatterns(p.plan, bodyLiterals);
+                p->plan.push_back(&bodyLiterals[posMagicAtoms[0]]);
+                extractAllEDBPatterns(p->plan, bodyLiterals);
                 if (! bodyLiterals[*itr].isMagic()) {
-                    p.plan.push_back(&bodyLiterals[*itr]);
+                    p->plan.push_back(&bodyLiterals[*itr]);
                 }
             } else {
-                extractAllEDBPatterns(p.plan, bodyLiterals);
-                idx = p.plan.size();
-                p.plan.push_back(&bodyLiterals[*itr]);
+                extractAllEDBPatterns(p->plan, bodyLiterals);
+                idx = p->plan.size();
+                p->plan.push_back(&bodyLiterals[*itr]);
             }
 
             //Add all others
@@ -426,63 +427,62 @@ void RuleExecutionDetails::createExecutionPlans(bool copyAllVars) {
                     itr2 != posIdbLiterals.end();
                     ++itr2) {
                 if (*itr2 != *itr && ! bodyLiterals[*itr2].isMagic()) {
-                    p.plan.push_back(&bodyLiterals[*itr2]);
+                    p->plan.push_back(&bodyLiterals[*itr2]);
                 }
             }
-            rearrangeLiterals(p.plan, idx);
+            rearrangeLiterals(p->plan, idx);
 
             //Do some checks
             auto &heads = rule.getHeads();
             if (heads.size() == 1) {
                 RuleExecutionDetails::checkFilteringStrategy(
-                        *p.plan[p.plan.size() - 1], heads[0], p);
-                p.checkIfFilteringHashMapIsPossible(heads[0]);
+                        *p->plan[p->plan.size() - 1], heads[0], *p);
+                p->checkIfFilteringHashMapIsPossible(heads[0]);
             }
 
             //RuleExecutionDetails::checkWhetherEDBsRedundantHead(p, h);
 
             //Calculate all join coordinates
-            p.calculateJoinsCoordinates(heads, copyAllVars);
+            p->calculateJoinsCoordinates(heads, copyAllVars);
 
             //New version. Should be able to catch everything
-            for (int i = 0; i < p.plan.size(); ++i) {
-                if (p.plan[i]->getPredicate().getType() == EDB) {
-                    p.ranges.push_back(std::make_pair(0, (size_t) - 1));
+            for (int i = 0; i < p->plan.size(); ++i) {
+				const Literal *l = p->plan[i];
+                if (l->getPredicate().getType() == EDB || l->isNegated()) {
+                    p->ranges.push_back(std::make_pair(0, (size_t) - 1));
                 } else {
-                    const Literal *l = p.plan[i];
                     if (l == &bodyLiterals[*itr]) {
-                        p.ranges.push_back(std::make_pair(1, (size_t) - 1));
+                        p->ranges.push_back(std::make_pair(1, (size_t) - 1));
                     } else if (l < &bodyLiterals[*itr]) {
-                        p.ranges.push_back(std::make_pair(0, 1));
+                        p->ranges.push_back(std::make_pair(0, 1));
                     } else {
-                        p.ranges.push_back(std::make_pair(0, (size_t) - 1));
+                        p->ranges.push_back(std::make_pair(0, (size_t) - 1));
                     }
                 }
             }
 
-            orderExecutions.push_back(p);
             order++;
         }
         assert(orderExecutions.size() == nIDBs);
     } else {
         //Create a single plan. Here they are all EDBs. So the ranges are all the same
         std::vector<const Literal*> v;
-        RuleExecutionPlan p;
-        p.filterLastHashMap = false;
-        p.dependenciesExtVars = dependenciesExtVars;
+        orderExecutions.resize(1);
+        RuleExecutionPlan *p = &orderExecutions[0];
+        p->filterLastHashMap = false;
+        p->dependenciesExtVars = dependenciesExtVars;
         for (std::vector<Literal>::const_iterator itr = bodyLiterals.begin();
                 itr != bodyLiterals.end();
                 ++itr) {
-            p.plan.push_back(&(*itr));
-            p.ranges.push_back(std::make_pair(0, (size_t) - 1));
+            p->plan.push_back(&(*itr));
+            p->ranges.push_back(std::make_pair(0, (size_t) - 1));
         }
 
         auto &heads = rule.getHeads();
         if (heads.size() == 1) {
             RuleExecutionDetails::checkFilteringStrategy(
-                    bodyLiterals[bodyLiterals.size() - 1], heads[0], p);
+                    bodyLiterals[bodyLiterals.size() - 1], heads[0], *p);
         }
-        p.calculateJoinsCoordinates(heads, copyAllVars);
-        orderExecutions.push_back(p);
+        p->calculateJoinsCoordinates(heads, copyAllVars);
     }
 }

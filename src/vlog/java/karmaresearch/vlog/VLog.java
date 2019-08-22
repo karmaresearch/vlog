@@ -295,10 +295,12 @@ public class VLog {
      * @return the result iterator.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
+     * @exception NonExistingPredicateException
+     *                is thrown when the query predicate does not exist.
      */
     public native QueryResultIterator query(int predicate, long[] terms,
             boolean includeConstants, boolean filterBlanks)
-            throws NotStartedException;
+            throws NotStartedException, NonExistingPredicateException;
 
     private long[] extractTerms(Term[] terms) throws NotStartedException {
         ArrayList<String> variables = new ArrayList<>();
@@ -335,9 +337,11 @@ public class VLog {
      * @return the result iterator.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
+     * @exception NonExistingPredicateException
+     *                is thrown when the query predicate does not exist.
      */
     public TermQueryResultIterator query(Atom query)
-            throws NotStartedException {
+            throws NotStartedException, NonExistingPredicateException { 
         return query(query, true, false);
     }
 
@@ -356,10 +360,12 @@ public class VLog {
      * @return the result iterator.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
+     * @exception NonExistingPredicateException
+     *                is thrown when the query predicate does not exist.
      */
 
     public TermQueryResultIterator query(Atom query, boolean includeConstants,
-            boolean filterBlanks) throws NotStartedException {
+            boolean filterBlanks) throws NotStartedException, NonExistingPredicateException {
         query.checkNoBlank();
         int intPred = getPredicateId(query.getPredicate());
         long[] longTerms = extractTerms(query.getTerms());
@@ -383,9 +389,11 @@ public class VLog {
      * @exception IOException
      *                is thrown when the file could not be written for some
      *                reason
+     * @exception NonExistingPredicateException
+     *                is thrown when the query predicate does not exist.
      */
     public void writeQueryResultsToCsv(Atom query, String fileName)
-            throws NotStartedException, IOException {
+            throws NotStartedException, NonExistingPredicateException, IOException {
         writeQueryResultsToCsv(query, fileName, false);
     }
 
@@ -404,9 +412,11 @@ public class VLog {
      * @exception IOException
      *                is thrown when the file could not be written for some
      *                reason
+     * @exception NonExistingPredicateException
+     *                is thrown when the query predicate does not exist.
      */
     public void writeQueryResultsToCsv(Atom query, String fileName,
-            boolean filterBlanks) throws NotStartedException, IOException {
+            boolean filterBlanks) throws NotStartedException, NonExistingPredicateException, IOException {
         query.checkNoBlank();
         int intPred = getPredicateId(query.getPredicate());
         long[] longTerms = extractTerms(query.getTerms());

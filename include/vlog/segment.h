@@ -54,23 +54,26 @@ struct SegmentSorter {
 
 class SegmentIterator {
     private:
-        std::vector<std::unique_ptr<ColumnReader>> readers;
+        std::unique_ptr<ColumnReader> *readers;
+        int nfields;
 
     protected:
         Term_t values[256];
         SegmentIterator() {
+            readers = NULL;
         }
 
     public:
-        SegmentIterator(const uint8_t nfields, std::shared_ptr<Column> *columns) {
+        SegmentIterator(const uint8_t nfields, std::shared_ptr<Column> *columns) : nfields(nfields) {
+            readers = new std::unique_ptr<ColumnReader>[nfields];
             for (int i = 0; i < nfields; i++) {
-                readers.push_back(columns[i]->getReader());
+                readers[i] = columns[i]->getReader();
             }
         }
 
         virtual bool hasNext() {
-            for (const auto  &reader : readers) {
-                if (! reader->hasNext()) {
+            for (int i = 0; i < nfields; i++) {
+                if (! readers[i]->hasNext()) {
                     return false;
                 }
             }
@@ -78,51 +81,47 @@ class SegmentIterator {
         }
 
         virtual void next() {
-            int idx = 0;
-            for (const auto  &reader : readers) {
-                values[idx++] = reader->next();
+            for (int i = 0; i < nfields; i++) {
+                values[i] = readers[i]->next();
             }
         }
 
         virtual void clear() {
-            for (const auto  &reader : readers) {
-                reader->clear();
+            for (int i = 0; i < nfields; i++) {
+                readers[i]->clear();
             }
         }
 
-        virtual Term_t get(const uint8_t pos) {
+        Term_t get(const uint8_t pos) {
             return values[pos];
         }
 
         virtual ~SegmentIterator() {
+            delete[] readers;
         }
 };
 
-class VectorSegmentIterator : public SegmentIterator {
+class VectorSegmentIterator final : public SegmentIterator {
     private:
         const std::vector<const std::vector<Term_t> *> vectors;
         int currentIndex;
-        bool first;
         int endIndex;
         int ncols;
         std::vector<bool> *allocatedVectors;
     public:
         VectorSegmentIterator(const std::vector<const std::vector<Term_t> *> &vectors, int firstIndex, int endIndex, std::vector<bool> *allocatedVectors)
-            : vectors(vectors), currentIndex(firstIndex), first(true), endIndex(endIndex), ncols(vectors.size()), allocatedVectors(allocatedVectors) {
+            : vectors(vectors), currentIndex(firstIndex-1), endIndex(endIndex), ncols(vectors.size()), allocatedVectors(allocatedVectors) {
                 if (endIndex > vectors[0]->size()) {
                     this->endIndex = vectors[0]->size();
                 }
             }
 
         bool hasNext() {
-            return currentIndex < endIndex - 1 || (first && currentIndex < endIndex);
+            return currentIndex < endIndex - 1;
         }
 
         void next() {
-            if (! first) {
-                currentIndex++;
-            }
-            first = false;
+            currentIndex++;
             for (int i = 0; i < ncols; i++) {
                 values[i] = (*vectors[i])[currentIndex];
             }
@@ -413,10 +412,16 @@ class SegmentInserter {
         };
 
     public:
-        SegmentInserter(const uint8_t nfields) : nfields(nfields),
+        SegmentInserter(const uint8_t nfields, bool compressed = true) : nfields(nfields),
         segmentSorted(true), duplicates(true) {
-            columns.resize(nfields);
             copyColumns.resize(nfields);
+            if (compressed) {
+                columns.resize(nfields);
+            } else {
+                for (int i = 0; i < nfields; i++) {
+                    columns.push_back(ColumnWriter(false));
+                }
+            }
         }
 #if DEBUG
         void checkSizes() const;

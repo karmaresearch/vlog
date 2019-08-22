@@ -48,9 +48,10 @@ class SemiNaiver {
         bool opt_intersect;
         bool opt_filtering;
         bool multithreaded;
-        bool restrictedChase;
+        TypeChase typeChase;
         bool checkCyclicTerms;
         bool foundCyclicTerms;
+        PredId_t predIgnoreBlock; //RMSA
         bool ignoreExistentialRules;
         std::shared_ptr<ChaseMgmt> chaseMgmt;
 
@@ -63,7 +64,7 @@ class SemiNaiver {
         bool ignoreDuplicatesElimination;
         std::vector<int> stratification;
         int nStratificationClasses;
-
+        Program *RMFC_program;
 
 #ifdef WEBINTERFACE
         long statsLastIteration;
@@ -83,11 +84,11 @@ class SemiNaiver {
 
         size_t countAllIDBs();
 
-        bool bodyChangedSince(Rule &rule, uint32_t iteration);
+        bool bodyChangedSince(Rule &rule, size_t iteration);
 
         bool checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
                 const RuleExecutionPlan &plan,
-                uint32_t limitView,
+                size_t limitView,
                 std::vector<size_t> &cards);
 
         void processRuleFirstAtom(const uint8_t nBodyLiterals,
@@ -97,7 +98,7 @@ class SemiNaiver {
                 const size_t max,
                 int &processedTables,
                 const bool lastLiteral,
-                const uint32_t iteration,
+                const size_t iteration,
                 const RuleExecutionDetails &ruleDetails,
                 const uint8_t orderExecution,
                 std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
@@ -114,13 +115,13 @@ class SemiNaiver {
         bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
                 std::vector<std::vector<RuleExecutionDetails>> &allIDBRules,    // one entry for each stratification class
                 std::vector<StatIteration> &costRules,
-                const uint32_t limitView,
+                const size_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
                 std::vector<Literal> &heads,
-                const uint32_t iteration,
-                const uint32_t limitView,
+                const size_t iteration,
+                const size_t limitView,
                 std::vector<ResultJoinProcessor*> *finalResultContainer);
 
         size_t estimateCardTable(const Literal &literal,
@@ -136,8 +137,8 @@ class SemiNaiver {
         int nthreads;
 
         bool executeRule(RuleExecutionDetails &ruleDetails,
-                const uint32_t iteration,
-                const uint32_t limitView,
+                const size_t iteration,
+                const size_t limitView,
                 std::vector<ResultJoinProcessor*> *finalResultContainer);
 
         virtual FCIterator getTableFromEDBLayer(const Literal & literal);
@@ -151,7 +152,7 @@ class SemiNaiver {
         virtual bool executeUntilSaturation(
                 std::vector<RuleExecutionDetails> &ruleset,
                 std::vector<StatIteration> &costRules,
-                uint32_t limitView,
+                size_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
 
         void prepare(std::vector<RuleExecutionDetails> &allrules,
@@ -166,8 +167,8 @@ class SemiNaiver {
         VLIBEXP SemiNaiver(EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
-                bool restrictedChase, int nthreads, bool shuffleRules,
-                bool ignoreExistentialRules);
+                TypeChase chase, int nthreads, bool shuffleRules,
+                bool ignoreExistentialRule, Program *RMFC_check = NULL);
 
         //disable restricted chase
         VLIBEXP SemiNaiver(EDBLayer &layer,
@@ -176,13 +177,17 @@ class SemiNaiver {
                 int nthreads, bool shuffleRules,
                 bool ignoreExistentialRules) :
             SemiNaiver(layer, program, opt_intersect, opt_filtering,
-                    multithreaded, false, nthreads, shuffleRules,
+                    multithreaded, TypeChase::SKOLEM_CHASE, nthreads, shuffleRules,
                     ignoreExistentialRules) {
             }
 
         VLIBEXP void run(unsigned long *timeout = NULL,
                 bool checkCyclicTerms = false) {
-            run(0, 1, timeout, checkCyclicTerms, -1);
+            run(0, 1, timeout, checkCyclicTerms, -1, -1);
+        }
+
+        Program *get_RMFC_program() {
+            return RMFC_program;
         }
 
         bool opt_filter() {
@@ -193,13 +198,18 @@ class SemiNaiver {
             return opt_intersect;
         }
 
+        std::shared_ptr<ChaseMgmt> getChaseManager() {
+            return chaseMgmt;
+        }
+
         virtual FCTable *getTable(const PredId_t pred, const uint8_t card);
 
         VLIBEXP void run(size_t lastIteration,
                 size_t iteration,
                 unsigned long *timeout = NULL,
                 bool checkCyclicTerms = false,
-                int singleRule = -1);
+                int singleRule = -1,
+                PredId_t predIgnoreBlock = -1);
 
         VLIBEXP void storeOnFile(std::string path, const PredId_t pred, const bool decompress,
                 const int minLevel, const bool csv);
@@ -212,7 +222,7 @@ class SemiNaiver {
             return getTable(literal, minIteration, maxIteration, NULL);
         }
 
-		VLIBEXP FCIterator getTable(const PredId_t predid);
+        VLIBEXP FCIterator getTable(const PredId_t predid);
 
         size_t getSizeTable(const PredId_t predid) const;
 
@@ -249,8 +259,8 @@ class SemiNaiver {
         virtual FCIterator getTable(const Literal &literal, const size_t minIteration,
                 const size_t maxIteration, TableFilterer *filter);
 
-        void checkAcyclicity(int singleRule = -1) {
-            run(0, 1, NULL, true, singleRule);
+        void checkAcyclicity(int singleRule = -1, PredId_t predIgnoreBlock = -1) {
+            run(0, 1, NULL, true, singleRule, predIgnoreBlock);
         }
 
         //Statistics methods
@@ -272,7 +282,6 @@ class SemiNaiver {
         std::chrono::system_clock::time_point getStartingTimeMs() {
             return startTime;
         }
-
 };
 
 #endif

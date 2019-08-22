@@ -6,6 +6,7 @@
 
 #include <vector>
 #include <map>
+#include <set>
 #include <unordered_map>
 
 #define SIZE_BLOCK 1000
@@ -19,6 +20,7 @@
 #define RULEVARMASK (RULE_MASK|VAR_MASK)
 #define COUNTER(v) (v & 0xFFFFFFFF)
 
+typedef enum TypeChase {RESTRICTED_CHASE, SKOLEM_CHASE, SUM_CHASE, SUM_RESTRICTED_CHASE } TypeChase;
 
 struct ChaseRow {
     uint8_t sz;
@@ -26,7 +28,8 @@ struct ChaseRow {
 
     ChaseRow() : sz(0), row(NULL) {}
 
-    ChaseRow(const uint8_t s, uint64_t *r) : sz(s), row(r) {}
+    ChaseRow(const uint8_t s, uint64_t *r) : sz(s), row(r) {
+    }
 
     bool operator == (const ChaseRow &other) const {
         for (int i = 0; i < sz; i++) {
@@ -61,15 +64,19 @@ class ChaseMgmt {
                 uint64_t *currentblock;
                 std::unordered_map<ChaseRow, uint64_t, hash_ChaseRow> rows;
                 bool cyclicTerms;
+                TypeChase typeChase;
 
             public:
                 Rows(uint64_t startCounter, uint8_t sizerow,
-                        std::vector<uint8_t> nameArgVars) :
+                        std::vector<uint8_t> nameArgVars,
+                        TypeChase typeChase) :
                     startCounter(startCounter), sizerow(sizerow),
                     nameArgVars(nameArgVars) {
                         blockCounter = 0;
                         currentblock = NULL;
                         currentcounter = startCounter;
+                        cyclicTerms = false;
+                        this->typeChase = typeChase;
                     }
 
                 uint8_t getSizeRow() {
@@ -91,7 +98,7 @@ class ChaseMgmt {
                 bool existingRow(uint64_t *row, uint64_t &value);
 
                 bool checkRecursive(uint64_t target, uint64_t value,
-                        std::vector<uint64_t> &toCheck);
+                        std::set<uint64_t> &toCheck);
         };
 
         class RuleContainer {
@@ -100,13 +107,17 @@ class ChaseMgmt {
                 std::map<uint8_t, ChaseMgmt::Rows> vars2rows;
                 uint64_t ruleBaseCounter;
                 Rule const * rule;
+                TypeChase chase;
+
             public:
                 RuleContainer(uint64_t ruleBaseCounter,
                         std::map<uint8_t, std::vector<uint8_t>> dep,
-                        Rule const * rule) {
+                        Rule const * rule,
+                        TypeChase chase) {
                     this->ruleBaseCounter = ruleBaseCounter;
                     dependencies = dep;
                     this->rule = rule;
+                    this->chase = chase;
                 }
 
                 bool containsCyclicTerms();
@@ -119,20 +130,22 @@ class ChaseMgmt {
         };
 
         std::vector<std::unique_ptr<ChaseMgmt::RuleContainer>> rules;
-        const bool restricted;
+        const TypeChase typeChase;
         const bool checkCyclic;
 
         const int ruleToCheck;
         bool cyclic;
+        PredId_t predIgnoreBlock;
 
-        bool checkRecursive(uint64_t target, uint64_t rv, int level);
+        bool checkSingle(uint64_t target, uint64_t rv, std::set<uint64_t> &toCheck);
 
-        bool checkNestedRecursive(uint64_t target, uint64_t rv, int level);
+        bool checkRecursive(uint64_t target, uint64_t rv);
 
     public:
         ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
-                const bool restricted, const bool checkCyclic,
-                const int ruleToCheck = -1);
+                const TypeChase typeChase, const bool checkCyclic,
+                const int ruleToCheck = -1,
+                const PredId_t predIgnoreBlocking = -1);
 
         std::shared_ptr<Column> getNewOrExistingIDs(
                 uint32_t ruleid,
@@ -152,12 +165,25 @@ class ChaseMgmt {
             }
         }
 
+        PredId_t getPredicateIgnoreBlocking() {
+            return predIgnoreBlock;
+        }
+
         bool isRestricted() {
-            return restricted;
+            return typeChase == TypeChase::RESTRICTED_CHASE ||
+                typeChase == TypeChase::SUM_RESTRICTED_CHASE;
+        }
+
+        TypeChase getChaseType() {
+            return typeChase;
         }
 
         bool hasRuleToCheck() {
             return ruleToCheck >= 0;
+        }
+
+        int getRuleToCheck() {
+            return ruleToCheck;
         }
 
         bool isCheckCyclicMode() {

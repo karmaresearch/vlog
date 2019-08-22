@@ -33,7 +33,7 @@ SingleHeadFinalRuleProcessor::SingleHeadFinalRuleProcessor(
         const int nthreads,
         const bool ignoreDuplicatesElimination) :
     SingleHeadFinalRuleProcessor(
-            new Term_t[table->getSizeRow()], true,
+            new Term_t[head.getPredicate().getCardinality()], true,
             posFromFirst, posFromSecond, listDerivations, table, head,
             posHeadInRule, ruleDetails, ruleExecOrder, iteration,
             addToEndTable,
@@ -55,7 +55,7 @@ SingleHeadFinalRuleProcessor::SingleHeadFinalRuleProcessor(
         const bool addToEndTable,
         const int nthreads,
         const bool ignoreDuplicatesElimination) :
-    ResultJoinProcessor(table->getSizeRow(), row, deleteRow,
+    ResultJoinProcessor(head.getPredicate().getCardinality(), row, deleteRow,
             (uint8_t) posFromFirst.size(),
             (uint8_t) posFromSecond.size(),
             posFromFirst.size() > 0 ? & (posFromFirst[0]) : NULL,
@@ -507,6 +507,9 @@ void SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
         return;
     }
 
+    if (t->nBlocks() > 32) {
+        t->collapseBlocks(ruleDetails->lastExecution, nthreads);
+    }
     if (utmpt != NULL) {
         for (int i = 0; i < nbuffers; ++i) {
             if (utmpt[i] != NULL && !utmpt[i]->isEmpty()) {
