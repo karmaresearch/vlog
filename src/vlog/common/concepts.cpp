@@ -1375,11 +1375,11 @@ int64_t Program::getOrAddPredicate(std::string & p, uint8_t cardinality) {
     PredId_t id = (PredId_t) dictPredicates.getOrAdd(p);
     if (cardPredicates.find(id) == cardPredicates.end()) {
         cardPredicates.insert(make_pair(id, cardinality));
-    } else {
-        if (cardPredicates.find(id)->second != cardinality) {
-            LOG(INFOL) << "Wrong cardinality for predicate " << p << ": should be " << (int) cardPredicates.find(id)->second;
-            return -1;
-        }
+    } else if (cardPredicates.find(id)->second == 0) {
+		cardPredicates.find(id)->second = cardinality;
+	} else if (cardPredicates.find(id)->second != cardinality) {
+		LOG(INFOL) << "Wrong cardinality for predicate " << p << ": should be " << (int) cardPredicates.find(id)->second;
+		return -1;
     }
     if (id >= rules.size()) {
         rules.resize(id+1);
