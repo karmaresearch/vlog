@@ -740,6 +740,15 @@ extern "C" {
 			LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
 		} catch(std::runtime_error e) {
 			throwMaterializationException(env, e.what());
+			if (f->sn != NULL) {
+				delete f->sn;
+			}
+			return false;
+		} catch(std::bad_alloc e) {
+			throwMaterializationException(env, e.what());
+			if (f->sn != NULL) {
+				delete f->sn;
+			}
 			return false;
 		}
 		f->sn->printCountAllIDBs("");
