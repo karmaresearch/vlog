@@ -366,8 +366,9 @@ extern "C" {
 			std::vector<std::string> value;
 			jobjectArray atom = (jobjectArray) env->GetObjectArrayElement(data, (jsize) i);
 			if (atom == NULL) {
-				throwEDBConfigurationException(env, "null data");
-				return;
+				// throwEDBConfigurationException(env, "null data");
+				// return;
+				continue;	// For issue #25
 			}
 			jint arity = env->GetArrayLength(atom);
 			if (arity != (uint8_t) arity) {
