@@ -465,14 +465,15 @@ bool SemiNaiver::executeUntilSaturation(
         }
         iteration++;
 
+		if (checkCyclicTerms) {
+			foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
+			if (foundCyclicTerms) {
+				LOG(DEBUGL) << "Found a cyclic term";
+				return newDer;
+			}
+		}
+
         if (response) {
-            if (checkCyclicTerms) {
-                foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
-                if (foundCyclicTerms) {
-                    LOG(DEBUGL) << "Found a cyclic term";
-                    return newDer;
-                }
-            }
 
             if ((typeChase == TypeChase::RESTRICTED_CHASE ||
                         typeChase == TypeChase::SUM_RESTRICTED_CHASE) &&
