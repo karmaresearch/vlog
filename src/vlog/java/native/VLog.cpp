@@ -933,7 +933,7 @@ extern "C" {
 				default:
 					return env->GetStaticObjectField(resultClass, fidINCONCLUSIVE);
 			}
-		} catch(int n) {
+		} catch(int) {
 			throwIllegalArgumentException(env, "Null algorithm specified in cycle check");
 		}
 		return NULL;
