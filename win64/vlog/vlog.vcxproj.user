@@ -4,14 +4,16 @@
     <LocalDebuggerEnvironment>PATH=%PATH%;..\..\..\trident\build\Debug;..\..\..\kognac\build\Debug
 $(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArguments>
-    </LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>query --edb lubm.conf --rules LUBM_L.dlog --query lubm_queries\lubm1.sparql</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommand>c:\Users\ceriel\debug\vlog.exe</LocalDebuggerCommand>
+    <LocalDebuggerWorkingDirectory>c:\Users\ceriel\test</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LocalDebuggerEnvironment>PATH=%PATH%;..\..\..\trident\build\Release;..\..\..\kognac\build\Release
 $(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArguments>
-    </LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>query --edb lubm.conf --rules LUBM_L.dlog --query lubm_queries\lubm1.sparql</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommand>c:\Users\ceriel\debug\vlog.exe</LocalDebuggerCommand>
+    <LocalDebuggerWorkingDirectory>c:\Users\ceriel\test</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
 </Project>
