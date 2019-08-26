@@ -584,6 +584,8 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
         }
     }
 
+    // LOG(TRACEL) << "P0: match = " << match << ", isSetBigger = " << isSetBigger << ", values size = " << values->getNRows();
+
     if (match && !isSetBigger && nRepeatedVars > 0) {
         for (uint8_t i = 0; i < nRepeatedVars; ++i) {
             //Check the values in the two positions. If they are both constants
@@ -647,8 +649,8 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
             for (uint8_t i = 0; i < nRepeatedVars; ++i) {
                 //Check the values in the two positions. If they are both constants
                 //then I check the value
-                Column *c1 = values->getColumn(repeatedVars[i].first).get();
-                Column *c2 = values->getColumn(repeatedVars[i].second).get();
+                Column *c1 = itr->values->getColumn(repeatedVars[i].first).get();
+                Column *c2 = itr->values->getColumn(repeatedVars[i].second).get();
                 if (c1->isConstant() && c2->isConstant()) {
                     if (c1->first() != c2->first()) {
                         match = false;
