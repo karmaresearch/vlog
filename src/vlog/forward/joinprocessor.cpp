@@ -730,13 +730,33 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                 size_t start, end;
                 //set up the query and coordinates
                 if (njoinfields < 2) {
-                    if (njoinfields > 0)
+                    if (njoinfields > 0) {
+                        uint8_t var = tuple.get(idxJoinFieldInLiteral1).getId();
                         tuple.set(VTerm(0, itr1->first), idxJoinFieldInLiteral1);
+                        // Watch out: this variable could occur more than once in the literal. --Ceriel
+                        for (int i = 0; i < tuple.getSize(); i++) {
+                            if (tuple.get(i).isVariable() && tuple.get(i).getId() == var) {
+                                tuple.set(VTerm(0, itr1->first), i);
+                            }
+                        }
+                    }
                     start = itr1->second.first;
                     end = itr1->second.second;
                 } else {
+                    // Watch out: the variables could occur more than once in the literal. --Ceriel
+                    uint8_t var1 = tuple.get(idxJoinFieldInLiteral1).getId();
+                    uint8_t var2 = tuple.get(idxJoinFieldInLiteral2).getId();
                     tuple.set(VTerm(0, itr2->first.first), idxJoinFieldInLiteral1);
                     tuple.set(VTerm(0, itr2->first.second), idxJoinFieldInLiteral2);
+                    for (int i = 0; i < tuple.getSize(); i++) {
+                        if (tuple.get(i).isVariable()) {
+                            if (tuple.get(i).getId() == var1) {
+                                tuple.set(VTerm(0, itr2->first.first), i);
+                            } else if (tuple.get(i).getId() == var2) {
+                                tuple.set(VTerm(0, itr2->first.second), i);
+                            }
+                        }
+                    }
                     start = itr2->second.first;
                     end = itr2->second.second;
                 }
@@ -790,7 +810,14 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                 while (outputLiterals != NULL && outputLiterals->size() == 1 &&  start < end) {
                     VTuple t = (*outputLiterals)[0].getTuple();
                     for (uint8_t i = 0; i < nPosFromFirst; ++i) {
+                        uint8_t var = t.get(posFromFirst[i].first).getId();
                         t.set(VTerm(0, values[start + posFromFirst[i].second]), posFromFirst[i].first);
+                        // Watch out: variable could be used more than once --Ceriel
+                        for (int j = 0; j < t.getSize(); j++) {
+                            if (t.get(j).isVariable() && t.get(j).getId() == var) {
+                                t.set(VTerm(0, values[start + posFromFirst[i].second]), j);
+                            }
+                        }
                     }
                     Literal l((*outputLiterals)[0].getPredicate(), t);
 
