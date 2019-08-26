@@ -518,7 +518,7 @@ void JoinExecutor::verificativeJoin(
 
     // If the index of the result in the intermediate is equal to the index of the join in the intermediate...
     if (hv.posFromFirst[currentLiteral].size() > 0 &&
-	    hv.posFromFirst[currentLiteral][0].second ==
+            hv.posFromFirst[currentLiteral][0].second ==
             hv.joinCoordinates[currentLiteral][0].first &&
             hv.sizeOutputRelation[currentLiteral] == 1 &&
             currentLiteral == hv.posFromFirst.size() - 1) { //The last literal checks that this is the last join we execute
@@ -557,7 +557,7 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
     if (literal.isNegated()) {
         LOG(TRACEL) << "Calling leftjoin";
         leftjoin(t1, naiver, outputLiterals, literal, min, max,
-                 joinsCoordinates, output, nthreads);
+                joinsCoordinates, output, nthreads);
     }
     //First I calculate whether the join is verificative or explorative.
     else if (JoinExecutor::isJoinVerificative(t1, hv, currentLiteral)) {
@@ -967,14 +967,14 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
             if (filterRowsInhashMap) {
                 filterRowsPosJoin = joinsCoordinates[0].first;
                 FinalRuleProcessor* o = (FinalRuleProcessor*)output;
-		if (o->getNCopyFromFirst() != 1) {
-		    filterRowsInhashMap = false;
-		} else {
-		    filterRowsPosOther = o->getPosFromFirst()[0].second;
-		    if (filterRowsPosJoin == filterRowsPosOther) {
-			filterRowsInhashMap = false;
-		    }
-		}
+                if (o->getNCopyFromFirst() != 1) {
+                    filterRowsInhashMap = false;
+                } else {
+                    filterRowsPosOther = o->getPosFromFirst()[0].second;
+                    if (filterRowsPosJoin == filterRowsPosOther) {
+                        filterRowsInhashMap = false;
+                    }
+                }
             }
 
             while (t2->hasNext()) {
@@ -994,8 +994,9 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
                     currentKey = newKey;
                     startpos = values.size();
                 }
-                for (uint8_t j = 0; j < t1->getRowSize(); ++j)
+                for (uint8_t j = 0; j < t1->getRowSize(); ++j) {
                     values.push_back(t2->getCurrentValue(j));
+                }
             }
 
             if (!first) {
@@ -1054,7 +1055,7 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
     } else {
         LOG(DEBUGL) << "Hashmap size = " << doublemap.size();
     }
-    
+
     //Perform as many joins as the rows in the hashmap
     execSelectiveHashJoin(ruleDetails, naiver, map, doublemap, output, (uint8_t) joinsCoordinates.size(),
             (joinsCoordinates.size() > 0) ? joinsCoordinates[0].second : 0,
@@ -1214,15 +1215,24 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
             for (uint32_t j = 0; j < idxColumnsLowCardInLiteral.size(); ++j) {
                 uint8_t idxInLiteral = 0;
                 uint8_t nvars = 0;
+                uint8_t var = 0;
                 for (uint8_t r = 0; r < literalToQuery.getTupleSize(); ++r) {
                     if (literalToQuery.getTermAtPos(r).isVariable()) {
                         if (nvars == idxColumnsLowCardInLiteral[j]) {
                             idxInLiteral = r;
+                            var = literalToQuery.getTermAtPos(r).getId();
                         }
                         nvars++;
                     }
                 }
                 t.set(VTerm(0, bagValuesColumns[j][idxs[j]]), idxInLiteral);
+                // Watch out: this variable could occur more than once in the literal. --Ceriel
+                for (uint8_t r = 0; r < literalToQuery.getTupleSize(); ++r) {
+                    if (literalToQuery.getTermAtPos(r).isVariable() &&
+                            literalToQuery.getTermAtPos(r).getId() == var) {
+                        t.set(VTerm(0, bagValuesColumns[j][idxs[j]]), r);
+                    }
+                }
                 valuesToFilterInFirstSide.push_back(bagValuesColumns[j][idxs[j]]);
             }
 
@@ -2350,17 +2360,17 @@ void JoinExecutor::left_join(const FCInternalTable * filteredT1,
     processedTables++;
     for (int i = 1; i < tables2.size(); i++) {
         processedTables++;
-		if (! t2->supportsMerge()) {
-			if (tables2[i]->supportsMerge()) {
-				t2 = tables2[i]->merge(t2, nthreads);
-			} else {
-				std::shared_ptr<const FCInternalTable> pt(new InmemoryFCInternalTable(t2->getRowSize(), 0));
-				t2 = pt->merge(t2, nthreads);
-				t2 = t2->merge(tables2[i], nthreads);
-			}
-		} else {
-			t2 = t2->merge(tables2[i], nthreads);
-		}
+        if (! t2->supportsMerge()) {
+            if (tables2[i]->supportsMerge()) {
+                t2 = tables2[i]->merge(t2, nthreads);
+            } else {
+                std::shared_ptr<const FCInternalTable> pt(new InmemoryFCInternalTable(t2->getRowSize(), 0));
+                t2 = pt->merge(t2, nthreads);
+                t2 = t2->merge(tables2[i], nthreads);
+            }
+        } else {
+            t2 = t2->merge(tables2[i], nthreads);
+        }
     }
 
     //Sort t2
