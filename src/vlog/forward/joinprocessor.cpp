@@ -202,7 +202,7 @@ void JoinExecutor::verificativeJoinOneColumnSameOutput(
             tableItr.moveNextCount();
         }
         if (!writer.isEmpty()) {
-            LOG(TRACEL) << "writer not empty, size = " << writer.getColumn()->size();
+            // LOG(TRACEL) << "writer not empty, size = " << writer.getColumn()->size();
             // Intersection of sorted-and-unique columns; result does not need sorting. --Ceriel
             output->addColumn(0, 0, writer.getColumn()/*->sort_and_unique(nthreads)*/, false,  true);
         }
@@ -226,7 +226,7 @@ void JoinExecutor::verificativeJoinOneColumnSameOutput(
         }
         std::shared_ptr<Column> secondColumn =
             secondColumnCreator.getColumn()->sort_and_unique(nthreads);
-        LOG(TRACEL) << "Finished sorting the columns";
+        // LOG(TRACEL) << "Finished sorting the columns";
         /*
            bool isSubsumed = secondColumn->size() >= firstColumn->size() && Column::subsumes(secondColumn, firstColumn);
            if (isSubsumed) {
@@ -241,7 +241,7 @@ void JoinExecutor::verificativeJoinOneColumnSameOutput(
             // Column::intersection(firstColumn, secondColumn, writer, nthreads);
             Column::intersection(firstColumn, secondColumn, writer);
             if (!writer.isEmpty()) {
-                LOG(TRACEL) << "writer not empty, size = " << writer.getColumn()->size();
+                // LOG(TRACEL) << "writer not empty, size = " << writer.getColumn()->size();
                 // Intersection of sorted-and-unique columns; result does not need sorting. --Ceriel
                 output->addColumn(0, 0, writer.getColumn()/*->sort_and_unique(nthreads)*/, false,  true);
             }
@@ -315,13 +315,13 @@ void JoinExecutor::verificativeJoinOneColumn(
         //to the EDB layer
         shared_ptr<const Column> column = table->
             getColumn(hv.joinCoordinates[currentLiteral][0].second);
-        LOG(TRACEL) << "Count = " << count;
+        // LOG(TRACEL) << "Count = " << count;
         FCInternalTableItr *itr = intermediateResults->sortBy(joinField /*, nthreads */);
         EDBLayer &layer = naiver->getEDBLayer();
         if (column->isEDB() && layer.supportsCheckIn(((EDBColumn*) column.get())->getLiteral())) {
             //Offload a merge join to the EDB layer
             EDBColumn *edbColumn = (EDBColumn*)column.get();
-            LOG(TRACEL) << "EDBcolumn: literal = " << edbColumn->getLiteral().tostring(naiver->getProgram(), &layer);
+            // LOG(TRACEL) << "EDBcolumn: literal = " << edbColumn->getLiteral().tostring(naiver->getProgram(), &layer);
             size_t sizeColumn = 0;
             std::vector<Term_t> possibleKeys;
             for (auto v : keys) {
@@ -561,7 +561,7 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
     }
     //First I calculate whether the join is verificative or explorative.
     else if (JoinExecutor::isJoinVerificative(t1, hv, currentLiteral)) {
-        LOG(TRACEL) << "Executing verificativeJoin. t1->getNRows()=" << t1->getNRows();
+        LOG(TRACEL) << "Executing verificativeJoin";
         verificativeJoin(naiver, t1, literal, min, max, output, hv,
                 currentLiteral, nthreads);
     } else if (JoinExecutor::isJoinTwoToOneJoin(hv, currentLiteral)) {
@@ -584,7 +584,7 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
                 && (factor != 1 || joinsCoordinates.size() > 1 ||
                     joinsCoordinates[0].first != joinsCoordinates[0].second ||
                     joinsCoordinates[0].first != 0)) {
-            LOG(TRACEL) << "Executing hashjoin. t1->getNRows()=" << t1->getNRows();
+            LOG(TRACEL) << "Executing hashjoin.";
             hashjoin(t1, naiver, outputLiterals, literal, min, max, filterValueVars,
                     joinsCoordinates, output,
                     lastLiteral, ruleDetails, hv, processedTables, nthreads);
@@ -592,7 +592,7 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
             output->checkSizes();
 #endif
         } else {
-            LOG(TRACEL) << "Executing mergejoin. t1->getNRows()=" << t1->getNRows();
+            LOG(TRACEL) << "Executing mergejoin.";
             mergejoin(t1, naiver, outputLiterals, literal, min, max,
                     joinsCoordinates, output, nthreads);
 #ifdef DEBUG
