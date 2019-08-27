@@ -100,10 +100,10 @@ class Test {
             vlog.writeQueryResultsToCsv(
                     new Atom("p3", q1.toArray(new Term[q1.size()])), "blabla");
             System.err.println("vlog should have thrown an exception");
-            Files.delete(Paths.get("blabla"));
         } catch (NonExistingPredicateException e) {
             // OK
         }
+        Files.delete(Paths.get("blabla"));
 
         vlog = new VLog();
         vlog.start("", false);
