@@ -609,7 +609,10 @@ bool JoinExecutor::isJoinSelective(JoinHashMap & map, const Literal & literal,
     size_t filteringCardinality = 0;
     for (JoinHashMap::iterator itr = map.begin(); itr != map.end(); ++itr) {
         VTuple tuple = literal.getTuple();
-        tuple.set(VTerm(0, itr->first), joinPos);
+        // Watch out: this variable could occur more than once in the literal. --Ceriel
+        // tuple.set(VTerm(0, itr->first), joinPos);
+        tuple.replaceAll(tuple.get(joinPos), VTerm(0, itr->first));
+
         Literal literalToQuery(literal.getPredicate(), tuple);
         filteringCardinality += naiver->estimateCardinality(literalToQuery, minIteration, maxIteration);
     }
