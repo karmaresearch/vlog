@@ -171,7 +171,7 @@ size_t QSQR::estimate(int depth, Predicate &pred, BindingsTable *inputTable/*, s
     return output;
 }
 
-void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Rule> &execRules) {
+void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<uint32_t> &execRules) {
 
     LOG(DEBUGL) << "Literal " << l.tostring(program, &layer) << ", depth = " << depth;
 
@@ -195,6 +195,7 @@ void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Ru
     }
 
     std::vector<Rule> r = program->getAllRulesByPredicate(pred.getId());
+
     for (std::vector<Rule>::iterator itr =
 	    r.begin(); itr != r.end(); ++itr) {
 	Literal head = itr->getHead(0);
@@ -215,11 +216,11 @@ void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Ru
 	for (int i = 0; i < nSubs; i++) {
 	    if (! substitutions[i].destination.isVariable()) {
 		 filteredSubstitutions.push_back(substitutions[i]);
-         ++filterednSubs;
+		 ++filterednSubs;
 	    }
 	}
 
-    estimateRule(m, depth - 1, *itr, filteredSubstitutions, filterednSubs, execRules);
+	estimateRule(m, depth - 1, *itr, filteredSubstitutions, filterednSubs, execRules);
 	metrics.estimate += m.estimate;
 	metrics.intermediateResults += m.intermediateResults;
 	metrics.countRules += m.countRules;
@@ -228,14 +229,14 @@ void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Ru
     }
 }
 
-void QSQR::estimateRule(Metrics &metrics, int depth, Rule &rule, vector<Substitution>& subs, int nSubs, std::vector<Rule> &execRules) {
+void QSQR::estimateRule(Metrics &metrics, int depth, Rule &rule, vector<Substitution>& subs, int nSubs, std::vector<uint32_t> &execRules) {
     bool exists = false;
-    for (std::vector<Rule>::iterator itr = execRules.begin(); itr != execRules.end() && ! exists; itr++) {
-	exists = itr->getId() == rule.getId();
+    for (std::vector<uint32_t>::iterator itr = execRules.begin(); itr != execRules.end() && ! exists; itr++) {
+	exists = *itr == rule.getId();
     }
     if (!exists) {
 	LOG(DEBUGL) << "Adding rule " << rule.tostring(program, &layer);
-	execRules.push_back(rule);
+	execRules.push_back(rule.getId());
     }
     metrics.countRules++;
     bool noAnswers = false;
