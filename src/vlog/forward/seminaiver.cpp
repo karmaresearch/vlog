@@ -37,7 +37,7 @@ void SemiNaiver::createGraphRuleDependency(std::vector<int> &nodes,
                 // Only add "interesting" rules: ones that have an IDB predicate in the RHS.
                 nodes.push_back(i);
                 definedBy[pred].push_back(i);
-                LOG(INFOL) << " Rule " << i << ": " << ri.tostring(program, &layer);
+                LOG(DEBUGL) << " Rule " << i << ": " << ri.tostring(program, &layer);
                 break;
             }
         }
@@ -465,14 +465,15 @@ bool SemiNaiver::executeUntilSaturation(
         }
         iteration++;
 
+		if (checkCyclicTerms) {
+			foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
+			if (foundCyclicTerms) {
+				LOG(DEBUGL) << "Found a cyclic term";
+				return newDer;
+			}
+		}
+
         if (response) {
-            if (checkCyclicTerms) {
-                foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
-                if (foundCyclicTerms) {
-                    LOG(DEBUGL) << "Found a cyclic term";
-                    return newDer;
-                }
-            }
 
             if ((typeChase == TypeChase::RESTRICTED_CHASE ||
                         typeChase == TypeChase::SUM_RESTRICTED_CHASE) &&
@@ -485,7 +486,7 @@ bool SemiNaiver::executeUntilSaturation(
                 //Is the rule recursive? Go until saturation...
                 int recursiveIterations = 0;
                 do {
-                    // LOG(INFOL) << "Iteration " << iteration;
+                    // LOG(DEBUGL) << "Iteration " << iteration;
                     start = std::chrono::system_clock::now();
                     recursiveIterations++;
                     response = executeRule(ruleset[currentRule],
@@ -534,7 +535,7 @@ bool SemiNaiver::executeUntilSaturation(
             LOG(DEBUGL) << "--Time round " << sec.count() * 1000 << " " << iteration;
             round_start = std::chrono::system_clock::now();
             //CODE FOR Statistics
-            LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". RulesWithDerivation=" <<
+            LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". IDB RulesWithDerivation=" <<
                 nRulesOnePass << " out of " << ruleset.size() << " Derivations so far " << countAllIDBs();
             printCountAllIDBs("After step " + to_string(iteration) + ": ");
             nRulesOnePass = 0;
@@ -1110,6 +1111,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
     if (! bodyChangedSince(rule, ruleDetails.lastExecution)) {
+        LOG(INFOL) << "Rule application: " << iteration << ", rule " << rule.tostring(program, &layer) << " skipped because dependencies did not change since the previous application of this rule";
         return false;
     }
 
@@ -1137,7 +1139,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         //set (should be only during the execution of RMFA or RMFC).
     }
 
-    LOG(INFOL) << "Iteration: " << iteration << " Rule: " << rule.tostring(program, &layer);
+    LOG(DEBUGL) << "Iteration: " << iteration << " Rule: " << rule.tostring(program, &layer);
 
     //Set up timers
     const std::chrono::system_clock::time_point startRule = std::chrono::system_clock::now();
@@ -1416,12 +1418,14 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     }
 
     if (prodDer) {
-        LOG(DEBUGL) << "Iteration " << iteration << ". Rule derived new tuples. Combinations " << orderExecution << ", Processed IDB Tables=" <<
+        LOG(INFOL) << "Rule application: " << iteration << ", derived " << getNLastDerivationsFromList() << " new tuple(s) using rule " << rule.tostring(program, &layer);
+        LOG(DEBUGL) << "Combinations " << orderExecution << ", Processed IDB Tables=" <<
             processedTables << ", Total runtime " << stream.str()
             << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
             durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
     } else {
-        LOG(DEBUGL) << "Iteration " << iteration << ". Rule derived NO new tuples. Combinations " << orderExecution << ", Processed IDB Tables=" <<
+        LOG(INFOL) << "Rule application: " << iteration << ", derived no new tuples using rule " << rule.tostring(program, &layer);
+        LOG(DEBUGL) << "Combinations " << orderExecution << ", Processed IDB Tables=" <<
             processedTables << ", Total runtime " << stream.str()
             << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
             durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
