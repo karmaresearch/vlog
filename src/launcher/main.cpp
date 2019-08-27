@@ -288,7 +288,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
 
     query_options.add<bool>("", "shufflerules", false,
             "shuffle rules randomly instead of using heuristics (only for <mat>, and only when running multithreaded).", false);
-    query_options.add<int>("r", "repeatQuery", 0,
+    query_options.add<int>("r", "repeatQuery", 1,
             "Repeat the query <arg> times. If the argument is not specified, then the query will not be repeated.", false);
     query_options.add<string>("","storemat_path", "",
             "Directory where to store all results of the materialization. Default is '' (disable).",false);
@@ -1111,8 +1111,9 @@ int main(int argc, const char** argv) {
                 } else {
                     vector<Metrics> featuresVector;
                     vector<int> decisionVector;
+                    vector<double> featuresTimesVector;
                     int nMagicQueries = 0;
-                    Training::runQueries(trainingQueriesVector, *layer, program, timeout, repeatQuery, featuresVector, decisionVector,nMagicQueries, logFileName, featureDepth);
+                    Training::runQueries(trainingQueriesVector, *layer, program, timeout, repeatQuery, featuresVector, decisionVector, featuresTimesVector, nMagicQueries, logFileName, featureDepth);
                 }
             }
         }
@@ -1262,12 +1263,12 @@ int main(int argc, const char** argv) {
             return 1;
         }
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-        std::vector<std::pair<std::string,int>> trainingQueries = ML::generateTrainingQueries(*layer, program, vt, vm);
+        std::vector<std::pair<std::string,int>> trainingQueries = Training::generateTrainingQueriesAllPaths(conf, *layer, program, depth, maxTuples, vt);
         std::chrono::duration<double> sec = std::chrono::system_clock::now()- start;
         int nQueries = trainingQueries.size();
         LOG(INFOL) << nQueries << " queries generated in " << sec.count() << " seconds";
         std::string trainingFileName = extractFileName(rulesFile);
-        trainingFileName += "-training.log";
+        trainingFileName += "-training-queries.log";
         std::ofstream logFile(trainingFileName);
         for (auto it = trainingQueries.begin(); it != trainingQueries.end(); ++it) {
             logFile << it->first <<" "<<it->second << std::endl;
@@ -1303,9 +1304,8 @@ int main(int argc, const char** argv) {
                 testQueriesLog.push_back(logLine);
             }
             LOG(INFOL) << "test Queries in the file = " << testQueriesLog.size();
-            size_t dotIndex = rulesFile.find_last_of(".");
-            string logFileName = rulesFile.substr(0, dotIndex);
-            logFileName += "-training.log";
+            std::string logFileName = extractFileName(rulesFile);
+            logFileName += "-training-features.log";
             double accuracy = 0.0;
             uint64_t timeout = vm["timeout"].as<unsigned int>();
             uint8_t repeatQuery = vm["repeatQuery"].as<unsigned int>();
