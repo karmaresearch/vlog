@@ -632,7 +632,7 @@ static bool rja_check(Program &p, Program &nongen_program, const Rule &rulev, co
     newProgram.parseRule(newRule, false);
 
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false);
+            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 0, false);
     sn->run();
     Reasoner r((uint64_t) 0);
     Dictionary dictVariables;

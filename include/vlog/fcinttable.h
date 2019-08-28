@@ -163,6 +163,8 @@ class FCInternalTable {
             throw 10;
         }
 
+		virtual bool supportsMerge() const = 0;
+
         virtual std::shared_ptr<const FCInternalTable> merge(
                 std::shared_ptr<const FCInternalTable> t, int nthreads) const = 0;
 
@@ -559,6 +561,10 @@ class InmemoryFCInternalTable final : public FCInternalTable {
                 const uint8_t *posConstantsToFilter,
                 const Term_t *valuesConstantsToFilter) const;
 
+		bool supportsMerge() const {
+			return true;
+		}
+
         std::shared_ptr<const FCInternalTable> merge(std::shared_ptr<const FCInternalTable> t, int nthreads) const;
 
         std::shared_ptr<const FCInternalTable> merge(std::shared_ptr<const Segment> seg, int nthreads) const;
@@ -653,6 +659,10 @@ class EDBFCInternalTable final : public FCInternalTable {
         FCInternalTableItr *getSortedIterator(int nthreads) const {
             return getSortedIterator();
         }
+
+		bool supportsMerge() const {
+			return false;
+		}
 
         std::shared_ptr<const FCInternalTable> merge(std::shared_ptr<const FCInternalTable> t, int nthreads) const;
 
@@ -782,6 +792,10 @@ class SingletonTable final : public FCInternalTable {
         FCInternalTableItr *getSortedIterator(int nthreads) const {
             return new SingletonItr(iteration);
         }
+
+		bool supportsMerge() const {
+			return false;
+		}
 
         std::shared_ptr<const FCInternalTable> merge(std::shared_ptr<const FCInternalTable> t, int nthreads) const {
             throw 10;

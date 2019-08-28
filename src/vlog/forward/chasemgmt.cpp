@@ -2,7 +2,7 @@
 
 //************** ROWS ***************
 uint64_t ChaseMgmt::Rows::addRow(uint64_t* row) {
-    LOG(TRACEL) << "Addrow: " << row[0];
+    // LOG(TRACEL) << "Addrow: " << row[0];
     if (!currentblock || blockCounter >= SIZE_BLOCK) {
         //Create a new block
         std::unique_ptr<uint64_t[]> n =
@@ -26,7 +26,15 @@ uint64_t ChaseMgmt::Rows::addRow(uint64_t* row) {
     auto out = currentcounter;
     if (typeChase != TypeChase::SUM_CHASE && typeChase != TypeChase::SUM_RESTRICTED_CHASE) {
         currentcounter++;
+    } else {
+        for(uint8_t i = 0; i < sizerow; ++i) {
+            if (row[i] & RULEVARMASK) {
+                // LOG(DEBUGL) << "Adding dependency " << row[i] << ", current = " << out;
+                deps.insert(row[i]);
+            }
+        }
     }
+    // LOG(DEBUGL) << "addRow returns " << out;
     return out;
 }
 
@@ -48,26 +56,15 @@ uint64_t *ChaseMgmt::Rows::getRow(size_t id) {
 }
 
 static bool checkValue(uint64_t target, uint64_t v, std::set<uint64_t> &toCheck) {
-    LOG(TRACEL) << "checkValue: target = " << target << ", v = " << v;
+    // LOG(TRACEL) << "checkValue: target = " << target << ", v = " << v;
     if ((v & RULEVARMASK) == target) {
+        // LOG(TRACEL) << "TRUE";
         return true;
     }
     if (v != 0) {
         toCheck.insert(v);
     }
-    return false;
-}
-
-bool ChaseMgmt::Rows::checkRecursive(uint64_t target, uint64_t value, std::set<uint64_t> &toCheck) {
-    // Find the right block to check
-    size_t blockNo = value / SIZE_BLOCK;
-    size_t offset = (value % SIZE_BLOCK) * sizerow;
-    auto block = blocks[blockNo].get();
-    for (size_t i = offset; i < offset + sizerow; i++) {
-        if (checkValue(target, block[i], toCheck)) {
-            return true;
-        }
-    }
+    // LOG(TRACEL) << "FALSE";
     return false;
 }
 
@@ -87,13 +84,6 @@ ChaseMgmt::Rows *ChaseMgmt::RuleContainer::getRows(uint8_t var) {
     return &vars2rows.find(var)->second;
 }
 
-bool ChaseMgmt::RuleContainer::containsCyclicTerms() {
-    for (auto &p : vars2rows) {
-        if (p.second.containsCyclicTerms())
-            return true;
-    }
-    return false;
-}
 //************** END RULE CONTAINER *************
 
 //************** CHASE MGMT ***************
@@ -117,6 +107,28 @@ ChaseMgmt::ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
                         typeChase));
         }
     }
+
+bool ChaseMgmt::Rows::checkRecursive(uint64_t target, uint64_t value, std::set<uint64_t> &toCheck) {
+    if (typeChase == TypeChase::SUM_CHASE || typeChase == TypeChase::SUM_RESTRICTED_CHASE) {
+        for (auto v : deps) {
+            if (checkValue(target, v, toCheck)) {
+                return true;
+            }
+        }
+    }
+    else {
+        // Find the right block to check
+        size_t blockNo = value / SIZE_BLOCK;
+        size_t offset = (value % SIZE_BLOCK) * sizerow;
+        auto block = blocks[blockNo].get();
+        for (size_t i = offset; i < offset + sizerow; i++) {
+            if (checkValue(target, block[i], toCheck)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 bool ChaseMgmt::checkSingle(uint64_t target, uint64_t rv, std::set<uint64_t> &toCheck) {
     auto &ruleContainer = rules[GET_RULE(rv)];
@@ -203,6 +215,7 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
                         } else {
                             cyclic = checkRecursive(rulevar, row[j]);
                         }
+                        // LOG(TRACEL) << "cyclic = " << cyclic;
                     }
                 }
             }

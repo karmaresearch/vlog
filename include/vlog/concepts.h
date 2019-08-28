@@ -97,6 +97,14 @@ class VTuple {
             terms[pos] = term;
         }
 
+        void replaceAll(const VTerm termA, const VTerm termB) {
+            for (int i = 0; i < sizetuple; i++) {
+                if (terms[i] == termA) {
+                    terms[i] = termB;
+                }
+            }
+        }
+
         std::vector<std::pair<uint8_t, uint8_t>> getRepeatedVars() const {
             std::vector<std::pair<uint8_t, uint8_t>> output;
             for (uint8_t i = 0; i < sizetuple; ++i) {

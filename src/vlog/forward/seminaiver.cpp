@@ -493,14 +493,15 @@ bool SemiNaiver::executeUntilSaturation(
         }
         iteration++;
 
-        if (response) {
-            if (checkCyclicTerms) {
-                foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
-                if (foundCyclicTerms) {
-                    LOG(DEBUGL) << "Found a cyclic term";
-                    return newDer;
-                }
+        if (checkCyclicTerms) {
+            foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
+            if (foundCyclicTerms) {
+                LOG(DEBUGL) << "Found a cyclic term";
+                return newDer;
             }
+        }
+
+        if (response) {
 
             if ((typeChase == TypeChase::RESTRICTED_CHASE ||
                         typeChase == TypeChase::SUM_RESTRICTED_CHASE) &&
@@ -513,7 +514,7 @@ bool SemiNaiver::executeUntilSaturation(
                 //Is the rule recursive? Go until saturation...
                 int recursiveIterations = 0;
                 do {
-                    // LOG(INFOL) << "Iteration " << iteration;
+                    // LOG(DEBUGL) << "Iteration " << iteration;
                     start = std::chrono::system_clock::now();
                     recursiveIterations++;
                     response = executeRule(ruleset[currentRule],
@@ -565,7 +566,7 @@ bool SemiNaiver::executeUntilSaturation(
             LOG(INFOL) << "--Time round " << sec.count() * 1000 << " " << iteration;
             round_start = std::chrono::system_clock::now();
             //CODE FOR Statistics
-            LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". RulesWithDerivation=" <<
+            LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". IDB RulesWithDerivation=" <<
                 nRulesOnePass << " out of " << ruleset.size() << " Derivations so far " << countAllIDBs();
             printCountAllIDBs("After step " + to_string(iteration) + ": ");
             nRulesOnePass = 0;
@@ -1144,6 +1145,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
     if (! bodyChangedSince(rule, ruleDetails.lastExecution)) {
+        LOG(INFOL) << "Rule application: " << iteration << ", rule " << rule.tostring(program, &layer) << " skipped because dependencies did not change since the previous application of this rule";
         return false;
     }
 
@@ -1173,11 +1175,11 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         //set (should be only during the execution of RMFA or RMFC).
     }
 
-    LOG(DEBUGL) << "Iteration: " << iteration <<
+        LOG(DEBUGL) << "Iteration: " << iteration <<
         " Rule: " << rule.tostring(program, &layer);
 
-    //Set up timers
-    const std::chrono::system_clock::time_point startRule = std::chrono::system_clock::now();
+        //Set up timers
+        const std::chrono::system_clock::time_point startRule = std::chrono::system_clock::now();
     std::chrono::duration<double> durationJoin(0);
     std::chrono::duration<double> durationConsolidation(0);
     std::chrono::duration<double> durationFirstAtom(0);
@@ -1475,319 +1477,321 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         stream << td << "ms";
     }
 
-    if (newDerivations) {
-        LOG(DEBUGL) << "Iteration " << iteration << ". Rule derived new tuples. Combinations " << orderExecution << ", Processed IDB Tables=" <<
-            processedTables << ", Total runtime " << stream.str()
-            << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
-            durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
-    } else {
-        LOG(DEBUGL) << "Iteration " << iteration << ". Rule derived NO new tuples. Combinations " << orderExecution << ", Processed IDB Tables=" <<
-            processedTables << ", Total runtime " << stream.str()
-            << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
-            durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
+        if (newDerivations) {
+                    LOG(INFOL) << "Rule application: " << iteration << ", derived " << getNLastDerivationsFromList() << " new tuple(s) using rule " << rule.tostring(program, &layer);
+                    LOG(DEBUGL) << "Combinations " << orderExecution << ", Processed IDB Tables=" <<
+                        processedTables << ", Total runtime " << stream.str()
+                        << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
+                        durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
+                } else {
+                    LOG(INFOL) << "Rule application: " << iteration << ", derived no new tuples using rule " << rule.tostring(program, &layer);
+                    LOG(DEBUGL) << "Combinations " << orderExecution << ", Processed IDB Tables=" <<
+                        processedTables << ", Total runtime " << stream.str()
+                        << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
+                        durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
+                }
+
+            LOG(DEBUGL) << t_iter.tostring();
+
+            return newDerivations;
+        }
+
+    long SemiNaiver::getNLastDerivationsFromList() {
+        return listDerivations.back().table->getNRows();
     }
 
-    LOG(DEBUGL) << t_iter.tostring();
+    size_t SemiNaiver::estimateCardTable(const Literal &literal,
+            const size_t minIteration,
+            const size_t maxIteration) {
 
-    return newDerivations;
-}
-
-long SemiNaiver::getNLastDerivationsFromList() {
-    return listDerivations.back().table->getNRows();
-}
-
-size_t SemiNaiver::estimateCardTable(const Literal &literal,
-        const size_t minIteration,
-        const size_t maxIteration) {
-
-    PredId_t id = literal.getPredicate().getId();
-    FCTable *table = predicatesTables[id];
-    if (literal.isNegated()) {
-        return 1;
-    }
-    if (table == NULL || table->isEmpty() ||
-            table->getMaxIteration() < minIteration ||
-            table->getMinIteration() > maxIteration) {
-        if (table == NULL && literal.getPredicate().getType() == EDB) {
-            //It might be because the table is not loaded. Try to load it and repeat the process
-            FCIterator itr = getTable(literal, minIteration, maxIteration);
-            if (itr.isEmpty()) {
-                return 0;
+        PredId_t id = literal.getPredicate().getId();
+        FCTable *table = predicatesTables[id];
+        if (literal.isNegated()) {
+            return 1;
+        }
+        if (table == NULL || table->isEmpty() ||
+                table->getMaxIteration() < minIteration ||
+                table->getMinIteration() > maxIteration) {
+            if (table == NULL && literal.getPredicate().getType() == EDB) {
+                //It might be because the table is not loaded. Try to load it and repeat the process
+                FCIterator itr = getTable(literal, minIteration, maxIteration);
+                if (itr.isEmpty()) {
+                    return 0;
+                } else {
+                    return estimateCardTable(literal, minIteration, maxIteration);
+                }
             } else {
-                return estimateCardTable(literal, minIteration, maxIteration);
+                return 0;
             }
         } else {
-            return 0;
+            size_t estimate = table->estimateCardinality(literal, minIteration, maxIteration);
+            if (estimate == 0) {
+                return 0;
+            }
+            return estimate;
+            // Was: return table->estimateCardInRange(minIteration, maxIteration);
         }
-    } else {
-        size_t estimate = table->estimateCardinality(literal, minIteration, maxIteration);
-        if (estimate == 0) {
-            return 0;
+    }
+
+    FCIterator SemiNaiver::getTableFromIDBLayer(const Literal &literal, const size_t minIteration, TableFilterer *filter) {
+
+        PredId_t id = literal.getPredicate().getId();
+        LOG(TRACEL) << "SemiNaiver::getTableFromIDBLayer: id = " << (int) id
+            << ", minIter = " << minIteration << ", literal=" << literal.tostring(NULL, NULL);
+        FCTable *table = predicatesTables[id];
+        if (table == NULL || table->isEmpty() || table->getMaxIteration() < minIteration) {
+            LOG(DEBUGL) << "Return empty iterator";
+            return FCIterator();
+        } else {
+            return table->filter(literal, minIteration, filter, nthreads)->read(minIteration);
         }
-        return estimate;
-        // Was: return table->estimateCardInRange(minIteration, maxIteration);
     }
-}
 
-FCIterator SemiNaiver::getTableFromIDBLayer(const Literal &literal, const size_t minIteration, TableFilterer *filter) {
-
-    PredId_t id = literal.getPredicate().getId();
-    LOG(TRACEL) << "SemiNaiver::getTableFromIDBLayer: id = " << (int) id
-        << ", minIter = " << minIteration << ", literal=" << literal.tostring(NULL, NULL);
-    FCTable *table = predicatesTables[id];
-    if (table == NULL || table->isEmpty() || table->getMaxIteration() < minIteration) {
-        LOG(DEBUGL) << "Return empty iterator";
-        return FCIterator();
-    } else {
-        return table->filter(literal, minIteration, filter, nthreads)->read(minIteration);
+    FCIterator SemiNaiver::getTableFromIDBLayer(const Literal &literal, const size_t minIteration,
+            const size_t maxIteration, TableFilterer *filter) {
+        PredId_t id = literal.getPredicate().getId();
+        LOG(TRACEL) << "SemiNaiver::getTableFromIDBLayer: id = " << (int) id
+            << ", minIter = " << minIteration << ", maxIteration = " << maxIteration << ", literal=" << literal.tostring(NULL, NULL);
+        FCTable *table = predicatesTables[id];
+        if (table == NULL || table->isEmpty() || table->getMaxIteration() < minIteration) {
+            LOG(DEBUGL) << "Return empty iterator";
+            return FCIterator();
+        } else {
+            if (literal.getNUniqueVars() < literal.getTupleSize()) {
+                return table->filter(literal, minIteration, filter, nthreads)->read(minIteration, maxIteration);
+            } else {
+                return table->read(minIteration, maxIteration);
+            }
+        }
     }
-}
 
-FCIterator SemiNaiver::getTableFromIDBLayer(const Literal &literal, const size_t minIteration,
-        const size_t maxIteration, TableFilterer *filter) {
-    PredId_t id = literal.getPredicate().getId();
-    LOG(TRACEL) << "SemiNaiver::getTableFromIDBLayer: id = " << (int) id
-        << ", minIter = " << minIteration << ", maxIteration = " << maxIteration << ", literal=" << literal.tostring(NULL, NULL);
-    FCTable *table = predicatesTables[id];
-    if (table == NULL || table->isEmpty() || table->getMaxIteration() < minIteration) {
-        LOG(DEBUGL) << "Return empty iterator";
-        return FCIterator();
-    } else {
+    size_t SemiNaiver::estimateCardinality(const Literal &literal, const size_t minIteration,
+            const size_t maxIteration) {
+        FCTable *table = predicatesTables[literal.getPredicate().getId()];
+        if (table == NULL) {
+            return 0;
+        } else {
+            return table->estimateCardinality(literal, minIteration, maxIteration);
+        }
+    }
+
+    FCIterator SemiNaiver::getTableFromEDBLayer(const Literal & literal) {
+        PredId_t id = literal.getPredicate().getId();
+        FCTable *table = predicatesTables[id];
+        if (table == NULL) {
+            table = SemiNaiver::getTable(id, (uint8_t) literal.getTupleSize());
+
+            VTuple t = literal.getTuple();
+            //Add all different variables
+            for (uint8_t i = 0; i < t.getSize(); ++i) {
+                t.set(VTerm(i + 1, 0), i);
+            }
+            Literal mostGenericLiteral(literal.getPredicate(), t);
+
+            std::shared_ptr<FCInternalTable> ptrTable(new EDBFCInternalTable(0,
+                        mostGenericLiteral, &layer));
+            table->add(ptrTable, mostGenericLiteral, 0, NULL, 0, 0, true, nthreads);
+        }
         if (literal.getNUniqueVars() < literal.getTupleSize()) {
-            return table->filter(literal, minIteration, filter, nthreads)->read(minIteration, maxIteration);
+            return table->filter(literal, nthreads)->read(0);
         } else {
-            return table->read(minIteration, maxIteration);
+            return table->read(0);
         }
     }
-}
 
-size_t SemiNaiver::estimateCardinality(const Literal &literal, const size_t minIteration,
-        const size_t maxIteration) {
-    FCTable *table = predicatesTables[literal.getPredicate().getId()];
-    if (table == NULL) {
-        return 0;
-    } else {
-        return table->estimateCardinality(literal, minIteration, maxIteration);
-    }
-}
-
-FCIterator SemiNaiver::getTableFromEDBLayer(const Literal & literal) {
-    PredId_t id = literal.getPredicate().getId();
-    FCTable *table = predicatesTables[id];
-    if (table == NULL) {
-        table = SemiNaiver::getTable(id, (uint8_t) literal.getTupleSize());
-
-        VTuple t = literal.getTuple();
-        //Add all different variables
-        for (uint8_t i = 0; i < t.getSize(); ++i) {
-            t.set(VTerm(i + 1, 0), i);
+    FCIterator SemiNaiver::getTable(const Literal & literal,
+            const size_t min, const size_t max, TableFilterer *filter) {
+        //BEGIN -- Get the table that correspond to the current literal
+        //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+        if (literal.getPredicate().getType() == EDB) {
+            return getTableFromEDBLayer(literal);
+        } else {
+            /*if (currentIDBpred == 0) {
+              literalItr = getTableFromIDBLayer(literal, ruleDetails.lastExecution);
+              } else {
+              if (orderExecution == 0) {
+              literalItr = getTableFromIDBLayer(literal, 0);
+              } else {
+              literalItr = getTableFromIDBLayer(literal, 0,
+              ruleDetails.lastExecution);
+              }
+              }
+              currentIDBpred++;*/
+            return getTableFromIDBLayer(literal, min, max, filter);
         }
-        Literal mostGenericLiteral(literal.getPredicate(), t);
+        //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+        //LOG(DEBUGL) << "Runtime retrieving literal ms = " << sec.count() * 1000;
+        //END -- Get the table that correspond to the literal
 
-        std::shared_ptr<FCInternalTable> ptrTable(new EDBFCInternalTable(0,
-                    mostGenericLiteral, &layer));
-        table->add(ptrTable, mostGenericLiteral, 0, NULL, 0, 0, true, nthreads);
-    }
-    if (literal.getNUniqueVars() < literal.getTupleSize()) {
-        return table->filter(literal, nthreads)->read(0);
-    } else {
-        return table->read(0);
-    }
-}
-
-FCIterator SemiNaiver::getTable(const Literal & literal,
-        const size_t min, const size_t max, TableFilterer *filter) {
-    //BEGIN -- Get the table that correspond to the current literal
-    //std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    if (literal.getPredicate().getType() == EDB) {
-        return getTableFromEDBLayer(literal);
-    } else {
-        /*if (currentIDBpred == 0) {
-          literalItr = getTableFromIDBLayer(literal, ruleDetails.lastExecution);
-          } else {
-          if (orderExecution == 0) {
-          literalItr = getTableFromIDBLayer(literal, 0);
-          } else {
-          literalItr = getTableFromIDBLayer(literal, 0,
-          ruleDetails.lastExecution);
-          }
-          }
-          currentIDBpred++;*/
-        return getTableFromIDBLayer(literal, min, max, filter);
-    }
-    //std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    //LOG(DEBUGL) << "Runtime retrieving literal ms = " << sec.count() * 1000;
-    //END -- Get the table that correspond to the literal
-
-}
-
-FCIterator SemiNaiver::getTable(const PredId_t predid) {
-    if (predicatesTables[predid] == NULL) {
-        return FCIterator();
-    }
-    return predicatesTables[predid]->read(0);
-}
-
-size_t SemiNaiver::getSizeTable(const PredId_t predid) const {
-    if (predicatesTables[predid])
-        return predicatesTables[predid]->getNAllRows();
-    else
-        return 0;
-}
-
-bool SemiNaiver::isEmpty(const PredId_t predid) const {
-    if (predicatesTables[predid] == NULL) {
-        return true;
-    } else {
-        return predicatesTables[predid]->getNAllRows() == 0;
-    }
-}
-
-SemiNaiver::~SemiNaiver() {
-    // Don't refer to program. It may already have been deallocated.
-    for (int i = 0; i < predicatesTables.size(); ++i) {
-        if (predicatesTables[i] != NULL)
-            delete predicatesTables[i];
     }
 
-    /*for (EDBCache::iterator itr = edbCache.begin(); itr != edbCache.end(); ++itr) {
-      delete itr->second;
-      }*/
-}
+    FCIterator SemiNaiver::getTable(const PredId_t predid) {
+        if (predicatesTables[predid] == NULL) {
+            return FCIterator();
+        }
+        return predicatesTables[predid]->read(0);
+    }
 
-size_t SemiNaiver::countAllIDBs() {
-    long c = 0;
-    for (PredId_t i = 0; i < program->getNPredicates(); ++i) {
-        if (predicatesTables[i] != NULL) {
-            if (program->isPredicateIDB(i)) {
-                long count = predicatesTables[i]->getNAllRows();
-                c += count;
+    size_t SemiNaiver::getSizeTable(const PredId_t predid) const {
+        if (predicatesTables[predid])
+            return predicatesTables[predid]->getNAllRows();
+        else
+            return 0;
+    }
+
+    bool SemiNaiver::isEmpty(const PredId_t predid) const {
+        if (predicatesTables[predid] == NULL) {
+            return true;
+        } else {
+            return predicatesTables[predid]->getNAllRows() == 0;
+        }
+    }
+
+    SemiNaiver::~SemiNaiver() {
+        // Don't refer to program. It may already have been deallocated.
+        for (int i = 0; i < predicatesTables.size(); ++i) {
+            if (predicatesTables[i] != NULL)
+                delete predicatesTables[i];
+        }
+
+        /*for (EDBCache::iterator itr = edbCache.begin(); itr != edbCache.end(); ++itr) {
+          delete itr->second;
+          }*/
+    }
+
+    size_t SemiNaiver::countAllIDBs() {
+        long c = 0;
+        for (PredId_t i = 0; i < program->getNPredicates(); ++i) {
+            if (predicatesTables[i] != NULL) {
+                if (program->isPredicateIDB(i)) {
+                    long count = predicatesTables[i]->getNAllRows();
+                    c += count;
+                }
             }
         }
+        return c;
     }
-    return c;
-}
 
 #ifdef WEBINTERFACE
-std::vector<std::pair<string, std::vector<StatsSizeIDB>>> SemiNaiver::getSizeIDBs() {
-    std::vector<std::pair<string, std::vector<StatsSizeIDB>>> out;
-    for (PredId_t i = 0; i < program->getNPredicates(); ++i) {
-        if (predicatesTables[i] != NULL && i != currentPredicate) {
-            if (program->isPredicateIDB(i)) {
-                FCIterator itr = predicatesTables[i]->read(0);
-                std::vector<StatsSizeIDB> stats;
-                while (!itr.isEmpty()) {
-                    std::shared_ptr<const FCInternalTable> t = itr.getCurrentTable();
-                    StatsSizeIDB s;
-                    s.iteration = itr.getCurrentIteration();
-                    s.idRule = itr.getRule()->ruleid;
-                    s.derivation = t->getNRows();
-                    stats.push_back(s);
-                    itr.moveNextCount();
-                }
+    std::vector<std::pair<string, std::vector<StatsSizeIDB>>> SemiNaiver::getSizeIDBs() {
+        std::vector<std::pair<string, std::vector<StatsSizeIDB>>> out;
+        for (PredId_t i = 0; i < program->getNPredicates(); ++i) {
+            if (predicatesTables[i] != NULL && i != currentPredicate) {
+                if (program->isPredicateIDB(i)) {
+                    FCIterator itr = predicatesTables[i]->read(0);
+                    std::vector<StatsSizeIDB> stats;
+                    while (!itr.isEmpty()) {
+                        std::shared_ptr<const FCInternalTable> t = itr.getCurrentTable();
+                        StatsSizeIDB s;
+                        s.iteration = itr.getCurrentIteration();
+                        s.idRule = itr.getRule()->ruleid;
+                        s.derivation = t->getNRows();
+                        stats.push_back(s);
+                        itr.moveNextCount();
+                    }
 
-                if (stats.size() > 0) {
-                    out.push_back(make_pair(program->getPredicateName(i), stats));
-                }
+                    if (stats.size() > 0) {
+                        out.push_back(make_pair(program->getPredicateName(i), stats));
+                    }
 
-                //long count = predicatesTables[i]->getNAllRows();
-                //out.push_back(make_pair(program->getPredicateName(i), count));
+                    //long count = predicatesTables[i]->getNAllRows();
+                    //out.push_back(make_pair(program->getPredicateName(i), count));
+                }
             }
         }
+        return out;
     }
-    return out;
-}
 #endif
 
-void SemiNaiver::printCountAllIDBs(string prefix) {
-    long c = 0;
-    long emptyRel = 0;
-    for (PredId_t i = 0; i < program->getNPredicates(); ++i) {
-        if (predicatesTables[i] != NULL) {
-            if (program->isPredicateIDB(i)) {
-                long count = predicatesTables[i]->getNAllRows();
-                if (count == 0) {
-                    emptyRel++;
+    void SemiNaiver::printCountAllIDBs(string prefix) {
+        long c = 0;
+        long emptyRel = 0;
+        for (PredId_t i = 0; i < program->getNPredicates(); ++i) {
+            if (predicatesTables[i] != NULL) {
+                if (program->isPredicateIDB(i)) {
+                    long count = predicatesTables[i]->getNAllRows();
+                    if (count == 0) {
+                        emptyRel++;
+                    }
+                    string predname = program->getPredicateName(i);
+                    LOG(DEBUGL) << prefix << "Cardinality of " <<
+                        predname << ": " << count;
+                    c += count;
                 }
-                string predname = program->getPredicateName(i);
-                LOG(DEBUGL) << prefix << "Cardinality of " <<
-                    predname << ": " << count;
-                c += count;
             }
         }
+        LOG(DEBUGL) << prefix << "Predicates without derivation: " << emptyRel;
+        LOG(INFOL) << prefix << "Total # derivations: " << c;
     }
-    LOG(DEBUGL) << prefix << "Predicates without derivation: " << emptyRel;
-    LOG(INFOL) << prefix << "Total # derivations: " << c;
-}
 
-std::pair<uint8_t, uint8_t> SemiNaiver::removePosConstants(
-        std::pair<uint8_t, uint8_t> columns,
-        const Literal &literal) {
+    std::pair<uint8_t, uint8_t> SemiNaiver::removePosConstants(
+            std::pair<uint8_t, uint8_t> columns,
+            const Literal &literal) {
 
-    std::pair<uint8_t, uint8_t> newcols;
-    //Fix first pos
-    newcols.first = columns.first;
-    for (int i = 0; i < columns.first; ++i) {
-        if (!literal.getTermAtPos(i).isVariable())
-            newcols.first--;
+        std::pair<uint8_t, uint8_t> newcols;
+        //Fix first pos
+        newcols.first = columns.first;
+        for (int i = 0; i < columns.first; ++i) {
+            if (!literal.getTermAtPos(i).isVariable())
+                newcols.first--;
+        }
+        newcols.second = columns.second;
+        for (int i = 0; i < columns.second; ++i) {
+            if (!literal.getTermAtPos(i).isVariable())
+                newcols.second--;
+        }
+        return newcols;
     }
-    newcols.second = columns.second;
-    for (int i = 0; i < columns.second; ++i) {
-        if (!literal.getTermAtPos(i).isVariable())
-            newcols.second--;
-    }
-    return newcols;
-}
 
-size_t SemiNaiver::getCurrentIteration() {
-    return iteration;
-}
+    size_t SemiNaiver::getCurrentIteration() {
+        return iteration;
+    }
 
 #ifdef WEBINTERFACE
-string SemiNaiver::getCurrentRule() {
-    return currentRule;
-}
-
-std::vector<StatsRule> SemiNaiver::getOutputNewIterations() {
-    std::vector<StatsRule> out;
-    size_t cIt = iteration;
-    int nextIteration = statsLastIteration + 1;
-    /*for (const auto &el : listDerivations) {
-      if (el.iteration > nextIteration && el.iteration < cIt) {
-      while (nextIteration < el.iteration) {
-      StatsRule r;
-      r.iteration = nextIteration;
-      r.derivation = 0;
-      out.push_back(r);
-      nextIteration++;
-      }
-      StatsRule r;
-      r.iteration = el.iteration;
-      r.derivation = el.table->getNRows();
-      r.idRule = getRuleID(el.rule);
-      out.push_back(r);
-      nextIteration++;
-      }
-      }
-      while (nextIteration < cIt) {
-      StatsRule r;
-      r.iteration = nextIteration;
-      r.derivation = 0;
-      out.push_back(r);
-      nextIteration++;
-      }*/
-    size_t sizeVector = statsRuleExecution.size();
-    for (int i = 0; i < sizeVector; ++i) {
-        StatsRule el = statsRuleExecution[i];
-        if (el.iteration >= nextIteration && el.iteration < cIt) {
-            out.push_back(el);
-            statsLastIteration = el.iteration;
-        }
+    string SemiNaiver::getCurrentRule() {
+        return currentRule;
     }
-    return out;
-}
 
-bool SemiNaiver::isRunning() {
-    return running;
-}
+    std::vector<StatsRule> SemiNaiver::getOutputNewIterations() {
+        std::vector<StatsRule> out;
+        size_t cIt = iteration;
+        int nextIteration = statsLastIteration + 1;
+        /*for (const auto &el : listDerivations) {
+          if (el.iteration > nextIteration && el.iteration < cIt) {
+          while (nextIteration < el.iteration) {
+          StatsRule r;
+          r.iteration = nextIteration;
+          r.derivation = 0;
+          out.push_back(r);
+          nextIteration++;
+          }
+          StatsRule r;
+          r.iteration = el.iteration;
+          r.derivation = el.table->getNRows();
+          r.idRule = getRuleID(el.rule);
+          out.push_back(r);
+          nextIteration++;
+          }
+          }
+          while (nextIteration < cIt) {
+          StatsRule r;
+          r.iteration = nextIteration;
+          r.derivation = 0;
+          out.push_back(r);
+          nextIteration++;
+          }*/
+        size_t sizeVector = statsRuleExecution.size();
+        for (int i = 0; i < sizeVector; ++i) {
+            StatsRule el = statsRuleExecution[i];
+            if (el.iteration >= nextIteration && el.iteration < cIt) {
+                out.push_back(el);
+                statsLastIteration = el.iteration;
+            }
+        }
+        return out;
+    }
+
+    bool SemiNaiver::isRunning() {
+        return running;
+    }
 #endif
