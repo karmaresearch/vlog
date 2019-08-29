@@ -1316,7 +1316,6 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
                 std::chrono::system_clock::time_point startGI = std::chrono::system_clock::now();
 #endif
 
-
                 TableFilterer filterer(naiver);
                 std::vector<std::shared_ptr<const FCInternalTable>> tablesToMergeJoin;
                 FCIterator itr2 = naiver->getTable(newLiteralToQuery, min, max,
@@ -2019,7 +2018,15 @@ void JoinExecutor::do_mergejoin(const FCInternalTable * filteredT1,
            */
         secS = std::chrono::system_clock::now() - startS;
         FCInternalTableItr *itr2 = sortedItr2;
-        size_t t2Size = vectors2[0]->size();
+        size_t t2Size = 0;
+        if (vectors2.size() == 0) {
+            if (t2->isEmpty())
+                t2Size = 0;
+            else
+                t2Size = 1;
+        } else {
+            t2Size = vectors2[0]->size();
+        }
         assert(t2->getNRows() == t2Size);
         if (faster) {
             sortedItr2 = new VectorFCInternalTableItr(vectors2, 0, t2Size);
