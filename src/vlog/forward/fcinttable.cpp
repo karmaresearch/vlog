@@ -558,8 +558,6 @@ Term_t InmemoryFCInternalTable::getValueConstantColumn(const uint8_t columnid) c
 std::pair<std::shared_ptr<const Segment>,
     std::shared_ptr<const Segment>>
     InmemoryFCInternalTable::replaceAllTermsWithMap(EGDTermMap &map, bool replace) const {
-        assert(unmergedSegments.size() == 0);
-
         SegmentInserter oldTuples(nfields);
         SegmentInserter newTuples(nfields);
         auto itr = getSortedIterator();

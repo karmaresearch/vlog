@@ -234,7 +234,7 @@ bool Checker::EMFA(Program &p) {
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)
     if (sn->isFoundCyclicTerms()) {
-        return false;   // Not MSA
+        return false;
     } else {
         return true;
     }

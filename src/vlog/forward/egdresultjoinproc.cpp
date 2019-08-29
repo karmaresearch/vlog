@@ -171,6 +171,9 @@ bool EGDRuleProcessor::isEmpty() const {
 }
 
 bool EGDRuleProcessor::consolidate(const bool isFinished) {
+    if (!isFinished)
+        return false;
+
     if (termsToReplace.size() > 0) {
         //Remove duplicates
         std::sort(termsToReplace.begin(), termsToReplace.end());
@@ -247,6 +250,7 @@ bool EGDRuleProcessor::consolidate(const bool isFinished) {
         bool replaced = false;
         if (map.size() > 0) {
             //Go through all the derivations in listDerivations.
+            int idx = 0;
             for(auto &block : listDerivations) {
                 assert(block.isCompleted);
                 auto table = block.table;
@@ -267,14 +271,15 @@ bool EGDRuleProcessor::consolidate(const bool isFinished) {
                             false, nthreads);
                     if (filteredSegment->getNRows() > 0) {
                         //Create a new block
+                        auto rowsize = table->getRowSize();
                         std::shared_ptr<const FCInternalTable> newtable =
                             std::shared_ptr<const FCInternalTable>(
-                                    new InmemoryFCInternalTable(table->getRowSize(),
-                                        block.iteration,
+                                    new InmemoryFCInternalTable(rowsize,
+                                        iteration,
                                         true,
                                         newSegment));
 
-                        t->add(newtable, block.query, 0, ruleDetails, ruleExecOrder,
+                        fctable->add(newtable, block.query, 0, NULL, 0,
                                 iteration, true, nthreads);
                         replaced = true;
                     }
@@ -293,7 +298,8 @@ bool EGDRuleProcessor::consolidate(const bool isFinished) {
                                     oldSegment));
                     block.table = newtable;
                     //Replace it also in fctable
-                    fctable->replaceInternalTable(block.iteration, newtable);}
+                    fctable->replaceInternalTable(block.iteration, newtable);
+                }
             }
         }
         termsToReplace.clear();
