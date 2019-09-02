@@ -768,7 +768,7 @@ void Program::singulariseEquality() {
             //Replace the head of the rule with the new predicate
             std::vector<Literal> head;
             head.push_back(Literal(mySameAsPred, r.getHeads()[0].getTuple()));
-            addRule(head, r.getBody(), false, true);
+            addRule(head, r.getBody(), false, false);
         } else {
             //First get the largest var ID used in the rule
             uint8_t largestVarID = 0;
