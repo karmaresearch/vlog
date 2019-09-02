@@ -1620,7 +1620,8 @@ void Program::axiomatizeEquality() {
     std::string sameAsName = "<http://www.w3.org/2002/07/owl#sameAs>";
     auto sameAsPred = getPredicate(sameAsName);
     std::string mySameAsName = "VlogAxiomEq";
-    auto mySameAsPred = getPredicate(mySameAsName);
+    auto mySameAsPredId = getPredicateID(mySameAsName, 2);
+    auto mySameAsPred = getPredicate(mySameAsPredId);
 
     //Add transitive rule
     VTuple t(2);
