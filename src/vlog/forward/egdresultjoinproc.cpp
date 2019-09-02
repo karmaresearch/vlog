@@ -194,56 +194,69 @@ bool EGDRuleProcessor::consolidate(const bool isFinished) {
                     key << "," << value << ")";
                 throw 10;
             }
-            uint64_t tmp;
-            if (!emfa) {
-                //The swap depends on the depth of the terms
-                uint64_t depthKey = 0;
-                if ((key & RULEVARMASK) != 0) {
-                    depthKey = sn->getChaseManager()->countDepth(key);
-                }
-                uint64_t depthValue = 0;
-                if ((value & RULEVARMASK) != 0) {
-                    depthValue = sn->getChaseManager()->countDepth(value);
-                }
-                if (depthKey >= depthValue) {
-                    if (!map.count(key)) {
-                        map.insert(std::make_pair(key,value));
+
+            //The swap depends on the depth of the terms
+            uint64_t depthKey = 0;
+            if ((key & RULEVARMASK) != 0) {
+                depthKey = sn->getChaseManager()->countDepth(key);
+            }
+            uint64_t depthValue = 0;
+            if ((value & RULEVARMASK) != 0) {
+                depthValue = sn->getChaseManager()->countDepth(value);
+            }
+            bool keySmallerThanValue = true;
+            if (depthKey > depthValue) {
+                keySmallerThanValue = false;
+            } else if (depthKey == depthValue) {
+                keySmallerThanValue = key < value;
+            }
+
+            if (!keySmallerThanValue) {
+                if (!map.count(key)) {
+                    map.insert(std::make_pair(key,std::make_pair(value, depthValue)));
+                } else {
+                    auto prevValue = map[key];
+                    auto depthPrevValue = prevValue.second;
+                    bool prevValueSmallerThanValue = true;
+                    if (depthValue < depthPrevValue) {
+                        prevValueSmallerThanValue = false;
+                    } else if (depthValue == depthPrevValue) {
+                        prevValueSmallerThanValue = prevValue.first < value;
                     }
-                    map[key] = value;
-                }
-                if (depthValue >= depthKey) {
-                    if (!map.count(value)) {
-                        map.insert(std::make_pair(value, key));
+                    if (!prevValueSmallerThanValue) {
+                        map[key] = std::make_pair(value, depthValue);
                     }
-                    map[value] = key;
                 }
             } else {
-                //Swap them according to standard EGD semantics
-                if ((key & RULEVARMASK) == 0) {
-                    //Swap the elements
-                    tmp = key;
-                    key = value;
-                    value = tmp;
+                if (!map.count(value)) {
+                    map.insert(std::make_pair(value, std::make_pair(key, depthKey)));
+                } else {
+                    auto prevKey = map[value];
+                    auto depthPrevKey = prevKey.second;
+                    bool prevKeySmallerThanKey = true;
+                    if (depthKey < depthPrevKey) {
+                        prevKeySmallerThanKey = false;
+                    } else if (depthKey == depthPrevKey) {
+                        prevKeySmallerThanKey = prevKey.first < key;
+                    }
+                    if (!prevKeySmallerThanKey) {
+                        map[value] = std::make_pair(key, depthKey);
+                    }
+
                 }
-                if (!map.count(key)) {
-                    map.insert(std::make_pair(key,value));
-                }
-                map[key] = value;
             }
         }
 
-        if (!emfa) {
-            bool checkCycles = false;
-            for(auto pair : map) {
-                if (map.count(pair.second)) {
-                    checkCycles = true;
-                    break;
-                }
+        bool checkCycles = false;
+        for(auto pair : map) {
+            if (map.count(pair.second.first)) {
+                checkCycles = true;
+                break;
             }
-            if (checkCycles) {
-                LOG(ERRORL) << "Must implement EGD closure to reason on this ...";
-                throw 10; //For now, I don't implement it.
-            }
+        }
+        if (checkCycles) {
+            LOG(ERRORL) << "Must implement EGD closure to reason on this ...";
+            throw 10; //For now, I don't implement it.
         }
 
         //Replace all the terms in the database
@@ -285,7 +298,7 @@ bool EGDRuleProcessor::consolidate(const bool isFinished) {
                     }
                 }
 
-                if (removedReplaced) {
+                if (removedReplaced && replaced) {
                     if (oldSegment.get() == NULL || oldSegment->isEmpty()) {
                         LOG(ERRORL) << "Substituting a table with NULL or empty table. Not tested!";
                         throw 10;

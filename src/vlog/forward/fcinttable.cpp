@@ -558,8 +558,10 @@ Term_t InmemoryFCInternalTable::getValueConstantColumn(const uint8_t columnid) c
 std::pair<std::shared_ptr<const Segment>,
     std::shared_ptr<const Segment>>
     InmemoryFCInternalTable::replaceAllTermsWithMap(EGDTermMap &map, bool replace) const {
+
         SegmentInserter oldTuples(nfields);
         SegmentInserter newTuples(nfields);
+
         auto itr = getSortedIterator();
         Term_t row[nfields];
         while (itr->hasNext()) {
@@ -1000,12 +1002,12 @@ void FCInternalTable::replaceRow(SegmentInserter &oldtuples, bool replace,
         auto v = row[i];
         if (map.count(v)) {
             auto replacement = map[v];
-            row[i] = replacement;
+            row[i] = replacement.first;
             changed = true;
         }
     }
     if (replace && !changed) {
-        newtuples.addRow(row);
+        oldtuples.addRow(row);
     }
     if (changed) {
         newtuples.addRow(row);
