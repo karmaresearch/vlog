@@ -757,7 +757,8 @@ void Program::singulariseEquality() {
     std::string sameAsName = "<http://www.w3.org/2002/07/owl#sameAs>";
     auto sameAsPred = getPredicate(sameAsName);
     std::string mySameAsName = "VlogAxiomEq";
-    auto mySameAsPred = getPredicate(mySameAsName);
+    auto mySameAsPredId = getPredicateID(mySameAsName, 2);
+    auto mySameAsPred = getPredicate(mySameAsPredId);
 
     //Rewrite the rules if there are multiple variable occurrences
     for(size_t i = 0; i < oldrules.size(); ++i) {
@@ -1420,13 +1421,13 @@ std::string Program::parseRule(std::string rule, bool rewriteMultihead) {
             }
             LOG(DEBUGL) << "headliteral = \"" << headLiteral << "\"";
             Literal h = parseLiteral(headLiteral, dictVariables);
-			if (h.isNegated()) {
-				throw "head literal cannot be negated";
-			}
-			Predicate pred = h.getPredicate();
-			if (pred.getType() == EDB) {
-				throw "predicate in head cannot be EDB";
-			}
+            if (h.isNegated()) {
+                throw "head literal cannot be negated";
+            }
+            Predicate pred = h.getPredicate();
+            if (pred.getType() == EDB) {
+                throw "predicate in head cannot be EDB";
+            }
             lHeads.push_back(h);
         }
 
@@ -1561,10 +1562,10 @@ int64_t Program::getOrAddPredicate(const std::string & p, uint8_t cardinality) {
     if (cardPredicates.find(id) == cardPredicates.end()) {
         cardPredicates.insert(make_pair(id, cardinality));
     } else if (cardPredicates.find(id)->second == 0) {
-		cardPredicates.find(id)->second = cardinality;
-	} else if (cardPredicates.find(id)->second != cardinality) {
-		LOG(INFOL) << "Wrong cardinality for predicate " << p << ": should be " << (int) cardPredicates.find(id)->second;
-		return -1;
+        cardPredicates.find(id)->second = cardinality;
+    } else if (cardPredicates.find(id)->second != cardinality) {
+        LOG(INFOL) << "Wrong cardinality for predicate " << p << ": should be " << (int) cardPredicates.find(id)->second;
+        return -1;
     }
     if (id >= rules.size()) {
         rules.resize(id+1);

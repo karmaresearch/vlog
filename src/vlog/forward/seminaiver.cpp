@@ -58,16 +58,7 @@ void SemiNaiver::createGraphRuleDependency(std::vector<int> &nodes,
                 }
             }
         }
-        /*
-        // Also add dependency to other rules defining the same predicate?
-        PredId_t id = ri.getHead().getPredicate().getId();
-        for (std::vector<int>::const_iterator k = definedBy[id].begin(); k != definedBy[id].end(); ++k) {
-        if (*k != i) {
-        edges.push_back(make_pair(*k, i));
-        }
-        }
-        */
-    }
+     }
     delete[] definedBy;
 }
 
@@ -1145,7 +1136,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
     if (! bodyChangedSince(rule, ruleDetails.lastExecution)) {
-        LOG(INFOL) << "Rule application: " << iteration << ", rule " << rule.tostring(program, &layer) << " skipped because dependencies did not change since the previous application of this rule";
+        LOG(DEBUGL) << "Rule application: " << iteration << ", rule " << rule.tostring(program, &layer) << " skipped because dependencies did not change since the previous application of this rule";
         return false;
     }
 
@@ -1261,6 +1252,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             //BEGIN -- Determine where to put the results of the query
             ResultJoinProcessor *joinOutput = NULL;
             const bool lastLiteral = optimalOrderIdx == (nBodyLiterals - 1);
+
             if (!lastLiteral) {
                 joinOutput = new InterTableJoinProcessor(
                         plan.sizeOutputRelation[optimalOrderIdx],
@@ -1479,13 +1471,13 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     }
 
     if (newDerivations) {
-        LOG(INFOL) << "Rule application: " << iteration << ", derived " << getNLastDerivationsFromList() << " new tuple(s) using rule " << rule.tostring(program, &layer);
+        LOG(DEBUGL) << "Rule application: " << iteration << ", derived " << getNLastDerivationsFromList() << " new tuple(s) using rule " << rule.tostring(program, &layer);
         LOG(DEBUGL) << "Combinations " << orderExecution << ", Processed IDB Tables=" <<
             processedTables << ", Total runtime " << stream.str()
             << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
             durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
     } else {
-        LOG(INFOL) << "Rule application: " << iteration << ", derived no new tuples using rule " << rule.tostring(program, &layer);
+        LOG(DEBUGL) << "Rule application: " << iteration << ", derived no new tuples using rule " << rule.tostring(program, &layer);
         LOG(DEBUGL) << "Combinations " << orderExecution << ", Processed IDB Tables=" <<
             processedTables << ", Total runtime " << stream.str()
             << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
