@@ -72,13 +72,13 @@ class EDBLayer {
             std::shared_ptr<EDBTable> manager;
         };
 
-        std::shared_ptr<Dictionary> predDictionary;
+        std::shared_ptr<Dictionary> predDictionary; //std::string, Term_t
         std::map<PredId_t, EDBInfoTable> dbPredicates;
 
         Factory<EDBMemIterator> memItrFactory;
         std::vector<IndexedTupleTable *>tmpRelations;
 
-        std::shared_ptr<Dictionary> termsDictionary;
+        std::shared_ptr<Dictionary> termsDictionary;//std::string, Term_t
 
         VLIBEXP void addTridentTable(const EDBConf::Table &tableConf, bool multithreaded);
 
@@ -164,7 +164,7 @@ class EDBLayer {
             return *(predDictionary.get());
         }
 
-        std::unordered_map< PredId_t, uint8_t> getPredicateCardUnorderedMap () {
+        std::unordered_map<PredId_t, uint8_t> getPredicateCardUnorderedMap () {
             std::unordered_map< PredId_t, uint8_t> ret;
             for (auto item : dbPredicates)
                 ret.insert(make_pair(item.first, item.second.arity));
