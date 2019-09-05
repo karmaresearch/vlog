@@ -194,7 +194,6 @@ class Segment {
                     return columns[i]->size();
                 }
             }
-
             return 0;
         }
 
