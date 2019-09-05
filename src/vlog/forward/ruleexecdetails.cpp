@@ -338,9 +338,9 @@ void RuleExecutionDetails::calculateDependencies(const Rule &rule,
 void RuleExecutionDetails::createExecutionPlans(
         std::vector<std::pair<size_t, size_t>> &ranges,
         bool copyAllVars) {
-    std::vector<Literal> bl = rule.getBody();
-    orderExecutions.clear();
     bodyLiterals.clear();
+    orderExecutions.clear();
+    std::vector<Literal> bl = rule.getBody();
 
     //Init
     for (std::vector<Literal>::iterator itr = bl.begin(); itr != bl.end(); ++itr) {
@@ -370,14 +370,16 @@ void RuleExecutionDetails::createExecutionPlans(
 }
 
 void RuleExecutionDetails::createExecutionPlans(bool copyAllVars) {
-    //Init
-    std::vector<Literal> bl = rule.getBody();
     bodyLiterals.clear();
+    orderExecutions.clear();
+    std::vector<Literal> bl = rule.getBody();
+
+    //Init
     for (std::vector<Literal>::iterator itr = bl.begin(); itr != bl.end(); ++itr) {
         bodyLiterals.push_back(*itr);
     }
-    orderExecutions.clear();
 
+    //Calculate the dependencies of the existential variables to the variables in the body
     std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars;
     calculateDependencies(rule, dependenciesExtVars);
 
