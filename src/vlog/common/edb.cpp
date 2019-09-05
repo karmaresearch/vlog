@@ -669,8 +669,7 @@ void EDBLayer::releaseIterator(EDBIterator * itr) {
 }
 
 std::vector<std::shared_ptr<Column>> EDBLayer::checkNewIn(
-        std::vector <
-        std::shared_ptr<Column >> &valuesToCheck,
+        std::vector<std::shared_ptr<Column>> &valuesToCheck,
         const Literal &l,
         std::vector<uint8_t> &posInL) {
     if (!dbPredicates.count(l.getPredicate().getId())) {
@@ -1151,7 +1150,7 @@ std::vector<std::shared_ptr<Column>> EDBTable::checkNewIn(const Literal &l1,
 
 std::vector<std::shared_ptr<Column>> EDBTable::checkNewIn(
         std::vector <
-        std::shared_ptr<Column >> &checkValues,
+        std::shared_ptr<Column>> &checkValues,
         const Literal &l,
         std::vector<uint8_t> &posInL) {
 
