@@ -1419,17 +1419,15 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 
     if (prodDer) {
         LOG(INFOL) << "Rule application: " << iteration << ", derived " << getNLastDerivationsFromList() << " new tuple(s) using rule " << rule.tostring(program, &layer);
-        LOG(DEBUGL) << "Combinations " << orderExecution << ", Processed IDB Tables=" <<
-            processedTables << ", Total runtime " << stream.str()
-            << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
-            durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
     } else {
         LOG(INFOL) << "Rule application: " << iteration << ", derived no new tuples using rule " << rule.tostring(program, &layer);
-        LOG(DEBUGL) << "Combinations " << orderExecution << ", Processed IDB Tables=" <<
-            processedTables << ", Total runtime " << stream.str()
-            << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
-            durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
     }
+    LOG(DEBUGL) << "Combinations " << orderExecution
+        << ", Processed IDB Tables=" << processedTables
+        << ", Total runtime " << stream.str()
+        << ", join " << durationJoin.count() * 1000
+        << "ms, consolidation " << durationConsolidation.count() * 1000
+        << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
 
     return prodDer;
 }
