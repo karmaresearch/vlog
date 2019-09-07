@@ -452,13 +452,11 @@ class Rule {
 
         void checkRule() const;
 
-        std::string tostring(Program *program, EDBLayer *db) const;
-
-        std::string toprettystring(Program * program, EDBLayer *db, bool replaceConstants = false) const;
+        Rule normalizeVars() const;
 
         std::string tostring() const;
-
-        Rule normalizeVars() const;
+        std::string tostring(Program *program, EDBLayer *db) const;
+        std::string toprettystring(Program *program, EDBLayer *db, bool replaceConstants = false) const;
 
         ~Rule() {
         }
