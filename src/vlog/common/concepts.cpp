@@ -630,10 +630,6 @@ Rule Rule::createAdornment(uint8_t headAdornment) const {
     return Rule(ruleId, newHeads, newBody);
 }
 
-std::string Rule::tostring() const {
-    return tostring(NULL, NULL);
-}
-
 std::vector<uint8_t> Rule::getVarsNotInBody() const {
     //Check if every variable in the head appears in the body
     std::vector<uint8_t> out;
@@ -698,6 +694,10 @@ std::vector<uint8_t> Rule::getVarsInHeadAndBody(PredId_t predToIgnore) const {
 
 bool Rule::isExistential() const {
     return existential;
+}
+
+std::string Rule::tostring() const {
+    return tostring(NULL, NULL);
 }
 
 std::string Rule::tostring(Program * program, EDBLayer *db) const {
