@@ -1280,15 +1280,6 @@ std::string Program::parseRule(std::string rule, bool rewriteMultihead) {
     }
 }
 
-static bool isInVector(uint8_t v, std::vector<uint8_t> &vec) {
-    for (int i = 0; i < vec.size(); i++) {
-        if (v == vec[i]) {
-            return true;
-        }
-    }
-    return false;
-}
-
 void Program::rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lBody) {
 
     std::vector<uint8_t> allHeadVars = getAllVars(lHeads);
