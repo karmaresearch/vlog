@@ -468,7 +468,7 @@ class Program {
     private:
         //const uint64_t assignedIds;
         EDBLayer *kb;
-        std::vector<std::vector<uint32_t>> rules;
+        std::vector<std::vector<uint32_t>> rules; // [head_predicate_id (idx) : [rule_ids]]
         std::vector<Rule> allrules;
         int rewriteCounter;
 
