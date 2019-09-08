@@ -73,13 +73,9 @@ uint8_t Literal::getNUniqueVars() const {
 }
 
 std::string adornmentToString(uint8_t adornment, int size) {
-    std::string out = "";
+    std::string out;
     for (int i = 0; i < size; ++i) {
-        if (adornment & 1) {
-            out = out + std::string("b");
-        } else {
-            out = out + std::string("f");
-        }
+        out += std::string(adornment & 1 ? "b" : "f");
         adornment >>= 1;
     }
     return out;
@@ -143,9 +139,9 @@ std::string Literal::toprettystring(Program *program, EDBLayer *db, bool replace
     else
         predName = std::to_string(pred.getId());
 
-    std::string out = "";
+    std::string out;
     if (isNegated())
-        out = "~";
+        out += "~";
     out += predName + std::string("(");
 
     for (int i = 0; i < tuple.getSize(); ++i) {
@@ -713,7 +709,7 @@ std::string Rule::tostring(Program * program, EDBLayer *db) const {
 }
 
 std::string Rule::toprettystring(Program * program, EDBLayer *db, bool replaceConstants) const {
-    std::string output = "";
+    std::string output;
     bool first = true;
     for(const auto& head : heads) {
         if (! first) {
@@ -865,7 +861,7 @@ std::string trim(const std::string& str,
 
 std::string Program::readFromFile(std::string pathFile, bool rewriteMultihead) {
     LOG(INFOL) << "Read program from file " << pathFile;
-    if (pathFile == "") {
+    if (pathFile.empty()) {
         LOG(INFOL) << "Using default rule TI(A,B,C) :- TE(A,B,C)";
         return parseRule("TI(A,B,C) :- TE(A,B,C)", false);
     } else {
@@ -873,10 +869,10 @@ std::string Program::readFromFile(std::string pathFile, bool rewriteMultihead) {
         std::string line;
         while (std::getline(file, line)) {
             line = trim(line);
-            if (line != "" && line.substr(0, 2) != "//") {
+            if (!line.empty() && line.substr(0, 2) != "//") {
                 LOG(DEBUGL) << "Parsing rule \"" << line << "\"";
                 std::string s = parseRule(line, rewriteMultihead);
-                if (s != "") {
+                if (!s.empty()) {
                     return s;
                 }
             }
@@ -891,7 +887,7 @@ std::string Program::readFromString(std::string rules, bool rewriteMultihead) {
     string rule;
     while (getline(ss, rule)) {
         rule = trim(rule);
-        if (rule != "" && rule .substr(0, 2) != "//") {
+        if (!rule.empty() && rule.substr(0, 2) != "//") {
             LOG(DEBUGL) << "Parsing rule " << rule;
             std::string s = parseRule(rule, rewriteMultihead);
             if (s != "") {
