@@ -388,7 +388,6 @@ std::vector<uint8_t> Literal::getNewVars(std::vector<uint8_t> &vars) const {
                 output.push_back(t.getId());
             }
         }
-    }
     return output;
 }
 
@@ -415,7 +414,6 @@ std::vector<uint8_t> Literal::getAllVars() const {
                 output.push_back(t.getId());
             }
         }
-    }
     return output;
 }
 
