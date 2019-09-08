@@ -586,63 +586,57 @@ Rule Rule::createAdornment(uint8_t headAdornment) const {
     return Rule(ruleId, newHeads, newBody);
 }
 
-std::vector<uint8_t> Rule::getVarsNotInBody() const {
-    //Check if every variable in the head appears in the body
+std::vector<uint8_t> Rule::getVarsInHead(PredId_t ignore) const {
+    std::vector<uint8_t> headVars;
+    for (const auto& head : heads) {
+        if (head.getPredicate().getId() != ignore) {
+            for (auto& variable : head.getAllVars()){
+                if (std::find(headVars.begin(), headVars.end(),variable) == headVars.end()){
+                    headVars.emplace_back(variable);
+                }
+            }
+        }
+    }
+    return headVars;
+}
+std::vector<uint8_t> Rule::getVarsInBody() const {
+    std::vector<uint8_t> bodyVars;
+    for (const auto& literal : body) {
+        for (auto& variable : literal.getAllVars()){
+            if (std::find(bodyVars.begin(), bodyVars.end(),variable) == bodyVars.end()){
+                bodyVars.emplace_back(variable);
+            }
+        }
+    }
+    return bodyVars;
+}
+
+/* Check if every variable in the head appears in the body
+ */
+std::vector<uint8_t> Rule::getExistentialVariables() const{
     std::vector<uint8_t> out;
+    std::vector<uint8_t> bodyVars = getVarsInBody();
     for(const auto& head : heads) {
         for(auto var : head.getAllVars()) {
             //Does var appear in the body?
-            bool ok = false;
-            for(auto& bodyLit : body) {
-                auto allvars = bodyLit.getAllVars();
-                for(auto v : allvars) {
-                    if (v == var) {
-                        ok = true; //found it!
-                        break;
-                    }
-                }
-                if (ok)
-                    break;
-            }
-            if (!ok) {
-                for (auto v : out) {
-                    if (v == var) {
-                        ok = true;
-                        break;
-                    }
-                }
-                if (! ok) {
-                    out.push_back(var);
-                }
+            if (std::find(bodyVars.begin(),bodyVars.end(),var) == bodyVars.end()){
+                out.emplace_back(var);
             }
         }
     }
     return out;
 }
 
-std::vector<uint8_t> Rule::getVarsInHeadAndBody(PredId_t predToIgnore) const {
-    //Check if every variable in the head appears in the body
+/* Check if every variable in the head appears in the body
+ */
+std::vector<uint8_t> Rule::getFrontierVariables(PredId_t ignore) const {
     std::vector<uint8_t> out;
-    for(const auto& head : heads) {
-        if (head.getPredicate().getId() == predToIgnore)
-            continue;
-
-        for(auto var : head.getAllVars()) {
-            //Does var appear in the body?
-            bool ok = false;
-            for(auto& bodyLit : body) {
-                auto allvars = bodyLit.getAllVars();
-                for(auto v : allvars) {
-                    if (v == var) {
-                        ok = true; //found it!
-                        break;
-                    }
-                }
-                if (ok)
-                    break;
-            }
-            if (ok)
-                out.push_back(var);
+    std::vector<uint8_t> bodyVars = getVarsInBody();
+    std::vector<uint8_t> headVars = getVarsInHead(ignore);
+    for(const auto& var : headVars) {
+        if (std::find(bodyVars.begin(), bodyVars.end(),var) != bodyVars.end()
+                && std::find(out.begin(), out.end(), var) != out.end()){
+                out.emplace_back(var);
         }
     }
     return out;

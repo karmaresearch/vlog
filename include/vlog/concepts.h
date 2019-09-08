@@ -363,7 +363,7 @@ class Rule {
             heads(heads),
             body(body),
             _isRecursive(checkRecursion(heads, body)),
-            existential(!getVarsNotInBody().empty()) {
+            existential(!getExistentialVariables().empty()) {
                 checkRule();
             }
 
@@ -398,9 +398,11 @@ class Rule {
 
         bool isExistential() const;
 
-        std::vector<uint8_t> getVarsNotInBody() const;  // Existential variables.
+        std::vector<uint8_t> getVarsInHead(PredId_t ignore = -1) const;
+        std::vector<uint8_t> getVarsInBody() const;
+        std::vector<uint8_t> getExistentialVariables() const;
 
-        std::vector<uint8_t> getVarsInHeadAndBody(PredId_t predToIgnore = -1) const; // Variables in the head that also occur in the body.
+        std::vector<uint8_t> getFrontierVariables(PredId_t ignore = -1) const;
 
         const std::vector<Literal> &getBody() const {
             return body;
