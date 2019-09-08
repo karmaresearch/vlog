@@ -94,7 +94,7 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
         /*** Check specific parameters ***/
         if (cmd == "query" || cmd == "queryLiteral") {
             string queryFile = vm["query"].as<string>();
-            if (cmd == "query" && (queryFile == ""  || !Utils::exists(queryFile))) {
+            if (cmd == "query" && (queryFile.empty()  || !Utils::exists(queryFile))) {
                 printErrorMsg(
                         (string("The file ") + queryFile
                          + string(" doesn't exist.")).c_str());
@@ -184,7 +184,7 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
             }
         } else if (cmd == "mat") {
             string path = vm["rules"].as<string>();
-            if (path == "") {
+            if (path.empty()) {
                 printErrorMsg(string("You must set up the 'rules' parameter to launch the materialization").c_str());
             }
             if (path != "" && !Utils::exists(path)) {
@@ -194,7 +194,7 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
             }
         } else if (cmd == "mat_tg") {
             string path = vm["trigger_paths"].as<string>();
-            if (path == "") {
+            if (path.empty()) {
                 printErrorMsg(string("You must indicate the file that contains trigger paths with '--trigger_paths'").c_str());
             }
             if (path != "" && !Utils::exists(path)) {
@@ -205,20 +205,20 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
 
         } else if (cmd == "cycles") {
             string path = vm["rules"].as<string>();
-            if (path == "") {
+            if (path.empty()) {
                 printErrorMsg(string("You must set up the 'rules' parameter to detect cycles").c_str());
             }
-            if (path != "" && !Utils::exists(path)) {
+            if (!path.empty() && !Utils::exists(path)) {
                 printErrorMsg((string("The rule file '") +
                             path + string("' does not exists")).c_str());
                 return false;
             }
         } else if (cmd == "deps") {
             string path = vm["rules"].as<string>();
-            if (path == "") {
+            if (path.empty()) {
                 printErrorMsg(string("You must set up the 'rules' parameter to detect dependencies").c_str());
             }
-            if (path != "" && !Utils::exists(path)) {
+            if (!path.empty() && !Utils::exists(path)) {
                 printErrorMsg((string("The rule file '") +
                             path + string("' does not exists")).c_str());
                 return false;
@@ -721,7 +721,7 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     }
 
     DBLayer *db = NULL;
-    if (pathRules == "") {
+    if (pathRules.empty()) {
         PredId_t p = edb.getFirstEDBPredicate();
         string typedb = edb.getTypeEDBPredicate(p);
         if (typedb == "Trident") {
@@ -733,7 +733,7 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
         }
     }
     if (db == NULL) {
-        if (pathRules == "") {
+        if (pathRules.empty()) {
             // Use default rule
             std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
             if (s != "") {
@@ -760,7 +760,7 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
 
 string selectStrategy(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reasoner, ProgramArgs &vm) {
     string strategy = vm["selectionStrategy"].as<string>();
-    if (strategy == "" || strategy == "cardEst") {
+    if (strategy.empty() || strategy == "cardEst") {
         // Use the original cardinality estimation strategy
         ReasoningMode mode = reasoner.chooseMostEfficientAlgo(literal, edb, p, NULL, NULL);
         return mode == TOPDOWN ? "qsqr" : "magic";
@@ -788,7 +788,7 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
         }
     }
 
-    if (algo == "auto" || algo == "") {
+    if (algo == "auto" || algo.empty()) {
         algo = selectStrategy(edb, p, literal, reasoner, vm);
         LOG(INFOL) << "Selection strategy determined that we go for " << algo;
     }
