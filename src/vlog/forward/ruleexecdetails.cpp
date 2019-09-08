@@ -18,7 +18,7 @@ void RuleExecutionDetails::rearrangeLiterals(std::vector<const Literal*> &vector
 
     //If there are elements that are not linked, then I add them after
     std::vector<const Literal*> subset2;
-    if (leftLiterals.size() > 0) {
+    if (!leftLiterals.empty()) {
         std::copy(leftLiterals.begin(), leftLiterals.end(), std::back_inserter(subset2));
     }
     std::copy(vector.begin() + idx + 1, vector.end(), std::back_inserter(subset2));
@@ -37,7 +37,7 @@ void RuleExecutionDetails::rearrangeLiterals(std::vector<const Literal*> &vector
     std::copy(subset2.begin(), subset2.end(), std::back_inserter(vector));
 
     //assert(leftLiterals2.size() == 0);
-    while (leftLiterals2.size() > 0) {
+    while (!leftLiterals2.empty()) {
         const Literal *lit = leftLiterals2.back();
         leftLiterals2.pop_back();
 
@@ -89,7 +89,7 @@ void RuleExecutionDetails::groupLiteralsBySharedVariables(std::vector<uint8_t> &
             std::copy(nv.begin(), nv.end(), std::back_inserter(newvars));
 
             groupLiteralsBySharedVariables(newvars, newSet, newleftElements);
-            if (newleftElements.size() == 0) {
+            if (newleftElements.empty()) {
                 startVars.clear();
                 set.clear();
                 leftelements.clear();
@@ -135,14 +135,14 @@ void RuleExecutionDetails::checkFilteringStrategy(
 
     std::vector<uint8_t> vars = literal.getAllVars();
     std::vector<uint8_t> sharedVars = head.getSharedVars(vars);
-    if (sharedVars.size() > 0) {
+    if (!sharedVars.empty()) {
         hv.lastLiteralSharesWithHead = true;
     } else {
         hv.lastLiteralSharesWithHead = false;
     }
 
     hv.lastSorting.clear();
-    if (sharedVars.size() > 0) {
+    if (!sharedVars.empty()) {
         //set the sorting by the position of the sharedVars in the literal
         for (std::vector<uint8_t>::iterator itr = sharedVars.begin();
                 itr != sharedVars.end();
@@ -185,7 +185,7 @@ void RuleExecutionDetails::calculateNVarsInHeadFromEDB() {
                     idxLiteral++;
                 }
 
-                if (edbLiterals.size() > 0) {
+                if (!edbLiterals.empty()) {
                     //add the position and the occurrences
                     posEDBVarsInHead.push_back(globalCounter + i);
                     occEDBVarsInHead.push_back(edbLiterals);
@@ -308,11 +308,12 @@ break;
 
 void RuleExecutionDetails::calculateDependencies(const Rule &rule,
         std::map<uint8_t, std::vector<uint8_t>> &dependenciesExtVars) {
+
     //Calculate the dependencies of the existential variables to the variables in the body
     std::map<uint8_t, std::set<uint8_t>> dependenciesExtVars_tmp;
     auto extvars = rule.getVarsNotInBody();
     auto othervars = rule.getVarsInHeadAndBody();
-    for(auto head : rule.getHeads()) {
+    for(const auto& head : rule.getHeads()) {
         auto allvars = head.getAllVars();
         for(auto v : allvars) {
             bool isext = false;
@@ -340,11 +341,10 @@ void RuleExecutionDetails::createExecutionPlans(
         bool copyAllVars) {
     bodyLiterals.clear();
     orderExecutions.clear();
-    std::vector<Literal> bl = rule.getBody();
 
     //Init
-    for (std::vector<Literal>::iterator itr = bl.begin(); itr != bl.end(); ++itr) {
-        bodyLiterals.push_back(*itr);
+    for (auto& literal : rule.getBody()) {
+        bodyLiterals.push_back(literal);
     }
 
     //Calculate the dependencies of the existential variables to the variables in the body
@@ -372,11 +372,9 @@ void RuleExecutionDetails::createExecutionPlans(
 void RuleExecutionDetails::createExecutionPlans(bool copyAllVars) {
     bodyLiterals.clear();
     orderExecutions.clear();
-    std::vector<Literal> bl = rule.getBody();
 
-    //Init
-    for (std::vector<Literal>::iterator itr = bl.begin(); itr != bl.end(); ++itr) {
-        bodyLiterals.push_back(*itr);
+    for (auto& literal : rule.getBody()) {
+        bodyLiterals.push_back(literal);
     }
 
     //Calculate the dependencies of the existential variables to the variables in the body
