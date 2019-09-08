@@ -381,34 +381,15 @@ std::vector<uint8_t> Literal::getNewVars(std::vector<uint8_t> &vars) const {
     std::vector<uint8_t> output;
     for (int i = 0; i < getTupleSize(); ++i) {
         VTerm t = getTermAtPos(i);
-        if (t.isVariable()) {
-            bool found = false;
-            for (std::vector<uint8_t>::iterator itr = vars.begin(); itr != vars.end();
-                    ++itr) {
-                if (t.getId() == *itr) {
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found) {
-                //Check is not in output
-                for (std::vector<uint8_t>::iterator itr = output.begin(); itr != output.end();
-                        ++itr) {
-                    if (*itr == t.getId()) {
-                        found = true;
-                        break;
-                    }
-                }
-            }
-
-            if (!found) {
+        // if t is variable and t.id not in vars and t.id not in output
+        if (t.isVariable() &&
+                std::find(vars.begin(), vars.end(), t.getId()) == vars.end() &&
+                std::find(output.begin(), output.end(), t.getId()) == output.end()) {
                 output.push_back(t.getId());
             }
         }
     }
     return output;
-
 }
 
 static std::vector<uint8_t> getAllVars(std::vector<Literal> &lits) {
@@ -416,19 +397,9 @@ static std::vector<uint8_t> getAllVars(std::vector<Literal> &lits) {
     for (Literal lit : lits) {
         for (int i = 0; i < lit.getTupleSize(); ++i) {
             VTerm t = lit.getTermAtPos(i);
-            if (t.isVariable()) {
-                bool found = false;
-                for (std::vector<uint8_t>::iterator itr = output.begin(); itr != output.end();
-                        ++itr) {
-                    if (*itr == t.getId()) {
-                        found = true;
-                        break;
-                    }
-                }
-
-                if (!found) {
+            if (t.isVariable() &&
+                    std::find(output.begin(), output.end(), t.getId()) == output.end()) {
                     output.push_back(t.getId());
-                }
             }
         }
     }
@@ -439,17 +410,8 @@ std::vector<uint8_t> Literal::getAllVars() const {
     std::vector<uint8_t> output;
     for (int i = 0; i < getTupleSize(); ++i) {
         VTerm t = getTermAtPos(i);
-        if (t.isVariable()) {
-            bool found = false;
-            for (std::vector<uint8_t>::iterator itr = output.begin(); itr != output.end();
-                    ++itr) {
-                if (*itr == t.getId()) {
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found) {
+        if (t.isVariable() &&
+                std::find(output.begin(), output.end(), t.getId()) == output.end()) {
                 output.push_back(t.getId());
             }
         }
