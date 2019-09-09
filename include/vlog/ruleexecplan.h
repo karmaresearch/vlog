@@ -16,8 +16,7 @@ struct RuleExecutionPlan {
     std::vector<MatchVariables> matches;
 
     //When I execute the joins, the following variables contain the size of the
-    //intermediate tuples,
-    //and all the positions to join and copy the results
+    //intermediate tuples, and all the positions to join and copy the results
     std::vector<uint8_t> sizeOutputRelation;
     std::vector<std::vector<std::pair<uint8_t, uint8_t>>> joinCoordinates;
     std::vector<std::vector<std::pair<uint8_t, uint8_t>>> posFromFirst;
@@ -66,9 +65,6 @@ struct RuleExecutionPlan {
             const std::vector<Literal> &heads,
             bool copyAllVars) const;
 
-    bool hasCartesian();
-
-    std::string toString();
 };
 
 #endif

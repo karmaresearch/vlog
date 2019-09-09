@@ -278,20 +278,3 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
 
 }
 
-bool RuleExecutionPlan::hasCartesian() {
-    for (int i = 1; i < joinCoordinates.size(); i++) {
-        LOG(DEBUGL) << "joinCoordinates[" << i << "]: size = " << joinCoordinates[i].size();
-        if (joinCoordinates[i].size() == 0) {
-            return true;
-        }
-    }
-    return false;
-}
-
-std::string RuleExecutionPlan::toString() {
-    std::string result;
-    for (auto ele : plan) {
-        result += std::to_string(ele->getPredicate().getId()) + " ";
-    }
-    return result;
-}
