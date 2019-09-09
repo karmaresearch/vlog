@@ -2,6 +2,7 @@
 
 #include <set>
 #include <map>
+#include <algorithm>
 
 void RuleExecutionDetails::rearrangeLiterals(std::vector<const Literal*> &vector, const size_t idx) {
     //First go through all the elements before, to make sure that there is always at least one shared variable.
@@ -305,37 +306,6 @@ break;
 }
 }
 }*/
-
-void RuleExecutionDetails::calculateDependencies(const Rule &rule,
-        std::map<uint8_t, std::vector<uint8_t>> &dependenciesExtVars) {
-
-    //Calculate the dependencies of the existential variables to the variables in the body
-    std::map<uint8_t, std::set<uint8_t>> dependenciesExtVars_tmp;
-    auto extvars = rule.getExistentialVariables();
-    auto othervars = rule.getFrontierVariables();
-    for(const auto& head : rule.getHeads()) {
-        auto allvars = head.getAllVars();
-        for(auto v : allvars) {
-            bool isext = false;
-            for(auto extvar : extvars)
-                if (extvar == v) {
-                    isext = true;
-                    break;
-                }
-            if (isext) {
-                for (auto othervar : othervars) {
-                    dependenciesExtVars_tmp[v].insert(othervar);
-                }
-            }
-        }
-    }
-    for(auto pair : dependenciesExtVars_tmp) {
-        for(auto el : pair.second) {
-            dependenciesExtVars[pair.first].push_back(el);
-        }
-    }
-}
-
 void RuleExecutionDetails::createExecutionPlans(
         std::vector<std::pair<size_t, size_t>> &ranges,
         bool copyAllVars) {
@@ -348,8 +318,7 @@ void RuleExecutionDetails::createExecutionPlans(
     }
 
     //Calculate the dependencies of the existential variables to the variables in the body
-    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars;
-    calculateDependencies(rule, dependenciesExtVars);
+    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars = rule.calculateDependencies();
 
     //Create a single execution plan
     RuleExecutionPlan p;
@@ -378,8 +347,7 @@ void RuleExecutionDetails::createExecutionPlans(bool copyAllVars) {
     }
 
     //Calculate the dependencies of the existential variables to the variables in the body
-    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars;
-    calculateDependencies(rule, dependenciesExtVars);
+    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars = rule.calculateDependencies();
 
     if (nIDBs > 0) {
         //Collect the IDB predicates

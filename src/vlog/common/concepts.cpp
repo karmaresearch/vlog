@@ -8,6 +8,7 @@
 
 #include <cctype>
 #include <set>
+#include <map>
 #include <stdlib.h>
 #include <fstream>
 
@@ -592,7 +593,7 @@ std::vector<uint8_t> Rule::getVarsInHead(PredId_t ignore) const {
         if (head.getPredicate().getId() != ignore) {
             for (auto& variable : head.getAllVars()){
                 if (std::find(headVars.begin(), headVars.end(),variable) == headVars.end()){
-                    headVars.emplace_back(variable);
+                    headVars.push_back(variable);
                 }
             }
         }
@@ -604,7 +605,7 @@ std::vector<uint8_t> Rule::getVarsInBody() const {
     for (const auto& literal : body) {
         for (auto& variable : literal.getAllVars()){
             if (std::find(bodyVars.begin(), bodyVars.end(),variable) == bodyVars.end()){
-                bodyVars.emplace_back(variable);
+                bodyVars.push_back(variable);
             }
         }
     }
@@ -620,7 +621,7 @@ std::vector<uint8_t> Rule::getExistentialVariables() const{
         for(auto var : head.getAllVars()) {
             //Does var appear in the body?
             if (std::find(bodyVars.begin(),bodyVars.end(),var) == bodyVars.end()){
-                out.emplace_back(var);
+                out.push_back(var);
             }
         }
     }
@@ -641,6 +642,28 @@ std::vector<uint8_t> Rule::getFrontierVariables(PredId_t ignore) const {
     }
     return out;
 }
+
+/* Calculate the dependencies of the existential variables to the variables in the body
+ *
+ * */
+std::map<uint8_t, std::vector<uint8_t>> Rule::calculateDependencies() const {
+    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars;
+    auto frontierVars = getFrontierVariables();
+    std::map<uint8_t, std::vector<uint8_t>>::iterator itr;
+    for (const auto& extVar : getExistentialVariables()){
+        for (const auto& frontierVar : frontierVars) {
+            if ((itr = dependenciesExtVars.find(extVar)) != dependenciesExtVars.end()){
+               if (std::find(itr->second.begin(), itr->second.end(), frontierVar) == itr->second.end()) {
+                   itr->second.push_back(frontierVar);
+               }
+            } else {
+                dependenciesExtVars[extVar].push_back(frontierVar);
+            }
+        }
+    }
+    return dependenciesExtVars;
+}
+
 
 bool Rule::isExistential() const {
     return existential;

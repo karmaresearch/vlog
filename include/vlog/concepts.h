@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <vector>
 #include <set>
+#include <map>
 #include <unordered_map>
 
 /*** PREDICATES ***/
@@ -403,6 +404,8 @@ class Rule {
         std::vector<uint8_t> getExistentialVariables() const;
 
         std::vector<uint8_t> getFrontierVariables(PredId_t ignore = -1) const;
+
+        std::map<uint8_t, std::vector<uint8_t>> calculateDependencies() const;
 
         const std::vector<Literal> &getBody() const {
             return body;
