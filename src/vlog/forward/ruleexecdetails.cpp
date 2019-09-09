@@ -2,6 +2,7 @@
 
 #include <set>
 #include <map>
+#include <cassert>
 #include <algorithm>
 
 void RuleExecutionDetails::rearrangeLiterals(std::vector<const Literal*> &vector, const size_t idx) {
@@ -325,12 +326,12 @@ void RuleExecutionDetails::createExecutionPlans(
     p.filterLastHashMap = false;
     std::vector<const Literal*> v;
     p.dependenciesExtVars = dependenciesExtVars;
-    int rangeid = 0;
+    int rangeId = 0;
     for (std::vector<Literal>::const_iterator itr = bodyLiterals.begin();
             itr != bodyLiterals.end();
             ++itr) {
         p.plan.push_back(&(*itr));
-        p.ranges.push_back(std::make_pair(ranges[rangeid].first, ranges[rangeid].second));
+        p.ranges.push_back(std::make_pair(ranges[rangeId].first, ranges[rangeId].second));
     }
 
     auto &heads = rule.getHeads();
@@ -353,19 +354,16 @@ void RuleExecutionDetails::createExecutionPlans(bool copyAllVars) {
         //Collect the IDB predicates
         std::vector<uint8_t> posMagicAtoms;
         std::vector<uint8_t> posIdbLiterals;
-        uint8_t i = 0;
         orderExecutions.resize(nIDBs);
 
-        for (std::vector<Literal>::const_iterator itr = bodyLiterals.begin();
-                itr != bodyLiterals.end();
-                ++itr) {
-            if (itr->getPredicate().getType() == IDB) {
+        for (uint8_t i = 0; i < bodyLiterals.size(); ++i){
+            Predicate predicate = bodyLiterals.at(i).getPredicate();
+            if(predicate.getType() == IDB){
                 posIdbLiterals.push_back(i);
-                if (itr->getPredicate().isMagic()) {
+                if(predicate.isMagic()) {
                     posMagicAtoms.push_back(i);
                 }
             }
-            i++;
         }
 
         int order = 0;

@@ -202,15 +202,12 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                     } else if (isVariableNeeded || copyAllVars) {
                         //Add it to the next list of bindings if it is not already present
                         bool isNew = true;
-                        int idx2 = 0;
-                        for (std::vector<uint8_t>::iterator itr = newExistingVariables.begin();
-                                itr != newExistingVariables.end() && isNew; ++itr) {
-                            if (*itr == t.getId()) {
+                        for (uint8_t idx2 = 0; idx2 < newExistingVariables.size(); ++idx2) {
+                            if (newExistingVariables[idx2] == t.getId()) {
                                 isNew = false;
                                 v2p.push_back(std::make_pair(x, idx2));
                                 break;
                             }
-                            idx2 += 1;
                         }
 
                         if (isNew) {
