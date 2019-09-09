@@ -634,9 +634,9 @@ std::vector<uint8_t> Rule::getFrontierVariables(PredId_t ignore) const {
     std::vector<uint8_t> bodyVars = getVarsInBody();
     std::vector<uint8_t> headVars = getVarsInHead(ignore);
     for(const auto& var : headVars) {
-        if (std::find(bodyVars.begin(), bodyVars.end(),var) != bodyVars.end()
-                && std::find(out.begin(), out.end(), var) != out.end()){
-                out.emplace_back(var);
+        if (std::find(bodyVars.begin(), bodyVars.end(),var) != bodyVars.end()) {
+//                && std::find(out.begin(), out.end(), var) != out.end()){
+                out.push_back(var);
         }
     }
     return out;
