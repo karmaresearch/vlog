@@ -50,7 +50,7 @@ void SemiNaiver::createGraphRuleDependency(std::vector<int> &nodes,
             if (pred.getType() == IDB) {
                 PredId_t id = pred.getId();
                 for (std::vector<int>::const_iterator k = definedBy[id].begin(); k != definedBy[id].end(); ++k) {
-                    edges.push_back(make_pair(*k, i));
+                    edges.push_back(std::make_pair(*k, i));
                 }
             }
         }
@@ -59,7 +59,7 @@ void SemiNaiver::createGraphRuleDependency(std::vector<int> &nodes,
         PredId_t id = ri.getHead().getPredicate().getId();
         for (std::vector<int>::const_iterator k = definedBy[id].begin(); k != definedBy[id].end(); ++k) {
         if (*k != i) {
-        edges.push_back(make_pair(*k, i));
+        edges.push_back(std::make_pair(*k, i));
         }
         }
         */
@@ -110,17 +110,16 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
         for (int i = 0; i < nStratificationClasses; i++) {
             this->allIDBRules[i].reserve(ruleset.size());
         }
-        for (std::vector<Rule>::iterator itr = ruleset.begin(); itr != ruleset.end();
-                ++itr) {
-            RuleExecutionDetails *d = new RuleExecutionDetails(*itr, ruleid++);
-            std::vector<Literal> bodyLiterals = itr->getBody();
-            for (std::vector<Literal>::iterator itr = bodyLiterals.begin();
-                    itr != bodyLiterals.end(); ++itr) {
-                if (itr->getPredicate().getType() == IDB)
+        for (const auto& rule : ruleset){
+            RuleExecutionDetails *d = new RuleExecutionDetails(rule, ruleid++);
+            std::vector<Literal> bodyLiterals = rule.getBody();
+            for (const auto& literal : bodyLiterals){
+                if (literal.getPredicate().getType() == IDB) {
                     d->nIDBs++;
+                }
             }
             if (d->nIDBs != 0) {
-                PredId_t id = itr->getFirstHead().getPredicate().getId();
+                PredId_t id = rule.getFirstHead().getPredicate().getId();
                 this->allIDBRules[nStratificationClasses == 1 ? 0 : stratification[id]].push_back(*d);
             } else
                 this->allEDBRules.push_back(*d);
@@ -262,35 +261,29 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
     LOG(DEBUGL) << "Optimizing ruleset...";
 #endif
     size_t allRulesSize = 0;
-    for (int k = 0; k < allIDBRules.size(); k++) {
-        for (std::vector<RuleExecutionDetails>::iterator itr = allIDBRules[k].begin();
-                itr != allIDBRules[k].end();
-                ++itr) {
+    for (auto& strata : allIDBRules) {
+        for (auto& ruleExecDetails: strata) {
 #if DEBUG
-            LOG(DEBUGL) << "Optimizing rule " << itr->rule.tostring(NULL, NULL);
+            LOG(DEBUGL) << "Optimizing rule " << ruleExecDetails.rule.tostring(NULL, NULL);
 #endif
-            itr->createExecutionPlans(checkCyclicTerms);
-            itr->calculateNVarsInHeadFromEDB();
-            itr->lastExecution = lastExecution;
-
+            ruleExecDetails.createExecutionPlans(checkCyclicTerms);
+            ruleExecDetails.calculateNVarsInHeadFromEDB();
+            ruleExecDetails.lastExecution = lastExecution;
 #if DEBUG
-            for (int i = 0; i < itr->orderExecutions.size(); ++i) {
+            for (const auto& ruleExecPlan : ruleExecDetails.orderExecutions) {
                 std::string plan = "";
-                for (int j = 0; j < itr->orderExecutions[i].plan.size(); ++j) {
-                    plan += " " +
-                        itr->orderExecutions[i].plan[j]->tostring(program, &layer);
+                for (const auto& literal : ruleExecPlan.plan){
+                    plan += " " + literal->tostring(program, &layer);
                 }
                 LOG(DEBUGL) << "-->" << plan;
             }
-            LOG(DEBUGL) << itr->rule.tostring(program, &layer);
+            LOG(DEBUGL) << ruleExecDetails.rule.tostring(program, &layer);
 #endif
-            allRulesSize += allIDBRules[k].size();
         }
+        allRulesSize += strata.size();
     }
-    for (std::vector<RuleExecutionDetails>::iterator itr = allEDBRules.begin();
-            itr != allEDBRules.end();
-            ++itr) {
-        itr->createExecutionPlans(checkCyclicTerms);
+    for (auto& ruleExecDetails : allEDBRules) {
+        ruleExecDetails.createExecutionPlans(checkCyclicTerms);
     }
     allRulesSize += allEDBRules.size();
     allrules.reserve(allRulesSize);
@@ -1196,10 +1189,8 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 
 #ifdef DEBUG
         std::string listLiterals = "EXEC COMB: ";
-        for (std::vector<const Literal*>::iterator itr = plan.plan.begin();
-                itr != plan.plan.end();
-                ++itr) {
-            listLiterals += (*itr)->tostring(program, &layer);
+        for (const auto literal : plan.plan) {
+            listLiterals += literal->tostring(program, &layer);
         }
         LOG(DEBUGL) << listLiterals;
 #endif
@@ -1575,8 +1566,9 @@ size_t SemiNaiver::getSizeTable(const PredId_t predid) const {
 SemiNaiver::~SemiNaiver() {
     // Don't refer to program. It may already have been deallocated.
     for (int i = 0; i < predicatesTables.size(); ++i) {
-        if (predicatesTables[i] != NULL)
+        if (predicatesTables[i] != NULL) {
             delete predicatesTables[i];
+        }
     }
 
     /*for (EDBCache::iterator itr = edbCache.begin(); itr != edbCache.end(); ++itr) {
@@ -1616,11 +1608,11 @@ std::vector<std::pair<string, std::vector<StatsSizeIDB>>> SemiNaiver::getSizeIDB
                 }
 
                 if (stats.size() > 0) {
-                    out.push_back(make_pair(program->getPredicateName(i), stats));
+                    out.push_back(std::make_pair(program->getPredicateName(i), stats));
                 }
 
                 //long count = predicatesTables[i]->getNAllRows();
-                //out.push_back(make_pair(program->getPredicateName(i), count));
+                //out.push_back(std::make_pair(program->getPredicateName(i), count));
             }
         }
     }
