@@ -35,8 +35,8 @@ EDBLayer::EDBLayer(EDBLayer &db, bool copyTables) {
 
 void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithreaded) {
     EDBInfoTable infot;
-    const string pn = tableConf.predname;
-    const string kbpath = tableConf.params[0];
+    const std::string pn = tableConf.predname;
+    const std::string kbpath = tableConf.params[0];
     if (!Utils::exists(kbpath) || !Utils::exists(kbpath + DIR_SEP + "p0")) {
         LOG(ERRORL) << "The KB at " << kbpath << " does not exist. Check the edb.conf file.";
         throw 10;
@@ -52,7 +52,7 @@ void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithread
 #ifdef MYSQL
 void EDBLayer::addMySQLTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
-    const string pn = tableConf.predname;
+    const std::string pn = tableConf.predname;
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.arity = 3;
     infot.type = tableConf.type;
@@ -66,7 +66,7 @@ void EDBLayer::addMySQLTable(const EDBConf::Table &tableConf) {
 #ifdef ODBC
 void EDBLayer::addODBCTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
-    const string pn = tableConf.predname;
+    const std::string pn = tableConf.predname;
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.arity = 3;
     infot.type = tableConf.type;
@@ -80,7 +80,7 @@ void EDBLayer::addODBCTable(const EDBConf::Table &tableConf) {
 #ifdef MAPI
 void EDBLayer::addMAPITable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
-    const string pn = tableConf.predname;
+    const std::string pn = tableConf.predname;
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.arity = 3;
     infot.type = tableConf.type;
@@ -94,7 +94,7 @@ void EDBLayer::addMAPITable(const EDBConf::Table &tableConf) {
 #ifdef MDLITE
 void EDBLayer::addMDLiteTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
-    const string pn = tableConf.predname;
+    const std::string pn = tableConf.predname;
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.type = tableConf.type;
     MDLiteTable *table = new MDLiteTable(infot.id, tableConf.params[0], tableConf.params[1], this);
@@ -106,7 +106,7 @@ void EDBLayer::addMDLiteTable(const EDBConf::Table &tableConf) {
 
 void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
-    const string pn = tableConf.predname;
+    const std::string pn = tableConf.predname;
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.type = tableConf.type;
     InmemoryTable *table = new InmemoryTable(tableConf.params[0],
@@ -156,7 +156,7 @@ void EDBLayer::addInmemoryTable(PredId_t id,
 #ifdef SPARQL
 void EDBLayer::addSparqlTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
-    const string predicate = tableConf.predname;
+    const std::string predicate = tableConf.predname;
     infot.id = (PredId_t) predDictionary->getOrAdd(predicate);
     if (doesPredExists(infot.id)) {
         LOG(WARNL) << "Rewriting table for predicate " << predicate;
@@ -936,14 +936,14 @@ uint64_t EDBLayer::getPredSize(PredId_t id) {
     return 0;
 }
 
-string EDBLayer::getPredType(PredId_t id) {
+std::string EDBLayer::getPredType(PredId_t id) {
     if (dbPredicates.count(id)) {
         return dbPredicates[id].type;
     }
     return 0;
 }
 
-string EDBLayer::getPredName(PredId_t id) {
+std::string EDBLayer::getPredName(PredId_t id) {
     if (dbPredicates.count(id)) {
         return predDictionary->getRawValue(id);
     }

@@ -319,7 +319,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
 void lookup(EDBLayer &layer, ProgramArgs &vm) {
     if (vm.count("text")) {
         uint64_t value;
-        string textTerm = vm["text"].as<string>();
+        std::string textTerm = vm["text"].as<string>();
         if (!layer.getDictNumber((char*) textTerm.c_str(), textTerm.size(), value)) {
             cout << "Term " << textTerm << " not found" << endl;
         } else {
@@ -1119,7 +1119,7 @@ int main(int argc, const char** argv) {
         delete loader;
     } else if (cmd == "gentq") {
         EDBConf conf(edbFile);
-        string rulesFile = vm["rules"].as<string>();
+        std::string rulesFile = vm["rules"].as<string>();
         EDBLayer *layer = new EDBLayer(conf, false);
         Program p(layer);
         //uint8_t vt1 = (uint8_t) p.getIDVar("V1");

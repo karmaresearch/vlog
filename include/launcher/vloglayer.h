@@ -23,7 +23,7 @@ class VLogLayer : public DBLayer {
 
     public:
         VLogLayer(EDBLayer &edb, Program &p, uint64_t threshold,
-                string predname, string edbpredname) : edb(edb), p(p),
+                std::string predname, std::string edbpredname) : edb(edb), p(p),
         reasoner(threshold), predQueries(p.getPredicate(predname)),
         edbPredName(p.getPredicate(edbpredname)) {
             init();

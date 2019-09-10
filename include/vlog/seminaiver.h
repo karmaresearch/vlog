@@ -68,7 +68,7 @@ class SemiNaiver {
 
 #ifdef WEBINTERFACE
         long statsLastIteration;
-        string currentRule;
+        std::string currentRule;
         PredId_t currentPredicate;
 #endif
 
@@ -270,11 +270,11 @@ class SemiNaiver {
         size_t getCurrentIteration();
 
 #ifdef WEBINTERFACE
-        string getCurrentRule();
+        std::string getCurrentRule();
 
         bool isRunning();
 
-        std::vector<std::pair<string, std::vector<StatsSizeIDB>>> getSizeIDBs();
+        std::vector<std::pair<std::string, std::vector<StatsSizeIDB>>> getSizeIDBs();
 
         std::vector<StatsRule> getOutputNewIterations();
 #endif

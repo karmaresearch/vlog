@@ -67,7 +67,7 @@ void SemiNaiver::createGraphRuleDependency(std::vector<int> &nodes,
     delete[] definedBy;
 }
 
-string set_to_string(std::unordered_set<int> s) {
+std::string set_to_string(std::unordered_set<int> s) {
     ostringstream oss("");
     for (std::unordered_set<int>::const_iterator k = s.begin(); k != s.end(); ++k) {
         oss << *k << " ";
@@ -275,9 +275,9 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
 
 #if DEBUG
             for (int i = 0; i < itr->orderExecutions.size(); ++i) {
-                string plan = "";
+                std::string plan = "";
                 for (int j = 0; j < itr->orderExecutions[i].plan.size(); ++j) {
-                    plan += string(" ") +
+                    plan += " " +
                         itr->orderExecutions[i].plan[j]->tostring(program, &layer);
                 }
                 LOG(DEBUGL) << "-->" << plan;
@@ -542,7 +542,7 @@ bool SemiNaiver::executeUntilSaturation(
 
             //Get the top 10 rules in the last iteration
             std::sort(costRules.begin(), costRules.end());
-            string out = "";
+            std::string out = "";
             int n = 0;
             for (const auto &exec : costRules) {
                 if (exec.iteration >= lastIteration) {
@@ -597,10 +597,10 @@ void SemiNaiver::storeOnFile(std::string path, const PredId_t pred, const bool d
                                     } else {
                                         row += ",";
                                     }
-                                    row += VLogUtils::csvString(string(buffer));
+                                    row += VLogUtils::csvString(std::string(buffer));
                                 } else {
                                     row += "\t";
-                                    row += string(buffer);
+                                    row += std::string(buffer);
                                 }
                             } else {
                                 uint64_t v = iitr->getCurrentValue(m);
@@ -1628,7 +1628,7 @@ std::vector<std::pair<string, std::vector<StatsSizeIDB>>> SemiNaiver::getSizeIDB
 }
 #endif
 
-void SemiNaiver::printCountAllIDBs(string prefix) {
+void SemiNaiver::printCountAllIDBs(std::string prefix) {
     long c = 0;
     long emptyRel = 0;
     for (PredId_t i = 0; i < program->getNPredicates(); ++i) {
@@ -1638,7 +1638,7 @@ void SemiNaiver::printCountAllIDBs(string prefix) {
                 if (count == 0) {
                     emptyRel++;
                 }
-                string predname = program->getPredicateName(i);
+                std::string predname = program->getPredicateName(i);
                 LOG(DEBUGL) << prefix << "Cardinality of " <<
                     predname << ": " << count;
                 c += count;
@@ -1673,7 +1673,7 @@ size_t SemiNaiver::getCurrentIteration() {
 }
 
 #ifdef WEBINTERFACE
-string SemiNaiver::getCurrentRule() {
+std::string SemiNaiver::getCurrentRule() {
     return currentRule;
 }
 

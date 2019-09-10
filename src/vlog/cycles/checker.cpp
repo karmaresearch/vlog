@@ -874,7 +874,7 @@ Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
                     uint64_t id = tuple.get(i).getValue();
                     char text[MAX_TERM_SIZE];
                     if (db->getDictText(id, text)) {
-                        string v = Program::compressRDFOWLConstants(std::string(text));
+                        std::string v = Program::compressRDFOWLConstants(std::string(text));
                         output += v;
                     } else {
                         std::string t = db->getDictText(id);

@@ -26,8 +26,8 @@
 #include <regex>
 
 WebInterface::WebInterface(
-        ProgramArgs &vm, std::shared_ptr<SemiNaiver> sn, string htmlfiles,
-        string cmdArgs, string edbfile) : vm(vm), sn(sn),
+        ProgramArgs &vm, std::shared_ptr<SemiNaiver> sn, std::string htmlfiles,
+        std::string cmdArgs, std::string edbfile) : vm(vm), sn(sn),
     dirhtmlfiles(htmlfiles), cmdArgs(cmdArgs),
     isActive(false),
     edbFile(edbfile),
@@ -44,7 +44,7 @@ void WebInterface::setupTridentLayer() {
     if (edb) {
         //Setup a TridentLayer (for queries without datalog)
         PredId_t p = edb->getFirstEDBPredicate();
-        string typedb = edb->getTypeEDBPredicate(p);
+        std::string typedb = edb->getTypeEDBPredicate(p);
         tridentlayer = NULL;
         if (typedb == "Trident") {
             auto edbTable = edb->getEDBTable(p);
@@ -95,14 +95,14 @@ long WebInterface::getDurationExecMs() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(sec).count();
 }
 
-static string _getValueParam(string req, string param) {
+static std::string _getValueParam(std::string req, std::string param) {
     int pos = req.find(param);
-    if (pos == string::npos) {
+    if (pos == std::string::npos) {
         return "";
     } else {
         int postart = req.find("=", pos);
         int posend = req.find("&", pos);
-        if (posend == string::npos) {
+        if (posend == std::string::npos) {
             return req.substr(postart + 1);
         } else {
             return req.substr(postart + 1, posend - postart - 1);
@@ -110,32 +110,32 @@ static string _getValueParam(string req, string param) {
     }
 }
 
-string WebInterface::lookup(string sId, DBLayer &db) {
+std::string WebInterface::lookup(std::string sId, DBLayer &db) {
     const char *start;
     const char *end;
     unsigned id = stoi(sId);
     ::Type::ID type;
     unsigned st;
     db.lookupById(id, start, end, type, st);
-    return string(start, end - start);
+    return std::string(start, end - start);
 }
 
 
 void WebInterface::processRequest(std::string req, std::string &resp) {
     setActive();
     //Get the page
-    string page;
+    std::string page;
     bool isjson = false;
     int error = 0;
 
     if (Utils::starts_with(req, "POST")) {
         int pos = req.find("HTTP");
-        string path = req.substr(5, pos - 6);
+        std::string path = req.substr(5, pos - 6);
         if (path == "/sparql") {
             //Get the SPARQL query
-            string form = req.substr(req.find("application/x-www-form-urlencoded"));
-            string printresults = _getValueParam(form, "print");
-            string sparqlquery = _getValueParam(form, "query");
+            std::string form = req.substr(req.find("application/x-www-form-urlencoded"));
+            std::string printresults = _getValueParam(form, "print");
+            std::string sparqlquery = _getValueParam(form, "query");
             //Decode the query
             sparqlquery = HttpClient::unescape(sparqlquery);
             std::regex e1("\\+");
@@ -155,7 +155,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             JSON vars;
             JSON bindings;
             JSON stats;
-            bool jsonoutput = printresults == string("true");
+            bool jsonoutput = printresults == std::string("true");
             if (program) {
                 LOG(INFOL) << "Answering the SPARQL query with VLog ...";
                 VLogUtils::execSPARQLQuery(sparqlquery,
@@ -189,10 +189,10 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             page = buf.str();
             isjson = true;
         } else if (path == "/lookup") {
-            string form = req.substr(req.find("application/x-www-form-urlencoded"));
-            string id = _getValueParam(form, "id");
+            std::string form = req.substr(req.find("application/x-www-form-urlencoded"));
+            std::string id = _getValueParam(form, "id");
             //Lookup the value
-            string value = lookup(id, *(tridentlayer.get()));
+            std::string value = lookup(id, *(tridentlayer.get()));
             JSON pt;
             pt.put("value", value);
             std::ostringstream buf;
@@ -201,10 +201,10 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             page = buf.str();
             isjson = true;
         } else if (path == "/setup") {
-            string form = req.substr(req.find("application/x-www-form-urlencoded"));
-            string srules = _getValueParam(form, "rules");
-            string spremat = _getValueParam(form, "queries");
-            string sauto = _getValueParam(form, "automat");
+            std::string form = req.substr(req.find("application/x-www-form-urlencoded"));
+            std::string srules = _getValueParam(form, "rules");
+            std::string spremat = _getValueParam(form, "queries");
+            std::string sauto = _getValueParam(form, "automat");
             int automatThreshold = 1000000; // microsecond timeout
 
             srules = HttpClient::unescape(srules);
@@ -280,7 +280,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
     } else if (Utils::starts_with(req, "GET")) {
         //Get the page
         int pos = req.find("HTTP");
-        string path = req.substr(4, pos - 5);
+        std::string path = req.substr(4, pos - 5);
         if (path == "/refresh") {
             //Create JSON object
             JSON pt;
@@ -303,7 +303,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             std::vector<StatsRule> outputrules =
                 getSemiNaiver()->
                 getOutputNewIterations();
-            string outrules = "";
+            std::string outrules = "";
             for (const auto &el : outputrules) {
                 outrules += to_string(el.iteration) + "," +
                     to_string(el.derivation) + "," +
@@ -439,10 +439,10 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             JSON pt;
             std::vector<std::pair<string, std::vector<StatsSizeIDB>>> sizeIDBs = getSemiNaiver()->getSizeIDBs();
             //Construct the string
-            string flat = "";
+            std::string flat = "";
             for (auto el : sizeIDBs) {
 
-                string listderivations = "";
+                std::string listderivations = "";
                 for (const auto &stats : el.second) {
                     listderivations += to_string(stats.iteration) + "," +
                         to_string(stats.idRule) + "," +
@@ -470,7 +470,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
         page = getDefaultPage();
     }
 
-    string code = "200 OK ";
+    std::string code = "200 OK ";
     if (error) {
         code = "500 ERROR ";
     }
@@ -483,24 +483,24 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
     setInactive();
 }
 
-string WebInterface::getDefaultPage() {
+std::string WebInterface::getDefaultPage() {
     return getPage("/index.html");
 }
 
-string WebInterface::getPage(string f) {
+std::string WebInterface::getPage(std::string f) {
     if (cachehtml.count(f)) {
         return cachehtml.find(f)->second;
     }
 
     //Read the file (if any) and return it to the user
-    string pathfile = dirhtmlfiles + "/" + f;
+    std::string pathfile = dirhtmlfiles + "/" + f;
     if (Utils::exists(pathfile)) {
         //Read the content of the file
         LOG(DEBUGL) << "Reading the content of " << pathfile;
         ifstream ifs(pathfile);
-        stringstream sstr;
+        std::stringstream sstr;
         sstr << ifs.rdbuf();
-        string contentFile = sstr.str();
+        std::string contentFile = sstr.str();
         //Replace WEB_PORT with the right port
         size_t index = 0;
         index = contentFile.find("WEB_PORT", index);
