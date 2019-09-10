@@ -13,14 +13,14 @@
 #include <fstream>
 
 bool Literal::hasRepeatedVars() const {
-    std::vector<uint8_t> exVar;
-    for (int i = 0; i < tuple.getSize(); ++i) {
-        if (tuple.get(i).isVariable()) {
-            for (std::vector<uint8_t>::iterator itr = exVar.begin(); itr != exVar.end();
-                    ++itr) {
-                if (*itr == tuple.get(i).getId()) {
-                    return true;
-                }
+    std::vector<uint8_t> variables;
+    for (int i = 0; i < getTupleSize(); ++i) {
+        VTerm t = getTermAtPos(i);
+        if (t.isVariable()){
+            if (std::find(variables.begin(), variables.end(), t.getId()) != variables.end()){
+                return true;
+            } else {
+                variables.push_back(t.getId());
             }
         }
     }
