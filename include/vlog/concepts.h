@@ -301,7 +301,8 @@ class Literal {
             return negated;
         }
 
-        static int mgu(Substitution *substitutions, const Literal &l, const Literal &m);
+        //L. do we need this function?
+        //static int mgu(Substitution *substitutions, const Literal &l, const Literal &m);
 
         static int subsumes(std::vector<Substitution> &substitutions, const Literal &from, const Literal &to);
 

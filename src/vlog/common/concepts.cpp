@@ -14,7 +14,7 @@
 
 bool Literal::hasRepeatedVars() const {
     std::vector<uint8_t> variables;
-    for (int i = 0; i < getTupleSize(); ++i) {
+    for (uint8_t i = 0; i < getTupleSize(); ++i) {
         VTerm t = getTermAtPos(i);
         if (t.isVariable()){
             if (std::find(variables.begin(), variables.end(), t.getId()) != variables.end()){
@@ -27,48 +27,45 @@ bool Literal::hasRepeatedVars() const {
     return false;
 }
 
+/* Returns the number of variables in Literal
+ * ex: p(?X,?Y,?X).getNVars = 3
+ * */
 uint8_t Literal::getNVars() const {
     uint8_t n = 0;
-    for (int i = 0; i < tuple.getSize(); ++i) {
+    for (uint8_t i = 0; i < getTupleSize(); ++i) {
         if (tuple.get(i).isVariable())
             n++;
     }
     return n;
 }
 
+/* Returns the number of constant in the Literal
+ * */
 uint8_t Literal::getNConstants() const {
     return getTupleSize() - getNVars();
 }
 
+/* Returns the positions in the literal that are variables
+ * */
 std::vector<uint8_t> Literal::getPosVars() const {
     std::vector<uint8_t> out;
-    for (uint8_t i = 0; i < tuple.getSize(); ++i) {
+    for (uint8_t i = 0; i < getTupleSize(); ++i) {
         if (tuple.get(i).isVariable())
             out.push_back(i);
     }
     return out;
 }
 
+/* Returns the number of different variables in the Literal
+ * */
 uint8_t Literal::getNUniqueVars() const {
-    std::vector<uint8_t> exVar;
-    uint8_t n = 0;
+    std::set<uint8_t> variables;
     for (int i = 0; i < tuple.getSize(); ++i) {
         if (tuple.get(i).isVariable()) {
-            bool found = false;
-            for (std::vector<uint8_t>::iterator itr = exVar.begin(); itr != exVar.end();
-                    ++itr) {
-                if (*itr == tuple.get(i).getId()) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                n++;
-                exVar.push_back(tuple.get(i).getId());
-            }
+            variables.insert(tuple.get(i).getId());
         }
     }
-    return n;
+    return variables.size();
 }
 
 std::string adornmentToString(uint8_t adornment, int size) {
@@ -186,47 +183,47 @@ std::vector<std::pair<uint8_t, uint8_t>> Literal::getRepeatedVars() const {
     return tuple.getRepeatedVars();
 }
 
-int Literal::mgu(Substitution *substitutions, const Literal &l, const Literal &m) {
-    if (l.getPredicate().getId() != l.getPredicate().getId()) {
-        return -1;
-    }
-
-    int tupleSize = 0;
-    for (int i = 0; i < l.getTupleSize(); ++i) {
-        VTerm tl = l.getTermAtPos(i);
-        VTerm tm = m.getTermAtPos(i);
-        if (!tl.isVariable() && !tm.isVariable() && tl.getValue() != tm.getValue())
-            return -1;
-
-        if (tl.isVariable()) {
-            bool found = false;
-            for (int j = 0; j < tupleSize && !found; ++j) {
-                if (substitutions[j].origin == tl.getId()) {
-                    found = true;
-                    if (substitutions[j].destination != tm) {
-                        return -1;
-                    }
-                }
-            }
-
-            if (!found)
-                substitutions[tupleSize++] = Substitution(tl.getId(), tm);
-        } else if (tm.isVariable()) {
-            bool found = false;
-            for (int j = 0; j < tupleSize && !found; ++j) {
-                if (substitutions[j].origin == tm.getId()) {
-                    found = true;
-                    if (substitutions[j].destination != tl) {
-                        return -1;
-                    }
-                }
-            }
-            if (!found)
-                substitutions[tupleSize++] = Substitution(tm.getId(), tl);
-        }
-    }
-    return tupleSize;
-}
+//int Literal::mgu(Substitution *substitutions, const Literal &l, const Literal &m) {
+//    if (l.getPredicate().getId() != l.getPredicate().getId()) {
+//        return -1;
+//    }
+//
+//    int tupleSize = 0;
+//    for (int i = 0; i < l.getTupleSize(); ++i) {
+//        VTerm tl = l.getTermAtPos(i);
+//        VTerm tm = m.getTermAtPos(i);
+//        if (!tl.isVariable() && !tm.isVariable() && tl.getValue() != tm.getValue())
+//            return -1;
+//
+//        if (tl.isVariable()) {
+//            bool found = false;
+//            for (int j = 0; j < tupleSize && !found; ++j) {
+//                if (substitutions[j].origin == tl.getId()) {
+//                    found = true;
+//                    if (substitutions[j].destination != tm) {
+//                        return -1;
+//                    }
+//                }
+//            }
+//
+//            if (!found)
+//                substitutions[tupleSize++] = Substitution(tl.getId(), tm);
+//        } else if (tm.isVariable()) {
+//            bool found = false;
+//            for (int j = 0; j < tupleSize && !found; ++j) {
+//                if (substitutions[j].origin == tm.getId()) {
+//                    found = true;
+//                    if (substitutions[j].destination != tl) {
+//                        return -1;
+//                    }
+//                }
+//            }
+//            if (!found)
+//                substitutions[tupleSize++] = Substitution(tm.getId(), tl);
+//        }
+//    }
+//    return tupleSize;
+//}
 
 bool Literal::sameVarSequenceAs(const Literal &l) const {
     if (getNVars() == l.getNVars()) {
@@ -355,22 +352,10 @@ std::vector<uint8_t> Literal::getSharedVars(const std::vector<uint8_t> &vars) co
     std::vector<uint8_t> output;
     for (int i = 0; i < getTupleSize(); ++i) {
         VTerm t = getTermAtPos(i);
-        if (t.isVariable()) {
-            for (std::vector<uint8_t>::const_iterator itr = vars.cbegin(); itr != vars.cend();
-                    ++itr) {
-                if (t.getId() == *itr) {
-                    //Check is not already in output
-                    bool found = false;
-                    for (std::vector<uint8_t>::iterator itr2 = output.begin(); itr2 != output.end(); ++itr2) {
-                        if (*itr == *itr2) {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found)
-                        output.push_back(t.getId());
-                }
-            }
+        if (t.isVariable() &&
+                std::find(vars.begin(), vars.end(), t.getId()) != vars.end() &&
+                std::find(output.begin(), output.end(), t.getId()) == output.end()) {
+            output.push_back(t.getId());
         }
     }
     return output;
