@@ -330,6 +330,7 @@ class Literal {
         std::vector<uint8_t> getNewVars(std::vector<uint8_t> &vars) const;
 
         std::vector<uint8_t> getAllVars() const;
+        bool containsVariable(uint8_t variableId) const;
 
         std::string tostring(Program *program, EDBLayer *db) const;
 

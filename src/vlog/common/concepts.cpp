@@ -418,6 +418,11 @@ std::vector<uint8_t> Literal::getAllVars() const {
     return output;
 }
 
+bool Literal::containsVariable(uint8_t variableId) const {
+    auto variables = Literal::getAllVars();
+    return std::find(variables.begin(), variables.end(), variableId) != variables.end();
+}
+
 bool Literal::operator==(const Literal & other) const {
     if (pred.getId() != other.pred.getId())
         return false;

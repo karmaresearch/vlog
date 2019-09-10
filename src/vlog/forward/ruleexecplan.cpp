@@ -4,6 +4,7 @@
 #include <kognac/logs.h>
 
 #include <set>
+#include <algorithm>
 
 void RuleExecutionPlan::checkIfFilteringHashMapIsPossible(const Literal &head) {
     //2 conditions: the last literal shares the same variables as the head in the same position and has the same constants
@@ -64,6 +65,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
     std::vector<uint8_t> existingVariables;
 
     //Get all variables in the head, and dependencies if they are existential
+    //{head_variable_id:[position_in_term_list_in_head]}
     std::map<uint8_t,std::vector<uint8_t>> variablesNeededForHead;
     uint32_t countVars = 0;
     for (auto &headLiteral : heads) {
@@ -141,28 +143,21 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
             const VTerm t = currentLiteral->getTermAtPos(x);
 
             if (t.isVariable()) {
-                //Is join?
-                bool found = false;
-                uint8_t j = 0;
-                for (; j < existingVariables.size() && !found; ++j) {
-                    if (existingVariables[j] == t.getId()) {
-                        found = true;
-                        break;
-                    }
-                }
-
-                if (found) {
+                //Is it join?
+                auto itr = std::find(existingVariables.begin(),existingVariables.end(),t.getId());
+                if (itr != existingVariables.end()) { //found
+                    uint8_t position = itr - existingVariables.begin();
                     //Maybe I join with a repeated variable. In this case, I don't add it
                     bool repeatedFound = false;
                     for(auto &c : jc) {
-                        if (c.first == j) {
+                        if (c.first == position) {
                             repeatedFound = true;
                             break;
                         }
                     }
                     if (!repeatedFound) {
-                        jc.push_back(std::make_pair(j, litVars));
-                        v2p.push_back(std::make_pair(x, j));
+                        jc.push_back(std::make_pair(position, litVars));
+                        v2p.push_back(std::make_pair(x, position));
                     }
                 } else {
                     // Check if we still need this variable. We need it if it occurs
@@ -172,19 +167,15 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                     // first occurrence.
                     bool isVariableNeeded = false;
                     //Check next literals
-                    for (uint8_t m = i + 1; m < plan.size() && !isVariableNeeded; ++m) {
-                        std::vector<uint8_t> allVars = plan[m]->getAllVars();
-                        for (uint8_t n = 0; n < allVars.size() && !isVariableNeeded; ++n) {
-                            if (allVars[n] == t.getId()) {
-                                isVariableNeeded = true;
-                            }
+                    for (uint8_t m = i + 1; m < plan.size(); ++m) {
+                        if (plan[m]->containsVariable(t.getId())){
+                            isVariableNeeded = true;
+                            break;
                         }
                     }
 
                     //Check the head or chase-related dependencies
-                    if (!isVariableNeeded) {
-                        isVariableNeeded = variablesNeededForHead.count(t.getId());
-                    }
+                    isVariableNeeded = isVariableNeeded || variablesNeededForHead.count(t.getId());
 
                     if (i == (plan.size() - 1)) {
                         if (isVariableNeeded) {
