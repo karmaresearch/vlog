@@ -156,6 +156,7 @@ class VTuple {
            return *this;
            }
            */
+        //L. Can I create an iterator on it? begin, end etc?
 
         ~VTuple() {
             delete[] terms;
