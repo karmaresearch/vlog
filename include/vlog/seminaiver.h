@@ -155,9 +155,7 @@ class SemiNaiver {
                 size_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
 
-        void prepare(std::vector<RuleExecutionDetails> &allrules,
-                size_t lastExecution,
-                int singleRuleToCheck);
+        void prepare(size_t lastExecution, int singleRuleToCheck);
 
         void setIgnoreDuplicatesElimination() {
             ignoreDuplicatesElimination = true;
