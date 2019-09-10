@@ -12,8 +12,6 @@
 #include <stdlib.h>
 #include <fstream>
 
-using namespace std;
-
 bool Literal::hasRepeatedVars() const {
     std::vector<uint8_t> exVar;
     for (int i = 0; i < tuple.getSize(); ++i) {
@@ -94,13 +92,13 @@ std::string Literal::tostring(Program *program, EDBLayer *db) const {
     else
         predName = std::to_string(pred.getId());
 
-    std::string out = (isNegated() ? "~" : "") + predName + std::string("[") +
-        std::to_string(pred.getType()) + std::string("]") +
-        adornmentToString(pred.getAdorment(), tuple.getSize()) + std::string("(");
+    std::string out = (isNegated() ? "~" : "") + predName + "[" +
+        std::to_string(pred.getType()) + "]" +
+        adornmentToString(pred.getAdorment(), tuple.getSize()) + "(";
 
     for (int i = 0; i < tuple.getSize(); ++i) {
         if (tuple.get(i).isVariable()) {
-            out += std::string("?") + std::to_string(tuple.get(i).getId());
+            out += "?" + std::to_string(tuple.get(i).getId());
         } else {
             if (db == NULL) {
                 out += std::to_string(tuple.get(i).getValue());
@@ -114,7 +112,7 @@ std::string Literal::tostring(Program *program, EDBLayer *db) const {
                         out += std::to_string(id);
                     } else {
                         std::string t = db->getDictText(id);
-                        if (t == std::string("")) {
+                        if (t.empty()) {
                             out += std::to_string(id);
                         } else {
                             out += Program::compressRDFOWLConstants(t);
@@ -124,11 +122,11 @@ std::string Literal::tostring(Program *program, EDBLayer *db) const {
             }
         }
         if (i < tuple.getSize() - 1) {
-            out += std::string(",");
+            out += ",";
         }
     }
 
-    out += std::string(")");
+    out += ")";
     return out;
 }
 
@@ -143,11 +141,11 @@ std::string Literal::toprettystring(Program *program, EDBLayer *db, bool replace
     std::string out;
     if (isNegated())
         out += "~";
-    out += predName + std::string("(");
+    out += predName + "(";
 
     for (int i = 0; i < tuple.getSize(); ++i) {
         if (tuple.get(i).isVariable()) {
-            out += std::string("A") + std::to_string(tuple.get(i).getId());
+            out += "A" + std::to_string(tuple.get(i).getId());
         } else {
             if (replaceConstants) {
                 out += "*";
@@ -157,14 +155,14 @@ std::string Literal::toprettystring(Program *program, EDBLayer *db, bool replace
                 uint64_t id = tuple.get(i).getValue();
                 char text[MAX_TERM_SIZE];
                 if (db->getDictText(id, text)) {
-                    string v = Program::compressRDFOWLConstants(std::string(text));
+                    std::string v = Program::compressRDFOWLConstants(std::string(text));
                     out += v;
                 } else {
                     if (program == NULL) {
                         out += std::to_string(id);
                     } else {
                         std::string t = db->getDictText(id);
-                        if (t == std::string("")) {
+                        if (t.empty()) {
                             out += std::to_string(id);
                         } else {
                             out += Program::compressRDFOWLConstants(t);
@@ -174,11 +172,11 @@ std::string Literal::toprettystring(Program *program, EDBLayer *db, bool replace
             }
         }
         if (i < tuple.getSize() - 1) {
-            out += std::string(",");
+            out += ",";
         }
     }
 
-    out += std::string(")");
+    out += ")";
     return out;
 }
 
@@ -679,13 +677,13 @@ std::string Rule::tostring() const {
 }
 
 std::string Rule::tostring(Program * program, EDBLayer *db) const {
-    std::string output = std::string("HEAD=");
+    std::string output = "HEAD=";
     for(const auto &head : heads) {
         output += " " + head.tostring(program, db) ;
     }
-    output += std::string(" BODY= ");
+    output += " BODY= ";
     for (int i = 0; i < body.size(); ++i) {
-        output += body[i].tostring(program, db) + std::string(" ");
+        output += body[i].tostring(program, db) + " ";
     }
     return output;
 }
@@ -828,9 +826,7 @@ Program::Program(Program *p, EDBLayer *kb) : kb(kb),
     cardPredicates(p->cardPredicates) {
     }
 
-std::string trim(const std::string& str,
-        const std::string& whitespace = "\r \t")
-{
+std::string trim(const std::string& str, const std::string& whitespace = "\r \t") {
     const auto strBegin = str.find_first_not_of(whitespace);
     if (strBegin == std::string::npos)
         return ""; // no content
@@ -865,8 +861,8 @@ std::string Program::readFromFile(std::string pathFile, bool rewriteMultihead) {
 }
 
 std::string Program::readFromString(std::string rules, bool rewriteMultihead) {
-    stringstream ss(rules);
-    string rule;
+    std::stringstream ss(rules);
+    std::string rule;
     while (getline(ss, rule)) {
         rule = trim(rule);
         if (!rule.empty() && rule.substr(0, 2) != "//") {
@@ -884,18 +880,18 @@ std::string Program::readFromString(std::string rules, bool rewriteMultihead) {
 std::string Program::compressRDFOWLConstants(std::string input) {
     size_t rdfPos = input.find("<http://www.w3.org/1999/02/22-rdf-syntax-ns#");
     if (rdfPos != std::string::npos) {
-        return string("rdf:") + input.substr(44, input.size() - 45);
+        return "rdf:" + input.substr(44, input.size() - 45);
     }
 
     size_t rdfsPos = input.find("<http://www.w3.org/2000/01/rdf-schema#");
     if (rdfsPos != std::string::npos) {
-        input = string("rdfs:") + input.substr(38, input.size() - 39);
+        input = "rdfs:" + input.substr(38, input.size() - 39);
         return input;
     }
 
     size_t owlPos = input.find("<http://www.w3.org/2002/07/owl#");
     if (owlPos != std::string::npos) {
-        input = string("owl:") + input.substr(31, input.size() - 32);
+        input = "owl:" + input.substr(31, input.size() - 32);
         return input;
     }
 
@@ -906,19 +902,19 @@ std::string Program::compressRDFOWLConstants(std::string input) {
 std::string Program::rewriteRDFOWLConstants(std::string input) {
     size_t rdfPos = input.find("rdf:");
     if (rdfPos != std::string::npos) {
-        input = string("<http://www.w3.org/1999/02/22-rdf-syntax-ns#") + input.substr(rdfPos + 4, std::string::npos) + string(">");
+        input = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#" + input.substr(rdfPos + 4, std::string::npos) + ">";
         return input;
     }
 
     size_t rdfsPos = input.find("rdfs:");
     if (rdfsPos != std::string::npos) {
-        input = string("<http://www.w3.org/2000/01/rdf-schema#") + input.substr(rdfsPos + 5, std::string::npos) + string(">");
+        input = "<http://www.w3.org/2000/01/rdf-schema#" + input.substr(rdfsPos + 5, std::string::npos) + ">";
         return input;
     }
 
     size_t owlPos = input.find("owl:");
     if (owlPos != std::string::npos) {
-        input = string("<http://www.w3.org/2002/07/owl#") + input.substr(owlPos + 4, std::string::npos) + string(">");
+        input = "<http://www.w3.org/2002/07/owl#" + input.substr(owlPos + 4, std::string::npos) + ">";
         return input;
     }
 
@@ -1057,11 +1053,11 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     //Determine predicate
     PredId_t predid = (PredId_t) dictPredicates.getOrAdd(predicate);
     if (cardPredicates.find(predid) == cardPredicates.end()) {
-        cardPredicates.insert(make_pair(predid, t.size()));
+        cardPredicates.insert(std::make_pair(predid, t.size()));
     } else {
         int card = cardPredicates.find(predid)->second;
         if (card == 0) {
-            cardPredicates.insert(make_pair(predid, t.size()));
+            cardPredicates.insert(std::make_pair(predid, t.size()));
             card = t.size();
         }
         if (card != t.size()) {
@@ -1343,7 +1339,7 @@ Predicate Program::getPredicate(std::string & p, uint8_t adornment) {
 int64_t Program::getOrAddPredicate(std::string & p, uint8_t cardinality) {
     PredId_t id = (PredId_t) dictPredicates.getOrAdd(p);
     if (cardPredicates.find(id) == cardPredicates.end()) {
-        cardPredicates.insert(make_pair(id, cardinality));
+        cardPredicates.insert(std::make_pair(id, cardinality));
     } else if (cardPredicates.find(id)->second == 0) {
 		cardPredicates.find(id)->second = cardinality;
 	} else if (cardPredicates.find(id)->second != cardinality) {
@@ -1379,7 +1375,7 @@ std::vector<PredId_t> Program::getAllEDBPredicateIds() {
 std::string Program::tostring() {
     std::string output = "";
     for(const auto &rule : allrules) {
-        output += rule.tostring() + std::string("\n");
+        output += rule.tostring() + "\n";
     }
     return output;
 }

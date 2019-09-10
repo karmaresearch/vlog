@@ -102,7 +102,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                 if (variablesNeededForHead.count(existingVariables[m])) {
                     auto p = variablesNeededForHead.find(existingVariables[m]);
                     for (auto &el : p->second)
-                        pf.push_back(make_pair(el, m));
+                        pf.push_back(std::make_pair(el, m));
                 }
             }
         } else {
@@ -127,7 +127,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
 
                 if (isVarNeeded || copyAllVars) {
                     // Maps from the new position to the old.
-                    pf.push_back(make_pair(newExistingVariables.size(), j));
+                    pf.push_back(std::make_pair(newExistingVariables.size(), j));
                     newExistingVariables.push_back(existingVariables[j]);
                 }
             }
@@ -185,7 +185,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                             if (!varSoFar.count(t.getId())) {
                                 auto p = variablesNeededForHead.find(t.getId());
                                 for(auto &el : p->second)
-                                    ps.push_back(make_pair(el, litVars));
+                                    ps.push_back(std::make_pair(el, litVars));
                             }
                             varSoFar.insert(t.getId());
                         }
@@ -202,7 +202,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                         }
 
                         if (isNew) {
-                            ps.push_back(make_pair(newExistingVariables.size(), litVars));
+                            ps.push_back(std::make_pair(newExistingVariables.size(), litVars));
                             v2p.push_back(std::make_pair(x, newExistingVariables.size()));
                             newExistingVariables.push_back(t.getId());
                             LOG(TRACEL) << "New variable: " << (int) t.getId();

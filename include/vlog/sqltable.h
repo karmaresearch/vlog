@@ -10,18 +10,18 @@ private:
     SegmentInserter *getInserter(const Literal &query);
 public:
     PredId_t predid;
-    string tablename;
+    std::string tablename;
     uint8_t arity;
-    std::vector<string> fieldTables;
+    std::vector<std::string> fieldTables;
     EDBLayer *layer;
     
-    SQLTable(PredId_t predid, string name, string fieldNames, EDBLayer *layer);
+    SQLTable(PredId_t predid, std::string name, std::string fieldNames, EDBLayer *layer);
 
-    string mapToField(uint64_t value, uint8_t ind);
+    std::string mapToField(uint64_t value, uint8_t ind);
 
-    string literalConstraintsToSQLQuery(const Literal &q);
+    std::string literalConstraintsToSQLQuery(const Literal &q);
 
-    string repeatedToSQLQuery(const Literal &q);
+    std::string repeatedToSQLQuery(const Literal &q);
 
     void releaseIterator(EDBIterator *itr);
 

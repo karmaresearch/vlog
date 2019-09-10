@@ -59,7 +59,7 @@ class InmemoryTable : public EDBTable {
                 }
         };
 
-        std::vector<string> varnames;
+        std::vector<std::string> varnames;
         PredId_t predid;
         uint8_t arity;
         EDBLayer *layer;
@@ -77,7 +77,7 @@ class InmemoryTable : public EDBTable {
                 const std::vector<uint8_t> &fields);
 
     public:
-        InmemoryTable(string repository, string tablename, PredId_t predid, EDBLayer *layer);
+        InmemoryTable(std::string repository, std::string tablename, PredId_t predid, EDBLayer *layer);
 
         InmemoryTable(PredId_t predid, std::vector<std::vector<std::string>> &entries, EDBLayer *layer);
 

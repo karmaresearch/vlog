@@ -313,7 +313,7 @@ void JoinExecutor::verificativeJoinOneColumn(
 
         //Get the column from the table. Is it EDB? Then offload the join
         //to the EDB layer
-        shared_ptr<const Column> column = table->
+        std::shared_ptr<const Column> column = table->
             getColumn(hv.joinCoordinates[currentLiteral][0].second);
         // LOG(TRACEL) << "Count = " << count;
         FCInternalTableItr *itr = intermediateResults->sortBy(joinField /*, nthreads */);

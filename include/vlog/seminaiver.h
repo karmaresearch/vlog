@@ -265,7 +265,7 @@ class SemiNaiver {
 
         //Statistics methods
 
-        VLIBEXP void printCountAllIDBs(string prefix);
+        VLIBEXP void printCountAllIDBs(std::string prefix);
 
         size_t getCurrentIteration();
 

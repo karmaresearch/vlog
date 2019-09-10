@@ -24,10 +24,8 @@ typedef uint32_t PredId_t;
 
 class EDBLayer;
 
-using namespace std;
-
 inline std::string fields2str(const std::vector<uint8_t> &fields) {
-    ostringstream os;
+    std::ostringstream os;
     os << "[" << fields.size() << "]{";
     for (auto f : fields) {
         os << (int)f << ",";
