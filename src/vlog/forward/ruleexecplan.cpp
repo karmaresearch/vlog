@@ -184,10 +184,11 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                             // the variable number in the pattern.
                             if (!varSoFar.count(t.getId())) {
                                 auto p = variablesNeededForHead.find(t.getId());
-                                for(auto &el : p->second)
+                                for(auto &el : p->second) {
                                     ps.push_back(std::make_pair(el, litVars));
+                                }
+                                varSoFar.insert(t.getId());
                             }
-                            varSoFar.insert(t.getId());
                         }
                         v2p.push_back(std::make_pair(x, newExistingVariables.size() + litVars));
                     } else if (isVariableNeeded || copyAllVars) {
@@ -215,7 +216,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
             //Calculate the positions of the dependencies for the chase
             std::map<uint8_t, std::vector<uint8_t>> extvars2pos;
             for(const auto &pair : dependenciesExtVars) {
-                for(auto v : pair.second) {
+                for(const auto& v : pair.second) {
                     //Search first the existingVariables
                     bool found = false;
                     LOG(TRACEL) << "v = " << (int) v;
