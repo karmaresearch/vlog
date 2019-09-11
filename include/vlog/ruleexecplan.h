@@ -49,7 +49,7 @@ struct RuleExecutionPlan {
     std::vector<const Literal*> plan;
     std::vector<std::pair<size_t, size_t>> ranges;
 
-    //Created by ruleexecdetails::createExecutionPlan
+    //Created by RuleExecutionDetails::createExecutionPlan
     std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars;
 
     //Check if we can apply filtering HashMap. See comment above
