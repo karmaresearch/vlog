@@ -601,6 +601,7 @@ std::vector<uint8_t> Rule::getVarsInBody() const {
 }
 
 /* Check if every variable in the head appears in the body
+ * @returns a list of unique existentially quantified variable_ids
  */
 std::vector<uint8_t> Rule::getExistentialVariables() const{
     std::vector<uint8_t> out;
@@ -617,6 +618,7 @@ std::vector<uint8_t> Rule::getExistentialVariables() const{
 }
 
 /* Check if every variable in the head appears in the body
+ * @returns a list of non-unique frontier variables
  */
 std::vector<uint8_t> Rule::getFrontierVariables(PredId_t ignore) const {
     std::vector<uint8_t> out;
@@ -624,15 +626,14 @@ std::vector<uint8_t> Rule::getFrontierVariables(PredId_t ignore) const {
     std::vector<uint8_t> headVars = getVarsInHead(ignore);
     for(const auto& var : headVars) {
         if (std::find(bodyVars.begin(), bodyVars.end(),var) != bodyVars.end()) {
-//                && std::find(out.begin(), out.end(), var) != out.end()){
-                out.push_back(var);
+            out.push_back(var);
         }
     }
     return out;
 }
 
 /* Calculate the dependencies of the existential variables to the variables in the body
- *
+ * @return {var_id:[var_id]} the variable dependences of an existentially quantified variable
  * */
 std::map<uint8_t, std::vector<uint8_t>> Rule::calculateDependencies() const {
     std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars;
