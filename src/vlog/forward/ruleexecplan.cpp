@@ -210,6 +210,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
         vars2pos.push_back(v2p);
 
         if (i == plan.size() - 1) {
+            //TODO this code can be simplified.
             //output.sizeOutputRelation.push_back((uint8_t) headLiteral.getTupleSize());
             sizeOutputRelation.push_back(~0);
 
