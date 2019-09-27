@@ -869,7 +869,7 @@ bool EDBLayer::getOrAddDictNumber(const char *text, const size_t sizeText,
         }
         std::string t(text, sizeText);
         id = termsDictionary->getOrAdd(t);
-        LOG(DEBUGL) << "getOrAddDictNumber \"" << t << "\" returns " << id;
+        LOG(TRACEL) << "getOrAddDictNumber \"" << t << "\" returns " << id;
         resp = true;
     }
     return resp;
