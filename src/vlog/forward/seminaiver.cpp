@@ -624,6 +624,24 @@ void SemiNaiver::storeOnFile(std::string path, const PredId_t pred, const bool d
     streamout.close();
 }
 
+static std::string generateFileName(std::string name) {
+    std::stringstream stream;
+
+    stream << std::oct << std::setfill('0');
+
+    for(char ch : name) {
+        int code = static_cast<unsigned char>(ch);
+
+        if (code != '\\' && code != '/') {
+            stream.put(ch);
+        } else {
+            stream << "\\" << std::setw(3) << code;
+        }
+    }
+
+    return stream.str();
+}
+
 void SemiNaiver::storeOnFiles(std::string path, const bool decompress,
         const int minLevel, const bool csv) {
     char buffer[MAX_TERM_SIZE];
@@ -634,7 +652,7 @@ void SemiNaiver::storeOnFiles(std::string path, const bool decompress,
     for (PredId_t i = 0; i < program->getNPredicates(); ++i) {
         FCTable *table = predicatesTables[i];
         if (table != NULL && !table->isEmpty()) {
-            storeOnFile(path + "/" + program->getPredicateName(i), i, decompress, minLevel, csv);
+            storeOnFile(path + "/" + generateFileName(program->getPredicateName(i)), i, decompress, minLevel, csv);
         }
     }
 }
