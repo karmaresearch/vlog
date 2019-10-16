@@ -3,9 +3,9 @@
 #include <vlog/webinterface.h>
 #include <vlog/materialization.h>
 #include <vlog/seminaiver.h>
-#include <vlog/training.h>
+#include <vlog/ml/training.h>
 #include <vlog/utils.h>
-#include <vlog/helper.h>
+#include <vlog/ml/helper.h>
 
 #include <launcher/vloglayer.h>
 #include <cts/parser/SPARQLLexer.hpp>
