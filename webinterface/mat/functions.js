@@ -98,120 +98,23 @@ function launchMat() {
     http_request.send(null);
 }
 
-function trainAndTest() {
-
-    var queries = document.getElementById('textTestQueries').value;
-    document.getElementById('buttonTrain').disabled = true;
-    var body = '';
-    body += 'query=' + encodeURIComponent(queries);
-
-    var timeout = document.getElementById('timeoutTraining').value;
-    body += "&timeout=" + timeout;
-    var repeatQuery = document.getElementById('repeatQueryTraining').value;
-    body += "&repeatQuery=" + repeatQuery;
-    var maxTrainingQueries = document.getElementById('maxTrainingQueries').value;
-    body += "&maxTraining=" + maxTrainingQueries;
-
-    body = body.replace('/%20/g','+');
-    var http_request = new XMLHttpRequest();
-    http_request.open("POST", "http://" + window.location.hostname + ":" + port + "/gentq", true);
-    //http_request.timeout = 2000;
-    http_request.onreadystatechange = function () {
-        var done = 4, ok = 200;
-        if (http_request.readyState === done) {
-            if (http_request.status === ok) {
-                msgbox('ok', '#messageBox','Query executed!!', 1500);
-                results = JSON.parse(http_request.responseText);
-                console.log(results.accuracy);
-                //console.log(results.features);
-                //console.log(results.qsqrtimes);
-                var strAccuracy = JSON.stringify(results.accuracy);
-                //var strFeatures = JSON.stringify(results.features);
-                //var strQsqrTimes = JSON.stringify(results.qsqrtimes);
-                //var strMagicTimes = JSON.stringify(results.magictimes);
-                document.getElementById('textAccuracy').innerHTML = strAccuracy;
-                //document.getElementById('textFeatures').innerHTML = strFeatures;
-                //document.getElementById('textQsqrTime').innerHTML = strQsqrTimes;
-                //document.getElementById('textMagicTime').innerHTML = strMagicTimes;
-            } else {
-                console.log(http_request.status);
-            }
-            document.getElementById('buttonTrain').disabled = false;
-        } else {
-            msgbox('error', '#messageBox', 'http request failed', 2000);
-        }
-    };
-    http_request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-
-    http_request.send(body);
-}
-
-function execQuery() {
-
-    var queries = document.getElementById('textQueries').value;
-    document.getElementById('buttonQuery').disabled = true;
-    var body = '';
-    body += 'query=' + encodeURIComponent(queries);
-
-    var timeout = document.getElementById('timeout').value;
-    body += "&timeout=" + timeout;
-    var repeatQuery = document.getElementById('repeatQuery').value;
-    body += "&repeatQuery=" + repeatQuery;
-
-    body = body.replace('/%20/g','+');
-    var http_request = new XMLHttpRequest();
-    http_request.open("POST", "http://" + window.location.hostname + ":" + port + "/query", true);
-    //http_request.timeout = 2000;
-    http_request.onreadystatechange = function () {
-        var done = 4, ok = 200;
-        if (http_request.readyState === done) {
-            if (http_request.status === ok) {
-                msgbox('ok', '#messageBox','Query executed!!', 1500);
-                results = JSON.parse(http_request.responseText);
-                console.log(results.results);
-                console.log(results.features);
-                console.log(results.qsqrtimes);
-                var strResults = JSON.stringify(results.results);
-                var strFeatures = JSON.stringify(results.features);
-                var strQsqrTimes = JSON.stringify(results.qsqrtimes);
-                var strMagicTimes = JSON.stringify(results.magictimes);
-                document.getElementById('textResults').innerHTML = strResults;
-                document.getElementById('textFeatures').innerHTML = strFeatures;
-                document.getElementById('textQsqrTime').innerHTML = strQsqrTimes;
-                document.getElementById('textMagicTime').innerHTML = strMagicTimes;
-            } else {
-                console.log(http_request.status);
-            }
-            document.getElementById('buttonQuery').disabled = false;
-        } else {
-            msgbox('error', '#messageBox', 'http request failed', 2000);
-        }
-    };
-    http_request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-
-    http_request.send(body);
-}
-
-function setupProgram(event) {
+function setupProgram() {
     var info;
-    event.preventDefault();
+
     //Create the data for the form
     var contentform = '';
     var srule = document.getElementById('rulebox').value;
     contentform += 'rules=' + encodeURIComponent(srule);
-
     if (document.getElementById('automat').checked == true) {
         contentform += "&automat=on";
+    } else {
+        var spremat = document.getElementById('premat').value;
+        contentform += '&queries=' + encodeURIComponent(spremat);
     }
-    //else {
-    //    var spremat = document.getElementById('premat').value;
-    //    contentform += '&queries=' + encodeURIComponent(spremat);
-    //}
     contentform = contentform.replace('/%20/g', '+');
 
     var http_request = new XMLHttpRequest();
     document.getElementById('buttonSetup').disabled = true;
-    //getProgramInfo();
     http_request.open("POST", "http://" + window.location.hostname + ":" + port + "/setup", true);
     http_request.onreadystatechange = function () {
         var done = 4, ok = 200;
@@ -223,11 +126,10 @@ function setupProgram(event) {
             }
             document.getElementById('buttonSetup').value='Load Rules';
             document.getElementById('buttonSetup').disabled = false;
-        } else {
-            msgbox('error', '#messageBox', 'http request failed', 2000);
         }
     };
     http_request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    http_request.setRequestHeader('Content-Length', contentform.length);
 
     document.getElementById('buttonSetup').value='The program is loading ...';
     document.getElementById('buttonSetup').disabled = true;
