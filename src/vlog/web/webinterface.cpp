@@ -121,6 +121,40 @@ string WebInterface::lookup(string sId, DBLayer &db) {
 }
 
 
+void WebInterface::getResultsQueryLiteral(std::string predicate, long limit, JSON &out) {
+    long nresults = 0;
+    long nshownresults = 0;
+    JSON data;
+    if (program != NULL && sn != NULL) {
+        Predicate pred = program->getPredicate(predicate);
+        nresults = sn->getSizeTable(pred.getId());
+        auto itr = sn->getTable(pred.getId());
+        while (!itr.isEmpty() && (limit == -1 || nshownresults < limit)) {
+            auto table = itr.getCurrentTable();
+            auto tableItr = table->getIterator();
+            auto card = table->getRowSize();
+            while (tableItr->hasNext() && (limit == -1 || nshownresults < limit)) {
+                tableItr->next();
+                JSON row;
+                for(int j = 0; j < card; ++j) {
+                    auto termId = tableItr->getCurrentValue(j);
+                    auto txtTerm = edb->getDictText(termId);
+                    row.push_back(txtTerm);
+                }
+                data.push_back(row);
+                nshownresults++;
+            }
+            table->releaseIterator(tableItr);
+            itr.moveNextCount();
+        }
+    }
+    out.add_child("rows", data);
+    out.put("nresults", nresults);
+    out.put("nshownresults", nshownresults);
+}
+
+
+
 void WebInterface::processRequest(std::string req, std::string &resp) {
     setActive();
     //Get the page
@@ -185,7 +219,6 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
 
             std::ostringstream buf;
             JSON::write(buf, pt);
-            //write_json(buf, pt, false);
             page = buf.str();
             isjson = true;
         } else if (path == "/lookup") {
@@ -200,6 +233,22 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             //write_json(buf, pt, false);
             page = buf.str();
             isjson = true;
+        } else if (path == "/queryliteral") {
+            string form = req.substr(req.find("application/x-www-form-urlencoded"));
+            string predicate = _getValueParam(form, "predicate");
+            string slimit = _getValueParam(form, "limit");
+            JSON pt;
+            pt.put("predicate", predicate);
+            long limit = -1;
+            if (slimit != "") {
+                limit = stoi(slimit);
+            }
+            getResultsQueryLiteral(predicate, limit, pt);
+            std::ostringstream buf;
+            JSON::write(buf, pt);
+            page = buf.str();
+            isjson = true;
+
         } else if (path == "/setup") {
             string form = req.substr(req.find("application/x-www-form-urlencoded"));
             string srules = _getValueParam(form, "rules");

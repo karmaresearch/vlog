@@ -60,6 +60,8 @@ class WebInterface {
 
         void processRequest(std::string req, std::string &resp);
 
+        void getResultsQueryLiteral(std::string predicate, long limit, JSON &out);
+
     public:
         WebInterface(ProgramArgs &vm, std::shared_ptr<SemiNaiver> sn, string htmlfiles,
                 string cmdArgs, string edbfile);
