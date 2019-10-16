@@ -401,6 +401,7 @@ void startServer(int argc,
     std::unique_ptr<WebInterface> webint;
     int port = vm["port"].as<int>();
     std::string webinterface = vm["webpages"].as<string>();
+    std::string fullpath = "";
     if (Utils::isAbsolutePath(webinterface)) {
         //Absolute path
         fullpath = webinterface;
