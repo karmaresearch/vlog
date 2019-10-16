@@ -594,7 +594,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                             multithreaded ? vm["interRuleThreads"].as<int>() : 0,
                             !vm["shufflerules"].empty());
                     cvMatRunner.notify_one(); //start the computation
-                    page = getPage("/newmat.html");
+                    page = getPage("/mat/infobox.html");
                 } else {
                     error = 1;
                     page = "Materialization is already running!";
