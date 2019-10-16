@@ -74,6 +74,7 @@ function loadfile(el,dest) {
 }
 
 function launchMat() {
+    //Populate the framebox with the content of newmat.html
     clearTimeout(timeouts["messageBox"]);
     $('#buttonMat').prop("disabled", true);
     //Clean the graphs
@@ -97,26 +98,23 @@ function launchMat() {
     http_request.send(null);
 }
 
-function setupProgram(event) {
+function setupProgram() {
     var info;
-    event.preventDefault();
+
     //Create the data for the form
     var contentform = '';
     var srule = document.getElementById('rulebox').value;
     contentform += 'rules=' + encodeURIComponent(srule);
-
     if (document.getElementById('automat').checked == true) {
         contentform += "&automat=on";
+    } else {
+        var spremat = document.getElementById('premat').value;
+        contentform += '&queries=' + encodeURIComponent(spremat);
     }
-    //else {
-    //    var spremat = document.getElementById('premat').value;
-    //    contentform += '&queries=' + encodeURIComponent(spremat);
-    //}
     contentform = contentform.replace('/%20/g', '+');
 
     var http_request = new XMLHttpRequest();
     document.getElementById('buttonSetup').disabled = true;
-    //getProgramInfo();
     http_request.open("POST", "http://" + window.location.hostname + ":" + port + "/setup", true);
     http_request.onreadystatechange = function () {
         var done = 4, ok = 200;
@@ -128,11 +126,10 @@ function setupProgram(event) {
             }
             document.getElementById('buttonSetup').value='Load Rules';
             document.getElementById('buttonSetup').disabled = false;
-        } else {
-            msgbox('error', '#messageBox', 'http request failed', 2000);
         }
     };
     http_request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    http_request.setRequestHeader('Content-Length', contentform.length);
 
     document.getElementById('buttonSetup').value='The program is loading ...';
     document.getElementById('buttonSetup').disabled = true;
