@@ -291,7 +291,8 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                         accuracy,
                         timeout,
                         repeatQuery,
-                        logFileName);
+                        logFileName,
+                        5);
             }
             // 3. Set the output in json
             JSON node;

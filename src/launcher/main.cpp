@@ -286,8 +286,8 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "try to split up rules with multiple heads.", false);
     query_options.add<int64_t>("", "reasoningThreshold", 1000000,
             "This parameter sets a threshold to estimate the reasoning cost of a pattern. This cost can be broadly associated to the cardinality of the pattern. It is used to choose either TopDown or Magic evalution. Default is 1000000 (1M).", false);
-    query_options.add<string>("", "reasoningAlgo", "",
-            "Determines the reasoning algo (only for <queryLiteral>). Possible values are \"qsqr\", \"magic\", \"auto\".", false);
+    query_options.add<string>("", "reasoningAlgo", "", "Determines the reasoning algo (only for <queryLiteral>). Possible values are \"qsqr\", \"magic\", \"onlyMetrics\", \"auto\".", false);
+    query_options.add<int>("", "featureDepth", 5, "Recursion level of feature generation procedure", false);
     query_options.add<string>("", "trigger_algo", "",
             "Algorithm to use to create a trigger graph. For now only 'linear' or 'kbound'",
             false);
@@ -327,7 +327,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
 
     query_options.add<bool>("", "shufflerules", false,
             "shuffle rules randomly instead of using heuristics (only for <mat>, and only when running multithreaded).", false);
-    query_options.add<int>("r", "repeatQuery", 0,
+    query_options.add<int>("r", "repeatQuery", 1,
             "Repeat the query <arg> times. If the argument is not specified, then the query will not be repeated.", false);
     query_options.add<string>("","storemat_path", "",
             "Directory where to store all results of the materialization. Default is '' (disable).",false);
@@ -982,7 +982,8 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
     if (algo == "onlyMetrics") {
         Metrics m;
         std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
-        reasoner.getMetrics(literal, NULL, NULL, edb, p, m, 5);
+        int depth = vm["featureDepth"].as<int>();
+        reasoner.getMetrics(literal, NULL, NULL, edb, p, m, depth);
         std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
         LOG(INFOL) << "Query = " << literal.tostring(&p, &edb) << "Vector: " << \
             m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
@@ -1257,6 +1258,7 @@ int main(int argc, const char** argv) {
                 uint64_t timeout = vm["timeout"].as<unsigned int>();
                 uint8_t repeatQuery = vm["repeatQuery"].as<unsigned int>();
                 string algo = vm["reasoningAlgo"].as<string>();
+                int featureDepth = vm["featureDepth"].as<int>();
                 if (algo == "onlyMetrics") {
                     for (auto query : trainingQueriesVector) {
                         Dictionary dictVariables;
@@ -1264,7 +1266,7 @@ int main(int argc, const char** argv) {
                         Reasoner reasoner(vm["reasoningThreshold"].as<int64_t>());
                         Metrics m;
                         std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
-                        reasoner.getMetrics(literal, NULL, NULL, *layer, program, m, 5);
+                        reasoner.getMetrics(literal, NULL, NULL, *layer, program, m, featureDepth);
                         std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
                         LOG(INFOL) << "Query = " << query << "Vector: " << \
                             m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
@@ -1274,8 +1276,9 @@ int main(int argc, const char** argv) {
                 } else {
                     vector<Metrics> featuresVector;
                     vector<int> decisionVector;
+                    vector<double> featuresTimesVector;
                     int nMagicQueries = 0;
-                    Training::runQueries(trainingQueriesVector, *layer, program, timeout, repeatQuery, featuresVector, decisionVector,nMagicQueries, logFileName);
+                    Training::runQueries(trainingQueriesVector, *layer, program, timeout, repeatQuery, featuresVector, decisionVector, featuresTimesVector, nMagicQueries, logFileName, featureDepth);
                 }
             }
         }
@@ -1456,12 +1459,12 @@ int main(int argc, const char** argv) {
             return 1;
         }
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-        std::vector<std::pair<std::string,int>> trainingQueries = ML::generateTrainingQueries(*layer, program, vt, vm);
+        std::vector<std::pair<std::string,int>> trainingQueries = Training::generateTrainingQueriesAllPaths(conf, *layer, program, depth, maxTuples, vt);
         std::chrono::duration<double> sec = std::chrono::system_clock::now()- start;
         int nQueries = trainingQueries.size();
         LOG(INFOL) << nQueries << " queries generated in " << sec.count() << " seconds";
         std::string trainingFileName = extractFileName(rulesFile);
-        trainingFileName += "-training.log";
+        trainingFileName += "-training-queries.log";
         std::ofstream logFile(trainingFileName);
         for (auto it = trainingQueries.begin(); it != trainingQueries.end(); ++it) {
             logFile << it->first <<" "<<it->second << std::endl;
@@ -1497,12 +1500,12 @@ int main(int argc, const char** argv) {
                 testQueriesLog.push_back(logLine);
             }
             LOG(INFOL) << "test Queries in the file = " << testQueriesLog.size();
-            size_t dotIndex = rulesFile.find_last_of(".");
-            string logFileName = rulesFile.substr(0, dotIndex);
-            logFileName += "-training.log";
+            std::string logFileName = extractFileName(rulesFile);
+            logFileName += "-training-features.log";
             double accuracy = 0.0;
             uint64_t timeout = vm["timeout"].as<unsigned int>();
             uint8_t repeatQuery = vm["repeatQuery"].as<unsigned int>();
+            int featureDepth = vm["featureDepth"].as<int>();
             Training::trainAndTestModel(trainingQueriesVector,
                     testQueriesLog,
                     *layer,
@@ -1510,7 +1513,8 @@ int main(int argc, const char** argv) {
                     accuracy,
                     timeout,
                     repeatQuery,
-                    logFileName);
+                    logFileName,
+                    featureDepth);
         }
     } else if (cmd == "server") {
 #ifdef WEBINTERFACE
