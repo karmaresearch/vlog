@@ -287,8 +287,8 @@ void SemiNaiver::prepare(std::vector<RuleExecutionDetails> &allrules,
             }
             LOG(DEBUGL) << itr->rule.tostring(program, &layer);
 #endif
-            allRulesSize += allIDBRules[k].size();
         }
+        allRulesSize += allIDBRules[k].size();
     }
     for (std::vector<RuleExecutionDetails>::iterator itr = allEDBRules.begin();
             itr != allEDBRules.end();
@@ -471,14 +471,15 @@ bool SemiNaiver::executeUntilSaturation(
         }
         iteration++;
 
+		if (checkCyclicTerms) {
+			foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
+			if (foundCyclicTerms) {
+				LOG(DEBUGL) << "Found a cyclic term";
+				return newDer;
+			}
+		}
+
         if (response) {
-            if (checkCyclicTerms) {
-                foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
-                if (foundCyclicTerms) {
-                    LOG(DEBUGL) << "Found a cyclic term";
-                    return newDer;
-                }
-            }
 
             if ((typeChase == TypeChase::RESTRICTED_CHASE ||
                         typeChase == TypeChase::SUM_RESTRICTED_CHASE) &&
@@ -491,7 +492,7 @@ bool SemiNaiver::executeUntilSaturation(
                 //Is the rule recursive? Go until saturation...
                 int recursiveIterations = 0;
                 do {
-                    // LOG(INFOL) << "Iteration " << iteration;
+                    // LOG(DEBUGL) << "Iteration " << iteration;
                     start = std::chrono::system_clock::now();
                     recursiveIterations++;
                     response = executeRule(ruleset[currentRule],
@@ -543,7 +544,7 @@ bool SemiNaiver::executeUntilSaturation(
             LOG(INFOL) << "--Time round " << sec.count() * 1000 << " " << iteration;
             round_start = std::chrono::system_clock::now();
             //CODE FOR Statistics
-            LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". RulesWithDerivation=" <<
+            LOG(INFOL) << "Finish pass over the rules. Step=" << iteration << ". IDB RulesWithDerivation=" <<
                 nRulesOnePass << " out of " << ruleset.size() << " Derivations so far " << countAllIDBs();
             printCountAllIDBs("After step " + to_string(iteration) + ": ");
             nRulesOnePass = 0;
@@ -642,6 +643,24 @@ void SemiNaiver::storeOnFile(std::string path, const PredId_t pred, const bool d
     streamout.close();
 }
 
+static std::string generateFileName(std::string name) {
+    std::stringstream stream;
+
+    stream << std::oct << std::setfill('0');
+
+    for(char ch : name) {
+        int code = static_cast<unsigned char>(ch);
+
+        if (code != '\\' && code != '/') {
+            stream.put(ch);
+        } else {
+            stream << "\\" << std::setw(3) << code;
+        }
+    }
+
+    return stream.str();
+}
+
 void SemiNaiver::storeOnFiles(std::string path, const bool decompress,
         const int minLevel, const bool csv) {
     char buffer[MAX_TERM_SIZE];
@@ -652,7 +671,7 @@ void SemiNaiver::storeOnFiles(std::string path, const bool decompress,
     for (PredId_t i = 0; i < program->getNPredicates(); ++i) {
         FCTable *table = predicatesTables[i];
         if (table != NULL && !table->isEmpty()) {
-            storeOnFile(path + "/" + program->getPredicateName(i), i, decompress, minLevel, csv);
+            storeOnFile(path + "/" + generateFileName(program->getPredicateName(i)), i, decompress, minLevel, csv);
         }
     }
 }
@@ -1121,6 +1140,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
     if (! bodyChangedSince(rule, ruleDetails.lastExecution)) {
+        LOG(INFOL) << "Rule application: " << iteration << ", rule " << rule.tostring(program, &layer) << " skipped because dependencies did not change since the previous application of this rule";
         return false;
     }
 
@@ -1438,12 +1458,14 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     }
 
     if (prodDer) {
-        LOG(DEBUGL) << "Iteration " << iteration << ". Rule derived new tuples. Combinations " << orderExecution << ", Processed IDB Tables=" <<
+        LOG(INFOL) << "Rule application: " << iteration << ", derived " << getNLastDerivationsFromList() << " new tuple(s) using rule " << rule.tostring(program, &layer);
+        LOG(DEBUGL) << "Combinations " << orderExecution << ", Processed IDB Tables=" <<
             processedTables << ", Total runtime " << stream.str()
             << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
             durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";
     } else {
-        LOG(DEBUGL) << "Iteration " << iteration << ". Rule derived NO new tuples. Combinations " << orderExecution << ", Processed IDB Tables=" <<
+        LOG(INFOL) << "Rule application: " << iteration << ", derived no new tuples using rule " << rule.tostring(program, &layer);
+        LOG(DEBUGL) << "Combinations " << orderExecution << ", Processed IDB Tables=" <<
             processedTables << ", Total runtime " << stream.str()
             << ", join " << durationJoin.count() * 1000 << "ms, consolidation " <<
             durationConsolidation.count() * 1000 << "ms, retrieving first atom " << durationFirstAtom.count() * 1000 << "ms.";

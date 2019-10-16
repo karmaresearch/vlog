@@ -53,11 +53,11 @@ class EDBMemIterator : public EDBIterator {
                 const Term_t vc1, const bool c2, const Term_t vc2,
                 const bool equalFields);
 
-        void skipDuplicatedFirstColumn();
+        VLIBEXP void skipDuplicatedFirstColumn();
 
-        bool hasNext();
+        VLIBEXP bool hasNext();
 
-        void next();
+        VLIBEXP void next();
 
         PredId_t getPredicateID() {
             return predid;
@@ -65,7 +65,7 @@ class EDBMemIterator : public EDBIterator {
 
         void moveTo(const uint8_t fieldId, const Term_t t) {}
 
-        Term_t getElementAt(const uint8_t p);
+        VLIBEXP Term_t getElementAt(const uint8_t p);
 
         void clear() {}
 
