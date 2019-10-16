@@ -247,16 +247,19 @@ bool EGDRuleProcessor::consolidate(const bool isFinished) {
             }
         }
 
-        bool checkCycles = false;
-        for(auto pair : map) {
-            if (map.count(pair.second.first)) {
-                checkCycles = true;
+        while (true) {
+            bool replacedEntry = false;
+            for(auto &pair : map) {
+                if (map.count(pair.second.first)) {
+                    //Replace the value with the current one
+                    auto &v = map[pair.second.first];
+                    pair.second = v;
+                    replacedEntry = true;
+                }
+            }
+            if (!replacedEntry) {
                 break;
             }
-        }
-        if (checkCycles) {
-            LOG(ERRORL) << "Must implement EGD closure to reason on this ...";
-            throw 10; //For now, I don't implement it.
         }
 
         //Replace all the terms in the database
