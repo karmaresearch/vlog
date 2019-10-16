@@ -401,8 +401,15 @@ void startServer(int argc,
     std::unique_ptr<WebInterface> webint;
     int port = vm["port"].as<int>();
     std::string webinterface = vm["webpages"].as<string>();
+    if (Utils::isAbsolutePath(webinterface)) {
+        //Absolute path
+        fullpath = webinterface;
+    } else {
+        //Relative path
+        fullpath = pathExec + "/" + webinterface;
+    }
     webint = std::unique_ptr<WebInterface>(
-            new WebInterface(vm, NULL, pathExec + "/" + webinterface,
+            new WebInterface(vm, NULL, fullpath,
                 flattenAllArgs(argc, argv),
                 vm["edb"].as<string>()));
     webint->start(port);
@@ -443,9 +450,18 @@ void launchTriggeredMat(int argc,
 #ifdef WEBINTERFACE
     //Start the web interface if requested
     std::unique_ptr<WebInterface> webint;
+    std::string fullpath = "";
+    std::string webinterface = vm["webpages"].as<string>();
+    if (Utils::isAbsolutePath(webinterface)) {
+        //Absolute path
+        fullpath = webinterface;
+    } else {
+        //Relative path
+        fullpath = pathExec + "/" + webinterface;
+    }
     if (vm["webinterface"].as<bool>()) {
         webint = std::unique_ptr<WebInterface>(
-                new WebInterface(vm, sn, pathExec + "/webinterface",
+                new WebInterface(vm, sn, fullpath,
                     flattenAllArgs(argc, argv),
                     vm["edb"].as<string>()));
         int port = vm["port"].as<int>();
