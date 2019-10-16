@@ -1,0 +1,50 @@
+<h3>Non-empty IDB tables</h3>
+
+<div id="rightmiddle">
+<div id="finishedBox">
+    <h3><label id="finished"></label>
+    </h3>
+</div>
+
+<h3>Statistics</h3>
+
+
+<p><i>Runtime:</i> <label id="runtime"></label></p>
+
+
+<p><i>Current iteration:</i> <label id="iteration"></label></p>
+
+
+<p><i>Current rule:</i>
+</p>
+
+
+<p><label id="rule"></label>
+</p>
+<br>
+
+
+<h3>Outputs of Rule Executions:</h3>
+
+
+<p><small>Hide empty iterations<input id="hideempty" onchange="updateOutputGraph();" type="checkbox"><br>
+Show iterations from: <input size="3" id="startIt" text="0" value="0" onchange="updateOutputGraph();"> to <input id="stopIt" size="3" text="inf" value="inf" onchange="updateOutputGraph();"> ('0' and 'inf' for unrestricted bounds).<br>
+Filter iterations with output less than<input id="minDer" text="0" value="0" size="3" onchange="updateOutputGraph();"> or higher than <input id="maxDer" text="inf" value="inf" size="3" onchange="updateOutputGraph();"> ('0' and 'inf' for unrestricted bounds).</small>
+</p>
+
+
+<div id="ruleoutput">
+</div>
+<br>
+
+
+<h3>Runtimes of Rule Executions:</h3>
+
+
+<p><small>Show iterations from: <input size="3" id="startIt1" text="0" value="0" onchange="updateRuntimeGraph();"> to <input id="stopIt1" size="3" text="inf" value="inf" onchange="updateRuntimeGraph();"> ('0' and 'inf' for unrestricted bounds).<br>
+Filter iterations with time less than ms. <input id="minTime" text="1" value="1" size="3" onchange="updateRuntimeGraph();"> ('0' for unrestricted bounds).</small>
+</p>
+
+<div id="ruleruntime">
+</div>
+</div>
