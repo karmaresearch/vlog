@@ -463,8 +463,16 @@ void startServer(int argc,
     std::unique_ptr<WebInterface> webint;
     int port = vm["port"].as<int>();
     std::string webinterface = vm["webpages"].as<string>();
+    std::string fullpath = "";
+    if (Utils::isAbsolutePath(webinterface)) {
+        //Absolute path
+        fullpath = webinterface;
+    } else {
+        //Relative path
+        fullpath = pathExec + "/" + webinterface;
+    }
     webint = std::unique_ptr<WebInterface>(
-            new WebInterface(vm, NULL, pathExec + "/" + webinterface,
+            new WebInterface(vm, NULL, fullpath,
                 flattenAllArgs(argc, argv),
                 vm["edb"].as<string>()));
     webint->start(port);
@@ -1144,9 +1152,9 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
 }
 
 void checkAcyclicity(std::string ruleFile, std::string alg, EDBLayer &db, bool rewriteMultihead) {
-	std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     int response = Checker::checkFromFile(ruleFile, alg, db, rewriteMultihead);
-	std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     std::cout << "The response is: ";
     if (response == 0) {
         std::cout << "Unknown";
@@ -1156,8 +1164,8 @@ void checkAcyclicity(std::string ruleFile, std::string alg, EDBLayer &db, bool r
         std::cout << "Does not always terminate.";
     }
     std::cout << std::endl;
-	std::cout << "Runtime " << alg << " check = " <<
-                sec.count() * 1000 << " milliseconds" << std::endl;
+    std::cout << "Runtime " << alg << " check = " <<
+        sec.count() * 1000 << " milliseconds" << std::endl;
 }
 
 void detectDeps(std::string ruleFile, EDBLayer &db) {

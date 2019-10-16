@@ -74,7 +74,6 @@ function loadfile(el,dest) {
 }
 
 function launchMat() {
-    //Populate the framebox with the content of newmat.html
     clearTimeout(timeouts["messageBox"]);
     $('#buttonMat').prop("disabled", true);
     //Clean the graphs
@@ -96,100 +95,6 @@ function launchMat() {
         }
     };
     http_request.send(null);
-}
-
-function trainAndTest() {
-
-    var queries = document.getElementById('textTestQueries').value;
-    document.getElementById('buttonTrain').disabled = true;
-    var body = '';
-    body += 'query=' + encodeURIComponent(queries);
-
-    var timeout = document.getElementById('timeoutTraining').value;
-    body += "&timeout=" + timeout;
-    var repeatQuery = document.getElementById('repeatQueryTraining').value;
-    body += "&repeatQuery=" + repeatQuery;
-    var maxTrainingQueries = document.getElementById('maxTrainingQueries').value;
-    body += "&maxTraining=" + maxTrainingQueries;
-
-    body = body.replace('/%20/g','+');
-    var http_request = new XMLHttpRequest();
-    http_request.open("POST", "http://" + window.location.hostname + ":" + port + "/gentq", true);
-    //http_request.timeout = 2000;
-    http_request.onreadystatechange = function () {
-        var done = 4, ok = 200;
-        if (http_request.readyState === done) {
-            if (http_request.status === ok) {
-                msgbox('ok', '#messageBox','Query executed!!', 1500);
-                results = JSON.parse(http_request.responseText);
-                console.log(results.accuracy);
-                //console.log(results.features);
-                //console.log(results.qsqrtimes);
-                var strAccuracy = JSON.stringify(results.accuracy);
-                //var strFeatures = JSON.stringify(results.features);
-                //var strQsqrTimes = JSON.stringify(results.qsqrtimes);
-                //var strMagicTimes = JSON.stringify(results.magictimes);
-                document.getElementById('textAccuracy').innerHTML = strAccuracy;
-                //document.getElementById('textFeatures').innerHTML = strFeatures;
-                //document.getElementById('textQsqrTime').innerHTML = strQsqrTimes;
-                //document.getElementById('textMagicTime').innerHTML = strMagicTimes;
-            } else {
-                console.log(http_request.status);
-            }
-            document.getElementById('buttonTrain').disabled = false;
-        } else {
-            msgbox('error', '#messageBox', 'http request failed', 2000);
-        }
-    };
-    http_request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-
-    http_request.send(body);
-}
-
-function execQuery() {
-
-    var queries = document.getElementById('textQueries').value;
-    document.getElementById('buttonQuery').disabled = true;
-    var body = '';
-    body += 'query=' + encodeURIComponent(queries);
-
-    var timeout = document.getElementById('timeout').value;
-    body += "&timeout=" + timeout;
-    var repeatQuery = document.getElementById('repeatQuery').value;
-    body += "&repeatQuery=" + repeatQuery;
-
-    body = body.replace('/%20/g','+');
-    var http_request = new XMLHttpRequest();
-    http_request.open("POST", "http://" + window.location.hostname + ":" + port + "/query", true);
-    //http_request.timeout = 2000;
-    http_request.onreadystatechange = function () {
-        var done = 4, ok = 200;
-        if (http_request.readyState === done) {
-            if (http_request.status === ok) {
-                msgbox('ok', '#messageBox','Query executed!!', 1500);
-                results = JSON.parse(http_request.responseText);
-                console.log(results.results);
-                console.log(results.features);
-                console.log(results.qsqrtimes);
-                var strResults = JSON.stringify(results.results);
-                var strFeatures = JSON.stringify(results.features);
-                var strQsqrTimes = JSON.stringify(results.qsqrtimes);
-                var strMagicTimes = JSON.stringify(results.magictimes);
-                document.getElementById('textResults').innerHTML = strResults;
-                document.getElementById('textFeatures').innerHTML = strFeatures;
-                document.getElementById('textQsqrTime').innerHTML = strQsqrTimes;
-                document.getElementById('textMagicTime').innerHTML = strMagicTimes;
-            } else {
-                console.log(http_request.status);
-            }
-            document.getElementById('buttonQuery').disabled = false;
-        } else {
-            msgbox('error', '#messageBox', 'http request failed', 2000);
-        }
-    };
-    http_request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-
-    http_request.send(body);
 }
 
 function setupProgram(event) {
@@ -240,75 +145,6 @@ function disablepremat() {
     document.getElementById('premat').disabled = !val;
     document.getElementById('queryrule').disabled = !val;
 }
-
-var timestartquery;
-function launchquery(button) {
-    timestartquery = new Date().getTime();
-    button.value = 'Executing query ...';
-    button.disabled = true;
-    var results;
-    var http_request = new XMLHttpRequest();
-    var uri = "http://" + window.location.hostname + ":" + port + "/sparql";
-    http_request.open("POST", uri, true);
-    http_request.onreadystatechange = function () {
-        var done = 4, ok = 200;
-        if (http_request.readyState === done && http_request.status === ok) {
-            var timestopquery = new Date().getTime();
-            results = JSON.parse(http_request.responseText);
-
-            var printresults = document.getElementById("printresults").checked;
-            var rb = document.getElementById('sparqlresults');
-            var con = '';
-            var stats = results.stats;
-
-            if (printresults == true) {
-                var headvars = results.head.vars;
-                for(var i = 0; i < headvars.length; ++i) {
-                    con += '<td><strong><center>' + headvars[i] + '</center></strong></td>';
-                }
-                con += '</tr>';
-
-                var bindings = results.results.bindings;
-                for(var i = 0; i < bindings.length; ++i) {
-                    var bin = bindings[i];
-                    con += '<tr>';
-                    for(var j = 0; j < bin.length; ++j) {
-                        //sanitize the string
-                        var stringtoprint = bin[j].value;
-                        stringtoprint = stringtoprint.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-                        con += '<td>' + stringtoprint + '</td>';
-                    }
-                    con += '</tr>';
-                }
-                con += '</table>';
-            }
-
-            //Add headers
-            var timequery = (timestopquery - timestartquery)/1000;
-
-            var nresults = '';
-            if (printresults == true)
-                nresults = bindings.length;
-            else
-                nresults = stats.nresults;
-
-            con = '<h3>N. results: ' + nresults + ', Runtime (clientside): ' + timequery + 'sec. Runtime (serverside): ' + stats.runtime + 'sec.<br/><table class="tsparql"><tr>' + con;
-            rb.innerHTML = con;
-            button.value = 'Execute SPARQL query';
-            button.disabled = false;
-        }
-    };
-    var sparqlquery = document.getElementById("querybox").value;
-    var print = document.getElementById("printresults").checked;
-    sparqlquery = 'print=' + print + '&query=' + encodeURIComponent(sparqlquery);
-    sparqlquery = sparqlquery.replace('/%20/g', '+');
-    http_request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-    http_request.setRequestHeader('Content-Length', sparqlquery.length);
-    http_request.send(sparqlquery);
-
-
-}
-
 
 function draw(ramperc) {
     var rp1 = radialProgress(document.getElementById('divRAM'))
