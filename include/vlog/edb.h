@@ -53,11 +53,11 @@ class EDBMemIterator : public EDBIterator {
                 const Term_t vc1, const bool c2, const Term_t vc2,
                 const bool equalFields);
 
-        void skipDuplicatedFirstColumn();
+        VLIBEXP void skipDuplicatedFirstColumn();
 
-        bool hasNext();
+        VLIBEXP bool hasNext();
 
-        void next();
+        VLIBEXP void next();
 
         PredId_t getPredicateID() {
             return predid;
@@ -65,7 +65,7 @@ class EDBMemIterator : public EDBIterator {
 
         void moveTo(const uint8_t fieldId, const Term_t t) {}
 
-        Term_t getElementAt(const uint8_t p);
+        VLIBEXP Term_t getElementAt(const uint8_t p);
 
         void clear() {}
 
@@ -79,20 +79,20 @@ class EDBLayer {
         struct EDBInfoTable {
             PredId_t id;
             uint8_t arity;
-            string type;
+            std::string type;
             std::shared_ptr<EDBTable> manager;
         };
 
         const EDBConf &conf;
         bool loadAllData;
 
-        std::shared_ptr<Dictionary> predDictionary;
+        std::shared_ptr<Dictionary> predDictionary; //std::string, Term_t
         std::map<PredId_t, EDBInfoTable> dbPredicates;
 
         Factory<EDBMemIterator> memItrFactory;
         std::vector<IndexedTupleTable *>tmpRelations;
 
-        std::shared_ptr<Dictionary> termsDictionary;
+        std::shared_ptr<Dictionary> termsDictionary;//std::string, Term_t
         std::string rootPath;
 
         VLIBEXP void addTridentTable(const EDBConf::Table &tableConf, bool multithreaded);
@@ -189,9 +189,9 @@ class EDBLayer {
 
         uint64_t getPredSize(PredId_t id) const;
 
-        string getPredType(PredId_t id) const;
+        std::string getPredType(PredId_t id) const;
 
-        string getPredName(PredId_t id) const;
+        std::string getPredName(PredId_t id) const;
 
         uint8_t getPredArity(PredId_t id) const;
 
@@ -214,10 +214,10 @@ class EDBLayer {
             return *(predDictionary.get());
         }
 
-        std::unordered_map< PredId_t, uint8_t> getPredicateCardUnorderedMap () {
+        std::unordered_map<PredId_t, uint8_t> getPredicateCardUnorderedMap () {
             std::unordered_map< PredId_t, uint8_t> ret;
             for (auto item : dbPredicates)
-                ret.insert(make_pair(item.first, item.second.arity));
+                ret.insert(std::make_pair(item.first, item.second.arity));
             return ret;
         }
 
@@ -302,7 +302,7 @@ class EDBLayer {
             }
         }
 
-        string getTypeEDBPredicate(PredId_t id) const {
+        std::string getTypeEDBPredicate(PredId_t id) const {
             if (dbPredicates.count(id)) {
                 return dbPredicates.find(id)->second.type;
             } else {

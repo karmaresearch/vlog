@@ -15,8 +15,7 @@ class EDBTable {
                 std::vector<uint8_t> &posInL2);
 
         virtual std::vector<std::shared_ptr<Column>> checkNewIn(
-                std::vector <
-                std::shared_ptr<Column >> &checkValues,
+                std::vector<std::shared_ptr<Column>> &checkValues,
                 const Literal &l2,
                 std::vector<uint8_t> &posInL2);
 

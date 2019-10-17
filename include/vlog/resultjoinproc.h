@@ -211,7 +211,7 @@ class InterTableJoinProcessor: public ResultJoinProcessor {
                     newsegments[i] = segments[i];
                 }
                 for (int i = currentSegmentSize; i < blockid + 1; ++i)
-                    newsegments[i] = shared_ptr<SegmentInserter>
+                    newsegments[i] = std::shared_ptr<SegmentInserter>
                         (new SegmentInserter(rowsize));
                 currentSegmentSize = blockid + 1;
                 delete[] segments;

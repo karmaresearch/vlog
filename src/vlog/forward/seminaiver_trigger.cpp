@@ -6,13 +6,11 @@
 
 void TriggerSemiNaiver::run(std::string trigger_paths) {
     //Create all the execution plans, etc.
-    std::vector<Rule> ruleset = program->getAllRules();
     std::vector<RuleExecutionDetails> allrules;
     int ruleid = 0;
-    for (std::vector<Rule>::iterator itr = ruleset.begin(); itr != ruleset.end();
-            ++itr) {
-        auto a = RuleExecutionDetails(*itr, ruleid++);
-        allrules.push_back(a);
+
+    for (auto& rule : program->getAllRules()) {
+        allrules.push_back(RuleExecutionDetails(rule, ruleid++));
     }
 
     for(auto &r : allrules) {
@@ -285,7 +283,7 @@ size_t TriggerSemiNaiver::unique_binary(std::vector<std::pair<Term_t, Term_t>>  
             for(size_t j = 0; j < size; ++j) {
                 Term_t cur1 = *(v.first.first + j);
                 Term_t cur2 = *(v.second.first + j);
-                tmpBuffer.push_back(make_pair(cur1, cur2));
+                tmpBuffer.push_back(std::make_pair(cur1, cur2));
             }
             std::sort(tmpBuffer.begin(), tmpBuffer.end());
             sortedBuffers.emplace_back();

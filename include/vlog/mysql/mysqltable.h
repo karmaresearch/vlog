@@ -29,8 +29,8 @@ class MySQLTable : public SQLTable {
         sql::Connection *con;
 
     public:
-        MySQLTable(PredId_t predid, string host, string user, string pwd, string dbname,
-                string tablename, string tablefields, EDBLayer *layer);
+        MySQLTable(PredId_t predid, std::string host, std::string user, std::string pwd, std::string dbname,
+                std::string tablename, std::string tablefields, EDBLayer *layer);
 
 	void executeQuery(const std::string &query, SegmentInserter *inserter);
 

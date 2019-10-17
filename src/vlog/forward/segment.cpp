@@ -309,7 +309,7 @@ std::shared_ptr<Segment> Segment::intsort(
                 for (size_t i = 0; i < allRows; ++i) {
                     const Term_t v1 = (*vectors[0])[i];
                     const Term_t v2 = (*vectors[1])[i];
-                    values.push_back(make_pair(v1, v2));
+                    values.push_back(std::make_pair(v1, v2));
                 }
                 deleteAllVectors(varColumns, vectors);
                 HiResTimer t_colsort("Segment column sort rows " + std::to_string(allRows));
@@ -1026,8 +1026,8 @@ std::shared_ptr<const Segment> SegmentInserter::retainMemMem(Column *c1,
     Term_t v2 = (Term_t) - 1;
 
     if (c1->isBackedByVector() && c2->isBackedByVector()) {
-        const vector<Term_t> &vc1 = c1->getVectorRef();
-        const vector<Term_t> &vc2 = c2->getVectorRef();
+        const std::vector<Term_t> &vc1 = c1->getVectorRef();
+        const std::vector<Term_t> &vc2 = c2->getVectorRef();
         int v1Index = 0;
         int v2Index = 0;
 

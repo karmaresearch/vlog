@@ -8,7 +8,8 @@ using json = nlohmann::json;
 static bool curl_initialized = false;
 static int  numTables = 0;
 
-SparqlTable::SparqlTable(PredId_t predid, string repository, EDBLayer *layer, string f, string whereBody) :
+SparqlTable::SparqlTable(PredId_t predid, std::string repository,
+        EDBLayer *layer, std::string f, std::string whereBody) :
     predid(predid), repository(repository), layer(layer), whereBody(whereBody) {
         if (! curl_initialized) {
             curl_global_init(CURL_GLOBAL_ALL);
@@ -187,6 +188,7 @@ json SparqlTable::launchQuery(std::string sparqlQuery) {
     curl_easy_setopt(curl, CURLOPT_HEADERDATA, &rheaders);
     struct curl_slist *headers = NULL;
     headers = curl_slist_append(headers, "Accept: application/sparql-results+json");
+    headers = curl_slist_append(headers, "User-Agent: VLog-v1.2.1");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
     CURLcode resp = curl_easy_perform(curl);

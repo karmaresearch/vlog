@@ -169,7 +169,7 @@ bool TableFilterer::isEligibleForPartialSubs(
             }
 
             if (childBlocks.empty()) {
-                LOG(INFOL) << "The child predicate is empty. Let it go";
+                // LOG(INFO) << "The child predicate is empty. Let it go";
                 return false;
             }
 
@@ -248,7 +248,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs(
         throw 10;
     }
 
-    map<Term_t, std::vector<Term_t>> mapSubstitutions;
+    std::map<Term_t, std::vector<Term_t>> mapSubstitutions;
     std::shared_ptr<Column> vLitCol = currentResults->getColumn(posLiteral[0].first);
     std::shared_ptr<Column> vHeadCol = currentResults->getColumn(posHead[0].second);
     if (vLitCol->isBackedByVector() && vHeadCol->isBackedByVector()) {
@@ -298,7 +298,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs(
 
 bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
         const FCBlock *block,
-        const map<Term_t, std::vector<Term_t>> &mapSubstitutions,
+        const std::map<Term_t, std::vector<Term_t>> &mapSubstitutions,
         const Literal &outputQuery,
         const Literal &currentQuery,
         const size_t posHead_first,
@@ -466,7 +466,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
         }
 
         // Calculate the set of all possible heads that we should match
-        set<Term_t> possibleHeads;
+        std::set<Term_t> possibleHeads;
         for (const auto &el2 : el.second)
             possibleHeads.insert(el2);
 
@@ -500,7 +500,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
             //of this query and now to the body literal.
             const Term_t k = el.first;
             if (mapSubstitutionsInBlockQuery.count(k)) {
-                set<Term_t> &localBindings = mapSubstitutionsInBlockQuery[k];
+                std::set<Term_t> &localBindings = mapSubstitutionsInBlockQuery[k];
 
                 //For each binding in the head, test if there it exists a
                 //corresponding query in the localbindings

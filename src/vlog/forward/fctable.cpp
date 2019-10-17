@@ -17,16 +17,21 @@ std::string FCTable::getSignature(const Literal &literal) {
     for (uint8_t i = 0; i < literal.getTupleSize(); ++i) {
         VTerm t = literal.getTermAtPos(i);
         if (t.isVariable()) {
-            int8_t idx = (int8_t) (-1 * existingVars.size() - 1);
+            int idx = (int) (-1 * existingVars.size() - 1);
+            bool found = false;
             for (uint8_t j = 0; j < existingVars.size(); ++j) {
                 if (existingVars[j] == t.getId()) {
                     idx = -1 * j - 1;
+                    found = true;
                     break;
                 }
             }
-            out += " " + to_string(idx) + " ";
+            if (! found) {
+                existingVars.push_back(t.getId());
+            }
+            out += " " + std::to_string(idx) + " ";
         } else {
-            out += " " + to_string(t.getValue()) + " ";
+            out += " " + std::to_string(t.getValue()) + " ";
         }
     }
     return out;
@@ -132,6 +137,7 @@ size_t FCTable::estimateCardinality(const Literal &literal, const size_t min, co
 
 std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal,
         const size_t minIteration, TableFilterer *filterer, int nthreads) {
+
     bool shouldFilter = literal.getNUniqueVars() < literal.getTupleSize();
 
     if (shouldFilter) {

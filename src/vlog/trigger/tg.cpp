@@ -212,7 +212,7 @@ void TriggerGraph::linearBuild_process(Program &program,
         groundHead = std::unique_ptr<Literal>(new Literal(head.substitutes(subs)));
         //Add existentially quantified IDs if necessary
         if (rule.isExistential()) {
-            const auto &varsNotInBody = rule.getVarsNotInBody();
+            const auto &varsNotInBody = rule.getExistentialVariables();
             VTuple tuple = groundHead->getTuple();
             for(int i = 0; i < head.getTupleSize(); ++i) {
                 const auto &t = head.getTermAtPos(i);
@@ -367,11 +367,11 @@ void TriggerGraph::dumpGraphToFile(std::ofstream &fedges, std::ofstream &fnodes,
     }
 }
 
-uint64_t TriggerGraph::getNNodes(Node *n, std::set<string> *cache) {
+uint64_t TriggerGraph::getNNodes(Node *n, std::set<std::string> *cache) {
     uint64_t out = 0;
     if (n == NULL) {
         out = nodes.size();
-        std::set<string> cache;
+        std::set<std::string> cache;
         for (const auto &child : nodes) {
             out += getNNodes(child.get(), &cache);
         }
@@ -593,7 +593,7 @@ void TriggerGraph::applyRule(const Rule &rule,
             for(int j = 0; j < head.getTupleSize(); ++j) {
                 VTerm headTerm = head.getTermAtPos(j);
                 if (headTerm.getId() == term.getId()) {
-                    subs.push_back(make_pair(i, j));
+                    subs.push_back(std::make_pair(i, j));
                 }
             }
             processedVars.push_back(term.getId());
@@ -602,7 +602,7 @@ void TriggerGraph::applyRule(const Rule &rule,
     bool isExistential = rule.isExistential();
     std::vector<std::vector<uint8_t>> extpos;
     if (isExistential) {
-        auto vars = rule.getVarsNotInBody();
+        auto vars = rule.getExistentialVariables();
     }
 
     VTuple headTuple(head.getTupleSize());
