@@ -62,6 +62,10 @@ class SparqlTable : public EDBTable {
 
         bool getDictText(const uint64_t id, std::string &text);
 
+        bool expensiveLayer() {
+            return true;
+        }
+
         uint64_t getNTerms();
 
         void releaseIterator(EDBIterator *itr);

@@ -3,6 +3,7 @@
 
 #include <vlog/support.h>
 #include <vlog/consts.h>
+#include <vlog/graph.h>
 
 #include <kognac/logs.h>
 
@@ -10,15 +11,15 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <vector>
+#include <set>
 #include <unordered_map>
 
 /*** PREDICATES ***/
 #define EDB 0
 #define IDB 1
-#define MAX_NPREDS 32768
-#define OUT_OF_PREDICATES   32768
+#define MAX_NPREDS (2048*1024)
 
-typedef uint16_t PredId_t;
+typedef uint32_t PredId_t;
 
 class EDBLayer;
 
@@ -34,6 +35,7 @@ inline std::string fields2str(const std::vector<uint8_t> &fields) {
 
     return os.str();
 }
+
 
 /*** TERMS ***/
 class VTerm {
@@ -73,15 +75,15 @@ class VTuple {
         VTerm *terms;
     public:
         VTuple(const uint8_t sizetuple) : sizetuple(sizetuple) {
-	    terms = new VTerm[sizetuple];
+            terms = new VTerm[sizetuple];
         }
 
-	VTuple(const VTuple &v) : sizetuple(v.sizetuple) {
-	    terms = new VTerm[sizetuple];
-	    for (int i = 0; i < sizetuple; i++) {
-		terms[i] = v.terms[i];
-	    }
-	}
+        VTuple(const VTuple &v) : sizetuple(v.sizetuple) {
+            terms = new VTerm[sizetuple];
+            for (int i = 0; i < sizetuple; i++) {
+                terms[i] = v.terms[i];
+            }
+        }
 
         size_t getSize() const {
             return sizetuple;
@@ -93,6 +95,14 @@ class VTuple {
 
         void set(const VTerm term, const int pos) {
             terms[pos] = term;
+        }
+
+        void replaceAll(const VTerm termA, const VTerm termB) {
+            for (int i = 0; i < sizetuple; i++) {
+                if (terms[i] == termA) {
+                    terms[i] = termB;
+                }
+            }
         }
 
         std::vector<std::pair<uint8_t, uint8_t>> getRepeatedVars() const {
@@ -131,26 +141,26 @@ class VTuple {
             return false;
         }
 
-	/*
-	VTuple & operator=(const VTuple &v) {
-	    if (this == &v) {
-		return *this;
-	    }
-	    if (terms != NULL) {
-		delete[] terms;
-	    }
-	    sizetuple = v.sizetuple;
-	    terms = new VTerm[sizetuple];
-	    for (int i = 0; i < sizetuple; i++) {
-		terms[i] = v.terms[i];
-	    }
-	    return *this;
-	}
-	*/
+        /*
+           VTuple & operator=(const VTuple &v) {
+           if (this == &v) {
+           return *this;
+           }
+           if (terms != NULL) {
+           delete[] terms;
+           }
+           sizetuple = v.sizetuple;
+           terms = new VTerm[sizetuple];
+           for (int i = 0; i < sizetuple; i++) {
+           terms[i] = v.terms[i];
+           }
+           return *this;
+           }
+           */
 
-	~VTuple() {
-	    delete[] terms;
-	}
+        ~VTuple() {
+            delete[] terms;
+        }
 };
 
 struct hash_VTuple {
@@ -257,8 +267,11 @@ class Literal {
     private:
         const Predicate pred;
         const VTuple tuple;
+        const bool negated;
     public:
-        Literal(const Predicate pred, const VTuple tuple) : pred(pred), tuple(tuple) {}
+        Literal(const Predicate pred, const VTuple tuple) : pred(pred), tuple(tuple), negated(false) {}
+
+        Literal(const Predicate pred, const VTuple tuple, bool negated) : pred(pred), tuple(tuple), negated(negated) {}
 
         Predicate getPredicate() const {
             return pred;
@@ -284,6 +297,10 @@ class Literal {
             return pred.getNFields(pred.getAdorment());
         }
 
+        bool isNegated() const {
+            return negated;
+        }
+
         static int mgu(Substitution *substitutions, const Literal &l, const Literal &m);
 
         static int subsumes(std::vector<Substitution> &substitutions, const Literal &from, const Literal &to);
@@ -291,7 +308,7 @@ class Literal {
         static int getSubstitutionsA2B(
                 std::vector<Substitution> &substitutions, const Literal &a, const Literal &b);
 
-        Literal substitutes(std::vector<Substitution> &substitions) const;
+        Literal substitutes(std::vector<Substitution> &substitions, int *nsubs = NULL) const;
 
         bool sameVarSequenceAs(const Literal &l) const;
 
@@ -315,7 +332,8 @@ class Literal {
 
         std::string tostring(const Program *program, const EDBLayer *db) const;
 
-        std::string toprettystring(const Program *program, const EDBLayer *db) const;
+        std::string toprettystring(const Program *program, const EDBLayer *db,
+                                   bool replaceConstants = false) const;
 
         std::string tostring() const;
 
@@ -350,6 +368,11 @@ class Rule {
                 checkRule();
             }
 
+        Rule(uint32_t ruleId, Rule &r) : ruleId(ruleId),
+        heads(r.heads), body(r.body), _isRecursive(r._isRecursive),
+        existential(r.existential) {
+        }
+
         Rule createAdornment(uint8_t headAdornment) const;
 
         bool isRecursive() const {
@@ -365,8 +388,8 @@ class Rule {
         }
 
         Literal getFirstHead() const {
-            if (heads.size() > 1)
-                LOG(WARNL) << "This method should be called only if we handle multiple heads properly...";
+            // if (heads.size() > 1)
+            //     LOG(WARNL) << "This method should be called only if we handle multiple heads properly...";
             return heads[0];
         }
 
@@ -376,9 +399,9 @@ class Rule {
 
         bool isExistential() const;
 
-        std::vector<uint8_t> getVarsNotInBody() const;
+        std::vector<uint8_t> getVarsNotInBody() const;  // Existential variables.
 
-        std::vector<uint8_t> getVarsInBody() const;
+        std::vector<uint8_t> getVarsInHeadAndBody(PredId_t predToIgnore = -1) const; // Variables in the head that also occur in the body.
 
         const std::vector<Literal> &getBody() const {
             return body;
@@ -417,11 +440,22 @@ class Rule {
             return i;
         }
 
+        uint8_t numberOfNegatedLiteralsInBody() {
+            uint8_t result = 0;
+            for (std::vector<Literal>::const_iterator itr = getBody().begin();
+                    itr != getBody().end(); ++itr) {
+                if (itr->isNegated()){
+                    ++result;
+                }
+            }
+            return result;
+        }
+
         void checkRule() const;
 
         std::string tostring(Program *program, EDBLayer *db) const;
 
-        std::string toprettystring(Program * program, EDBLayer *db) const;
+        std::string toprettystring(Program * program, EDBLayer *db, bool replaceConstants = false) const;
 
         std::string tostring() const;
 
@@ -435,8 +469,9 @@ class Program {
     private:
         //const uint64_t assignedIds;
         EDBLayer *kb;
-        std::vector<uint32_t> rules[MAX_NPREDS];
+        std::vector<std::vector<uint32_t>> rules;
         std::vector<Rule> allrules;
+        int rewriteCounter;
 
         Dictionary dictPredicates;
         std::unordered_map<PredId_t, uint8_t> cardPredicates;
@@ -444,16 +479,30 @@ class Program {
         //Move them to the EDB layer ...
         //Dictionary additionalConstants;
 
-	std::string parseRule(std::string rule, bool rewriteMultihead);
+        void rewriteRule(std::vector<Literal> &heads, std::vector<Literal> &body);
 
-        void rewriteRule(Rule &r);
+        void addRule(Rule &rule);
 
     public:
         VLIBEXP Program(EDBLayer *kb);
 
+        VLIBEXP Program(Program *p, EDBLayer *kb);
+
         EDBLayer *getKB() const {
             return kb;
         }
+
+        VLIBEXP void setKB(EDBLayer *e) {
+            kb = e;
+        }
+
+        uint64_t getMaxPredicateId() {
+            return dictPredicates.getCounter();
+        }
+
+        std::string parseRule(std::string rule, bool rewriteMultihead);
+
+        VLIBEXP std::vector<PredId_t> getAllPredicateIDs() const;
 
         VLIBEXP Literal parseLiteral(std::string literal, Dictionary &dictVariables);
 
@@ -475,6 +524,8 @@ class Program {
         VLIBEXP Predicate getPredicate(const PredId_t id) const;
 
         VLIBEXP int64_t getOrAddPredicate(const std::string &p, uint8_t cardinality);
+
+        VLIBEXP bool doesPredicateExist(const PredId_t id) const;
 
         std::vector<Rule> getAllRulesByPredicate(PredId_t predid) const;
 
@@ -504,8 +555,6 @@ class Program {
 
         void cleanAllRules();
 
-        VLIBEXP void addRule(Rule &rule, bool rewriteMultihead = false);
-
         VLIBEXP void addRule(std::vector<Literal> heads,
                 std::vector<Literal> body, bool rewriteMultihead = false);
 
@@ -525,6 +574,10 @@ class Program {
 
         VLIBEXP bool areExistentialRules() const;
 
+        int getNPredicates() {
+            return rules.size();
+        }
+
         static std::string rewriteRDFOWLConstants(std::string input);
 
         static std::string compressRDFOWLConstants(std::string input);
@@ -535,6 +588,11 @@ class Program {
         uint8_t getPredicateCard(PredId_t pred) {
             return cardPredicates[pred];
         }
+
+        // Returns true if stratification succeeded, and then stores the stratification in the parameter.
+        // The result vector is indexed by predicate id, and then gives the stratification class.
+        // The number of stratification classes is also returned.
+        bool stratify(std::vector<int> &stratification, int &nStatificationClasses);
 
         ~Program() {
         }

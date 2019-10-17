@@ -37,16 +37,26 @@ bool TableFilterer::producedDerivationInPreviousSteps(
     std::vector<Substitution> subs;
     int nsubs = Literal::getSubstitutionsA2B(subs,
             rule->rule.getHead(block->posQueryInRule), currentQuery);
+#if DEBUG
     assert(nsubs != -1);
+    LOG(DEBUGL) << "head = " << rule->rule.getHead(block->posQueryInRule).tostring(NULL, NULL)
+        << ", current = " << currentQuery.tostring(NULL, NULL) << ", output = " << outputQuery.tostring(NULL, NULL);
+#endif
 
     for (const auto &lit : rule->rule.getBody()) {
-        if (lit.getPredicate().getType() == IDB) {
-            const Literal subsChild = lit.substitutes(subs);
-            if (subsChild == outputQuery) {
+        if (lit.getPredicate().getId() == outputQuery.getPredicate().getId()) {
+            int ns;
+            int nv = lit.getNVars();
+            const Literal subsChild = lit.substitutes(subs, &ns);
+#if DEBUG
+            LOG(DEBUGL) << "subs = " << subsChild.tostring(NULL, NULL);
+#endif
+            if (ns == nv && subsChild == outputQuery) {
+                // Note: this is only correct if all variables in the literal have been substituted.
+                // Otherwise, this could be a coincidental match.
                 //LOG(INFOL) << "SIMPLEPRUNING ok";
                 return true;
             }
-
         }
     }
     return false;
@@ -159,12 +169,13 @@ bool TableFilterer::isEligibleForPartialSubs(
             }
 
             if (childBlocks.empty()) {
-                LOG(INFOL) << "The child predicate is empty. Let it go";
+                // LOG(INFO) << "The child predicate is empty. Let it go";
                 return false;
             }
 
             //Is the rule in that block recursive?
-            if (childBlocks.back()->rule->rule.isRecursive()) {
+            //Note that some cyclicity checks have blocks with no rule.
+            if (childBlocks.back()->rule != NULL && childBlocks.back()->rule->rule.isRecursive()) {
                 //LOG(INFOL) << "THE LAST BLOCK in the prev predicate is recursive!";
                 //Ok now check the previous block (if any). I must be sure
                 //that the block occurred before the previous execution of this

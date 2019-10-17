@@ -43,7 +43,7 @@ bool SemiNaiverThreaded::executeUntilSaturation(
         //Copy all the derivations produced by the rules in the KB
         anotherRound = false;
         // anotherRound = doGlobalConsolidation(status);
-        for (int i = 0; i < MAX_NPREDS; i++) {
+        for (int i = 0; i < marked.size(); i++) {
             marked[i] = newMarked[i];
             if (marked[i]) {
                 anotherRound = true;

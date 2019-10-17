@@ -146,19 +146,15 @@ Term_t CompressedColumn::getValue(const size_t pos) const {
     throw 10;
 }
 
-bool ColumnReaderImpl::hasNext() {
-    return currentBlock < blocks.size() - 1 ||
-        posInBlock < blocks.back().size + 1;
-}
-
 Term_t ColumnReaderImpl::next() {
+    position++;
     if (posInBlock == 0) {
         posInBlock++;
         return blocks[currentBlock].value;
     } else {
-        if (posInBlock == blocks[currentBlock].size + 1) {
+        if (posInBlock > blocks[currentBlock].size) {
             //Move to the next block
-            assert(currentBlock < blocks.size() - 1);
+            assert(currentBlock < numBlocks - 1);
             currentBlock++;
             posInBlock = 1;
             return blocks[currentBlock].value;
@@ -203,19 +199,19 @@ return returnedValue;
 }*/
 
 std::vector<Term_t> ColumnReaderImpl::asVector() {
-    std::vector<Term_t> output;
-    output.reserve(_size);
+    std::vector<Term_t> output(_size);
+    if (_size > 0) {
+        Term_t *p = &output[0];
 
-    for (std::vector<CompressedColumnBlock>::const_iterator itr = blocks.begin();
-            itr != blocks.end(); ++itr) {
-        output.push_back(itr->value);
-        if (itr->delta == 0) {
-            for (int32_t i = 1; i <= itr->size; ++i) {
-                output.push_back(itr->value);
-            }
-        } else {
-            for (int32_t i = 1; i <= itr->size; ++i) {
-                output.push_back(itr->value + itr->delta * i);
+        for (size_t j = 0; j < numBlocks; j++) {
+            if (blocks[j].delta == 0) {
+                for (int32_t i = 0; i <= blocks[j].size; ++i) {
+                    *p++ = blocks[j].value;
+                }
+            } else {
+                for (int32_t i = 0; i <= blocks[j].size; ++i) {
+                    *p++ = blocks[j].value + blocks[j].delta * i;
+                }
             }
         }
     }
@@ -223,11 +219,11 @@ std::vector<Term_t> ColumnReaderImpl::asVector() {
 }
 
 Term_t ColumnReaderImpl::last() {
-    return blocks.back().value + blocks.back().delta * blocks.back().size;
+    return blocks[numBlocks-1].value + blocks[numBlocks-1].delta * blocks[numBlocks-1].size;
 }
 
 Term_t ColumnReaderImpl::first() {
-    return blocks.front().value;
+    return blocks->value;
 }
 
 EDBColumn::EDBColumn(EDBLayer &edb, const Literal &lit, uint8_t posColumn,
@@ -238,7 +234,13 @@ EDBColumn::EDBColumn(EDBLayer &edb, const Literal &lit, uint8_t posColumn,
     posColumn(posColumn),
     presortPos(presortPos),
     unq(unq) {
+        LOG(DEBUGL) << "EDBColumn: posColumn = " << (int) posColumn
+            << ", literal = " << lit.tostring() << ", presortPos = " << fields2str(presortPos);
         assert(!unq || presortPos.empty());
+        for (int i = 0; i < presortPos.size(); ++i) {
+            assert(presortPos[i] < lit.getTupleSize());
+        }
+        assert(posColumn < lit.getTupleSize());
     }
 
 bool EDBColumn::isEmptyRemovals() const {
@@ -258,6 +260,7 @@ size_t EDBColumn::estimateSize() const {
 }
 
 size_t EDBColumn::size() const {
+    // TODO: check this! It seems to assume that arity == 3? --Ceriel
     QSQQuery query(l);
     size_t retval;
     if (!unq) {
@@ -291,9 +294,19 @@ size_t EDBColumn::size() const {
     }
 #else
     if (layer.hasRemoveLiterals(pred_id)) {
+        // FIXME RFHH: just overwrites retval, why then invoke the code above?
         size_t sz = getReader()->asVector().size();
         LOG(INFOL) << "column size cached " << retval << " calculated " << sz;
         retval = sz;
+    }
+#endif
+#if TRACE
+    size_t sz = getReader()->asVector().size();
+    if (sz != retval) {
+        LOG(TRACEL) << "query = " << l.tostring();
+        LOG(TRACEL) << "sz = " << sz << ", should be " << retval;
+        LOG(TRACEL) << "unq = " << unq << ", l.getNVars = " << (int) l.getNVars();
+        throw 10;
     }
 #endif
     return retval;

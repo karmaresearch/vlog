@@ -122,7 +122,8 @@ IncrOverdelete::IncrOverdelete(// const
             vm["no-intersect"].empty(),
             vm["no-filtering"].empty(),
             !vm["multithreaded"].empty(),
-            vm["restrictedChase"].as<bool>(),
+            vm["restrictedChase"].as<bool>() ?
+                TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE,
             nthreads,
             interRuleThreads,
             ! vm["shufflerules"].empty());
@@ -367,7 +368,8 @@ IncrRederive::IncrRederive(// const
             vm["no-intersect"].empty(),
             vm["no-filtering"].empty(),
             !vm["multithreaded"].empty(),
-            vm["restrictedChase"].as<bool>(),
+            vm["restrictedChase"].as<bool>() ?
+                TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE,
             nthreads,
             interRuleThreads,
             ! vm["shufflerules"].empty());
@@ -617,7 +619,8 @@ IncrAdd::IncrAdd(// const
             vm["no-intersect"].empty(),
             vm["no-filtering"].empty(),
             !vm["multithreaded"].empty(),
-            vm["restrictedChase"].as<bool>(),
+            vm["restrictedChase"].as<bool>() ?
+                TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE,
             nthreads,
             interRuleThreads,
             ! vm["shufflerules"].empty());

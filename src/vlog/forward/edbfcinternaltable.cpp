@@ -2,21 +2,22 @@
 #include <vlog/concepts.h>
 
 EDBFCInternalTable::EDBFCInternalTable(const size_t iteration,
-                                       const Literal &literal, EDBLayer *layer)
+        const Literal &literal, EDBLayer *layer)
     : iteration(iteration),
-      nfields(literal.getNVars()),
-      query(QSQQuery(literal)),
-      layer(layer) {
-    uint8_t j = 0;
-    defaultSorting.clear();
-    for (uint8_t i = 0; i < literal.getTupleSize(); ++i) {
-        VTerm t = literal.getTermAtPos(i);
-        if (t.isVariable()) {
-            defaultSorting.push_back(j);
-            posFields[j++] = i;
+    nfields(literal.getNVars()),
+    query(QSQQuery(literal)),
+    layer(layer) {
+
+        uint8_t j = 0;
+        defaultSorting.clear();
+        for (uint8_t i = 0; i < literal.getTupleSize(); ++i) {
+            VTerm t = literal.getTermAtPos(i);
+            if (t.isVariable()) {
+                defaultSorting.push_back(j);
+                posFields[j++] = i;
+            }
         }
     }
-}
 
 size_t EDBFCInternalTable::getNRows() const {
     return layer->getCardinality(*query.getLiteral());
@@ -24,9 +25,8 @@ size_t EDBFCInternalTable::getNRows() const {
 
 bool EDBFCInternalTable::isEmpty() const {
     const Literal l = *query.getLiteral();
-    // LOG(DEBUGL) << "isEmpty: literal = " << l.tostring(NULL, layer);
     bool retval = layer->isEmpty(l, NULL, NULL);
-    // LOG(DEBUGL) << "isEmpty(): " << retval;
+    LOG(DEBUGL) << "isEmpty: literal = " << l.tostring(NULL, layer) << ", returns: " << retval;
     return retval;
 }
 
@@ -56,11 +56,15 @@ bool EDBFCInternalTable::isSorted() const {
     return true;
 }
 
+size_t EDBFCInternalTable::getRepresentationSize(std::set<uint64_t> &IDs) const {
+    return 0;
+}
+
 size_t EDBFCInternalTable::estimateNRows(const uint8_t nconstantsToFilter,
         const uint8_t *posConstantsToFilter,
         const Term_t *valuesConstantsToFilter) const {
     if (nconstantsToFilter == 0)
-        return layer->getCardinality(*(query.getLiteral()));
+        return layer->estimateCardinality(*(query.getLiteral()));
 
     //Create a new literal adding the constants
     VTuple t = query.getLiteral()->getTuple();
@@ -73,18 +77,18 @@ size_t EDBFCInternalTable::estimateNRows(const uint8_t nconstantsToFilter,
 }
 
 std::shared_ptr<Column> EDBFCInternalTable::getColumn(
-    const uint8_t columnIdx) const {
+        const uint8_t columnIdx) const {
     //bool unq = query.getLiteral()->getNVars() == 2;
     std::vector<uint8_t> presortFields;
     for (uint8_t i = 0; i < columnIdx; ++i)
         presortFields.push_back(i);
 
     return std::shared_ptr<Column>(new EDBColumn(*layer,
-                                   *query.getLiteral(),
-                                   posFields[columnIdx],
-                                   presortFields,
-                                   //unq));
-                                   false));
+                *query.getLiteral(),
+                posFields[columnIdx],
+                presortFields,
+                //unq));
+           false));
 }
 
 bool EDBFCInternalTable::isColumnConstant(const uint8_t columnid) const {
@@ -96,10 +100,10 @@ Term_t EDBFCInternalTable::getValueConstantColumn(const uint8_t columnid) const 
 }
 
 std::shared_ptr<const FCInternalTable> EDBFCInternalTable::filter(
-    const uint8_t nPosToCopy, const uint8_t *posVarsToCopy,
-    const uint8_t nPosToFilter, const uint8_t *posConstantsToFilter,
-    const Term_t *valuesConstantsToFilter, const uint8_t nRepeatedVars,
-    const std::pair<uint8_t, uint8_t> *repeatedVars, int nthreads) const {
+        const uint8_t nPosToCopy, const uint8_t *posVarsToCopy,
+        const uint8_t nPosToFilter, const uint8_t *posConstantsToFilter,
+        const Term_t *valuesConstantsToFilter, const uint8_t nRepeatedVars,
+        const std::pair<uint8_t, uint8_t> *repeatedVars, int nthreads) const {
 
     //Create a new literal adding the constants
     VTuple t = query.getLiteral()->getTuple();
@@ -148,12 +152,12 @@ EDBFCInternalTable::~EDBFCInternalTable() {
 }
 
 void EDBFCInternalTableItr::init(const size_t iteration,
-                                 const std::vector<uint8_t> &fields,
-                                 const uint8_t nfields,
-                                 uint8_t const *posFields,
-                                 EDBIterator *itr,
-                                 EDBLayer *layer,
-                                 const Literal *query) {
+        const std::vector<uint8_t> &fields,
+        const uint8_t nfields,
+        uint8_t const *posFields,
+        EDBIterator *itr,
+        EDBLayer *layer,
+        const Literal *query) {
     this->iteration = iteration;
     this->edbItr = itr;
     this->fields = fields;
@@ -198,13 +202,13 @@ inline Term_t EDBFCInternalTableItr::getCurrentValue(const uint8_t pos) {
 }
 
 std::vector<std::shared_ptr<Column>> EDBFCInternalTableItr::getColumn(
-const uint8_t ncolumns, const uint8_t *columns) {
+        const uint8_t ncolumns, const uint8_t *columns) {
     std::vector<std::shared_ptr<Column>> output;
 
     //Fields are the fields on which this table should be sorted
     std::vector<uint8_t> presortFields = fields;
     for (uint8_t i = 0; i < ncolumns; ++i) {
-	int columnNo = columns[i];
+        int columnNo = columns[i];
         std::vector<uint8_t> columnpresort;
         for(int j = 0; j < presortFields.size(); ++j) {
             if (presortFields[j] != columnNo)
@@ -214,7 +218,7 @@ const uint8_t ncolumns, const uint8_t *columns) {
         }
 
         output.push_back(std::shared_ptr<Column>(
-                             new EDBColumn(*layer, *query, columnNo, columnpresort, false)));
+                    new EDBColumn(*layer, *query, columnNo, columnpresort, false)));
         //Add it only if it is not there
         bool found = false;
         for(int j = 0; j < presortFields.size() && !found; ++j)

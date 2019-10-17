@@ -318,6 +318,27 @@ class JoinExecutor {
                 int &processedTables, int nthreads);
 
         static int cmp(const Term_t *r1, const Term_t *r2, const uint8_t s);
+
+        static void leftjoin(const FCInternalTable * t1, SemiNaiver *naiver,
+                const std::vector<Literal> *outputLiterals,
+                const Literal &literalToQuery,
+                const uint32_t min, const uint32_t max,
+                std::vector<std::pair<uint8_t, uint8_t>> joinsCoordinates,
+                ResultJoinProcessor * output, int nthreads);
+
+        static void left_join(const FCInternalTable * filteredT1,
+               std::vector<uint8_t> &fieldsToSortInMap,
+               std::vector<std::shared_ptr<const FCInternalTable>> &tables2,
+               const std::vector<uint8_t> &fields1, const uint8_t *posOtherVars,
+               const std::vector<Term_t> *valuesOtherVars,
+               const std::vector<uint8_t> &fields2, ResultJoinProcessor * output,
+               int nthreads);
+
+        static void do_left_join(const std::vector<const std::vector<Term_t> *> &vectors1,
+                const std::vector<const std::vector<Term_t> *> &vectors2,
+                const std::vector<uint8_t> &fields1,
+                const std::vector<uint8_t> &fields2,
+                Output * output);
 };
 
 class DuplicateContainers {

@@ -6,12 +6,26 @@ SparqlIterator::SparqlIterator(const json &qr, EDBLayer *l, const Literal &q, co
 }
 
 std::string getString(json &jref) {
-    std::string val = jref["value"];
-    std::string type = jref["type"];
-    if (type == "uri") {
-	val = "<" + val + ">";
+    try {
+        std::string val = jref["value"];
+        std::string type = jref["type"];
+        if (type == "uri") {
+            val = "<" + val + ">";
+        } else if (type == "literal") {
+            if (jref.count("datatype") > 0) {
+                std::string datatype = jref["datatype"];
+                val = "\"" + val + "\"^^<" + datatype +">";
+            } else {
+                val = "\"" + val + "\"^^<http://www.w3.org/2001/XMLSchema#string>";
+            }
+        }
+        return val;
+    } catch(nlohmann::detail::type_error) {
+        // This may happen on null values, for instance when the query contains OPTIONAL.
+        // I don't know if this is the "right" way to deal with it, but surely this is better than have
+        // vlog terminate.
+        return "__NULL__";
     }
-    return val;
 }
 
 bool SparqlIterator::hasNext() {

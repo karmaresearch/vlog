@@ -19,7 +19,7 @@
 #include <map>
 
 class Column;
-class SemiNaiver;       // Why cannot I break the software hierarchy? RFHH
+class SemiNaiver;
 class EDBFCInternalTable;
 
 using RemoveLiteralOf = std::unordered_map<PredId_t, const EDBRemoveLiterals *>;
@@ -27,7 +27,7 @@ using RemoveLiteralOf = std::unordered_map<PredId_t, const EDBRemoveLiterals *>;
 using NamedSemiNaiver = std::unordered_map<std::string,
                                            std::shared_ptr<SemiNaiver>>;
 
-class EDBMemIterator : public EDBIterator {
+class EDBMemIterator final : public EDBIterator {
     private:
         uint8_t nfields = 0;
         bool isFirst = false, hasFirst = false;
@@ -53,11 +53,11 @@ class EDBMemIterator : public EDBIterator {
                 const Term_t vc1, const bool c2, const Term_t vc2,
                 const bool equalFields);
 
-        void skipDuplicatedFirstColumn();
+        VLIBEXP void skipDuplicatedFirstColumn();
 
-        bool hasNext();
+        VLIBEXP bool hasNext();
 
-        void next();
+        VLIBEXP void next();
 
         PredId_t getPredicateID() {
             return predid;
@@ -65,7 +65,7 @@ class EDBMemIterator : public EDBIterator {
 
         void moveTo(const uint8_t fieldId, const Term_t t) {}
 
-        Term_t getElementAt(const uint8_t p);
+        VLIBEXP Term_t getElementAt(const uint8_t p);
 
         void clear() {}
 
@@ -85,13 +85,13 @@ class EDBLayer {
 
         const EDBConf &conf;
 
-        std::unique_ptr<Dictionary> predDictionary;
+        std::shared_ptr<Dictionary> predDictionary;
         std::map<PredId_t, EDBInfoTable> dbPredicates;
 
         Factory<EDBMemIterator> memItrFactory;
-        IndexedTupleTable *tmpRelations[MAX_NPREDS];
+        std::vector<IndexedTupleTable *>tmpRelations;
 
-        std::unique_ptr<Dictionary> termsDictionary;
+        std::shared_ptr<Dictionary> termsDictionary;
 
         VLIBEXP void addTridentTable(const EDBConf::Table &tableConf, bool multithreaded);
 
@@ -126,12 +126,14 @@ class EDBLayer {
         std::string name;
 
     public:
+        EDBLayer(const EDBLayer &db, bool copyTables = false);
+
         EDBLayer(const EDBConf &conf, bool multithreaded,
                  const NamedSemiNaiver &prevSemiNaiver) :
                 conf(conf), prevSemiNaiver(prevSemiNaiver) {
             const std::vector<EDBConf::Table> tables = conf.getTables();
 
-            predDictionary = std::unique_ptr<Dictionary>(new Dictionary());
+            predDictionary = std::shared_ptr<Dictionary>(new Dictionary());
 
             if (prevSemiNaiver.size() != 0) {
                 handlePrevSemiNaiver();
@@ -171,10 +173,6 @@ class EDBLayer {
                     throw 10;
                 }
             }
-
-            for (int i = 0; i < MAX_NPREDS; ++i) {
-                tmpRelations[i] = NULL;
-            }
         }
 
         EDBLayer(const EDBConf &conf, bool multithreaded) :
@@ -193,9 +191,14 @@ class EDBLayer {
 
         PredId_t getPredID(const std::string &name) const;
 
+        void setPredArity(PredId_t id, uint8_t arity);
+
         void addTmpRelation(Predicate &pred, IndexedTupleTable *table);
 
         bool isTmpRelationEmpty(Predicate &pred) {
+            if (pred.getId() >= tmpRelations.size()) {
+                return false;
+            }
             return tmpRelations[pred.getId()] == NULL ||
                 tmpRelations[pred.getId()]->getNTuples() == 0;
         }
@@ -203,6 +206,13 @@ class EDBLayer {
         const Dictionary &getPredDictionary() {
             assert(predDictionary.get() != NULL);
             return *(predDictionary.get());
+        }
+
+        std::unordered_map< PredId_t, uint8_t> getPredicateCardUnorderedMap () {
+            std::unordered_map< PredId_t, uint8_t> ret;
+            for (auto item : dbPredicates)
+                ret.insert(make_pair(item.first, item.second.arity));
+            return ret;
         }
 
         VLIBEXP bool doesPredExists(PredId_t id) const;
@@ -222,6 +232,9 @@ class EDBLayer {
                 const Term_t value) const;
 
         size_t getSizeTmpRelation(Predicate &pred) {
+            if (pred.getId() >= tmpRelations.size()) {
+                return 0;
+            }
             return tmpRelations[pred.getId()]->getNTuples();
         }
 
@@ -291,6 +304,13 @@ class EDBLayer {
             }
         }
 
+        bool expensiveEDBPredicate(PredId_t id) {
+            if (dbPredicates.count(id)) {
+                return dbPredicates.find(id)->second.manager->expensiveLayer();
+            }
+            return false;
+        }
+
         VLIBEXP uint64_t getNTerms() const;
 
         void releaseIterator(EDBIterator *itr);
@@ -314,7 +334,16 @@ class EDBLayer {
         }
 
         // For JNI interface ...
-        VLIBEXP void addInmemoryTable(std::string predicate, std::vector<std::vector<std::string>> &rows);
+        VLIBEXP void addInmemoryTable(std::string predicate,
+                std::vector<std::vector<std::string>> &rows);
+
+        VLIBEXP void addInmemoryTable(std::string predicate,
+                PredId_t id, std::vector<std::vector<std::string>> &rows);
+
+        //For RMFA check
+        VLIBEXP void addInmemoryTable(PredId_t predicate,
+                uint8_t arity,
+                std::vector<uint64_t> &rows);
 
         const EDBConf &getConf() const {
             return conf;
@@ -329,7 +358,7 @@ class EDBLayer {
         }
 
         ~EDBLayer() {
-            for (int i = 0; i < MAX_NPREDS; ++i) {
+            for (int i = 0; i < tmpRelations.size(); ++i) {
                 if (tmpRelations[i] != NULL) {
                     delete tmpRelations[i];
                 }

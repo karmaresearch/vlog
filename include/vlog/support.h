@@ -61,6 +61,10 @@ public:
         }
     }
 
+    uint64_t getCounter() {
+	return counter;
+    }
+
     bool get(const std::string &rawValue, Term_t &id) const {
         SimpleHashmap::const_iterator itr = map.find(rawValue);
         if (itr == map.end()) {

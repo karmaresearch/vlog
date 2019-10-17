@@ -23,8 +23,13 @@
     <ClCompile Include="..\..\src\vlog\common\edb.cpp" />
     <ClCompile Include="..\..\src\vlog\common\edbconf.cpp" />
     <ClCompile Include="..\..\src\vlog\common\exporter.cpp" />
+    <ClCompile Include="..\..\src\vlog\common\graph.cpp" />
     <ClCompile Include="..\..\src\vlog\common\idxtupletable.cpp" />
     <ClCompile Include="..\..\src\vlog\common\sqltable.cpp" />
+    <ClCompile Include="..\..\src\vlog\cycles\checker.cpp" />
+    <ClCompile Include="..\..\src\vlog\deps\detector.cpp" />
+    <ClCompile Include="..\..\src\vlog\deps\mapping.cpp" />
+    <ClCompile Include="..\..\src\vlog\deps\tgpath.cpp" />
     <ClCompile Include="..\..\src\vlog\forward\chasemgmt.cpp" />
     <ClCompile Include="..\..\src\vlog\forward\column.cpp" />
     <ClCompile Include="..\..\src\vlog\forward\edbfcinternaltable.cpp" />
@@ -42,6 +47,7 @@
     <ClCompile Include="..\..\src\vlog\forward\segment.cpp" />
     <ClCompile Include="..\..\src\vlog\forward\seminaiver.cpp" />
     <ClCompile Include="..\..\src\vlog\forward\seminaiver_threaded.cpp" />
+    <ClCompile Include="..\..\src\vlog\forward\seminaiver_trigger.cpp" />
     <ClCompile Include="..\..\src\vlog\inmemory\inmemorytable.cpp" />
     <ClCompile Include="..\..\src\vlog\magic\wizard.cpp" />
     <ClCompile Include="..\..\src\vlog\ml\ml.cpp" />
@@ -64,6 +70,10 @@
     <ClInclude Include="..\..\include\vlog\concepts.h" />
     <ClInclude Include="..\..\include\vlog\consts.h" />
     <ClInclude Include="..\..\include\vlog\costestimator.h" />
+    <ClInclude Include="..\..\include\vlog\cycles\checker.h" />
+    <ClInclude Include="..\..\include\vlog\deps\detector.h" />
+    <ClInclude Include="..\..\include\vlog\deps\equivalence.h" />
+    <ClInclude Include="..\..\include\vlog\deps\mapping.h" />
     <ClInclude Include="..\..\include\vlog\edb.h" />
     <ClInclude Include="..\..\include\vlog\edbconf.h" />
     <ClInclude Include="..\..\include\vlog\edbiterator.h" />
@@ -75,6 +85,7 @@
     <ClInclude Include="..\..\include\vlog\filterer.h" />
     <ClInclude Include="..\..\include\vlog\filterhashjoin.h" />
     <ClInclude Include="..\..\include\vlog\finalresultjoinproc.h" />
+    <ClInclude Include="..\..\include\vlog\graph.h" />
     <ClInclude Include="..\..\include\vlog\idxtupletable.h" />
     <ClInclude Include="..\..\include\vlog\inmemory\inmemorytable.h" />
     <ClInclude Include="..\..\include\vlog\joinprocessor.h" />
@@ -93,6 +104,7 @@
     <ClInclude Include="..\..\include\vlog\segment_support.h" />
     <ClInclude Include="..\..\include\vlog\seminaiver.h" />
     <ClInclude Include="..\..\include\vlog\seminaiver_threaded.h" />
+    <ClInclude Include="..\..\include\vlog\seminaiver_trigger.h" />
     <ClInclude Include="..\..\include\vlog\sqltable.h" />
     <ClInclude Include="..\..\include\vlog\support.h" />
     <ClInclude Include="..\..\include\vlog\term.h" />
@@ -184,7 +196,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>..\..\..\deps\lib\zlib.lib;..\..\..\deps\lib\liblz4_static.lib;..\..\..\deps\lib\libcurl_a.lib;..\..\..\deps\lib\libssl.lib;..\..\..\kognac\win64\x64\Release\kognac-core.lib;..\..\..\trident\win64\x64\Release\trident-core.lib;..\..\..\trident\win64\x64\Release\trident-sparql.lib;crypt32.lib;wldap32.lib;normaliz.lib;Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>..\..\..\deps\lib\zlib.lib;..\..\..\deps\lib\liblz4_static.lib;..\..\..\deps\lib\libcurl_a.lib;..\..\..\kognac\win64\x64\Release\kognac-core.lib;..\..\..\trident\win64\x64\Release\trident-core.lib;..\..\..\trident\win64\x64\Release\trident-sparql.lib;crypt32.lib;wldap32.lib;normaliz.lib;Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

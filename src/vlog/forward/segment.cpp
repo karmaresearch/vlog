@@ -49,6 +49,22 @@ void Segment::checkSizes() const {
 }
 #endif
 
+size_t Segment::getRepresentationSize(std::set<uint64_t> &IDs) const {
+    size_t size = 0;
+    for (int i = 0; i < nfields; ++i) {
+        assert(columns[i]);
+        if (!columns[i]->isEDB()) {
+            //Check if I already considered the column before
+            size_t memLocation = (size_t)columns[i].get();
+            if (!IDs.count(memLocation)) {
+                size += columns[i]->getRepresentationSize();
+                IDs.insert(memLocation);
+            }
+        }
+    }
+    return size;
+}
+
 Segment& Segment::operator =(const std::shared_ptr<Column> *v) {
     for (uint8_t i = 0; i < nfields; ++i) {
         columns[i] = v[i];
@@ -147,7 +163,7 @@ bool Segment::areAllColumnsPartOftheSameQuery(EDBLayer **edb, const Literal **l,
             } else {
                 //Check the literal is the same
                 const Literal *newlit = &(edbC->getLiteral());
-		std::vector<Substitution> subs;
+                std::vector<Substitution> subs;
                 if (Literal::subsumes(subs, *newlit, *lit) != -1
                         && Literal::subsumes(subs, *lit, *newlit) != -1) {
                     posInLiteral.push_back(edbC->posColumnInLiteral());
@@ -223,7 +239,7 @@ std::shared_ptr<Segment> Segment::sortBy(const std::vector<uint8_t> *fields,
             return newSeg;
         }
     } //End special case
-    if (nthreads == 1) {
+    if (nthreads <= 1) {
         assert(filterDupls == false);
         return intsort(fields);
     } else {
@@ -754,7 +770,7 @@ void SegmentInserter::addRow(const Term_t *row) {
 
 bool SegmentInserter::isEmpty() const {
     if (nfields == 0) {
-	return true;
+        return true;
     }
     if (copyColumns[0] != std::shared_ptr<Column>()) {
         if (!copyColumns[0]->isEmpty())
@@ -1182,7 +1198,7 @@ std::shared_ptr<const Segment> SegmentInserter::retainEDB(
             ->posColumnInLiteral();
         //Chech the two literals are equivalent and that the rel. are
         //different positions. ??? What if the head is, say pred(?A,?A)? --Ceriel
-	std::vector<Substitution> subs;
+        std::vector<Substitution> subs;
         if (!l1.sameVarSequenceAs(l12) || l1.subsumes(subs, l1, l12) == -1
                 // || pos1 == pos12 // Commented out --Ceriel
            ) {
@@ -1235,16 +1251,20 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
         return segment;
     }
 
-    std::vector<uint8_t> posConstants;
-    std::vector<uint8_t> posToCopy;
-    std::vector<Term_t> valueConstants;
+    int nPosToCopy = 0;
+    uint8_t posToCopy[256];
+    int nPosConstants = 0;
+    uint8_t posConstants[256];
+    Term_t valueConstants[256];
     if (!segment->isEmpty()) {
         for (uint8_t i = 0; i < segment->getNColumns(); ++i) {
             if (segment->isConstantField(i)) {
-                posConstants.push_back(i);
-                valueConstants.push_back(segment->firstInColumn(i));
+                posConstants[nPosConstants] = i;
+                valueConstants[nPosConstants] = segment->firstInColumn(i);
+                nPosConstants++;
             } else {
-                posToCopy.push_back(i);
+                posToCopy[nPosToCopy] = i;
+                nPosToCopy++;
             }
         }
     }
@@ -1252,9 +1272,9 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
     bool match = true;
     bool superset = false;
     if (existingValues != NULL && !existingValues->isEmpty()
-            && posConstants.size() > 0) {
+            && nPosConstants > 0) {
         //Is existingValues a superset of the current values?
-        for (uint8_t i = 0; i < posConstants.size() && match; ++i) {
+        for (uint8_t i = 0; i < nPosConstants && match; ++i) {
             if (existingValues->isColumnConstant(posConstants[i])) {
                 if (valueConstants[i] !=
                         existingValues->
@@ -1268,22 +1288,22 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
     }
 
     if (superset) {
-        existingValues = existingValues->filter((uint8_t) posToCopy.size(),
-                posToCopy.size() > 0 ?
+        existingValues = existingValues->filter(nPosToCopy,
+                nPosToCopy > 0 ?
                 & (posToCopy[0]) : NULL,
-                (uint8_t) posConstants.size(),
+                nPosConstants,
                 &(posConstants[0]),
                 &(valueConstants[0]),
                 0, NULL, nthreads);
     } else if (existingValues != NULL &&
-            posToCopy.size() < existingValues->getRowSize()) {
-        existingValues = existingValues->filter((uint8_t) posToCopy.size(),
-                posToCopy.empty() ? NULL : &(posToCopy[0]), 0, NULL,
+            nPosToCopy < existingValues->getRowSize()) {
+        existingValues = existingValues->filter(nPosToCopy,
+                nPosToCopy == 0 ? NULL : &(posToCopy[0]), 0, NULL,
                 NULL, 0, NULL, nthreads);
     }
 
-    const size_t nPosToCompare = posToCopy.size();
-    const uint8_t *posToCompare = posToCopy.size() > 0 ? &(posToCopy[0]) : NULL;
+    const size_t nPosToCompare = nPosToCopy;
+    const uint8_t *posToCompare = nPosToCopy > 0 ? &(posToCopy[0]) : NULL;
 
     /*if (duplicates && nPosToCompare == 1) {
     //Clean the duplicated lines
@@ -1295,7 +1315,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
     assert(c->isConstant());
     segment->replaceColumn(posConstants[i],
     std::shared_ptr<Column>(new
-    ColumnImpl(c->getReader()->first(),
+    ColumnImpl(c->first(),
     newsize)));
     }
     //duplicates = false;
@@ -1321,8 +1341,8 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
     if (nPosToCompare == 1 && segment->getNColumns() == 1 && itr2 != NULL) {
         //It is column vs. column. Launch a faster algo than the one below
         std::shared_ptr<Column> c1 = segment->getColumn(posToCompare[0]);
-        std::vector<uint8_t> fields;
-        fields.push_back((uint8_t)0);
+        uint8_t fields[1];
+        fields[0] = 0;
         std::vector<std::shared_ptr<Column>> c2 = itr2->getColumn(1, &(fields[0]));
         segment = retainMemMem(c1.get(), c2[0].get());
         existingValues->releaseIterator(itr2);
@@ -1330,14 +1350,16 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
     }
 
     const uint8_t nfields = segment->getNColumns();
-    std::unique_ptr<SegmentIterator> segmentIterator = segment->iterator();
+    std::unique_ptr<VectorSegmentIterator> segmentIterator = segment->vectorIterator();
     active1 = segmentIterator->hasNext();
     assert(active1);
     segmentIterator->next();
 
-    Term_t *prevrow1 = new Term_t[nfields];
+    Term_t prevrow1[256];
     bool prevrow1valid = false;
     SegmentInserter retainedValues(nfields);
+
+    bool nothingSkipped = true;
 
     while (active1 && active2) {
         if (toRead1) {
@@ -1350,6 +1372,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
                         if (prevrow1[i] != segmentIterator->get(i))
                             same = false;
                     if (same) {
+                        nothingSkipped = false;
                         active1 = segmentIterator->hasNext();
                         continue;
                     }
@@ -1370,12 +1393,13 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
 
         long res = 0;
         for (uint8_t i = 0; i < nPosToCompare; ++i) {
-            if (segmentIterator->get(posToCompare[i]) != itr2->getCurrentValue(i)) {
-                res = segmentIterator->get(posToCompare[i]) - itr2->getCurrentValue(i);
+            res = segmentIterator->get(posToCompare[i]) - itr2->getCurrentValue(i);
+            if (res != 0) {
                 break;
             }
         }
         if (res == 0) {
+            nothingSkipped = false;
             toRead1 = true;
             active1 = segmentIterator->hasNext();
         } else if (res < 0) {
@@ -1386,6 +1410,15 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
             toRead2 = true;
             active2 = itr2->hasNext();
         }
+    }
+
+    if (nothingSkipped && (! duplicates || ! segmentIterator->hasNext())) {
+        segmentIterator->clear();
+
+        if (itr2 != NULL) {
+            existingValues->releaseIterator(itr2);
+        }
+        return segment;
     }
 
     //Copy the remaining
@@ -1401,7 +1434,6 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
     }
 
     if (duplicates) {
-        //for (; idx1 < segment->getNRows(); ++idx1) {
         while (segmentIterator->hasNext()) {
             segmentIterator->next();
             if (prevrow1valid) {
@@ -1437,8 +1469,6 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
     }
 
     segmentIterator->clear();
-
-    delete[] prevrow1;
 
     if (itr2 != NULL) {
         existingValues->releaseIterator(itr2);

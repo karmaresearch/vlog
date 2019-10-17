@@ -40,6 +40,16 @@ uint8_t InmemoryFCInternalTable::getRowSize() const {
     return nfields;
 }
 
+size_t InmemoryFCInternalTable::getRepresentationSize(std::set<uint64_t> &IDs) const {
+    if (this->unmergedSegments.size() > 0) {
+        LOG(ERRORL) << "All tables should not have any unmerged segment ...";
+        throw 10;
+    }
+    size_t size = nfields; //Every table can be seen as a meta-fact
+    size += values->getRepresentationSize(IDs);
+    return size;
+}
+
 FCInternalTableItr *InmemoryFCInternalTable::getIterator() const {
 
     assert(values == NULL || values->getNColumns() == nfields);
@@ -79,7 +89,8 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::merge(std::share
     LOG(TRACEL) << "InmemoryFCInternalTable::merge";
     assert(!t->isEmpty() && t->getRowSize() == nfields);
 
-    if (isEmpty()) {
+    if (isEmpty() && ! t->isEDB()) {
+        // Note: EDBFCInternalTable does not support merge, so don't return that.
         return t;
     }
 
@@ -558,7 +569,7 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
        */
     for (uint8_t i = 0; i < nConstantsToFilter && match; ++i) {
         if (values->getColumn(posConstantsToFilter[i])->isConstant()) {
-            const Term_t v = values->getColumn(posConstantsToFilter[i])->getReader()->first();
+            const Term_t v = values->getColumn(posConstantsToFilter[i])->first();
             if (v != valuesConstantsToFilter[i]) {
                 match = false;
             }
@@ -573,6 +584,8 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
         }
     }
 
+    // LOG(TRACEL) << "P0: match = " << match << ", isSetBigger = " << isSetBigger << ", values size = " << values->getNRows();
+
     if (match && !isSetBigger && nRepeatedVars > 0) {
         for (uint8_t i = 0; i < nRepeatedVars; ++i) {
             //Check the values in the two positions. If they are both constants
@@ -580,7 +593,7 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
             Column *c1 = values->getColumn(repeatedVars[i].first).get();
             Column *c2 = values->getColumn(repeatedVars[i].second).get();
             if (c1->isConstant() && c2->isConstant()) {
-                if (c1->getReader()->first() != c2->getReader()->first()) {
+                if (c1->first() != c2->first()) {
                     match = false;
                     break;
                 }
@@ -636,10 +649,10 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
             for (uint8_t i = 0; i < nRepeatedVars; ++i) {
                 //Check the values in the two positions. If they are both constants
                 //then I check the value
-                Column *c1 = values->getColumn(repeatedVars[i].first).get();
-                Column *c2 = values->getColumn(repeatedVars[i].second).get();
+                Column *c1 = itr->values->getColumn(repeatedVars[i].first).get();
+                Column *c2 = itr->values->getColumn(repeatedVars[i].second).get();
                 if (c1->isConstant() && c2->isConstant()) {
-                    if (c1->getReader()->first() != c2->getReader()->first()) {
+                    if (c1->first() != c2->first()) {
                         match = false;
                         break;
                     }
@@ -906,7 +919,7 @@ MergerInternalTableItr::MergerInternalTableItr(const std::vector<std::pair<FCInt
         const std::vector<uint8_t> &positionsToSort, const uint8_t nfields)
     : iterators(iterators), firstCall(true),
     sorter(iterators, (uint8_t) positionsToSort.size(), sortPos), nfields(nfields) {
-        for (uint8_t i = 0; i < iterators.size(); ++i) {
+        for (size_t i = 0; i < iterators.size(); ++i) {
             indices.push_back(i);
         }
         for (uint8_t i = 0; i < positionsToSort.size(); ++i)
@@ -933,14 +946,14 @@ void MergerInternalTableItr::next() {
     }
 }
 
-bool MITISorter::operator ()(const uint8_t i1, const uint8_t i2) const {
+bool MITISorter::operator ()(const size_t i1, const size_t i2) const {
     if (i1 == i2) {
-	return false;
+        return false;
     }
-    for (uint8_t i = 0; i < tuplesize; ++i) {
+    for (int i = 0; i < tuplesize; ++i) {
         Term_t v1 = iterators[i1].first->getCurrentValue(sortPos[i]);
         Term_t v2 = iterators[i2].first->getCurrentValue(sortPos[i]);
-	// LOG(TRACEL) << "i = " << i << ", i1 = " << i1 << ", v1 = " << v1 << ", i2 = " << i2 << ", v2 = " << v2;
+        // LOG(TRACEL) << "i = " << i << ", i1 = " << i1 << ", v1 = " << v1 << ", i2 = " << i2 << ", v2 = " << v2;
         if (v1 > v2)
             return true;
         else if (v1 < v2)

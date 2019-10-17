@@ -129,7 +129,7 @@ public class VLog {
     };
 
     public enum LogLevel {
-        ERROR, WARNING, INFO, DEBUG
+        ERROR, WARNING, INFO, DEBUG, TRACE
     };
 
     /**
@@ -283,8 +283,6 @@ public class VLog {
      * Queries the current, so possibly materialized, database, and returns an
      * iterator that delivers the answers, one by one.
      *
-     * TODO: is having variables as negative values OK?
-     *
      * @param predicate
      *            the predicate id of the query
      * @param terms
@@ -297,10 +295,12 @@ public class VLog {
      * @return the result iterator.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
+     * @exception NonExistingPredicateException
+     *                is thrown when the query predicate does not exist.
      */
     public native QueryResultIterator query(int predicate, long[] terms,
             boolean includeConstants, boolean filterBlanks)
-            throws NotStartedException;
+            throws NotStartedException, NonExistingPredicateException;
 
     private long[] extractTerms(Term[] terms) throws NotStartedException {
         ArrayList<String> variables = new ArrayList<>();
@@ -337,9 +337,11 @@ public class VLog {
      * @return the result iterator.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
+     * @exception NonExistingPredicateException
+     *                is thrown when the query predicate does not exist.
      */
     public TermQueryResultIterator query(Atom query)
-            throws NotStartedException {
+            throws NotStartedException, NonExistingPredicateException { 
         return query(query, true, false);
     }
 
@@ -358,10 +360,12 @@ public class VLog {
      * @return the result iterator.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
+     * @exception NonExistingPredicateException
+     *                is thrown when the query predicate does not exist.
      */
 
     public TermQueryResultIterator query(Atom query, boolean includeConstants,
-            boolean filterBlanks) throws NotStartedException {
+            boolean filterBlanks) throws NotStartedException, NonExistingPredicateException {
         query.checkNoBlank();
         int intPred = getPredicateId(query.getPredicate());
         long[] longTerms = extractTerms(query.getTerms());
@@ -385,9 +389,11 @@ public class VLog {
      * @exception IOException
      *                is thrown when the file could not be written for some
      *                reason
+     * @exception NonExistingPredicateException
+     *                is thrown when the query predicate does not exist.
      */
     public void writeQueryResultsToCsv(Atom query, String fileName)
-            throws NotStartedException, IOException {
+            throws NotStartedException, NonExistingPredicateException, IOException {
         writeQueryResultsToCsv(query, fileName, false);
     }
 
@@ -406,9 +412,11 @@ public class VLog {
      * @exception IOException
      *                is thrown when the file could not be written for some
      *                reason
+     * @exception NonExistingPredicateException
+     *                is thrown when the query predicate does not exist.
      */
     public void writeQueryResultsToCsv(Atom query, String fileName,
-            boolean filterBlanks) throws NotStartedException, IOException {
+            boolean filterBlanks) throws NotStartedException, NonExistingPredicateException, IOException {
         query.checkNoBlank();
         int intPred = getPredicateId(query.getPredicate());
         long[] longTerms = extractTerms(query.getTerms());
@@ -455,6 +463,8 @@ public class VLog {
      * @return <code>true</code> if success.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
+     * @exception MaterializationException
+     *                is thrown when the materialization fails for some reason.
      */
     public boolean materialize(boolean skolem) throws NotStartedException {
         return materialize(skolem, 0);
@@ -473,6 +483,8 @@ public class VLog {
      *         if success.
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
+     * @exception MaterializationException
+     *                is thrown when the materialization fails for some reason.
      */
     public native boolean materialize(boolean skolem, int timeout)
             throws NotStartedException;
@@ -494,6 +506,32 @@ public class VLog {
      */
     public native void writePredicateToCsv(String predicateName,
             String fileName) throws NotStartedException, IOException;
+
+    /**
+     * Result of a cyclicity check.
+     */
+    public enum CyclicCheckResult {
+        NON_CYCLIC, INCONCLUSIVE, CYCLIC
+    };
+
+    /**
+     * Performs a cyclic-check on the specified rules.
+     *
+     * Note: a rule set with only non-existential rules will always return
+     * NON_CYCLIC.
+     *
+     * @param method
+     *            indicates the cyclic-check method to use: JA, RJA, MFA, RMFA,
+     *            MFC (other methods to be added).
+     *
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet.
+     * @exception IllegalArgumentException
+     *                is thrown when the cyclic-check method is not recognized.
+     * @return the result of the check
+     */
+    public native CyclicCheckResult checkCyclic(String method)
+            throws NotStartedException;
 
     @Override
     protected void finalize() {

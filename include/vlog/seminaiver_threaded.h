@@ -43,8 +43,8 @@ class SemiNaiverThreaded: public SemiNaiver {
         //TODO This variable is only visible to the thread
         std::shared_ptr<SemiNaiver_Threadlocal> thread_data;
 
-        bool marked[MAX_NPREDS];
-        bool newMarked[MAX_NPREDS];
+        std::vector<bool> marked;
+        std::vector<bool> newMarked;
 
         /*** VARIOUS MUTEXES */
         std::mutex mutexInsert;
@@ -55,7 +55,7 @@ class SemiNaiverThreaded: public SemiNaiver {
         const int interRuleThreads;
 
         //Create one mutex per table
-        std::mutex mutexes[MAX_NPREDS];
+        std::mutex *mutexes;
 
         size_t getAtomicIteration() {
             std::lock_guard<std::mutex> lock(mutexIteration);
@@ -71,24 +71,27 @@ class SemiNaiverThreaded: public SemiNaiver {
         void unlock(std::vector<PredId_t> &predicates, PredId_t idHeadPredicate);
 
     public:
-        SemiNaiverThreaded(std::vector<Rule> ruleset,
-                EDBLayer &layer,
+        SemiNaiverThreaded(EDBLayer &layer,
                 Program *program,
                 bool opt_intersect,
                 bool opt_filtering,
                 bool shuffleRules,
                 const int nthreads,
-                const int interRuleThreads) : SemiNaiver(ruleset, layer,
+                const int interRuleThreads) : SemiNaiver(layer,
                     program, opt_intersect, opt_filtering, true,
-                    nthreads, shuffleRules),
+                    nthreads, shuffleRules, false),
                 interRuleThreads(interRuleThreads) {
-
                     // Marks for parallel version
-                    for (int i = 0; i < MAX_NPREDS; i++) {
-                        marked[i] = true;
-                        newMarked[i] = false;
+                    for (int i = 0; i < program->getNPredicates(); i++) {
+                        marked.push_back(true);
+                        newMarked.push_back(false);
                     }
+                    mutexes = new std::mutex[program->getNPredicates()];
                 }
+
+        ~SemiNaiverThreaded() {
+            delete[] mutexes;
+        }
 
     protected:
         long getNLastDerivationsFromList();
@@ -110,7 +113,7 @@ class SemiNaiverThreaded: public SemiNaiver {
         bool executeUntilSaturation(
                 std::vector<RuleExecutionDetails> &ruleset,
                 std::vector<StatIteration> &costRules,
-		uint32_t limitView,
+                uint32_t limitView,
                 bool fixpoint);
 };
 

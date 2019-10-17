@@ -75,17 +75,18 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>..\..\..\deps\include;..\..\..\kognac\include;..\..\..\trident\rdf3x\include;..\..\..\trident\include;..\..\include;C:\Program Files\Java\jdk1.8.0_192\include\win32;C:\Program Files\Java\jdk1.8.0_192\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>C:\Program Files\Java\jdk1.8.0_192\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>..\..\..\deps\include;..\..\..\kognac\include;..\..\..\trident\rdf3x\include;..\..\..\trident\include;..\..\include;C:\Program Files\Java\jdk1.8.0_192\include\win32;C:\Program Files\Java\jdk1.8.0_192\include;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Program Files\Java\jdk1.8.0_192\include\win32;C:\Program Files\Java\jdk1.8.0_192\include;..\..\..\deps\include;..\..\..\kognac\include;..\..\..\trident\rdf3x\include;..\..\..\trident\include;..\..\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

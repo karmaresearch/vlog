@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <string>
 #include <unordered_map>
+#include <set>
 
 class FCInternalTableItr {
     public:
@@ -137,6 +138,8 @@ class FCInternalTable {
             return estimateNRows(0, NULL, NULL);
         }
 
+        virtual size_t getRepresentationSize(std::set<uint64_t> &IDs) const = 0;
+
         virtual std::shared_ptr<const FCInternalTable> filter(
                 const uint8_t nPosToCopy, const uint8_t *posVarsToCopy,
                 const uint8_t nPosToFilter, const uint8_t *posConstantsToFilter,
@@ -154,6 +157,8 @@ class FCInternalTable {
         virtual Term_t get(const size_t rowId, const uint8_t columnId) const {
             throw 10;
         }
+
+        virtual bool supportsMerge() const = 0;
 
         virtual std::shared_ptr<const FCInternalTable> merge(
                 std::shared_ptr<const FCInternalTable> t, int nthreads) const = 0;
@@ -175,19 +180,18 @@ class FCInternalTable {
         virtual ~FCInternalTable();
 };
 
-class VectorFCInternalTableItr : public FCInternalTableItr {
+class VectorFCInternalTableItr final : public FCInternalTableItr {
     private:
         const std::vector<const std::vector<Term_t> *> vectors;
         int beginIndex;
         int endIndex;
         int currentIndex;
-        bool first;
 
     public:
         VectorFCInternalTableItr(const std::vector<const std::vector<Term_t> *> &vectors,
                 int beginIndex, int endIndex) :
             vectors(vectors), beginIndex(beginIndex), endIndex(endIndex),
-            currentIndex(beginIndex), first(true) {
+            currentIndex(beginIndex-1) {
                 if (endIndex > vectors[0]->size()) {
                     endIndex = vectors[0]->size();
                 }
@@ -220,22 +224,18 @@ class VectorFCInternalTableItr : public FCInternalTableItr {
         }
 
         bool hasNext() {
-            return currentIndex < endIndex - 1 || (first && currentIndex < endIndex);
+            return currentIndex < endIndex - 1;
         }
 
         void next() {
-            if (! first) {
-                currentIndex++;
-            }
-            first = false;
+            currentIndex++;
         }
 
         void clear() {
         }
 
         void reset() {
-            currentIndex = beginIndex;
-            first = true;
+            currentIndex = beginIndex - 1;
         }
 
         ~VectorFCInternalTableItr() {
@@ -243,7 +243,7 @@ class VectorFCInternalTableItr : public FCInternalTableItr {
         }
 };
 
-class InmemoryFCInternalTableItr : public FCInternalTableItr {
+class InmemoryFCInternalTableItr final : public FCInternalTableItr {
     private:
         uint8_t nfields;
         size_t iteration;
@@ -305,7 +305,7 @@ class InmemoryFCInternalTableItr : public FCInternalTableItr {
         }
 };
 
-class EDBFCInternalTableItr : public FCInternalTableItr {
+class EDBFCInternalTableItr final : public FCInternalTableItr {
     private:
         std::vector<uint8_t> fields;
         EDBIterator *edbItr;
@@ -356,12 +356,12 @@ struct MITISorter {
             const uint8_t tuplesize, uint8_t *sortPos) : iterators(iterators),
     tuplesize(tuplesize), sortPos(sortPos) {}
 
-    bool operator ()(const uint8_t i1, const uint8_t i2) const;
+    bool operator ()(const size_t i1, const size_t i2) const;
 };
 
-class MergerInternalTableItr : public FCInternalTableItr {
+class MergerInternalTableItr final : public FCInternalTableItr {
     private:
-        std::vector<uint8_t> indices;
+        std::vector<size_t> indices;
         const std::vector<std::pair<FCInternalTableItr*, size_t>> iterators;
         uint8_t sortPos[10];
         bool firstCall;
@@ -430,7 +430,7 @@ struct InmemoryFCInternalTableUnmergedSegment {
             }
 };
 
-class InmemoryFCInternalTable : public FCInternalTable {
+class InmemoryFCInternalTable final : public FCInternalTable {
     private:
         const uint8_t nfields;
         const size_t iteration;
@@ -509,7 +509,7 @@ class InmemoryFCInternalTable : public FCInternalTable {
 
         bool isEDB() const {
             if (values != NULL) {
-                for (uint8_t i = 0; i < nfields; ++i) {
+                for (int i = 0; i < nfields; ++i) {
                     if (!values->getColumn(i)->isEDB()) {
                         return false;
                     }
@@ -519,6 +519,9 @@ class InmemoryFCInternalTable : public FCInternalTable {
         }
 
         size_t getNRows() const;
+
+
+        size_t getRepresentationSize(std::set<uint64_t> &IDs) const;
 
         bool isEmpty() const;
 
@@ -545,6 +548,10 @@ class InmemoryFCInternalTable : public FCInternalTable {
         size_t estimateNRows(const uint8_t nconstantsToFilter,
                 const uint8_t *posConstantsToFilter,
                 const Term_t *valuesConstantsToFilter) const;
+
+        bool supportsMerge() const {
+            return true;
+        }
 
         std::shared_ptr<const FCInternalTable> merge(std::shared_ptr<const FCInternalTable> t, int nthreads) const;
 
@@ -573,7 +580,7 @@ class InmemoryFCInternalTable : public FCInternalTable {
         ~InmemoryFCInternalTable();
 };
 
-class EDBFCInternalTable : public FCInternalTable {
+class EDBFCInternalTable final : public FCInternalTable {
     private:
         const size_t iteration;
         const uint8_t nfields;
@@ -611,6 +618,8 @@ class EDBFCInternalTable : public FCInternalTable {
 
         size_t getNRows() const;
 
+        size_t getRepresentationSize(std::set<uint64_t> &IDs) const;
+
         bool isEmpty() const;
 
         bool supportsDirectAccess() const {
@@ -634,6 +643,10 @@ class EDBFCInternalTable : public FCInternalTable {
 
         FCInternalTableItr *getSortedIterator(int nthreads) const {
             return getSortedIterator();
+        }
+
+        bool supportsMerge() const {
+            return false;
         }
 
         std::shared_ptr<const FCInternalTable> merge(std::shared_ptr<const FCInternalTable> t, int nthreads) const;
@@ -665,7 +678,7 @@ class EDBFCInternalTable : public FCInternalTable {
         ~EDBFCInternalTable();
 };
 
-class SingletonItr : public FCInternalTableItr {
+class SingletonItr final : public FCInternalTableItr {
     private:
         const size_t iteration;
         bool first;
@@ -716,7 +729,7 @@ class SingletonItr : public FCInternalTableItr {
 
 };
 
-class SingletonTable : public FCInternalTable {
+class SingletonTable final : public FCInternalTable {
     private:
         const size_t iteration;
 
@@ -740,6 +753,10 @@ class SingletonTable : public FCInternalTable {
             return true;
         }
 
+        size_t getRepresentationSize(std::set<uint64_t> &IDs) const {
+            return 0;
+        }
+
         FCInternalTableItr *getIterator() const {
             return new SingletonItr(iteration);
         };
@@ -759,6 +776,10 @@ class SingletonTable : public FCInternalTable {
 
         FCInternalTableItr *getSortedIterator(int nthreads) const {
             return new SingletonItr(iteration);
+        }
+
+        bool supportsMerge() const {
+            return false;
         }
 
         std::shared_ptr<const FCInternalTable> merge(std::shared_ptr<const FCInternalTable> t, int nthreads) const {
