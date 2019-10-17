@@ -26,7 +26,7 @@ class EDBIterator {
         }
 
         virtual std::pair<uint8_t, std::pair<uint8_t, uint8_t>> getSizeElemUnderlyingArray(uint8_t column) {
-            return std::make_pair(0, make_pair(0, 0));
+            return std::make_pair(0, std::make_pair(0, 0));
         }
 
         virtual ~EDBIterator() {}

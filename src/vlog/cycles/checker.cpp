@@ -56,6 +56,8 @@ int Checker::check(Program &p, std::string alg, EDBLayer &db) {
         return MFC(p, true) ? 2 : 0;
     } else if (alg == "RMFA") {
         return RMFA(p) ? 1 : 0;
+    } else if (alg == "RMSA") {
+        return RMSA(p) ? 1 : 0;
     } else if (alg == "MSA") {
         // Model Summarisation Acyclic
         return MSA(p) ? 1 : 0;
@@ -150,7 +152,7 @@ bool Checker::MFA(Program &p) {
 
     //Launch the skolem chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false);
+            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 0, false);
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)
     if (sn->isFoundCyclicTerms()) {
@@ -170,7 +172,7 @@ bool Checker::MSA(Program &p) {
 
     //Launch a simpler version of the skolem chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, TypeChase::SUM_CHASE, 1, 1, false);
+            &newProgram, true, true, false, TypeChase::SUM_CHASE, 1, 0, false);
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)
     if (sn->isFoundCyclicTerms()) {
@@ -183,12 +185,21 @@ bool Checker::MSA(Program &p) {
 // Add special targets that have the head of existential rules as body, but only the non-existential variables in the head.
 // So, for instance, if we have a rule P(X,Y),Q(Y) :- R(X), then we add a rule Z(X) :- P(X,Y),Q(Y). This is for the implementation
 // of the blocked check.
-void Checker::addBlockCheckTargets(Program &p) {
+void Checker::addBlockCheckTargets(Program &p, PredId_t ignorePredId) {
     std::vector<Rule> rules = p.getAllRules();
     for (auto rule : rules) {
         if (rule.isExistential()) {
-            auto newBody = rule.getHeads();
-            std::vector<uint8_t> headvars = rule.getVarsInBody();
+            auto ruleHeadAtoms = rule.getHeads();
+            //Remove from newBody any atom with the special predicate
+            std::vector<Literal> newBody;
+            for(size_t i = 0; i < ruleHeadAtoms.size(); ++i) {
+                auto &atom = ruleHeadAtoms[i];
+                if (atom.getPredicate().getId() != ignorePredId) {
+                    newBody.push_back(atom);
+                }
+            }
+
+            std::vector<uint8_t> headvars = rule.getFrontierVariables(ignorePredId);
             std::string newPred = "__GENERATED_PRED__" + std::to_string(rule.getId());
             Predicate newp = p.getPredicate(p.getOrAddPredicate(newPred, headvars.size()));
             VTuple t(headvars.size());
@@ -222,6 +233,134 @@ bool Checker::RMFA(Program &p) {
         return true;
     }
 }
+
+bool Checker::RMSA(Program &originalProgram) {
+    // Create  the critical instance (cdb)
+    EDBLayer *db = originalProgram.getKB();
+    EDBLayer layer(*db, false);
+
+
+    Program programWithCritical(&layer);
+    createCriticalInstance(programWithCritical, originalProgram, db, layer);
+
+    //Add a special predicate to the head of all existential rules to track the
+    //dependencies
+    std::string nameSpecialPred = "__S__";
+    auto specialPredId = programWithCritical.getOrAddPredicate(nameSpecialPred, 2);
+    Predicate specialPred(specialPredId, 0, IDB, 2);
+
+    std::vector<Rule> newRules;
+    size_t ruleCounter = programWithCritical.getAllRules().size() + 1;
+    for(auto &rule : programWithCritical.getAllRules()) {
+        if (rule.isExistential()) {
+            std::vector<Literal> newHeads;
+            auto varsInHeadAndBody = rule.getFrontierVariables();
+            if (varsInHeadAndBody.size() > 0) {
+                //For each existential var, add a new atom in the head
+                auto varsNotInBody = rule.getExistentialVariables();
+                for(auto varNotInBody : varsNotInBody) {
+                    //Create a special predicate
+                    //std::string nameSpecialPredVar = "__SR_" + std::to_string(rule.getId()) + "_" + std::to_string(varNotInBody) + "__";
+                    //auto specialPredVarId = programWithCritical.getOrAddPredicate(nameSpecialPredVar, varsInHeadAndBody.size() + 1);
+                    //Predicate specialPredVar(specialPredVarId, 0, IDB, varsInHeadAndBody.size() + 1);
+                    for(size_t i = 0; i < varsInHeadAndBody.size(); ++i) {
+                        VTuple t(2);
+                        auto varInHeadAndBody = varsInHeadAndBody[i];
+                        t.set(VTerm(varInHeadAndBody, 0), 0);
+                        t.set(VTerm(varNotInBody, 0), 1);
+                        Literal specialLiteral = Literal(specialPred, t);
+                        newHeads.push_back(specialLiteral);
+                    }
+
+                    /*//Add also a new rule (necessary to compute the cycles
+                      for(size_t i = 0; i < varsInHeadAndBody.size(); ++i) {
+                      std::vector<Literal> auxBody;
+                      auxBody.push_back(specialLiteral);
+                      std::vector<Literal> auxHead;
+                      VTuple t(2);
+                      t.set(VTerm(varsInHeadAndBody[i], 0), 0);
+                      t.set(VTerm(varNotInBody, 0), 1);
+                      auxHead.push_back(Literal(specialPred, t));
+                      newRules.push_back(Rule(ruleCounter++, auxHead, auxBody));
+                      }*/
+                }
+            }
+            auto &heads = rule.getHeads();
+            for (auto &head : heads) {
+                newHeads.push_back(head);
+            }
+            newRules.push_back(Rule(rule.getId(), newHeads, rule.getBody()));
+        } else {
+            newRules.push_back(rule);
+        }
+    }
+
+    //Add a couple of transitive rules for creating the cycles
+    //These rules are
+    //S_TRANS(X,Y) :- S(X,Y)
+    std::string nameSpecialPredTrans = "__S_TRANS__";
+    auto specialPredTransId = programWithCritical.getOrAddPredicate(nameSpecialPredTrans, 2);
+    Predicate specialPredTrans(specialPredTransId, 0, IDB, 2);
+    VTuple t(2);
+    t.set(VTerm(1, 0), 0);
+    t.set(VTerm(2, 0), 1);
+    std::vector<Literal> auxBody;
+    auxBody.push_back(Literal(specialPred, t));
+    std::vector<Literal> auxHead;
+    auxHead.push_back(Literal(specialPredTrans, t));
+    newRules.push_back(Rule(ruleCounter++, auxHead, auxBody));
+    //S_TRANS(X,Z) :- S_TRANS(X,Y),S(Y,Z)
+    auxBody.clear();
+    auxBody.push_back(Literal(specialPredTrans, t));
+    t.set(VTerm(2, 0), 0);
+    t.set(VTerm(3, 0), 1);
+    auxBody.push_back(Literal(specialPred, t));
+    auxHead.clear();
+    t.set(VTerm(1, 0), 0);
+    t.set(VTerm(3, 0), 1);
+    auxHead.push_back(Literal(specialPredTrans, t));
+    newRules.push_back(Rule(ruleCounter++, auxHead, auxBody));
+
+    Program rewrittenPrg = programWithCritical.clone();
+    rewrittenPrg.cleanAllRules();
+    rewrittenPrg.addAllRules(newRules);
+
+    addBlockCheckTargets(rewrittenPrg, specialPredId);
+    for(auto &r : rewrittenPrg.getAllRules()) {
+        LOG(DEBUGL) << r.toprettystring(&rewrittenPrg, &layer);
+    }
+
+    //Launch the (special) restricted chase with the check for cyclic terms
+    std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
+            &rewrittenPrg, true, true, false, TypeChase::SUM_RESTRICTED_CHASE, 1, 0, false);
+    sn->checkAcyclicity(-1, specialPredId); //run(0, 1, NULL);
+
+    //Parse the content of the special relation. If we find a cycle, then we stop
+    bool foundCycles = false;
+    auto itr = sn->getTable(specialPredTransId);
+    while (!itr.isEmpty() && !foundCycles) {
+        auto table = itr.getCurrentTable();
+        auto tableItr = table->getIterator();
+        while (tableItr->hasNext()) {
+            tableItr->next();
+            Term_t v1 = tableItr->getCurrentValue(0);
+            Term_t v2 = tableItr->getCurrentValue(1);
+            //std::cout << v1 <<  " " << v2 << std::endl;
+            if (v1 == v2) { //Cycle!
+                foundCycles = true;
+                break;
+            }
+        }
+        table->releaseIterator(tableItr);
+        itr.moveNextCount();
+    }
+    if (foundCycles) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
 
 static void closure(Program &p, std::map<PredId_t, std::vector<uint32_t>> &occurrences,
         std::vector<std::pair<PredId_t, uint8_t>> &input) {
@@ -297,7 +436,7 @@ static void getAllExtPropagatePositions(Program &p, std::map<rpos, std::vector<v
         if (rule.isExistential()) {
             // First, get the predicate positions of the existential variables in the head(s)
             std::vector<vpos> predPositions[256];
-            std::vector<uint8_t> extVars = rule.getVarsNotInBody();
+            std::vector<uint8_t> extVars = rule.getExistentialVariables();
             for (auto head : rule.getHeads()) {
                 VTuple tpl = head.getTuple();
                 for (int i = 0; i < tpl.getSize(); i++) {
@@ -435,7 +574,7 @@ static bool rja_check(Program &p, Program &nongen_program, const Rule &rulev, co
     newProgram.parseRule(newRule, false);
 
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 1, false);
+            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 0, false);
     sn->run();
     Reasoner r((uint64_t) 0);
     Dictionary dictVariables;
@@ -490,7 +629,7 @@ bool Checker::JA(Program &p, bool restricted) {
                 }
                 dest++;
             }
-            // Now check if the graph is cyclic. 
+            // Now check if the graph is cyclic.
             // If it is, the ruleset is not JA (Joint Acyclic) (which means that the result is inconclusive).
             // If the ruleset is JA, we know that the chase will terminate.
             if (g.isCyclic()) {
@@ -520,13 +659,13 @@ bool Checker::JA(Program &p, bool restricted) {
         for (auto &it : allExtVarsPos) {
             int dest = 0;
             const Rule &rulev = p.getRule(it.first.first);
-            std::vector<uint8_t> extVars = rulev.getVarsNotInBody();
+            std::vector<uint8_t> extVars = rulev.getExistentialVariables();
             uint8_t v = extVars[it.first.second];
             LOG(TRACEL) << "Src = " << src << ", rule " << rulev.tostring(&p, p.getKB());
             for (auto &it2: allExtVarsPos) {
                 const Rule &rulew = p.getRule(it2.first.first);
                 auto body = rulew.getBody();
-                extVars = rulew.getVarsNotInBody();
+                extVars = rulew.getExistentialVariables();
                 uint8_t w = extVars[it2.first.second];
                 LOG(TRACEL) << "Trying " << dest << ", rule " << rulew.tostring(&p, p.getKB());
                 std::map<uint8_t, std::vector<vpos>> positions;
@@ -560,7 +699,7 @@ bool Checker::JA(Program &p, bool restricted) {
                 }
                 dest++;
             }
-            // Now check if the graph is cyclic. 
+            // Now check if the graph is cyclic.
             // If it is, the ruleset is not JA (Joint Acyclic) (which means that the result is inconclusive).
             // If the ruleset is JA, we know that the chase will terminate.
             if (g.isCyclic()) {
@@ -708,7 +847,7 @@ Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
     size_t count = 0;
     for (auto rule : rules) {
         std::string output = "";
-        std::vector<uint8_t> existentials = rule.getVarsNotInBody();
+        std::vector<uint8_t> existentials = rule.getExistentialVariables();
         bool first = true;
         for(const auto& head : rule.getHeads()) {
             if (! first) {
@@ -735,7 +874,7 @@ Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
                     uint64_t id = tuple.get(i).getValue();
                     char text[MAX_TERM_SIZE];
                     if (db->getDictText(id, text)) {
-                        string v = Program::compressRDFOWLConstants(std::string(text));
+                        std::string v = Program::compressRDFOWLConstants(std::string(text));
                         output += v;
                     } else {
                         std::string t = db->getDictText(id);
@@ -764,9 +903,9 @@ Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
         }
         if (existentials.size() > 0) {
             // Add negated term allowing for exclusion of a specific binding
-            output += ", neg_";
+            output += ", ~";
             output += "__EXCLUDE_DUMMY__" + std::to_string(count) + "(";
-            std::vector<uint8_t> vars = rule.getVarsInBody();
+            std::vector<uint8_t> vars = rule.getFrontierVariables();
             bool f = true;
             for (int i = 0; i < vars.size(); i++) {
                 if (! f) {

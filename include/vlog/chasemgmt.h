@@ -20,7 +20,7 @@
 #define RULEVARMASK (RULE_MASK|VAR_MASK)
 #define COUNTER(v) (v & 0xFFFFFFFF)
 
-typedef enum TypeChase {RESTRICTED_CHASE, SKOLEM_CHASE, SUM_CHASE } TypeChase;
+typedef enum TypeChase {RESTRICTED_CHASE, SKOLEM_CHASE, SUM_CHASE, SUM_RESTRICTED_CHASE } TypeChase;
 
 struct ChaseRow {
     uint8_t sz;
@@ -28,7 +28,8 @@ struct ChaseRow {
 
     ChaseRow() : sz(0), row(NULL) {}
 
-    ChaseRow(const uint8_t s, uint64_t *r) : sz(s), row(r) {}
+    ChaseRow(const uint8_t s, uint64_t *r) : sz(s), row(r) {
+    }
 
     bool operator == (const ChaseRow &other) const {
         for (int i = 0; i < sz; i++) {
@@ -62,8 +63,8 @@ class ChaseMgmt {
                 uint32_t blockCounter;
                 uint64_t *currentblock;
                 std::unordered_map<ChaseRow, uint64_t, hash_ChaseRow> rows;
-                bool cyclicTerms;
                 TypeChase typeChase;
+				std::set<uint64_t> deps;	// For SUM chases.
 
             public:
                 Rows(uint64_t startCounter, uint8_t sizerow,
@@ -74,16 +75,11 @@ class ChaseMgmt {
                         blockCounter = 0;
                         currentblock = NULL;
                         currentcounter = startCounter;
-                        cyclicTerms = false;
                         this->typeChase = typeChase;
                     }
 
                 uint8_t getSizeRow() {
                     return sizerow;
-                }
-
-                bool containsCyclicTerms() {
-                    return cyclicTerms;
                 }
 
                 uint64_t *getRow(size_t id);
@@ -119,8 +115,6 @@ class ChaseMgmt {
                     this->chase = chase;
                 }
 
-                bool containsCyclicTerms();
-
                 Rule const *getRule() {
                     return rule;
                 }
@@ -134,6 +128,7 @@ class ChaseMgmt {
 
         const int ruleToCheck;
         bool cyclic;
+        PredId_t predIgnoreBlock;
 
         bool checkSingle(uint64_t target, uint64_t rv, std::set<uint64_t> &toCheck);
 
@@ -142,7 +137,8 @@ class ChaseMgmt {
     public:
         ChaseMgmt(std::vector<RuleExecutionDetails> &rules,
                 const TypeChase typeChase, const bool checkCyclic,
-                const int ruleToCheck = -1);
+                const int ruleToCheck = -1,
+                const PredId_t predIgnoreBlocking = -1);
 
         std::shared_ptr<Column> getNewOrExistingIDs(
                 uint32_t ruleid,
@@ -162,8 +158,17 @@ class ChaseMgmt {
             }
         }
 
+        PredId_t getPredicateIgnoreBlocking() {
+            return predIgnoreBlock;
+        }
+
         bool isRestricted() {
-            return typeChase == TypeChase::RESTRICTED_CHASE;
+            return typeChase == TypeChase::RESTRICTED_CHASE ||
+                typeChase == TypeChase::SUM_RESTRICTED_CHASE;
+        }
+
+        TypeChase getChaseType() {
+            return typeChase;
         }
 
         bool hasRuleToCheck() {

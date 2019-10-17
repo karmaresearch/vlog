@@ -48,18 +48,20 @@ class Test {
         VLog vlog = new VLog();
         vlog.setLogLevel(LogLevel.INFO);
         vlog.start("", false);
-        try (TermQueryResultIterator e = vlog
-                .query(new Atom("A", new Term(Term.TermType.VARIABLE, "C")))) {
-            if (e.hasNext()) {
-                throw new Error("Error in query");
+        try {
+            try (TermQueryResultIterator e = vlog.query(
+                    new Atom("A", new Term(Term.TermType.VARIABLE, "C")))) {
+                System.err.println("vlog should have thrown an exception");
             }
+        } catch (NonExistingPredicateException e) {
+            // OK
         }
     }
 
     static void runTest() throws Exception {
         testEmpty();
         VLog vlog = new VLog();
-        vlog.setLogLevel(LogLevel.DEBUG);
+        vlog.setLogLevel(LogLevel.INFO);
         try {
             vlog.start("blabla", false);
             System.err.println("vlog.start() should have thrown an exception.");
@@ -94,8 +96,13 @@ class Test {
             throw new Error(
                     "Error in query, check file 'blabla', should contain 'c,d,e'");
         }
-        vlog.writeQueryResultsToCsv(
-                new Atom("p3", q1.toArray(new Term[q1.size()])), "blabla");
+        try {
+            vlog.writeQueryResultsToCsv(
+                    new Atom("p3", q1.toArray(new Term[q1.size()])), "blabla");
+            System.err.println("vlog should have thrown an exception");
+        } catch (NonExistingPredicateException e) {
+            // OK
+        }
         Files.delete(Paths.get("blabla"));
 
         vlog = new VLog();
@@ -254,6 +261,7 @@ class Test {
 
         vlog = new VLog();
         vlog.start(edbConf, false);
+
         vlog.setRules(parentRules, RuleRewriteStrategy.AGGRESSIVE);
         if (!vlog.materialize(false, 100)) {
             System.out.println("Timeout ... try again without ...");

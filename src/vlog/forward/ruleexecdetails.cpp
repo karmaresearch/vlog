@@ -2,6 +2,8 @@
 
 #include <set>
 #include <map>
+#include <cassert>
+#include <algorithm>
 
 void RuleExecutionDetails::rearrangeLiterals(std::vector<const Literal*> &vector, const size_t idx) {
     //First go through all the elements before, to make sure that there is always at least one shared variable.
@@ -18,15 +20,14 @@ void RuleExecutionDetails::rearrangeLiterals(std::vector<const Literal*> &vector
 
     //If there are elements that are not linked, then I add them after
     std::vector<const Literal*> subset2;
-    if (leftLiterals.size() > 0) {
+    if (!leftLiterals.empty()) {
         std::copy(leftLiterals.begin(), leftLiterals.end(), std::back_inserter(subset2));
     }
     std::copy(vector.begin() + idx + 1, vector.end(), std::back_inserter(subset2));
 
-    for (std::vector<const Literal*>::iterator itr = subset.begin(); itr != subset.end();
-            ++itr) {
-        std::vector<uint8_t> newvars = (*itr)->getNewVars(startVars);
-        std::copy(newvars.begin(), newvars.end(), std::back_inserter(startVars));
+    for (const auto& literalPointer : subset) {
+        std::vector<uint8_t> newVars = literalPointer->getNewVars(startVars);
+        std::copy(newVars.begin(), newVars.end(), std::back_inserter(startVars));
     }
     std::vector<const Literal*> leftLiterals2;
     groupLiteralsBySharedVariables(startVars, subset2, leftLiterals2);
@@ -37,7 +38,7 @@ void RuleExecutionDetails::rearrangeLiterals(std::vector<const Literal*> &vector
     std::copy(subset2.begin(), subset2.end(), std::back_inserter(vector));
 
     //assert(leftLiterals2.size() == 0);
-    while (leftLiterals2.size() > 0) {
+    while (!leftLiterals2.empty()) {
         const Literal *lit = leftLiterals2.back();
         leftLiterals2.pop_back();
 
@@ -59,8 +60,8 @@ void RuleExecutionDetails::groupLiteralsBySharedVariables(std::vector<uint8_t> &
             leftelements.push_back(set[0]);
             set.clear();
         }
-        std::vector<uint8_t> newvars = set[0]->getNewVars(startVars);
-        std::copy(newvars.begin(), newvars.end(), std::back_inserter(startVars));
+        std::vector<uint8_t> newVars = set[0]->getNewVars(startVars);
+        std::copy(newVars.begin(), newVars.end(), std::back_inserter(startVars));
         return;
     }
 
@@ -68,43 +69,40 @@ void RuleExecutionDetails::groupLiteralsBySharedVariables(std::vector<uint8_t> &
     std::vector<const Literal*> bestMatching;
     std::vector<const Literal*> bestMatchingLeft(set);
 
-    for (std::vector<const Literal*>::iterator itr = set.begin(); itr != set.end();
-            ++itr) {
-        const Literal *lit = *itr;
-        std::vector<uint8_t> sharedVars = lit->getSharedVars(startVars);
+    for (const auto& literalPointer : set) {
+        std::vector<uint8_t> sharedVars = literalPointer->getSharedVars(startVars);
         if (sharedVars.size() > 0 || startVars.size() == 0) {
             //copy the remaining
             std::vector<const Literal*> newSet;
-            std::vector<const Literal*> newleftElements;
-            for (std::vector<const Literal*>::iterator itr2 = set.begin(); itr2 != set.end();
-                    ++itr2) {
-                if (*itr2 != *itr) {
-                    newSet.push_back(*itr2);
+            std::vector<const Literal*> newLeftElements;
+            for (const auto& literalPointer2 : set) {
+                if (literalPointer2 != literalPointer) {
+                    newSet.push_back(literalPointer2);
                 }
             }
 
             //copy the new vars
-            std::vector<uint8_t> newvars(startVars);
-            std::vector<uint8_t> nv = lit->getNewVars(newvars);
-            std::copy(nv.begin(), nv.end(), std::back_inserter(newvars));
+            std::vector<uint8_t> newVars(startVars);
+            std::vector<uint8_t> nv = literalPointer->getNewVars(newVars);
+            std::copy(nv.begin(), nv.end(), std::back_inserter(newVars));
 
-            groupLiteralsBySharedVariables(newvars, newSet, newleftElements);
-            if (newleftElements.size() == 0) {
+            groupLiteralsBySharedVariables(newVars, newSet, newLeftElements);
+            if (newLeftElements.empty()) {
                 startVars.clear();
                 set.clear();
                 leftelements.clear();
-                set.push_back(lit);
+                set.push_back(literalPointer);
                 std::copy(newSet.begin(), newSet.end(), std::back_inserter(set));
-                std::copy(newvars.begin(), newvars.end(), std::back_inserter(startVars));
+                std::copy(newVars.begin(), newVars.end(), std::back_inserter(startVars));
                 return;
             } else {
                 if (newSet.size() > bestMatching.size()) {
                     varsBestMatching.clear();
                     bestMatching.clear();
                     bestMatchingLeft.clear();
-                    std::copy(newvars.begin(), newvars.end(), std::back_inserter(varsBestMatching));
+                    std::copy(newVars.begin(), newVars.end(), std::back_inserter(varsBestMatching));
                     std::copy(newSet.begin(), newSet.end(), std::back_inserter(bestMatching));
-                    std::copy(newleftElements.begin(), newleftElements.end(), std::back_inserter(bestMatchingLeft));
+                    std::copy(newLeftElements.begin(), newLeftElements.end(), std::back_inserter(bestMatchingLeft));
                 }
             }
         }
@@ -120,10 +118,9 @@ void RuleExecutionDetails::groupLiteralsBySharedVariables(std::vector<uint8_t> &
 }
 
 void RuleExecutionDetails::extractAllEDBPatterns(std::vector<const Literal*> &output, const std::vector<Literal> &input) {
-    for (std::vector<Literal>::const_iterator itr = input.begin(); itr != input.end();
-            ++itr) {
-        if (itr->getPredicate().getType() == EDB) {
-            output.push_back(&(*itr));
+    for (const auto& literal : input) {
+        if (literal.getPredicate().getType() == EDB) {
+            output.push_back(&literal);
         }
     }
 }
@@ -135,23 +132,21 @@ void RuleExecutionDetails::checkFilteringStrategy(
 
     std::vector<uint8_t> vars = literal.getAllVars();
     std::vector<uint8_t> sharedVars = head.getSharedVars(vars);
-    if (sharedVars.size() > 0) {
+    if (!sharedVars.empty()) {
         hv.lastLiteralSharesWithHead = true;
     } else {
         hv.lastLiteralSharesWithHead = false;
     }
 
     hv.lastSorting.clear();
-    if (sharedVars.size() > 0) {
+    if (!sharedVars.empty()) {
         //set the sorting by the position of the sharedVars in the literal
-        for (std::vector<uint8_t>::iterator itr = sharedVars.begin();
-                itr != sharedVars.end();
-                ++itr) {
+        for (const auto& sharedVar : sharedVars) {
             uint8_t posVar = 0;
             for (uint8_t pos = 0; pos < literal.getTupleSize(); ++pos) {
                 VTerm t = literal.getTermAtPos(pos);
                 if (t.isVariable()) {
-                    if (t.getId() == *itr) {
+                    if (t.getId() == sharedVar) {
                         hv.lastSorting.push_back(posVar);
                     }
                     posVar++;
@@ -170,12 +165,10 @@ void RuleExecutionDetails::calculateNVarsInHeadFromEDB() {
                 //Check if this variable appears on some edb terms
                 std::vector<std::pair<uint8_t, uint8_t>> edbLiterals;
                 uint8_t idxLiteral = 0;
-                for (std::vector<Literal>::iterator itr = bodyLiterals.begin();
-                        itr != bodyLiterals.end();
-                        ++itr) {
-                    if (itr->getPredicate().getType() == EDB) {
-                        for (uint8_t j = 0; j < itr->getTupleSize(); ++j) {
-                            VTerm t2 = itr->getTermAtPos(j);
+                for (const auto & literal : bodyLiterals) {
+                    if (literal.getPredicate().getType() == EDB) {
+                        for (uint8_t j = 0; j < literal.getTupleSize(); ++j) {
+                            VTerm t2 = literal.getTermAtPos(j);
                             if (t2.isVariable() && t.getId() == t2.getId()) {
                                 edbLiterals.push_back(std::make_pair(idxLiteral, j));
                                 break;
@@ -185,7 +178,7 @@ void RuleExecutionDetails::calculateNVarsInHeadFromEDB() {
                     idxLiteral++;
                 }
 
-                if (edbLiterals.size() > 0) {
+                if (!edbLiterals.empty()) {
                     //add the position and the occurrences
                     posEDBVarsInHead.push_back(globalCounter + i);
                     occEDBVarsInHead.push_back(edbLiterals);
@@ -305,63 +298,29 @@ break;
 }
 }
 }*/
-
-void RuleExecutionDetails::calculateDependencies(const Rule &rule,
-        std::map<uint8_t, std::vector<uint8_t>> &dependenciesExtVars) {
-    //Calculate the dependencies of the existential variables to the variables in the body
-    std::map<uint8_t, std::set<uint8_t>> dependenciesExtVars_tmp;
-    auto extvars = rule.getVarsNotInBody();
-    auto othervars = rule.getVarsInBody();
-    for(auto head : rule.getHeads()) {
-        auto allvars = head.getAllVars();
-        for(auto v : allvars) {
-            bool isext = false;
-            for(auto extvar : extvars)
-                if (extvar == v) {
-                    isext = true;
-                    break;
-                }
-            if (isext) {
-                for (auto othervar : othervars) {
-                    dependenciesExtVars_tmp[v].insert(othervar);
-                }
-            }
-        }
-    }
-    for(auto pair : dependenciesExtVars_tmp) {
-        for(auto el : pair.second) {
-            dependenciesExtVars[pair.first].push_back(el);
-        }
-    }
-}
-
 void RuleExecutionDetails::createExecutionPlans(
         std::vector<std::pair<size_t, size_t>> &ranges,
         bool copyAllVars) {
-    std::vector<Literal> bl = rule.getBody();
-    orderExecutions.clear();
     bodyLiterals.clear();
+    orderExecutions.clear();
 
     //Init
-    for (std::vector<Literal>::iterator itr = bl.begin(); itr != bl.end(); ++itr) {
-        bodyLiterals.push_back(*itr);
+    for (auto& literal : rule.getBody()) {
+        bodyLiterals.push_back(literal);
     }
 
     //Calculate the dependencies of the existential variables to the variables in the body
-    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars;
-    calculateDependencies(rule, dependenciesExtVars);
+    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars = rule.calculateDependencies();
 
     //Create a single execution plan
     RuleExecutionPlan p;
     p.filterLastHashMap = false;
     std::vector<const Literal*> v;
     p.dependenciesExtVars = dependenciesExtVars;
-    int rangeid = 0;
-    for (std::vector<Literal>::const_iterator itr = bodyLiterals.begin();
-            itr != bodyLiterals.end();
-            ++itr) {
-        p.plan.push_back(&(*itr));
-        p.ranges.push_back(std::make_pair(ranges[rangeid].first, ranges[rangeid].second));
+    int rangeId = 0;
+    for (const auto& literal : bodyLiterals) {
+        p.plan.push_back(&literal);
+        p.ranges.push_back(std::make_pair(ranges[rangeId].first, ranges[rangeId].second));
     }
 
     auto &heads = rule.getHeads();
@@ -370,40 +329,34 @@ void RuleExecutionDetails::createExecutionPlans(
 }
 
 void RuleExecutionDetails::createExecutionPlans(bool copyAllVars) {
-    //Init
-    std::vector<Literal> bl = rule.getBody();
     bodyLiterals.clear();
-    for (std::vector<Literal>::iterator itr = bl.begin(); itr != bl.end(); ++itr) {
-        bodyLiterals.push_back(*itr);
-    }
     orderExecutions.clear();
 
-    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars;
-    calculateDependencies(rule, dependenciesExtVars);
+    for (auto& literal : rule.getBody()) {
+        bodyLiterals.push_back(literal);
+    }
+
+    //Calculate the dependencies of the existential variables to the variables in the body
+    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars = rule.calculateDependencies();
 
     if (nIDBs > 0) {
         //Collect the IDB predicates
         std::vector<uint8_t> posMagicAtoms;
         std::vector<uint8_t> posIdbLiterals;
-        uint8_t i = 0;
         orderExecutions.resize(nIDBs);
 
-        for (std::vector<Literal>::const_iterator itr = bodyLiterals.begin();
-                itr != bodyLiterals.end();
-                ++itr) {
-            if (itr->getPredicate().getType() == IDB) {
+        for (uint8_t i = 0; i < bodyLiterals.size(); ++i){
+            Predicate predicate = bodyLiterals.at(i).getPredicate();
+            if(predicate.getType() == IDB){
                 posIdbLiterals.push_back(i);
-                if (itr->getPredicate().isMagic()) {
+                if(predicate.isMagic()) {
                     posMagicAtoms.push_back(i);
                 }
             }
-            i++;
         }
 
         int order = 0;
-        for (std::vector<uint8_t>::iterator itr = posIdbLiterals.begin();
-                itr != posIdbLiterals.end();
-                ++itr) {
+        for (const auto& pos : posIdbLiterals) {
             RuleExecutionPlan *p = &orderExecutions[order];
             p->filterLastHashMap = false;
             p->dependenciesExtVars = dependenciesExtVars;
@@ -413,21 +366,19 @@ void RuleExecutionDetails::createExecutionPlans(bool copyAllVars) {
                 assert(posMagicAtoms.size() == 1);
                 p->plan.push_back(&bodyLiterals[posMagicAtoms[0]]);
                 extractAllEDBPatterns(p->plan, bodyLiterals);
-                if (! bodyLiterals[*itr].isMagic()) {
-                    p->plan.push_back(&bodyLiterals[*itr]);
+                if (! bodyLiterals[pos].isMagic()) {
+                    p->plan.push_back(&bodyLiterals[pos]);
                 }
             } else {
                 extractAllEDBPatterns(p->plan, bodyLiterals);
                 idx = p->plan.size();
-                p->plan.push_back(&bodyLiterals[*itr]);
+                p->plan.push_back(&bodyLiterals[pos]);
             }
 
             //Add all others
-            for (std::vector<uint8_t>::iterator itr2 = posIdbLiterals.begin();
-                    itr2 != posIdbLiterals.end();
-                    ++itr2) {
-                if (*itr2 != *itr && ! bodyLiterals[*itr2].isMagic()) {
-                    p->plan.push_back(&bodyLiterals[*itr2]);
+            for (const auto& pos2 : posIdbLiterals) {
+                if (pos2 != pos && ! bodyLiterals[pos2].isMagic()) {
+                    p->plan.push_back(&bodyLiterals[pos2]);
                 }
             }
             rearrangeLiterals(p->plan, idx);
@@ -446,14 +397,13 @@ void RuleExecutionDetails::createExecutionPlans(bool copyAllVars) {
             p->calculateJoinsCoordinates(heads, copyAllVars);
 
             //New version. Should be able to catch everything
-            for (int i = 0; i < p->plan.size(); ++i) {
-                if (p->plan[i]->getPredicate().getType() == EDB) {
+            for (const auto& literal : p->plan) {
+                if (literal->getPredicate().getType() == EDB || literal->isNegated()) {
                     p->ranges.push_back(std::make_pair(0, (size_t) - 1));
                 } else {
-                    const Literal *l = p->plan[i];
-                    if (l == &bodyLiterals[*itr]) {
+                    if (literal == &bodyLiterals[pos]) {
                         p->ranges.push_back(std::make_pair(1, (size_t) - 1));
-                    } else if (l < &bodyLiterals[*itr]) {
+                    } else if (literal < &bodyLiterals[pos]) {
                         p->ranges.push_back(std::make_pair(0, 1));
                     } else {
                         p->ranges.push_back(std::make_pair(0, (size_t) - 1));

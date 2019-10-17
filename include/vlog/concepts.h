@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <vector>
 #include <set>
+#include <map>
 #include <unordered_map>
 
 #include <parser/ruledriver.h>
@@ -26,13 +27,11 @@ typedef uint32_t PredId_t;
 
 class EDBLayer;
 
-using namespace std;
-
 inline std::string fields2str(const std::vector<uint8_t> &fields) {
-    ostringstream os;
+    std::ostringstream os;
     os << "[" << fields.size() << "]{";
     for (auto f : fields) {
-       os << (int)f << ",";
+        os << (int)f << ",";
     }
     os << "}";
 
@@ -100,6 +99,14 @@ class VTuple {
             terms[pos] = term;
         }
 
+        void replaceAll(const VTerm termA, const VTerm termB) {
+            for (int i = 0; i < sizetuple; i++) {
+                if (terms[i] == termA) {
+                    terms[i] = termB;
+                }
+            }
+        }
+
         std::vector<std::pair<uint8_t, uint8_t>> getRepeatedVars() const {
             std::vector<std::pair<uint8_t, uint8_t>> output;
             for (uint8_t i = 0; i < sizetuple; ++i) {
@@ -152,6 +159,7 @@ class VTuple {
            return *this;
            }
            */
+        //L. Can I create an iterator on it? begin, end etc?
 
         ~VTuple() {
             delete[] terms;
@@ -296,7 +304,8 @@ class Literal {
             return negated;
         }
 
-        static int mgu(Substitution *substitutions, const Literal &l, const Literal &m);
+        //L. do we need this function?
+        //static int mgu(Substitution *substitutions, const Literal &l, const Literal &m);
 
         static int subsumes(std::vector<Substitution> &substitutions, const Literal &from, const Literal &to);
 
@@ -324,6 +333,7 @@ class Literal {
         std::vector<uint8_t> getNewVars(std::vector<uint8_t> &vars) const;
 
         std::vector<uint8_t> getAllVars() const;
+        bool containsVariable(uint8_t variableId) const;
 
         std::string tostring(Program *program, EDBLayer *db) const;
 
@@ -358,13 +368,13 @@ class Rule {
             heads(heads),
             body(body),
             _isRecursive(checkRecursion(heads, body)),
-            existential(!getVarsNotInBody().empty()) {
+            existential(!getExistentialVariables().empty()) {
                 checkRule();
             }
 
         Rule(uint32_t ruleId, Rule &r) : ruleId(ruleId),
-            heads(r.heads), body(r.body), _isRecursive(r._isRecursive),
-            existential(r.existential) {
+        heads(r.heads), body(r.body), _isRecursive(r._isRecursive),
+        existential(r.existential) {
         }
 
         Rule createAdornment(uint8_t headAdornment) const;
@@ -393,9 +403,13 @@ class Rule {
 
         bool isExistential() const;
 
-        std::vector<uint8_t> getVarsNotInBody() const;  // Existential variables.
+        std::vector<uint8_t> getVarsInHead(PredId_t ignore = -1) const;
+        std::vector<uint8_t> getVarsInBody() const;
+        std::vector<uint8_t> getExistentialVariables() const;
 
-        std::vector<uint8_t> getVarsInBody() const; // Variables in the head that also occur in the body.
+        std::vector<uint8_t> getFrontierVariables(PredId_t ignore = -1) const;
+
+        std::map<uint8_t, std::vector<uint8_t>> calculateDependencies() const;
 
         const std::vector<Literal> &getBody() const {
             return body;
@@ -447,13 +461,11 @@ class Rule {
 
         void checkRule() const;
 
-        std::string tostring(Program *program, EDBLayer *db) const;
-
-        std::string toprettystring(Program * program, EDBLayer *db, bool replaceConstants = false) const;
+        Rule normalizeVars() const;
 
         std::string tostring() const;
-
-        Rule normalizeVars() const;
+        std::string tostring(Program *program, EDBLayer *db) const;
+        std::string toprettystring(Program *program, EDBLayer *db, bool replaceConstants = false) const;
 
         ~Rule() {
         }
@@ -463,7 +475,7 @@ class Program {
     private:
         //const uint64_t assignedIds;
         EDBLayer *kb;
-        std::vector<std::vector<uint32_t>> rules;
+        std::vector<std::vector<uint32_t>> rules; // [head_predicate_id (idx) : [rule_ids]]
         std::vector<Rule> allrules;
         int rewriteCounter;
 
@@ -492,9 +504,9 @@ class Program {
             kb = e;
         }
 
-	uint64_t getMaxPredicateId() {
-	    return dictPredicates.getCounter();
-	}
+        uint64_t getMaxPredicateId() {
+            return dictPredicates.getCounter();
+        }
 
         std::string parseRule(std::string rule, bool rewriteMultihead);
 

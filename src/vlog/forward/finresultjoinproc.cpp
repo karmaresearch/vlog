@@ -329,7 +329,7 @@ void SingleHeadFinalRuleProcessor::addColumns(const int blockid,
                 if (!literal.getTermAtPos(i).isVariable()) {
                     newc.push_back(std::shared_ptr<Column>(
                                 new CompressedColumn(row[i],
-                                    c[0]->size())));
+                                    c.size() == 0 ? 1 : c[0]->size())));
                 } else {
                     newc.push_back(c[idxVar++]);
                 }
@@ -769,14 +769,14 @@ FinalRuleProcessor::FinalRuleProcessor(
         for(auto &pair : posFromFirst) {
             if (pair.first >= currentTupleSize &&
                     pair.first < currentTupleSize + h.getTupleSize()) {
-                newPosFromFirst.push_back(make_pair(pair.first - currentTupleSize,
+                newPosFromFirst.push_back(std::make_pair(pair.first - currentTupleSize,
                             pair.second));
             }
         }
         for(auto &pair : posFromSecond) {
             if (pair.first >= currentTupleSize &&
                     pair.first < currentTupleSize + h.getTupleSize()) {
-                newPosFromSecond.push_back(make_pair(pair.first - currentTupleSize,
+                newPosFromSecond.push_back(std::make_pair(pair.first - currentTupleSize,
                             pair.second));
             }
         }

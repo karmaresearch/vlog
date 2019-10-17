@@ -51,6 +51,7 @@ class SemiNaiver {
         TypeChase typeChase;
         bool checkCyclicTerms;
         bool foundCyclicTerms;
+        PredId_t predIgnoreBlock; //RMSA
         bool ignoreExistentialRules;
         std::shared_ptr<ChaseMgmt> chaseMgmt;
 
@@ -67,7 +68,7 @@ class SemiNaiver {
 
 #ifdef WEBINTERFACE
         long statsLastIteration;
-        string currentRule;
+        std::string currentRule;
         PredId_t currentPredicate;
 #endif
 
@@ -154,9 +155,7 @@ class SemiNaiver {
                 size_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
 
-        void prepare(std::vector<RuleExecutionDetails> &allrules,
-                size_t lastExecution,
-                int singleRuleToCheck);
+        void prepare(size_t lastExecution, int singleRuleToCheck);
 
         void setIgnoreDuplicatesElimination() {
             ignoreDuplicatesElimination = true;
@@ -182,7 +181,7 @@ class SemiNaiver {
 
         VLIBEXP void run(unsigned long *timeout = NULL,
                 bool checkCyclicTerms = false) {
-            run(0, 1, timeout, checkCyclicTerms, -1);
+            run(0, 1, timeout, checkCyclicTerms, -1, -1);
         }
 
         Program *get_RMFC_program() {
@@ -197,13 +196,18 @@ class SemiNaiver {
             return opt_intersect;
         }
 
+        std::shared_ptr<ChaseMgmt> getChaseManager() {
+            return chaseMgmt;
+        }
+
         virtual FCTable *getTable(const PredId_t pred, const uint8_t card);
 
         VLIBEXP void run(size_t lastIteration,
                 size_t iteration,
                 unsigned long *timeout = NULL,
                 bool checkCyclicTerms = false,
-                int singleRule = -1);
+                int singleRule = -1,
+                PredId_t predIgnoreBlock = -1);
 
         VLIBEXP void storeOnFile(std::string path, const PredId_t pred, const bool decompress,
                 const int minLevel, const bool csv);
@@ -253,22 +257,22 @@ class SemiNaiver {
         virtual FCIterator getTable(const Literal &literal, const size_t minIteration,
                 const size_t maxIteration, TableFilterer *filter);
 
-        void checkAcyclicity(int singleRule = -1) {
-            run(0, 1, NULL, true, singleRule);
+        void checkAcyclicity(int singleRule = -1, PredId_t predIgnoreBlock = -1) {
+            run(0, 1, NULL, true, singleRule, predIgnoreBlock);
         }
 
         //Statistics methods
 
-        VLIBEXP void printCountAllIDBs(string prefix);
+        VLIBEXP void printCountAllIDBs(std::string prefix);
 
         size_t getCurrentIteration();
 
 #ifdef WEBINTERFACE
-        string getCurrentRule();
+        std::string getCurrentRule();
 
         bool isRunning();
 
-        std::vector<std::pair<string, std::vector<StatsSizeIDB>>> getSizeIDBs();
+        std::vector<std::pair<std::string, std::vector<StatsSizeIDB>>> getSizeIDBs();
 
         std::vector<StatsRule> getOutputNewIterations();
 #endif
@@ -276,7 +280,6 @@ class SemiNaiver {
         std::chrono::system_clock::time_point getStartingTimeMs() {
             return startTime;
         }
-
 };
 
 #endif

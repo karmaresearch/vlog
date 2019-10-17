@@ -3,6 +3,7 @@
 #include <kognac/logs.h>
 
 #include <unordered_set>
+#include <assert.h>
 
 std::shared_ptr<Program> Wizard::getAdornedProgram(Literal &query, Program &program) {
 
@@ -59,7 +60,7 @@ Literal Wizard::getMagicRelation(const bool hasPriority, std::shared_ptr<Program
     const uint8_t adornment = head.getPredicate().getAdorment();
 
     //new predicate
-    std::string newPred = "MAGICI_" + to_string(pred) + "_" + to_string(adornment);
+    std::string newPred = "MAGICI_" + std::to_string(pred) + "_" + std::to_string(adornment);
 
     const uint8_t tupleSize = Predicate::getNFields(adornment);
     VTuple newTuple(tupleSize);
