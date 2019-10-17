@@ -1,20 +1,19 @@
 #ifndef _EDB_CONF_H
 #define _EDB_CONF_H
 
+#include <vector>
+#include <string>
+
 #include <vlog/consts.h>
 
-#include <string>
-#include <vector>
-
-using namespace std;
 
 class EDBConf {
 public:
 
     struct Table {
-        string predname;
-        string type;
-        std::vector<string> params;
+        std::string predname;
+        std::string type;
+        std::vector<std::string> params;
         bool encoded;
         Table() : encoded(true) {}
         Table(bool encoded) : encoded(encoded) {}
@@ -23,12 +22,12 @@ public:
 private:
     std::vector<Table> tables;
 
-    void parse(string f);
+    void parse(std::string f);
 
 public:
-    VLIBEXP EDBConf(string rawcontent, bool isFile);
+    VLIBEXP EDBConf(std::string rawcontent, bool isFile);
 
-    EDBConf(string rawcontent) : EDBConf(rawcontent, true) {}
+    EDBConf(std::string rawcontent) : EDBConf(rawcontent, true) {}
 
     const std::vector<Table> &getTables() {
         return tables;

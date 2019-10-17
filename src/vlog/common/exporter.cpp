@@ -208,7 +208,7 @@ void Exporter::extractTriples(std::vector <uint64_t> &all_s,
     LOG(DEBUGL) << "Merged " << ntables << " tables";
 }
 
-/*void Exporter::generateTridentDiffIndexTabByTab(string outputdir) {
+/*void Exporter::generateTridentDiffIndexTabByTab(std::string outputdir) {
   std::vector<uint64_t> all_s;
   std::vector<uint64_t> all_p;
   std::vector<uint64_t> all_o;
@@ -294,7 +294,7 @@ LOG(INFOL) << "Copying table of " << nrows <<
 " postocopy " << (int)it->nPosToCopy;
 copyTable(all_s, all_p, all_o, it, intTable, nrows, triple);
 
-string diffdir = outputdir + string("/") + to_string(idxUpdate++);
+std::string diffdir = outputdir + string("/") + to_string(idxUpdate++);
 fs::create_directories(diffdir);
 LOG(INFOL) << "Creating the index " << diffdir
 << " posToCopy=" << (int)it->nPosToCopy;
@@ -376,7 +376,7 @@ void Exporter::copyTable(std::vector<uint64_t> &all_s,
     }
 }
 
-void Exporter::generateTridentDiffIndex(string outputdir) {
+void Exporter::generateTridentDiffIndex(std::string outputdir) {
     std::vector<uint64_t> all_s;
     std::vector<uint64_t> all_p;
     std::vector<uint64_t> all_o;
@@ -387,20 +387,20 @@ void Exporter::generateTridentDiffIndex(string outputdir) {
     std::shared_ptr<EDBTable> table = sn->getEDBLayer().getEDBTable(idpred);
     Querier *q = ((TridentTable*)table.get())->getQuerier();
 
-    string diffdir = Updater::getPathForUpdate(outputdir);
+    std::string diffdir = Updater::getPathForUpdate(outputdir);
 
     DiffIndex3::createDiffIndex(DiffIndex::TypeUpdate::ADDITION_df,
             diffdir, outputdir + DIR_SEP + "_diff",
             all_s, all_p, all_o, false, q, true);
     //Write the type of file
-    string flagup = diffdir + DIR_SEP + "ADD";
+    std::string flagup = diffdir + DIR_SEP + "ADD";
     //write also an additional dictionary (if any) TODO!
     // writeDict(kb.getDictMgmt(), locationupdate, tmpdict);
     ofstream ofs(flagup);
     ofs.close();
 }
 
-void Exporter::generateNTTriples(string outputdir, bool decompress) {
+void Exporter::generateNTTriples(std::string outputdir, bool decompress) {
     std::vector<uint64_t> all_s;
     std::vector<uint64_t> all_p;
     std::vector<uint64_t> all_o;
@@ -421,7 +421,7 @@ void Exporter::generateNTTriples(string outputdir, bool decompress) {
                 LOG(INFOL) << "So far exported " << i << " triples ...";
             }
             //Create the file. Close the previous one
-            string filename = outputdir + DIR_SEP + "out-" + to_string(idx++) + ".nt.gz";
+            std::string filename = outputdir + DIR_SEP + "out-" + to_string(idx++) + ".nt.gz";
             LOG(DEBUGL) << "Creating file " << filename;
             out = std::unique_ptr<zstr::ofstream>(new zstr::ofstream(filename));
         }

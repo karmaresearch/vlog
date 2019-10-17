@@ -5,7 +5,7 @@
 #include <string>
 
 
-SQLRETURN ODBCTable::check(SQLRETURN rc, string msg) {
+SQLRETURN ODBCTable::check(SQLRETURN rc, std::string msg) {
     if (SQL_SUCCEEDED(rc)) {
 	return rc;
     }
@@ -16,8 +16,8 @@ SQLRETURN ODBCTable::check(SQLRETURN rc, string msg) {
     throw 10;
 }
 
-ODBCTable::ODBCTable(PredId_t predid, string user, string pwd, string dbname,
-                       string tablename, string tablefields, EDBLayer *layer) :
+ODBCTable::ODBCTable(PredId_t predid, std::string user, std::string pwd, std::string dbname,
+                       std::string tablename, std::string tablefields, EDBLayer *layer) :
 	SQLTable(predid, tablename, tablefields, layer) {
 
     check(SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &env), "allocate environment handle");
