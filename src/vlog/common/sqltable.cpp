@@ -4,7 +4,7 @@
 #include <vlog/sqltable.h>
 #include <vlog/inmemory/inmemorytable.h>
 
-SQLTable::SQLTable(PredId_t predid, string name, string fieldnames, EDBLayer *layer) :
+SQLTable::SQLTable(PredId_t predid, std::string name, std::string fieldnames, EDBLayer *layer) :
     predid(predid), tablename(name), layer(layer) {
     std::stringstream ss(fieldnames);
     std::string item;
@@ -14,15 +14,15 @@ SQLTable::SQLTable(PredId_t predid, string name, string fieldnames, EDBLayer *la
     arity = fieldTables.size();
 }
 
-string SQLTable::mapToField(uint64_t value, uint8_t ind) {
-    string s = layer->getDictText(value);
+std::string SQLTable::mapToField(uint64_t value, uint8_t ind) {
+    std::string s = layer->getDictText(value);
     int pos = s.find("'");
-    if (pos == string::npos) {
+    if (pos == std::string::npos) {
 	return "'" + s + "'";
     }
     int oldpos = 0;
-    string retval = "'";
-    while (pos != string::npos) {
+    std::string retval = "'";
+    while (pos != std::string::npos) {
 	retval += s.substr(oldpos, pos+1) + "'";
 	oldpos = pos+1;
 	pos = s.find("'", oldpos);
@@ -31,12 +31,12 @@ string SQLTable::mapToField(uint64_t value, uint8_t ind) {
     return retval;
 }
 
-string SQLTable::literalConstraintsToSQLQuery(const Literal &q) {
-    string cond = "";
+std::string SQLTable::literalConstraintsToSQLQuery(const Literal &q) {
+    std::string cond = "";
     int idxField = 0;
     while (idxField < q.getTupleSize()) {
         if (!q.getTermAtPos(idxField).isVariable()) {
-            if (cond != "") {
+            if (!cond.empty()) {
                 cond += " and ";
             }
             cond += fieldTables[idxField] + "=" +
@@ -47,8 +47,8 @@ string SQLTable::literalConstraintsToSQLQuery(const Literal &q) {
     return cond;
 }
 
-string SQLTable::repeatedToSQLQuery(const Literal &q) {
-    string cond = "";
+std::string SQLTable::repeatedToSQLQuery(const Literal &q) {
+    std::string cond = "";
     std::vector<std::pair<uint8_t, uint8_t>> repeated = q.getRepeatedVars();
     for (int i = 0; i < repeated.size(); i++) {
 	if (i != 0) {
@@ -61,14 +61,14 @@ string SQLTable::repeatedToSQLQuery(const Literal &q) {
 
 size_t SQLTable::getCardinality(const Literal &q) {
     LOG(DEBUGL) << "getCardinality: query = " << q.tostring(NULL, layer);
-    string query = "SELECT COUNT(*) from ";
-    string cond = literalConstraintsToSQLQuery(q);
-    string cond1 = repeatedToSQLQuery(q);
-    if (cond != "" || cond1 != "") {
+    std::string query = "SELECT COUNT(*) from ";
+    std::string cond = literalConstraintsToSQLQuery(q);
+    std::string cond1 = repeatedToSQLQuery(q);
+    if (!cond.empty() || !cond1.empty()) {
 	query += "( SELECT DISTINCT * FROM " + tablename;
 	query += " WHERE " + cond;
-	if (cond1 != "") {
-	    if (cond != "") {
+	if (!cond1.empty()) {
+	    if (!cond.empty()) {
 		query += " and ";
 	    }
 	    query += cond1;
@@ -83,13 +83,13 @@ size_t SQLTable::getCardinality(const Literal &q) {
 
 size_t SQLTable::getCardinalityColumn(const Literal &q, uint8_t posColumn) {
     LOG(DEBUGL) << "getCardinalityColumn: col = " << (int)posColumn << ", query = " << q.tostring(NULL, layer);
-    string query = "SELECT COUNT(DISTINCT " + fieldTables[posColumn] + ") as c from " + tablename;
-    string cond = literalConstraintsToSQLQuery(q);
-    string cond1 = repeatedToSQLQuery(q);
-    if (cond != "" || cond1 != "") {
+    std::string query = "SELECT COUNT(DISTINCT " + fieldTables[posColumn] + ") as c from " + tablename;
+    std::string cond = literalConstraintsToSQLQuery(q);
+    std::string cond1 = repeatedToSQLQuery(q);
+    if (!cond.empty() || !cond1.empty()) {
 	query += " WHERE " + cond;
-	if (cond1 != "") {
-	    if (cond != "") {
+	if (!cond1.empty()) {
+	    if (!cond.empty()) {
 		query += " and ";
 	    }
 	    query += cond1;
@@ -107,24 +107,24 @@ bool SQLTable::isEmpty(const Literal &q, std::vector<uint8_t> *posToFilter,
         return getCardinality(q) == 0;
     }
 
-    string query = "SELECT COUNT(*) as c from ";
+    std::string query = "SELECT COUNT(*) as c from ";
 
-    string cond = literalConstraintsToSQLQuery(q);
-    string cond1 = repeatedToSQLQuery(q);
-    if (cond == "") {
+    std::string cond = literalConstraintsToSQLQuery(q);
+    std::string cond1 = repeatedToSQLQuery(q);
+    if (cond.empty()) {
 	cond = cond1;
-    } else if (cond1 != "") {
+    } else if (!cond1.empty()) {
 	cond += " and " + cond1;
     }
     for (int i = 0; i < posToFilter->size(); i++) {
-        if (cond != "") {
+        if (!cond.empty()) {
             cond += " and ";
         }
         cond += fieldTables[posToFilter->at(i)] + "=" +
                 mapToField(valuesToFilter->at(i), posToFilter->at(i));
     }
 
-    if (cond != "") {
+    if (!cond.empty()) {
         query += "( SELECT DISTINCT * FROM " + tablename + " WHERE " + cond + ") Temp";
     } else {
 	query += tablename;
@@ -135,15 +135,15 @@ bool SQLTable::isEmpty(const Literal &q, std::vector<uint8_t> *posToFilter,
 }
 
 SegmentInserter *SQLTable::getInserter(const Literal &q) {
-    string cond = literalConstraintsToSQLQuery(q);
-    string cond1 = repeatedToSQLQuery(q);
-    if (cond == "") {
+    std::string cond = literalConstraintsToSQLQuery(q);
+    std::string cond1 = repeatedToSQLQuery(q);
+    if (cond.empty()) {
 	cond = cond1;
-    } else if (cond1 != "") {
+    } else if (!cond1.empty()) {
 	cond += " and " + cond1;
     }
-    string query = "SELECT DISTINCT * FROM " + tablename;
-    if (cond != "") {
+    std::string query = "SELECT DISTINCT * FROM " + tablename;
+    if (!cond.empty()) {
 	query += " WHERE " + cond;
     }
     SegmentInserter *inserter = new SegmentInserter(arity);
@@ -211,27 +211,27 @@ void SQLTable::query(QSQQuery *query, TupleTable *outputTable,
 	iter = getIterator(*l);
     } else {
 	//Create first part of query.
-	string sqlQuery = "SELECT DISTINCT * FROM " + tablename;
+	std::string sqlQuery = "SELECT DISTINCT * FROM " + tablename;
 	if (valuesToFilter->size() > TEMP_TABLE_THRESHOLD) {
 	    // TODO
 	    LOG(ERRORL) << "Not implemented: SQLTable::query with many values to filter.";
 	    throw 10;
 	}
 	sqlQuery += " WHERE ";
-	string cond = literalConstraintsToSQLQuery(*l);
-	if (cond != "") {
+	std::string cond = literalConstraintsToSQLQuery(*l);
+	if (!cond.empty()) {
 	    sqlQuery += cond;
 	}
 
-	string cond1 = repeatedToSQLQuery(*l);
-	if (cond1 != "") {
-	    if (cond != "") {
+	std::string cond1 = repeatedToSQLQuery(*l);
+	if (!cond1.empty()) {
+	    if (!cond.empty()) {
 		sqlQuery += " AND ";
 	    }
 	    sqlQuery += cond1;
 	}
      
-	if (cond1 != "" || cond != "") {
+	if (!cond1.empty() || !cond.empty()) {
 	    sqlQuery += " AND ";
 	}
 
@@ -244,7 +244,7 @@ void SQLTable::query(QSQQuery *query, TupleTable *outputTable,
 	    }
 	    sqlQuery += "(";
 	    for (int i = 0; i < posToFilter->size(); i++, itr++) {
-		string pref = i > 0 ? " AND " : "";
+		std::string pref = i > 0 ? " AND " : "";
 		uint8_t pos = posToFilter->at(i);
 		sqlQuery += pref + fieldTables[pos] + " = " + mapToField(*itr, pos);
 	    }
@@ -275,7 +275,7 @@ void SQLTable::query(QSQQuery *query, TupleTable *outputTable,
 }
 
 uint64_t SQLTable::getSize() {
-    string query = "SELECT COUNT(*) from " + tablename;
+    std::string query = "SELECT COUNT(*) from " + tablename;
     uint64_t result = getSizeFromDB(query);
     return result;
 }

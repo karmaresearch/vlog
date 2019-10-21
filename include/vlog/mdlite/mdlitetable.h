@@ -27,11 +27,11 @@ class MDLiteCon {
 
 class MDLiteTable : public SQLTable {
     private:
-        std::vector<string> varnames;
+        std::vector<std::string> varnames;
         uint8_t arity;
 
     public:
-        MDLiteTable(string repository, string tablename);
+        MDLiteTable(std::string repository, std::string tablename);
 
         virtual uint8_t getArity() const;
 

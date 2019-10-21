@@ -317,9 +317,8 @@ void JoinExecutor::verificativeJoinOneColumn(
 
         //Get the column from the table. Is it EDB? Then offload the join
         //to the EDB layer
-        shared_ptr<const Column> column = table->
+        std::shared_ptr<const Column> column = table->
             getColumn(hv.joinCoordinates[currentLiteral][0].second);
-        LOG(TRACEL) << "Count = " << count;
 #if RESET_SORTED_ITR
         itr->reset();
 #else
@@ -833,12 +832,10 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                     //Filter the tables in input checking whether the input query produced
                     //by the rule can have produced output tuples in following derivations
                     uint32_t nEmptyDerivations = 0;
-                    for (std::vector<std::pair<const FCBlock *, uint32_t>>::iterator itr = tables.begin();
-                            itr != tables.end(); ++itr) {
-                        if (queryFilterer.
-                                producedDerivationInPreviousSteps(l,
-                                    literalToQuery, itr->first)) {
-                            itr->second--;
+                    for (auto& table : tables) {
+                        if (queryFilterer.producedDerivationInPreviousSteps(
+                                    l, literalToQuery, table.first)) {
+                            table.second--;
                             nEmptyDerivations++;
                         }
                     }
@@ -863,12 +860,11 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
 
                 {
                     std::vector<FilterHashJoinBlock> retainedTables;
-                    for (std::vector<std::pair<const FCBlock *, uint32_t>>::iterator itr = tables.begin();
-                            itr != tables.end(); ++itr) {
-                        if (itr->second > 0) {
+                    for (auto& table : tables) {
+                        if (table.second > 0) {
                             FilterHashJoinBlock b;
-                            b.table = itr->first->table.get();
-                            b.iteration = itr->first->iteration;
+                            b.table = table.first->table.get();
+                            b.iteration = table.first->iteration;
                             retainedTables.push_back(b);
                         }
                     }
@@ -907,10 +903,8 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                     //std::chrono::duration<double> secJ = std::chrono::system_clock::now() - startJ;
                 } //retained tables
 
-                for (std::vector<DuplicateContainers>::iterator itr = existingTuples.begin();
-                        itr != existingTuples.end();
-                        ++itr) {
-                    itr->clear();
+                for (auto& tuple : existingTuples) {
+                    tuple.clear();
                 }
 
                 //size_t uniqueDerivation = out->getUniqueDerivation();
