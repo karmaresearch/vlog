@@ -199,7 +199,7 @@ void Checker::addBlockCheckTargets(Program &p, PredId_t ignorePredId) {
                 }
             }
 
-            std::vector<uint8_t> headvars = rule.getVarsInHeadAndBody(ignorePredId);
+            std::vector<uint8_t> headvars = rule.getFrontierVariables(ignorePredId);
             std::string newPred = "__GENERATED_PRED__" + std::to_string(rule.getId());
             Predicate newp = p.getPredicate(p.getOrAddPredicate(newPred, headvars.size()));
             VTuple t(headvars.size());
@@ -254,10 +254,10 @@ bool Checker::RMSA(Program &originalProgram) {
     for(auto &rule : programWithCritical.getAllRules()) {
         if (rule.isExistential()) {
             std::vector<Literal> newHeads;
-            auto varsInHeadAndBody = rule.getVarsInHeadAndBody();
+            auto varsInHeadAndBody = rule.getFrontierVariables();
             if (varsInHeadAndBody.size() > 0) {
                 //For each existential var, add a new atom in the head
-                auto varsNotInBody = rule.getVarsNotInBody();
+                auto varsNotInBody = rule.getExistentialVariables();
                 for(auto varNotInBody : varsNotInBody) {
                     //Create a special predicate
                     //std::string nameSpecialPredVar = "__SR_" + std::to_string(rule.getId()) + "_" + std::to_string(varNotInBody) + "__";
@@ -436,7 +436,7 @@ static void getAllExtPropagatePositions(Program &p, std::map<rpos, std::vector<v
         if (rule.isExistential()) {
             // First, get the predicate positions of the existential variables in the head(s)
             std::vector<vpos> predPositions[256];
-            std::vector<uint8_t> extVars = rule.getVarsNotInBody();
+            std::vector<uint8_t> extVars = rule.getExistentialVariables();
             for (auto head : rule.getHeads()) {
                 VTuple tpl = head.getTuple();
                 for (int i = 0; i < tpl.getSize(); i++) {
@@ -659,13 +659,13 @@ bool Checker::JA(Program &p, bool restricted) {
         for (auto &it : allExtVarsPos) {
             int dest = 0;
             const Rule &rulev = p.getRule(it.first.first);
-            std::vector<uint8_t> extVars = rulev.getVarsNotInBody();
+            std::vector<uint8_t> extVars = rulev.getExistentialVariables();
             uint8_t v = extVars[it.first.second];
             LOG(TRACEL) << "Src = " << src << ", rule " << rulev.tostring(&p, p.getKB());
             for (auto &it2: allExtVarsPos) {
                 const Rule &rulew = p.getRule(it2.first.first);
                 auto body = rulew.getBody();
-                extVars = rulew.getVarsNotInBody();
+                extVars = rulew.getExistentialVariables();
                 uint8_t w = extVars[it2.first.second];
                 LOG(TRACEL) << "Trying " << dest << ", rule " << rulew.tostring(&p, p.getKB());
                 std::map<uint8_t, std::vector<vpos>> positions;
@@ -847,7 +847,7 @@ Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
     size_t count = 0;
     for (auto rule : rules) {
         std::string output = "";
-        std::vector<uint8_t> existentials = rule.getVarsNotInBody();
+        std::vector<uint8_t> existentials = rule.getExistentialVariables();
         bool first = true;
         for(const auto& head : rule.getHeads()) {
             if (! first) {
@@ -874,7 +874,7 @@ Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
                     uint64_t id = tuple.get(i).getValue();
                     char text[MAX_TERM_SIZE];
                     if (db->getDictText(id, text)) {
-                        string v = Program::compressRDFOWLConstants(std::string(text));
+                        std::string v = Program::compressRDFOWLConstants(std::string(text));
                         output += v;
                     } else {
                         std::string t = db->getDictText(id);
@@ -905,7 +905,7 @@ Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
             // Add negated term allowing for exclusion of a specific binding
             output += ", ~";
             output += "__EXCLUDE_DUMMY__" + std::to_string(count) + "(";
-            std::vector<uint8_t> vars = rule.getVarsInHeadAndBody();
+            std::vector<uint8_t> vars = rule.getFrontierVariables();
             bool f = true;
             for (int i = 0; i < vars.size(); i++) {
                 if (! f) {

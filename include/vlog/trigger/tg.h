@@ -76,7 +76,7 @@ class TriggerGraph {
 
         std::vector<VTuple> linearGetNonIsomorphicTuples(int start = 0, int arity = 1);
 
-        uint64_t getNNodes(Node *n = NULL, std::set<string> *cache = NULL);
+        uint64_t getNNodes(Node *n = NULL, std::set<std::string> *cache = NULL);
 
         void applyRule(const Rule &r,
                 std::vector<Literal> &out,

@@ -716,7 +716,7 @@ std::vector<uint64_t> ExistentialRuleProcessor::blocked_check_computeBodyAtoms(
 #endif
     auto bodyAtoms = plan.plan;
     int idx = 0;
-    std::vector<uint8_t> vars = ruleDetails->rule.getVarsInHeadAndBody(headPredicateToIgnore);
+    std::vector<uint8_t> vars = ruleDetails->rule.getFrontierVariables(headPredicateToIgnore);
     std::vector<uint64_t> toMatch(vars.size());
     std::vector<bool> found(vars.size());
 

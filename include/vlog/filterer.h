@@ -10,8 +10,6 @@
 #include <map>
 #include <set>
 
-using namespace std;
-
 class FCInternalTable;
 class TableFilterer {
 
@@ -43,7 +41,7 @@ private:
 
     bool producedDerivationInPreviousStepsWithSubs_rec(
         const FCBlock *block,
-        const map<Term_t, std::vector<Term_t>> &mapSubstitutions,
+        const std::map<Term_t, std::vector<Term_t>> &mapSubstitutions,
         const Literal &outputQuery,
         const Literal &currentQuery,
         const size_t posHead_first,

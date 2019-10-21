@@ -5,7 +5,7 @@
 #include <string>
 
 
-MapiHdl MAPITable::doquery(Mapi dbh, string q) { 
+MapiHdl MAPITable::doquery(Mapi dbh, std::string q) { 
     MapiHdl ret = NULL; 
 
     if ((ret = mapi_query(dbh, q.c_str())) == NULL || mapi_error(dbh) != MOK)  {
@@ -27,9 +27,9 @@ MapiHdl MAPITable::doquery(Mapi dbh, string q) {
     return(ret); 
 }
 
-MAPITable::MAPITable(PredId_t predid, string host, int port,
-			string user, string pwd, string dbname,
-                        string tablename, string tablefields,
+MAPITable::MAPITable(PredId_t predid, std::string host, int port,
+			std::string user, std::string pwd, std::string dbname,
+                        std::string tablename, std::string tablefields,
 		        EDBLayer *layer) : SQLTable(predid, tablename, tablefields, layer) {
     con = mapi_connect(host.c_str(), port, user.c_str(), pwd.c_str(), "sql", dbname.c_str()); 
     if (mapi_error(con)) {

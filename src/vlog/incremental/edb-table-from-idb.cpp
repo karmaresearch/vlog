@@ -256,7 +256,7 @@ std::ostream &EDBonIDBTable::dump(std::ostream &os) {
             if (getDictText(v, buffer)) {
                 os << buffer;
             } else {
-                os << to_string(v);
+                os << std::to_string(v);
             }
         }
         os << std::endl;
