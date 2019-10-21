@@ -43,8 +43,6 @@
 #include <thread>
 #include <cmath>
 
-using namespace std;
-
 void printHelp(const char *programName, ProgramArgs &desc) {
     cout << "Usage: " << programName << " <command> [options]" << endl << endl;
     cout << "Possible commands:" << endl;
@@ -63,15 +61,15 @@ void printHelp(const char *programName, ProgramArgs &desc) {
     cout << desc.tostring() << endl;
 }
 
-inline void printErrorMsg(const char *msg) {
-    cout << endl << "*** ERROR: " << msg << "***" << endl << endl
+inline void printErrorMsg(const std::string msg) {
+    std::cout << std::endl << "*** ERROR: " << msg << "***" << std::endl << std::endl
         << "Please type the subcommand \"help\" for instructions (e.g. Vlog help)."
-        << endl;
+        << std::endl;
 }
 
 bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
 
-    string cmd;
+    std::string cmd;
     if (argc < 2) {
         printErrorMsg("Command is missing!");
         return false;
@@ -82,8 +80,7 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
     if (cmd != "help" && cmd != "query" && cmd != "lookup" && cmd != "load" && cmd != "queryLiteral"
             && cmd != "mat" && cmd != "mat_tg" && cmd != "rulesgraph" && cmd != "server" && cmd != "gentq" &&
             cmd != "cycles" && cmd !="deps") {
-        printErrorMsg(
-                (string("The command \"") + cmd + string("\" is unknown.")).c_str());
+        printErrorMsg("The command \"" + cmd + "\" is unknown.");
         return false;
     }
 
@@ -93,134 +90,115 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
     } else {
         /*** Check specific parameters ***/
         if (cmd == "query" || cmd == "queryLiteral") {
-            string queryFile = vm["query"].as<string>();
-            if (cmd == "query" && (queryFile == ""  || !Utils::exists(queryFile))) {
-                printErrorMsg(
-                        (string("The file ") + queryFile
-                         + string(" doesn't exist.")).c_str());
+            std::string queryFile = vm["query"].as<string>();
+            if (cmd == "query" && (queryFile.empty()  || !Utils::exists(queryFile))) {
+                printErrorMsg("The file \"" + queryFile + "\" doesn't exist.");
                 return false;
             }
 
-            if (vm["rules"].as<string>().compare("") != 0) {
-                string path = vm["rules"].as<string>();
+            if (!vm["rules"].as<string>().empty()) {
+                std::string path = vm["rules"].as<string>();
                 if (!Utils::exists(path)) {
-                    printErrorMsg((string("The rule file ") + path + string(" doe not exists")).c_str());
+                    printErrorMsg("The rule file \"" + path + "\" doe not exists");
                     return false;
                 }
             }
         } else if (cmd == "lookup") {
             if (!vm.count("text") && !vm.count("number")) {
-                printErrorMsg(
-                        "Neither the -t nor -n parameters are set. At least one of them must be set.");
+                printErrorMsg("Neither the -t nor -n parameters are set. At least one of them must be set.");
                 return false;
             }
 
             if (vm.count("text") && vm.count("number")) {
-                printErrorMsg(
-                        "Both the -t and -n parameters are set, and this is ambiguous. Please choose either one or the other.");
+                printErrorMsg("Both the -t and -n parameters are set, and this is ambiguous. Please choose either one or the other.");
                 return false;
             }
         } else if (cmd == "load") {
             if (!vm.count("input") && !vm.count("comprinput")) {
-                printErrorMsg(
-                        "The parameter -i (path to the triple files) is not set. Also --comprinput (file with the compressed triples) is not set.");
+                printErrorMsg("The parameter -i (path to the triple files) is not set. Also --comprinput (file with the compressed triples) is not set.");
                 return false;
             }
 
             if (vm.count("comprinput")) {
-                string tripleDir = vm["comprinput"].as<string>();
+                std::string tripleDir = vm["comprinput"].as<string>();
                 if (!Utils::exists(tripleDir)) {
-                    printErrorMsg(
-                            (string("The file ") + tripleDir
-                             + string(" does not exist.")).c_str());
+                    printErrorMsg("The file \"" + tripleDir + "\" does not exist.");
                     return false;
                 }
                 if (!vm.count("comprdict")) {
-                    printErrorMsg(
-                            "The parameter -comprdict (path to the compressed dict) is not set.");
+                    printErrorMsg("The parameter -comprdict (path to the compressed dict) is not set.");
                     return false;
                 }
             } else {
-                string tripleDir = vm["input"].as<string>();
+                std::string tripleDir = vm["input"].as<string>();
                 if (!Utils::exists(tripleDir)) {
-                    printErrorMsg(
-                            (string("The path ") + tripleDir
-                             + string(" does not exist.")).c_str());
+                    printErrorMsg("The path " + tripleDir + " does not exist.");
                     return false;
                 }
             }
 
             if (!vm.count("output")) {
-                printErrorMsg(
-                        "The parameter -o (path to the kb is not set.");
+                printErrorMsg("The parameter -o (path to the kb is not set.");
                 return false;
             }
-            string kbdir = vm["output"].as<string>();
+            std::string kbdir = vm["output"].as<string>();
             if (Utils::exists(kbdir)) {
-                printErrorMsg(
-                        (string("The path ") + kbdir
-                         + string(" already exist. Please remove it or choose another path.")).c_str());
+                printErrorMsg("The path \"" + kbdir + "\" already exist. Please remove it or choose another path.");
                 return false;
             }
             if (vm["maxThreads"].as<int>() < 1) {
-                printErrorMsg(
-                        "The number of threads to use must be at least 1");
+                printErrorMsg("The number of threads to use must be at least 1");
                 return false;
             }
 
             if (vm["readThreads"].as<int>() < 1) {
-                printErrorMsg(
-                        "The number of threads to use to read the input must be at least 1");
+                printErrorMsg("The number of threads to use to read the input must be at least 1");
                 return false;
             }
 
         } else if (cmd == "gentq") {
-            if (vm["rules"].as<string>().compare("") != 0) {
-                string path = vm["rules"].as<string>();
+            if (!vm["rules"].as<string>().empty()) {
+                std::string path = vm["rules"].as<string>();
                 if (!Utils::exists(path)) {
-                    printErrorMsg((string("The rule file ") + path + string(" doe not exists")).c_str());
+                    printErrorMsg("The rule file \"" + path + "\" does not exists");
                     return false;
                 }
             }
         } else if (cmd == "mat") {
-            string path = vm["rules"].as<string>();
-            if (path == "") {
-                printErrorMsg(string("You must set up the 'rules' parameter to launch the materialization").c_str());
+            std::string path = vm["rules"].as<string>();
+            if (path.empty()) {
+                printErrorMsg("You must set up the \"rules\" parameter to launch the materialization");
             }
-            if (path != "" && !Utils::exists(path)) {
-                printErrorMsg((string("The rule file '") +
-                            path + string("' does not exists")).c_str());
+            if (!path.empty() && !Utils::exists(path)) {
+                printErrorMsg("The rule file \"" + path + "\" does not exists");
                 return false;
             }
         } else if (cmd == "mat_tg") {
-            string path = vm["trigger_paths"].as<string>();
-            if (path == "") {
-                printErrorMsg(string("You must indicate the file that contains trigger paths with '--trigger_paths'").c_str());
+            std::string path = vm["trigger_paths"].as<string>();
+            if (path.empty()) {
+                printErrorMsg("You must indicate the file that contains trigger paths with \"--trigger_paths\"");
             }
-            if (path != "" && !Utils::exists(path)) {
-                printErrorMsg((string("The file '") +
-                            path + string("' does not exists")).c_str());
+            if (!path.empty() && !Utils::exists(path)) {
+                printErrorMsg("The file \"" + path + "\" does not exists");
                 return false;
             }
 
         } else if (cmd == "cycles") {
-            string path = vm["rules"].as<string>();
-            if (path == "") {
-                printErrorMsg(string("You must set up the 'rules' parameter to detect cycles").c_str());
+            std::string path = vm["rules"].as<string>();
+            if (path.empty()) {
+                printErrorMsg("You must set up the \"rules\" parameter to detect cycles");
             }
-            if (path != "" && !Utils::exists(path)) {
-                printErrorMsg((string("The rule file '") +
-                            path + string("' does not exists")).c_str());
+            if (!path.empty() && !Utils::exists(path)) {
+                printErrorMsg("The rule file '" + path + "' does not exists");
                 return false;
             }
         } else if (cmd == "deps") {
-            string path = vm["rules"].as<string>();
-            if (path == "") {
-                printErrorMsg(string("You must set up the 'rules' parameter to detect dependencies").c_str());
+            std::string path = vm["rules"].as<string>();
+            if (path.empty()) {
+                printErrorMsg("You must set up the \"rules\" parameter to detect dependencies");
             }
-            if (path != "" && !Utils::exists(path)) {
-                printErrorMsg((string("The rule file '") +
-                            path + string("' does not exists")).c_str());
+            if (!path.empty() && !Utils::exists(path)) {
+                printErrorMsg("The rule file \"" + path + "\" does not exists");
                 return false;
             }
         }
@@ -264,7 +242,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     query_options.add<bool>("","restrictedChase", true,
             "Use the restricted chase if there are existential rules.", false);
     query_options.add<int>("", "nthreads", std::max((unsigned int)1, std::thread::hardware_concurrency() / 2),
-            string("Set maximum number of threads to use when run in multithreaded mode. Default is " + to_string(std::max((unsigned int)1, std::thread::hardware_concurrency() / 2))).c_str(), false);
+            "Set maximum number of threads to use when run in multithreaded mode. Default is " + to_string(std::max((unsigned int)1, std::thread::hardware_concurrency() / 2)), false);
     query_options.add<int>("", "interRuleThreads", 0,
             "Set maximum number of threads to use for inter-rule parallelism. Default is 0", false);
 
@@ -341,7 +319,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
 void lookup(EDBLayer &layer, ProgramArgs &vm) {
     if (vm.count("text")) {
         uint64_t value;
-        string textTerm = vm["text"].as<string>();
+        std::string textTerm = vm["text"].as<string>();
         if (!layer.getDictNumber((char*) textTerm.c_str(), textTerm.size(), value)) {
             cout << "Term " << textTerm << " not found" << endl;
         } else {
@@ -358,20 +336,19 @@ void lookup(EDBLayer &layer, ProgramArgs &vm) {
     }
 }
 
-string flattenAllArgs(int argc,
-        const char** argv) {
-    string args = "";
+std::string flattenAllArgs(int argc, const char** argv) {
+    std::string args = "";
     for (int i = 1; i < argc; ++i) {
-        args += " " + string(argv[i]);
+        args += " " + std::string(argv[i]);
     }
     return args;
 }
 
-void writeRuleDependencyGraph(EDBLayer &db, string pathRules, string filegraph) {
+void writeRuleDependencyGraph(EDBLayer &db, std::string pathRules, std::string filegraph) {
     LOG(INFOL) << " Write the graph file to " << filegraph;
     Program p(&db);
     std::string s = p.readFromFile(pathRules, false);
-    if (s != "") {
+    if (!s.empty()) {
         LOG(ERRORL) << s;
         return;
     }
@@ -396,7 +373,7 @@ void writeRuleDependencyGraph(EDBLayer &db, string pathRules, string filegraph) 
 #ifdef WEBINTERFACE
 void startServer(int argc,
         const char** argv,
-        string pathExec,
+        std::string pathExec,
         ProgramArgs &vm) {
     std::unique_ptr<WebInterface> webint;
     int port = vm["port"].as<int>();
@@ -421,7 +398,7 @@ void startServer(int argc,
 
 void launchTriggeredMat(int argc,
         const char** argv,
-        string pathExec,
+        std::string pathExec,
         EDBLayer &db,
         ProgramArgs &vm,
         std::string pathRules,
@@ -429,7 +406,7 @@ void launchTriggeredMat(int argc,
     //Load a program with all the rules
     Program p(&db);
     std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
-    if (s != "") {
+    if (!s.empty()) {
         LOG(ERRORL) << s;
         return;
     }
@@ -498,12 +475,12 @@ void launchTriggeredMat(int argc,
     }
 #endif
 
-    if (vm["storemat_path"].as<string>() != "") {
+    if (!vm["storemat_path"].as<string>().empty()) {
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
         Exporter exp(sn);
 
-        string storemat_format = vm["storemat_format"].as<string>();
+        std::string storemat_format = vm["storemat_format"].as<string>();
 
         if (storemat_format == "files" || storemat_format == "csv") {
             sn->storeOnFiles(vm["storemat_path"].as<string>(),
@@ -554,14 +531,14 @@ void printRepresentationSize(std::shared_ptr<SemiNaiver> sn) {
 
 void launchFullMat(int argc,
         const char** argv,
-        string pathExec,
+        std::string pathExec,
         EDBLayer &db,
         ProgramArgs &vm,
         std::string pathRules) {
     //Load a program with all the rules
     Program p(&db);
     std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
-    if (s != "") {
+    if (!s.empty()) {
         LOG(ERRORL) << s;
         return;
     }
@@ -584,7 +561,7 @@ void launchFullMat(int argc,
                 - start;
             LOG(INFOL) << "Runtime pre-materialization = " <<
                 sec.count() * 1000 << " milliseconds";
-        } else if (vm["premat"].as<string>() != "") {
+        } else if (!vm["premat"].as<string>().empty()) {
             std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
             Materialization mat;
             mat.loadLiteralsFromFile(p, vm["premat"].as<string>());
@@ -661,12 +638,12 @@ void launchFullMat(int argc,
         }
 
 
-        if (vm["storemat_path"].as<string>() != "") {
+        if (!vm["storemat_path"].as<string>().empty()) {
             std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
 
             Exporter exp(sn);
 
-            string storemat_format = vm["storemat_format"].as<string>();
+            std::string storemat_format = vm["storemat_format"].as<string>();
 
             if (storemat_format == "files" || storemat_format == "csv") {
                 sn->storeOnFiles(vm["storemat_path"].as<string>(),
@@ -699,10 +676,10 @@ void launchFullMat(int argc,
 void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     //Parse the rules and create a program
     Program p(&edb);
-    string pathRules = vm["rules"].as<string>();
-    if (pathRules != "") {
+    std::string pathRules = vm["rules"].as<string>();
+    if (!pathRules.empty()) {
         std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
-        if (s != "") {
+        if (!s.empty()) {
             LOG(ERRORL) << s;
             return;
         }
@@ -710,7 +687,7 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     }
 
     //Set up the ruleset and perform the pre-materialization if necessary
-    if (pathRules != "") {
+    if (!pathRules.empty()) {
         if (!vm["automat"].empty()) {
             //Automatic prematerialization
             std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
@@ -723,7 +700,7 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
                 - start;
             LOG(INFOL) << "Runtime pre-materialization = " <<
                 sec.count() * 1000 << " milliseconds";
-        } else if (vm["premat"].as<string>() != "") {
+        } else if (!vm["premat"].as<string>().empty()) {
             std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
             Materialization *mat = new Materialization();
             mat->loadLiteralsFromFile(p, vm["premat"].as<string>());
@@ -738,9 +715,9 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     }
 
     DBLayer *db = NULL;
-    if (pathRules == "") {
+    if (pathRules.empty()) {
         PredId_t p = edb.getFirstEDBPredicate();
-        string typedb = edb.getTypeEDBPredicate(p);
+        std::string typedb = edb.getTypeEDBPredicate(p);
         if (typedb == "Trident") {
             auto edbTable = edb.getEDBTable(p);
             KB *kb = ((TridentTable*)edbTable.get())->getKB();
@@ -750,10 +727,10 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
         }
     }
     if (db == NULL) {
-        if (pathRules == "") {
+        if (pathRules.empty()) {
             // Use default rule
             std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
-            if (s != "") {
+            if (!s.empty()) {
                 LOG(ERRORL) << s;
                 return;
             }
@@ -761,7 +738,7 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
         }
         db = new VLogLayer(edb, p, vm["reasoningThreshold"].as<int64_t>(), "TI", "TE");
     }
-    string queryFileName = vm["query"].as<string>();
+    std::string queryFileName = vm["query"].as<string>();
     // Parse the query
     std::fstream inFile;
     inFile.open(queryFileName);//open the input file
@@ -775,9 +752,9 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     delete db;
 }
 
-string selectStrategy(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reasoner, ProgramArgs &vm) {
-    string strategy = vm["selectionStrategy"].as<string>();
-    if (strategy == "" || strategy == "cardEst") {
+std::string selectStrategy(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reasoner, ProgramArgs &vm) {
+    std::string strategy = vm["selectionStrategy"].as<string>();
+    if (strategy.empty() || strategy == "cardEst") {
         // Use the original cardinality estimation strategy
         ReasoningMode mode = reasoner.chooseMostEfficientAlgo(literal, edb, p, NULL, NULL);
         return mode == TOPDOWN ? "qsqr" : "magic";
@@ -791,7 +768,7 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
 
     std::chrono::system_clock::time_point startQ1 = std::chrono::system_clock::now();
 
-    string algo = vm["reasoningAlgo"].as<string>();
+    std::string algo = vm["reasoningAlgo"].as<string>();
     int times = vm["repeatQuery"].as<int>();
     bool printResults = vm["printResults"].as<bool>();
 
@@ -805,7 +782,7 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
         }
     }
 
-    if (algo == "auto" || algo == "") {
+    if (algo == "auto" || algo.empty()) {
         algo = selectStrategy(edb, p, literal, reasoner, vm);
         LOG(INFOL) << "Selection strategy determined that we go for " << algo;
     }
@@ -893,10 +870,10 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
 void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     //Parse the rules and create a program
     Program p(&edb);
-    string pathRules = vm["rules"].as<string>();
-    if (pathRules != "") {
+    std::string pathRules = vm["rules"].as<string>();
+    if (!pathRules.empty()) {
         std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
-        if (s != "") {
+        if (!s.empty()) {
             LOG(ERRORL) << s;
             return;
         }
@@ -904,7 +881,7 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     }
 
     //Set up the ruleset and perform the pre-materialization if necessary
-    if (pathRules != "") {
+    if (!pathRules.empty()) {
         if (!vm["automat"].empty()) {
             //Automatic prematerialization
             std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
@@ -917,7 +894,7 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
                 - start;
             LOG(INFOL) << "Runtime pre-materialization = " <<
                 sec.count() * 1000 << " milliseconds";
-        } else if (vm["premat"].as<string>() != "") {
+        } else if (!vm["premat"].as<string>().empty()) {
             std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
             Materialization *mat = new Materialization();
             mat->loadLiteralsFromFile(p, vm["premat"].as<string>());
@@ -931,8 +908,8 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
         }
     }
 
-    string query;
-    string queryFileName = vm["query"].as<string>();
+    std::string query;
+    std::string queryFileName = vm["query"].as<string>();
     if (Utils::exists(queryFileName)) {
         // Parse the query
         std::fstream inFile;
@@ -980,9 +957,9 @@ int main(int argc, const char** argv) {
     if (!initParams(argc, argv, vm)) {
         return EXIT_FAILURE;
     }
-    string full_path = Utils::getFullPathExec();
+    std::string full_path = Utils::getFullPathExec();
     //Set logging level
-    string ll = vm["logLevel"].as<string>();
+    std::string ll = vm["logLevel"].as<string>();
     if (ll == "debug") {
         Logger::setMinLevel(DEBUGL);
     } else if (ll == "info") {
@@ -993,19 +970,19 @@ int main(int argc, const char** argv) {
         Logger::setMinLevel(ERRORL);
     }
 
-    string cmd = string(argv[1]);
+    std::string cmd = std::string(argv[1]);
 
     //Get the path to the EDB layer
-    string edbFile = vm["edb"].as<string>();
+    std::string edbFile = vm["edb"].as<string>();
     if (edbFile == "default") {
         //Get current directory
-        string execFile = string(argv[0]);
-        string dirExecFile = Utils::parentDir(execFile);
-        edbFile = dirExecFile + DIR_SEP + string("edb.conf");
+        std::string execFile = std::string(argv[0]);
+        std::string dirExecFile = Utils::parentDir(execFile);
+        edbFile = dirExecFile + DIR_SEP + std::string("edb.conf");
     }
 
     if (cmd != "load" && !Utils::exists(edbFile)) {
-        printErrorMsg(string("I could not find the EDB conf file " + edbFile).c_str());
+        printErrorMsg("I could not find the EDB conf file " + edbFile);
         return EXIT_FAILURE;
     }
 
@@ -1066,7 +1043,7 @@ int main(int argc, const char** argv) {
         Loader *loader = new Loader();
         bool onlyCompress = false;
         int sampleMethod = PARSE_COUNTMIN;
-        string dictMethod = DICT_HEURISTICS;
+        std::string dictMethod = DICT_HEURISTICS;
         int popArg = 1000;
         int nindices = 6;
         bool aggrIndices = false;
@@ -1078,10 +1055,10 @@ int main(int argc, const char** argv) {
         int ndicts = 1;
         bool canSkipTables = false;
         int thresholdSkipTable = 0;
-        string popMethod = "hash";
+        std::string popMethod = "hash";
         if (vm.count("comprinput")) {
-            string comprinput = vm["comprinput"].as<string>();
-            string comprdict = vm["comprdict"].as<string>();
+            std::string comprinput = vm["comprinput"].as<string>();
+            std::string comprdict = vm["comprdict"].as<string>();
             LOG(INFOL) << "Creating the KB from " << comprinput << "/" << comprdict;
 
             ParamsLoad p;
@@ -1159,7 +1136,7 @@ int main(int argc, const char** argv) {
         delete loader;
     } else if (cmd == "gentq") {
         EDBConf conf(edbFile);
-        string rulesFile = vm["rules"].as<string>();
+        std::string rulesFile = vm["rules"].as<string>();
         EDBLayer *layer = new EDBLayer(conf, false);
         Program p(layer);
         //uint8_t vt1 = (uint8_t) p.getIDVar("V1");
@@ -1176,7 +1153,7 @@ int main(int argc, const char** argv) {
         vt.push_back(vt3);
         vt.push_back(vt4);
         std::string s = p.readFromFile(rulesFile);
-        if (s != "") {
+        if (!s.empty()) {
             cerr << s << endl;
             return 1;
         }
@@ -1205,14 +1182,14 @@ int main(int argc, const char** argv) {
     } else if (cmd == "cycles") {
         EDBConf conf(edbFile);
         EDBLayer *layer = new EDBLayer(conf, false);
-        string rulesFile = vm["rules"].as<string>();
-        string alg = vm["alg"].as<string>();
+        std::string rulesFile = vm["rules"].as<string>();
+        std::string alg = vm["alg"].as<string>();
         checkAcyclicity(rulesFile, alg, *layer, vm["rewriteMultihead"].as<bool>());
 	delete layer;
     } else if (cmd == "deps") {
         EDBConf conf(edbFile);
         EDBLayer *layer = new EDBLayer(conf, false);
-        string rulesFile = vm["rules"].as<string>();
+        std::string rulesFile = vm["rules"].as<string>();
         detectDeps(rulesFile, *layer);
 	delete layer;
     }

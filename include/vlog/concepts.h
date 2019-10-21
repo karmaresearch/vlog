@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <vector>
 #include <set>
+#include <map>
 #include <unordered_map>
 
 /*** PREDICATES ***/
@@ -23,10 +24,8 @@ typedef uint32_t PredId_t;
 
 class EDBLayer;
 
-using namespace std;
-
 inline std::string fields2str(const std::vector<uint8_t> &fields) {
-    ostringstream os;
+    std::ostringstream os;
     os << "[" << fields.size() << "]{";
     for (auto f : fields) {
         os << (int)f << ",";
@@ -157,6 +156,7 @@ class VTuple {
            return *this;
            }
            */
+        //L. Can I create an iterator on it? begin, end etc?
 
         ~VTuple() {
             delete[] terms;
@@ -301,7 +301,8 @@ class Literal {
             return negated;
         }
 
-        static int mgu(Substitution *substitutions, const Literal &l, const Literal &m);
+        //L. do we need this function?
+        //static int mgu(Substitution *substitutions, const Literal &l, const Literal &m);
 
         static int subsumes(std::vector<Substitution> &substitutions, const Literal &from, const Literal &to);
 
@@ -329,6 +330,7 @@ class Literal {
         std::vector<uint8_t> getNewVars(std::vector<uint8_t> &vars) const;
 
         std::vector<uint8_t> getAllVars() const;
+        bool containsVariable(uint8_t variableId) const;
 
         std::string tostring(Program *program, EDBLayer *db) const;
 
@@ -363,7 +365,7 @@ class Rule {
             heads(heads),
             body(body),
             _isRecursive(checkRecursion(heads, body)),
-            existential(!getVarsNotInBody().empty()) {
+            existential(!getExistentialVariables().empty()) {
                 checkRule();
             }
 
@@ -398,9 +400,13 @@ class Rule {
 
         bool isExistential() const;
 
-        std::vector<uint8_t> getVarsNotInBody() const;  // Existential variables.
+        std::vector<uint8_t> getVarsInHead(PredId_t ignore = -1) const;
+        std::vector<uint8_t> getVarsInBody() const;
+        std::vector<uint8_t> getExistentialVariables() const;
 
-        std::vector<uint8_t> getVarsInHeadAndBody(PredId_t predToIgnore = -1) const; // Variables in the head that also occur in the body.
+        std::vector<uint8_t> getFrontierVariables(PredId_t ignore = -1) const;
+
+        std::map<uint8_t, std::vector<uint8_t>> calculateDependencies() const;
 
         const std::vector<Literal> &getBody() const {
             return body;
@@ -452,13 +458,11 @@ class Rule {
 
         void checkRule() const;
 
-        std::string tostring(Program *program, EDBLayer *db) const;
-
-        std::string toprettystring(Program * program, EDBLayer *db, bool replaceConstants = false) const;
+        Rule normalizeVars() const;
 
         std::string tostring() const;
-
-        Rule normalizeVars() const;
+        std::string tostring(Program *program, EDBLayer *db) const;
+        std::string toprettystring(Program *program, EDBLayer *db, bool replaceConstants = false) const;
 
         ~Rule() {
         }
@@ -468,7 +472,7 @@ class Program {
     private:
         //const uint64_t assignedIds;
         EDBLayer *kb;
-        std::vector<std::vector<uint32_t>> rules;
+        std::vector<std::vector<uint32_t>> rules; // [head_predicate_id (idx) : [rule_ids]]
         std::vector<Rule> allrules;
         int rewriteCounter;
 

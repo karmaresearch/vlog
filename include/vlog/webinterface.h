@@ -42,17 +42,17 @@ class WebInterface {
         std::thread matRunner;
         std::mutex mtxMatRunner;
         std::condition_variable cvMatRunner;
-        string dirhtmlfiles;
-        string cmdArgs;
+        std::string dirhtmlfiles;
+        std::string cmdArgs;
 
         std::shared_ptr<HttpServer> server;
 
         bool isActive;
-        string edbFile;
+        std::string edbFile;
         int webport;
         int nthreads;
 
-        map<string, string> cachehtml;
+        map<std::string, std::string> cachehtml;
 
         void startThread(int port);
 
@@ -63,8 +63,8 @@ class WebInterface {
         void getResultsQueryLiteral(std::string predicate, long limit, JSON &out);
 
     public:
-        WebInterface(ProgramArgs &vm, std::shared_ptr<SemiNaiver> sn, string htmlfiles,
-                string cmdArgs, string edbfile);
+        WebInterface(ProgramArgs &vm, std::shared_ptr<SemiNaiver> sn, std::string htmlfiles,
+                std::string cmdArgs, std::string edbfile);
 
         void start(int port);
 
@@ -72,9 +72,9 @@ class WebInterface {
 
         void stop();
 
-        string getDefaultPage();
+        std::string getDefaultPage();
 
-        string getPage(string page);
+        std::string getPage(std::string page);
 
         long getDurationExecMs();
 
@@ -94,11 +94,11 @@ class WebInterface {
             return sn;
         }
 
-        string getCommandLineArgs() {
+        std::string getCommandLineArgs() {
             return cmdArgs;
         }
 
-        static string lookup(string sId, DBLayer &db);
+        static std::string lookup(std::string sId, DBLayer &db);
 };
 #endif
 #endif

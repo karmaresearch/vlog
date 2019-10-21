@@ -83,7 +83,7 @@ std::string convertString(const char *s, int len) {
     return ss;
 }
 
-InmemoryTable::InmemoryTable(string repository, string tablename,
+InmemoryTable::InmemoryTable(std::string repository, std::string tablename,
         PredId_t predid, EDBLayer *layer) {
     this->layer = layer;
     arity = 0;
@@ -93,8 +93,8 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
     if (repository == "") {
         repository = ".";
     }
-    string tablefile = repository + "/" + tablename + ".csv";
-    string gz = tablefile + ".gz";
+    std::string tablefile = repository + "/" + tablename + ".csv";
+    std::string gz = tablefile + ".gz";
     istream *ifs = NULL;
     if (Utils::exists(gz)) {
         ifs = new zstr::ifstream(gz);
@@ -132,7 +132,7 @@ InmemoryTable::InmemoryTable(string repository, string tablename,
         delete ifs;
     } else {
         tablefile = repository + "/" + tablename + ".nt";
-        string gz = tablefile + ".gz";
+        std::string gz = tablefile + ".gz";
         FileInfo f;
         f.start = 0;
         if (Utils::exists(gz)) {

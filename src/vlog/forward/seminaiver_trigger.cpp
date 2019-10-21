@@ -6,12 +6,10 @@
 void TriggerSemiNaiver::run(std::string trigger_paths) {
 
     //Create all the execution plans, etc.
-    std::vector<Rule> ruleset = program->getAllRules();
     std::vector<RuleExecutionDetails> allrules;
     int ruleid = 0;
-    for (std::vector<Rule>::iterator itr = ruleset.begin(); itr != ruleset.end();
-            ++itr) {
-        allrules.push_back(RuleExecutionDetails(*itr, ruleid++));
+    for (auto& rule : program->getAllRules()) {
+        allrules.push_back(RuleExecutionDetails(rule, ruleid++));
     }
 
     //Do not check for duplicates anymore

@@ -9,13 +9,13 @@
 #include <fstream>
 #include <sstream>
 
-EDBConf::EDBConf(string rawcontent, bool isFile) {
+EDBConf::EDBConf(std::string rawcontent, bool isFile) {
     if (isFile) {
-	LOG(INFOL) << "Parsing EDB configuration " << rawcontent;
+        LOG(INFOL) << "Parsing EDB configuration " << rawcontent;
         //Read the input file line by line
-        string f = rawcontent;
+        std::string f = rawcontent;
         std::ifstream file(f);
-        string line;
+        std::string line;
         rawcontent = "";
         while (std::getline(file, line)) {
             rawcontent += line + "\n";
@@ -24,7 +24,7 @@ EDBConf::EDBConf(string rawcontent, bool isFile) {
     parse(rawcontent);
 }
 
-void EDBConf::parse(string f) {
+void EDBConf::parse(std::string f) {
     std::stringstream reader(f);
     std::string line;
     while (std::getline(reader, line)) {
@@ -34,12 +34,12 @@ void EDBConf::parse(string f) {
         if (Utils::starts_with(line, "EDB")) {
             //Read the ID of the edb
             std::size_t found = line.find("_");
-            if (found == string::npos) {
+            if (found == std::string::npos) {
                 LOG(ERRORL) << "Malformed line in edb.conf file: " << line;
                 throw ("Malformed line: " + line);
             }
 
-            string idedb = line.substr(3, found - 3);
+            std::string idedb = line.substr(3, found - 3);
             int id = TridentUtils::lexical_cast<int>(idedb);
 
             //Get the correspondent struct
@@ -50,12 +50,12 @@ void EDBConf::parse(string f) {
 
             //Get type of parameter
             size_t idxAss = line.find("=");
-            string typeParam = line.substr(found + 1, idxAss - found - 1);
+            std::string typeParam = line.substr(found + 1, idxAss - found - 1);
             if (typeParam == "predname") {
-                string predname = line.substr(idxAss + 1);
+                std::string predname = line.substr(idxAss + 1);
                 table.predname = predname;
             } else if (typeParam == "type") {
-                string typeStorage = line.substr(idxAss + 1);
+                std::string typeStorage = line.substr(idxAss + 1);
                 table.type = typeStorage;
             } else if (Utils::starts_with(typeParam, "param")) {
                 //It's param...something
@@ -69,14 +69,14 @@ void EDBConf::parse(string f) {
                 throw ("Malformed line: " + line);
             }
         } else {
-	    throw ("Malformed line: " + line);
-	}
+            throw ("Malformed line: " + line);
+        }
     }
 
 #ifdef DEBUG
     for (const auto &table : tables) {
-        string details = "conf edb table: predname=" + table.predname + " type=" + table.type;
-        string params = " PARAMS: ";
+        std::string details = "conf edb table: predname=" + table.predname + " type=" + table.type;
+        std::string params = " PARAMS: ";
         for (const auto p : table.params) {
             params += p + " ";
         }
