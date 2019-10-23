@@ -53,6 +53,7 @@ file(GLOB vlog_SRC
     "src/vlog/forward/*.cpp"
     "src/vlog/magic/*.cpp"
     "src/vlog/incremental/*.cpp"
+    "src/vlog/embeddings/*.cpp"
     "src/vlog/inmemory/*.cpp"
     "src/vlog/trident/*.cpp"
     "src/vlog/cycles/*.cpp"
