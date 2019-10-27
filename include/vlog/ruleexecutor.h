@@ -113,7 +113,7 @@ public:
     void processTask(QSQR_Task *task);
 #endif
 
-    string tostring() {
+    std::string tostring() {
         return adornedRule.tostring(NULL, NULL);
     }
 

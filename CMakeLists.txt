@@ -90,9 +90,7 @@ ELSE()
         DOWNLOAD_DIR .
         SOURCE_DIR trident
         BUILD_IN_SOURCE 1
-        CMAKE_ARGS 
-		-DSPARQL=1
-		-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+        CMAKE_ARGS "-DSPARQL=1" "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
         INSTALL_COMMAND ""
         )
     ExternalProject_Get_Property(git-trident SOURCE_DIR)
@@ -135,8 +133,8 @@ IF (${lz4h} STREQUAL "lz4h-NOTFOUND")
     add_library(lz4 STATIC IMPORTED)
     set_property(TARGET lz4 PROPERTY IMPORTED_LOCATION ${KOGNAC_LIB}/external/lz4/lib/${CMAKE_STATIC_LIBRARY_PREFIX}lz4${CMAKE_STATIC_LIBRARY_SUFFIX})
 ELSE()
-    include_directories(lz4h)
-    message("-- Found LZ4")
+   include_directories(lz4h)
+   message("-- Found LZ4")
 ENDIF()
 
 IF (JAVA)
@@ -175,6 +173,8 @@ IF(MAPI)
 ENDIF()
 
 IF(SPARQL)
+    find_package(CURL REQUIRED)
+    include_directories(${CURL_INCLUDE_DIR})
     file(GLOB vlog_sparqlSRC "src/vlog/sparql/*.cpp")
     set(vlog_SRC ${vlog_sparqlSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DSPARQL=1")

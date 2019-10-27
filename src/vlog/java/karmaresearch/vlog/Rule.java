@@ -25,6 +25,10 @@ public class Rule {
         }
         for (Atom h : head) {
             h.checkNoBlank();
+            if (h.isNegated()) {
+                throw new IllegalArgumentException(
+                        "Head is not allowed to contain a negated atom");
+            }
         }
         for (Atom h : body) {
             h.checkNoBlank();

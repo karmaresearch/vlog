@@ -63,8 +63,8 @@ class ChaseMgmt {
                 uint32_t blockCounter;
                 uint64_t *currentblock;
                 std::unordered_map<ChaseRow, uint64_t, hash_ChaseRow> rows;
-                bool cyclicTerms;
                 TypeChase typeChase;
+				std::set<uint64_t> deps;	// For SUM chases.
 
             public:
                 Rows(uint64_t startCounter, uint8_t sizerow,
@@ -75,16 +75,11 @@ class ChaseMgmt {
                         blockCounter = 0;
                         currentblock = NULL;
                         currentcounter = startCounter;
-                        cyclicTerms = false;
                         this->typeChase = typeChase;
                     }
 
                 uint8_t getSizeRow() {
                     return sizerow;
-                }
-
-                bool containsCyclicTerms() {
-                    return cyclicTerms;
                 }
 
                 uint64_t *getRow(size_t id);
@@ -119,8 +114,6 @@ class ChaseMgmt {
                     this->rule = rule;
                     this->chase = chase;
                 }
-
-                bool containsCyclicTerms();
 
                 Rule const *getRule() {
                     return rule;

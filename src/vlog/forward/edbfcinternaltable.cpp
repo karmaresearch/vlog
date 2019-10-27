@@ -7,6 +7,7 @@ EDBFCInternalTable::EDBFCInternalTable(const size_t iteration,
     nfields(literal.getNVars()),
     query(QSQQuery(literal)),
     layer(layer) {
+
         uint8_t j = 0;
         defaultSorting.clear();
         for (uint8_t i = 0; i < literal.getTupleSize(); ++i) {

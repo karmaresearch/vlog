@@ -71,7 +71,7 @@ void VLogUtils::parseQuery(bool &success,
     return;
 }
 
-void VLogUtils::execSPARQLQuery(string sparqlquery,
+void VLogUtils::execSPARQLQuery(std::string sparqlquery,
         bool explain,
         long nterms,
         DBLayer &db,
@@ -102,7 +102,7 @@ void VLogUtils::execSPARQLQuery(string sparqlquery,
         //Copy the output of the query in the json vars
         for (QueryGraph::projection_iterator itr = queryGraph->projectionBegin();
                 itr != queryGraph->projectionEnd(); ++itr) {
-            string namevar = parser->getVariableName(*itr);
+            std::string namevar = parser->getVariableName(*itr);
             JSON var;
             var.put("", namevar);
             jsonvars->push_back(var);

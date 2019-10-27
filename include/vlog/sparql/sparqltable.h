@@ -17,7 +17,7 @@ class SparqlTable : public EDBTable {
         CURL *curl;
 	std::string repository;
 	EDBLayer *layer;
-	std::vector<string> fieldVars;
+	std::vector<std::string> fieldVars;
 	std::string whereBody;
 	std::unordered_map<uint64_t, std::shared_ptr<const Segment>> cachedSegments;
 	std::unordered_map<std::string, json> cachedTables;
@@ -35,7 +35,8 @@ class SparqlTable : public EDBTable {
             return false;
         }
 
-        SparqlTable(PredId_t predid, string repository, EDBLayer *layer, string fields, string whereBody);
+        SparqlTable(PredId_t predid, std::string repository, EDBLayer *layer,
+                std::string fields, std::string whereBody);
 
         void query(QSQQuery *query, TupleTable *outputTable,
                 std::vector<uint8_t> *posToFilter,

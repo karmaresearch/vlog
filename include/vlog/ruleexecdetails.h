@@ -39,9 +39,6 @@ struct RuleExecutionDetails {
 
     private:
 
-    void calculateDependencies(const Rule &rule,
-        std::map<uint8_t, std::vector<uint8_t>> &dependenciesExtVars);
-
     void rearrangeLiterals(std::vector<const Literal*> &vector, const size_t idx);
 
     void groupLiteralsBySharedVariables(std::vector<uint8_t> &startVars,
@@ -51,6 +48,4 @@ struct RuleExecutionDetails {
     void extractAllEDBPatterns(std::vector<const Literal*> &output,
             const std::vector<Literal> &input);
 };
-
-
 #endif
