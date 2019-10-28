@@ -740,7 +740,7 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     }
     std::string queryFileName = vm["query"].as<string>();
     // Parse the query
-    std::fstream inFile;
+    std::ifstream inFile;
     inFile.open(queryFileName);//open the input file
     std::stringstream strStream;
     strStream << inFile.rdbuf();//read the file
@@ -912,7 +912,7 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     std::string queryFileName = vm["query"].as<string>();
     if (Utils::exists(queryFileName)) {
         // Parse the query
-        std::fstream inFile;
+        std::ifstream inFile;
         inFile.open(queryFileName);//open the input file
         std::getline(inFile, query);
         inFile.close();
