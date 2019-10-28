@@ -740,7 +740,7 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
     }
     std::string queryFileName = vm["query"].as<string>();
     // Parse the query
-    std::fstream inFile;
+    std::ifstream inFile;
     inFile.open(queryFileName);//open the input file
     std::stringstream strStream;
     strStream << inFile.rdbuf();//read the file
@@ -912,7 +912,7 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     std::string queryFileName = vm["query"].as<string>();
     if (Utils::exists(queryFileName)) {
         // Parse the query
-        std::fstream inFile;
+        std::ifstream inFile;
         inFile.open(queryFileName);//open the input file
         std::getline(inFile, query);
         inFile.close();
@@ -957,6 +957,8 @@ int main(int argc, const char** argv) {
     if (!initParams(argc, argv, vm)) {
         return EXIT_FAILURE;
     }
+
+    try {
     std::string full_path = Utils::getFullPathExec();
     //Set logging level
     std::string ll = vm["logLevel"].as<string>();
@@ -1198,5 +1200,12 @@ int main(int argc, const char** argv) {
 
     //Print other stats
     LOG(INFOL) << "Max memory used: " << Utils::get_max_mem() << " MB";
+    } catch (int code) {
+        cerr << "ERROR code " << code << endl;
+        return EXIT_FAILURE;
+    } catch (const char* msg) {
+        cerr << "ERROR " << msg << endl;
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }
