@@ -319,7 +319,6 @@ void JoinExecutor::verificativeJoinOneColumn(
         //to the EDB layer
         std::shared_ptr<const Column> column = table->
             getColumn(hv.joinCoordinates[currentLiteral][0].second);
-        // LOG(TRACEL) << "Count = " << count;
 #if RESET_SORTED_ITR
         itr->reset();
 #else

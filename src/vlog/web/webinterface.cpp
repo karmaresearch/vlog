@@ -3,9 +3,9 @@
 #include <vlog/webinterface.h>
 #include <vlog/materialization.h>
 #include <vlog/seminaiver.h>
-#include <vlog/training.h>
+#include <vlog/ml/training.h>
 #include <vlog/utils.h>
-#include <vlog/helper.h>
+#include <vlog/ml/helper.h>
 
 #include <launcher/vloglayer.h>
 #include <cts/parser/SPARQLLexer.hpp>
@@ -291,7 +291,8 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                         accuracy,
                         timeout,
                         repeatQuery,
-                        logFileName);
+                        logFileName,
+                        5);
             }
             // 3. Set the output in json
             JSON node;
@@ -593,7 +594,7 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
                             multithreaded ? vm["interRuleThreads"].as<int>() : 0,
                             !vm["shufflerules"].empty());
                     cvMatRunner.notify_one(); //start the computation
-                    page = getPage("/newmat.html");
+                    page = getPage("/mat/infobox.html");
                 } else {
                     error = 1;
                     page = "Materialization is already running!";

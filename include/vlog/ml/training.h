@@ -67,8 +67,10 @@ class Training {
         string& strMagicTime,
         uint64_t timeout,
         uint8_t repeatQuery,
+        int featureDepth,
         vector<Metrics>& featuresVector,
-        vector<int>& decisionVector);
+        vector<int>& decisionVector,
+        vector<double>& featuresTimesVector);
 
     static void execLiteralQueries(vector<string>& literalquery,
         EDBLayer& edb,
@@ -87,8 +89,10 @@ class Training {
         uint8_t repeatQuery,
         vector<Metrics>& featuresVector,
         vector<int>& decisionVector,
+        vector<double>& featuresTimesVector,
         int& nMagicQueries,
-        string& logFileName);
+        string& logFileName,
+        int featureDepth);
 
     static void trainAndTestModel(vector<string>& trainingQueriesVector,
         vector<string>& testQueriesLog,
@@ -97,7 +101,8 @@ class Training {
         double& accuracy,
         uint64_t timeout,
         uint8_t repeatQuery,
-        string& logFileName);
+        string& logFileName,
+        int featureDepth);
 };
 
 #endif
