@@ -402,11 +402,12 @@ void RuleExecutor::evaluateRule(const uint8_t bodyAtom,
             // posJoinsLiteral is variable position, so for instance 1 means second variable.
             // However, in edb layer, it means position in query, which may also contain constants.
             // So, replace by variable positions in query.
+	    std::vector<uint8_t> edbPosJoinsLiteral;
             for (int i = 0; i < posJoinsLiteral.size(); i++) {
-                posJoinsLiteral[i] = l.getPosVars()[posJoinsLiteral[i]];
+                edbPosJoinsLiteral.push_back(l.getPosVars()[posJoinsLiteral[i]]);
             }
             layer.query(&query, retrievedBindings,
-                    &posJoinsLiteral, &bindings);
+                    &edbPosJoinsLiteral, &bindings);
         } else {
             layer.query(&query, retrievedBindings, NULL, NULL);
         }
