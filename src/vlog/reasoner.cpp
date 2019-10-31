@@ -826,12 +826,31 @@ int Reasoner::getNumberOfIDBPredicates(Literal &query, Program &program) {
 }
 
 void Reasoner::getMetrics(Literal &query, std::vector<uint8_t> *posBindings, std::vector<Term_t> *valueBindings,
-	    EDBLayer &layer, Program &program, Metrics &metrics, int maxDepth) {
+	    EDBLayer &layer, Program &program, Metrics &metrics, int maxDepth, string& idbFeatures) {
     std::unique_ptr<QSQR> evaluator = std::unique_ptr<QSQR>(
             new QSQR(layer, &program));
     memset(&metrics, 0, sizeof(Metrics));
     std::vector<uint32_t> uniqueRules;
-    evaluator->estimateQuery(metrics, maxDepth, query, uniqueRules);
+    vector<PredId_t> idbIds;
+    evaluator->estimateQuery(metrics, maxDepth, query, uniqueRules, idbIds);
+    vector<PredId_t> allPredIds =  program.getAllPredicateIDs();
+    uint32_t countPreds = allPredIds.size();
+    int i = 0;
+    stringstream ss;
+    for (auto pid : allPredIds) {
+        auto it = std::find(idbIds.begin(), idbIds.end(), pid);
+        if (it != idbIds.end()) {
+            // found
+            ss << "1";
+        } else {
+            ss << "0";
+        }
+        if (i < countPreds-1){
+            ss << ",";
+        }
+        i += 1;
+    }
+    idbFeatures = ss.str();
     metrics.countUniqueRules = uniqueRules.size();
 }
 

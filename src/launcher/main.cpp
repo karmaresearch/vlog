@@ -820,11 +820,12 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
         Metrics m;
         std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
         int depth = vm["featureDepth"].as<int>();
-        reasoner.getMetrics(literal, NULL, NULL, edb, p, m, depth);
+        string idbFeatures;
+        reasoner.getMetrics(literal, NULL, NULL, edb, p, m, depth, idbFeatures);
         std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
         LOG(INFOL) << "Query = " << literal.tostring(&p, &edb) << "Vector: " << \
         m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
-        << ", " << m.countIntermediateQueries;
+        << ", " << m.countIntermediateQueries << ", " << idbFeatures;
         LOG(INFOL) << "Time taken : " << durationMetrics.count() * 1000 << "ms";
         return;
     }
@@ -1100,12 +1101,13 @@ int main(int argc, const char** argv) {
                         Literal literal = program.parseLiteral(query, dictVariables);
                         Reasoner reasoner(vm["reasoningThreshold"].as<int64_t>());
                         Metrics m;
+                        string idbFeatures;
                         std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
-                        reasoner.getMetrics(literal, NULL, NULL, *layer, program, m, featureDepth);
+                        reasoner.getMetrics(literal, NULL, NULL, *layer, program, m, featureDepth, idbFeatures);
                         std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
                         LOG(INFOL) << "Query = " << query << "Vector: " << \
                         m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
-                        << ", " << m.countIntermediateQueries;
+                        << ", " << m.countIntermediateQueries << ", " << idbFeatures;
                         LOG(INFOL) << "Time taken : " << durationMetrics.count() * 1000 << "ms";
                     }
                 } else {

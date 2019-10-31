@@ -12,6 +12,7 @@
 #include <trident/kb/querier.h>
 
 #include <trident/sparql/query.h>
+#include <vector>
 
 #define QUERY_MAT 0
 #define QUERY_ONDEM 1
@@ -69,7 +70,8 @@ class Reasoner {
                 EDBLayer &layer,
                 Program &program,
                 Metrics &metrics,
-                int maxDepth);
+                int maxDepth,
+                string& idbFeatures);
 
         VLIBEXP ReasoningMode chooseMostEfficientAlgo(Literal &query,
                 EDBLayer &layer, Program &program,

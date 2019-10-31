@@ -113,9 +113,9 @@ public:
         return getAnswerTable(literal->getPredicate(), literal->getPredicate().getAdornment());
     }
 
-    void estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<uint32_t> &execRules);
+    void estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<uint32_t> &execRules, vector<uint32_t> & idbs);
 
-    void estimateRule(Metrics &metrics, int depth, Rule &rule, vector<Substitution>& subs, int nsubs, std::vector<uint32_t> &execRules);
+    void estimateRule(Metrics &metrics, int depth, Rule &rule, vector<Substitution>& subs, int nsubs, std::vector<uint32_t> &execRules, vector<uint32_t> & idbs);
 
     size_t estimate(int depth, Predicate &pred, BindingsTable *inputTable/*, size_t offsetInput*/);
 
