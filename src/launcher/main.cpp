@@ -1096,6 +1096,7 @@ int main(int argc, const char** argv) {
                 string algo = vm["reasoningAlgo"].as<string>();
                 int featureDepth = vm["featureDepth"].as<int>();
                 if (algo == "onlyMetrics") {
+                    ofstream logMetrics(logFileName);
                     for (auto query : trainingQueriesVector) {
                         Dictionary dictVariables;
                         Literal literal = program.parseLiteral(query, dictVariables);
@@ -1109,7 +1110,18 @@ int main(int argc, const char** argv) {
                         m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
                         << ", " << m.countIntermediateQueries << ", " << idbFeatures;
                         LOG(INFOL) << "Time taken : " << durationMetrics.count() * 1000 << "ms";
+                        stringstream strMetrics;
+                        strMetrics  << std::to_string(m.cost) << ","
+                            << std::to_string(m.estimate) << ","
+                            << std::to_string(m.countRules) << ","
+                            << std::to_string(m.countUniqueRules) << ","
+                            << std::to_string(m.countIntermediateQueries) << ",";
+                        logMetrics << query << " " << strMetrics.str() << idbFeatures << endl;
                     }
+                    if (logMetrics.fail()) {
+                        LOG(ERRORL) << "Error writing to metrics log file" << logFileName;
+                    }
+                    logMetrics.close();
                 } else {
                     vector<Metrics> featuresVector;
                     vector<int> decisionVector;
