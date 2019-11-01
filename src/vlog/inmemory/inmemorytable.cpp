@@ -240,6 +240,25 @@ InmemoryTable::InmemoryTable(PredId_t predid,
     delete inserter;
 }
 
+struct VSorter {
+    unsigned sz;
+
+    VSorter(unsigned sz) : sz(sz) {
+    }
+
+    bool operator ()(const Term_t *t1, const Term_t *t2) const {
+        if (t1 == t2) {
+            return false;
+        }
+        for (unsigned i = 0; i < sz; i++) {
+            if (t1[i] != t2[i]) {
+                return t2[i] > t1[i];
+            }
+        }
+        return false;
+    }
+};
+
 void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
         std::vector<uint8_t> *posToFilter,
         std::vector<Term_t> *valuesToFilter) {
@@ -247,8 +266,7 @@ void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
     const Literal *lit = query->getLiteral();
     uint8_t *pos = query->getPosToCopy();
     const uint8_t npos = query->getNPosToCopy();
-    size_t sz = lit->getTupleSize();
-    if (posToFilter == NULL || posToFilter->size() == 0) {
+    if (posToFilter == NULL || posToFilter->size() == 0 || valuesToFilter == NULL || valuesToFilter->size() == 0) {
         EDBIterator *iter = getIterator(*lit);
         while (iter->hasNext()) {
             iter->next();
@@ -257,11 +275,53 @@ void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
             }
             outputTable->addRow(row);
         }
-        return;
-    }
+    } else {
+        EDBIterator *iter = getSortedIterator2(*lit, *posToFilter);
+        std::vector<Term_t *> values(valuesToFilter->size() / posToFilter->size());
+        for (size_t i = 0; i < values.size(); i++) {
+            values[i] = &((*valuesToFilter)[i * posToFilter->size()]);
+        }
+        VSorter sorter(posToFilter->size());
+        std::sort(values.begin(), values.end(), std::ref(sorter));
 
-    LOG(ERRORL) << "Not implemented yet";
-    throw 10;
+        size_t valIndex = 0;
+        while (iter->hasNext()) {
+            iter->next();
+            bool match = false;
+            while (valIndex < values.size()) {
+                match = true;
+                bool rematch = false;
+                for (int i = 0; match && i < posToFilter->size(); i++) {
+                    Term_t el = iter->getElementAt(posToFilter->at(i));
+                    Term_t t = values[valIndex][i];
+                    if (t < el) {
+                        match = false;
+                        valIndex++;
+                        rematch = true;
+                    } else if (t > el) {
+                        match = false;
+                    }
+                }
+                if (match) {
+                    valIndex++;
+                }
+                if (match || ! rematch) {
+                    break;
+                }
+            }
+
+            if (! match) {
+                continue;
+            }
+
+            for (uint8_t i = 0; i < npos; ++i) {
+                row[i] = iter->getElementAt(pos[i]);
+            }
+            outputTable->addRow(row);
+        }
+        // LOG(ERRORL) << "Not implemented yet";
+        // throw 10;
+    }
 }
 
 bool InmemoryTable::isEmpty(const Literal &q, std::vector<uint8_t> *posToFilter,
