@@ -248,8 +248,8 @@ void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
     uint8_t *pos = query->getPosToCopy();
     const uint8_t npos = query->getNPosToCopy();
     size_t sz = lit->getTupleSize();
-    EDBIterator *iter = getIterator(*lit);
     if (posToFilter == NULL || posToFilter->size() == 0) {
+        EDBIterator *iter = getIterator(*lit);
         while (iter->hasNext()) {
             iter->next();
             for (uint8_t i = 0; i < npos; ++i) {
@@ -266,11 +266,18 @@ void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
 
 bool InmemoryTable::isEmpty(const Literal &q, std::vector<uint8_t> *posToFilter,
         std::vector<Term_t> *valuesToFilter) {
-    if (posToFilter == NULL) {
-        return segment == NULL || getCardinality(q) == 0;
+    if (segment == NULL) {
+        return true;
+    }
+    if (posToFilter == NULL || posToFilter->size() == 0) {
+        return getCardinality(q) == 0;
     } else {
-        LOG(ERRORL) << "Not implemented yet";
-        throw 10;
+        VTuple v = q.getTuple();
+        for (int i = 0; i < posToFilter->size(); ++i) {
+            v.set(VTerm(0, valuesToFilter->at(i)), posToFilter->at(i));
+        }
+        Literal q1(q.getPredicate(), v);
+        return getCardinality(q1) == 0;
     }
 }
 

@@ -1,0 +1,63 @@
+#detailsIDB {
+    background-color: grey;
+    color: white;
+    border-width: 1px;
+    padding: 5px;
+    font: 14px sans-serif;
+}
+
+.bar:hover {
+  fill: orangered ;
+}
+
+* {
+	margin:0;
+	padding:0;
+}
+
+body {
+	font-family:Arial, Helvetica, sans-serif;
+	font-size:normal;
+}
+
+.ruleoutput div {
+  font: 10px sans-serif;
+  background-color: steelblue;
+  text-align: right;
+  padding: 3px;
+  margin: 1px;
+  color: white;
+}
+
+#sizeidbs td {
+    font-size: small;
+    border-width: 1px;
+	padding: 3px;
+	border-style: inset;
+	border-color: gray;
+	background-color: white;
+	-moz-border-radius: ;
+}
+#sizeidbs th {
+    border-width: 1px;
+	padding: 3px;
+	border-style: inset;
+	border-color: gray;
+	background-color: white;
+	-moz-border-radius: ;
+}
+
+
+#sizeidbs table {
+    margin-top: 5px;
+    border-width: 1px;
+	border-spacing: 2px;
+	border-style: solid;
+	border-color: gray;
+	border-collapse: collapse;
+	background-color: white;
+}
+
+#finishedBox {
+    color: green;
+}

@@ -271,7 +271,7 @@ void SingleHeadFinalRuleProcessor::addColumns(const int blockid,
                 if (!literal.getTermAtPos(i).isVariable()) {
                     newc.push_back(std::shared_ptr<Column>(
                                 new CompressedColumn(row[i],
-                                    c[0]->size())));
+                                    c.size() == 0 ? 1 : c[0]->size())));
                 } else {
                     newc.push_back(c[idxVar++]);
                 }

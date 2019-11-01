@@ -1,0 +1,50 @@
+<div>
+
+    <form id="formQueryLiteral" action="queryliteral">
+        <div class="form-group">
+            <label for="predicatename" class="col-form-label">Predicate name</label>
+            <input type="text" class="form-control" name="predicate" id="predicateName"/>
+        </div>
+        <div class="form-group">
+            <label for="" class="col-form-label">Limit results</label>
+            <input type="number" class="form-control" name="limit" id="limitResults"/>
+        </div>
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+
+    <br/>
+    <br/>
+    <h3>Results</h3>
+    <div id="queryLiteralResults" class="container-fluid collapse">
+        N. rows <label id="queryLiteralNRows"/> (shown <label id="queryLiteralNShownRows"/>)<br/>
+                <div id="queryLiteralRows">
+                </div>
+    </div>
+
+    <script>
+        $('#formQueryLiteral').submit(function () {
+            $("#queryLiteralResults").hide();
+            $.post("/queryliteral", $(this).serialize(), function (data, textStatus) {
+                var nresults = data['nresults'];
+                var nshownresults = data['nshownresults'];
+                $("#queryLiteralNRows").html(nresults);
+                $("#queryLiteralNShownRows").html(nshownresults);
+                $("#queryLiteralResults").show();
+
+                var txtRows = "";
+                var rows = data['rows'];
+                for (var i = 0; i < rows.length; ++i) {
+                    var row = rows[i];
+                    txtRows += '<div class="row">';
+                    for (var j = 0; j < row.length; ++j) {
+                        txtRows += '<div class="col">' + escape(row[j]) + "</div>";
+                    }
+                    txtRows += "</div>";
+                }
+                $('#queryLiteralRows').html(txtRows);
+            });
+            return false;
+        });
+    </script>
+
+</div>

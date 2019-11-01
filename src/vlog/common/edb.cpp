@@ -184,6 +184,8 @@ void EDBLayer::query(QSQQuery *query, TupleTable *outputTable,
     if (dbPredicates.count(predid)) {
         auto el = dbPredicates.find(predid);
         el->second.manager->query(query, outputTable, posToFilter, valuesToFilter);
+    } else if (tmpRelations.size() <= predid) {
+        // nothing
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
         uint8_t size = rel->getSizeTuple();
@@ -407,6 +409,8 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
     if (dbPredicates.count(predid)) {
         auto p = dbPredicates.find(predid);
         return p->second.manager->getIterator(query);
+    } else if (tmpRelations.size() <= predid) {
+        return new EmptyEDBIterator(predid);
     } else {
         bool equalFields = query.hasRepeatedVars();
         IndexedTupleTable *rel = tmpRelations[predid];
@@ -443,6 +447,8 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
     if (dbPredicates.count(predid)) {
         auto p = dbPredicates.find(predid);
         return p->second.manager->getSortedIterator(query, fields);
+    } else if (tmpRelations.size() <= predid) {
+        return new EmptyEDBIterator(predid);
     } else {
         assert(literal->getTupleSize() <= 2);
         bool equalFields = false;
@@ -494,6 +500,8 @@ size_t EDBLayer::getCardinalityColumn(const Literal &query,
     if (dbPredicates.count(predid)) {
         auto p = dbPredicates.find(predid);
         return p->second.manager->getCardinalityColumn(query, posColumn);
+    } else if (tmpRelations.size() <= predid) {
+        return 0;
     } else {
         // throw 10;
         IndexedTupleTable *rel = tmpRelations[predid];
@@ -507,6 +515,8 @@ size_t EDBLayer::getCardinality(const Literal &query) {
     if (dbPredicates.count(predid)) {
         auto p = dbPredicates.find(predid);
         return p->second.manager->getCardinality(query);
+    } else if (tmpRelations.size() <= predid) {
+        return 0;
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
         if (literal->getNVars() == literal->getTupleSize()) {
@@ -558,6 +568,8 @@ size_t EDBLayer::estimateCardinality(const Literal &query) {
     if (dbPredicates.count(predid)) {
         auto p = dbPredicates.find(predid);
         return p->second.manager->estimateCardinality(query);
+    } else if (tmpRelations.size() <= predid) {
+        return 0;
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
         return rel->getNTuples();
@@ -571,6 +583,8 @@ bool EDBLayer::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
     if (dbPredicates.count(predid)) {
         auto p = dbPredicates.find(predid);
         return p->second.manager->isEmpty(query, posToFilter, valuesToFilter);
+    } else if (tmpRelations.size() <= predid) {
+        return true;
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
         if (!rel) {
