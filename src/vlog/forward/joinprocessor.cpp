@@ -711,7 +711,6 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
         //We need these to filter duplicates
         const std::pair<uint8_t, uint8_t> *posFromFirst = resultsContainer->getPosFromFirst();
         const uint8_t nPosFromFirst = resultsContainer->getNCopyFromFirst();
-        VTuple tuple = literal.getTuple();
         std::vector<DuplicateContainers> existingTuples;
 
         //Iterating through the hashmap
@@ -728,6 +727,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
             }
 
             while (ok) {
+                VTuple tuple = literal.getTuple();
                 existingTuples.clear();
 
                 size_t start, end;
