@@ -1592,7 +1592,7 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
     std::shared_ptr<const Segment> SegmentInserter::merge(
             std::vector<std::shared_ptr<const Segment>> &segments) {
 
-        LOG(TRACEL) << "SegmentInserter::merge";
+        LOG(TRACEL) << "SegmentInserter::merge, numSegments = " << segments.size();
         //Check all segments have the same size
         const uint8_t nfields = segments[0]->getNColumns();
         for (int i = 1; i < segments.size(); ++i)
@@ -1642,13 +1642,13 @@ std::shared_ptr<const Segment> SegmentInserter::retain(
             }
 
             SegmentInserter out((uint8_t) fieldsToCompare.size());
-            /*uint32_t s1 = 0;
-              uint32_t s2 = 0;
-              const uint32_t e1 = lastSegment->getNRows();
-              const uint32_t e2 = curSegment->getNRows();*/
             const uint8_t nvars = (uint8_t) fieldsToCompare.size();
-            //LOG(TRACEL) << "Segment::merge, nvars = " << (int) nvars
-            //                         << ", e1 = " << e1 << ", e2 = " << e2;
+#if DEBUG
+              const uint32_t e1 = lastSegment->getNRows();
+              const uint32_t e2 = curSegment->getNRows();
+            LOG(TRACEL) << "Segment::merge, nvars = " << (int) nvars
+                                     << ", e1 = " << e1 << ", e2 = " << e2;
+#endif
 
             bool lastValueEOF = false;
             Term_t lastValues[256];
