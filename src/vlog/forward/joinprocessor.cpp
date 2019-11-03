@@ -299,7 +299,6 @@ void JoinExecutor::verificativeJoinOneColumn(
     }
     keys.push_back(make_pair(prevKey, std::make_pair(beginning,
                     currentIdx)));
-    intermediateResults->releaseIterator(itr);
 
     //3- Query the KB
     FCIterator tableItr = naiver->getTable(literal, min, max);
@@ -316,7 +315,13 @@ void JoinExecutor::verificativeJoinOneColumn(
         std::shared_ptr<const Column> column = table->
             getColumn(hv.joinCoordinates[currentLiteral][0].second);
         // LOG(TRACEL) << "Count = " << count;
-        FCInternalTableItr *itr = intermediateResults->sortBy(joinField /*, nthreads */);
+        try {
+            itr->reset();
+        } catch(int code) {
+            intermediateResults->releaseIterator(itr);
+            itr = intermediateResults->sortBy(joinField /*, nthreads */);
+
+        }
         EDBLayer &layer = naiver->getEDBLayer();
         if (column->isEDB() && layer.supportsCheckIn(((EDBColumn*) column.get())->getLiteral())) {
             //Offload a merge join to the EDB layer
@@ -493,10 +498,12 @@ void JoinExecutor::verificativeJoinOneColumn(
             output->checkSizes();
 #endif
         }
-        intermediateResults->releaseIterator(itr);
         keys.swap(newKeys);
         tableItr.moveNextCount();
     }
+
+    intermediateResults->releaseIterator(itr);
+
     LOG(TRACEL) << "Loop executed " << count << " times";
 }
 
@@ -1355,6 +1362,8 @@ void JoinExecutor::do_merge_join_classicalgo(FCInternalTableItr * sortedItr1,
         const Term_t *valBlocks,
         Output * output) {
 
+    std::chrono::system_clock::time_point startL = std::chrono::system_clock::now();
+
     //Classic merge join
     bool active1 = true;
     if (sortedItr1->hasNext()) {
@@ -1370,6 +1379,9 @@ void JoinExecutor::do_merge_join_classicalgo(FCInternalTableItr * sortedItr1,
         active2 = false;
     }
     int res = 0;
+
+    size_t total = 0;
+    size_t max = 65536;
 
     //Special case. There is no merge join
     if (fields1.size() == 0 && active1 && active2) {
@@ -1390,13 +1402,49 @@ void JoinExecutor::do_merge_join_classicalgo(FCInternalTableItr * sortedItr1,
                     sortedItr1->next();
                 }
             } while (active1);
+        } else {
+            // Cartesian product
+            // First draw the first iterator empty.
+            size_t count = 0;
+            std::vector<Term_t> rowsToJoin;
+            for (;;) {
+                for (uint8_t idxInItr = 0; idxInItr < sortedItr1->getNColumns();
+                        ++idxInItr) {
+                    Term_t v1 = sortedItr1->getCurrentValue(idxInItr);
+                    rowsToJoin.push_back(v1);
+                }
+                count++;
+                active1 = sortedItr1->hasNext();
+                if (active1) {
+                    sortedItr1->next();
+                } else {
+                    break;
+                }
+            }
+
+            // Then, add results one by one.
+            const Term_t *rowsSortedItr1 = &rowsToJoin[0];
+            for (;;) {
+                for (size_t i = 0; i < count; i++) {
+                    output->processResults(0, rowsSortedItr1, sortedItr2, false);
+                    rowsSortedItr1 += sortedItr1->getNColumns();
+                }
+                total += count;
+
+                while (total >= max) {
+                    LOG(TRACEL) << "Count = " << count << ", total = " << total;
+                    max = max + max;
+                }
+
+                active2 = sortedItr2->hasNext();
+                if (active2) {
+                    sortedItr2->next();
+                } else {
+                    break;
+                }
+            }
         }
     }
-
-    std::chrono::system_clock::time_point startL = std::chrono::system_clock::now();
-
-    size_t total = 0;
-    size_t max = 65536;
 
     while (active1 && active2) {
         //Are they matching?
@@ -1591,6 +1639,11 @@ void JoinExecutor::do_merge_join_classicalgo(const std::vector<const std::vector
 
     int res = 0;
 
+    std::chrono::system_clock::time_point startL = std::chrono::system_clock::now();
+
+    size_t total = 0;
+    size_t max = 65536;
+
     //Special case. There is no merge join
     if (fields1.size() == 0 && l1 < u1 && l2 < u2) {
         if (vectors1.size() == 0) {
@@ -1604,13 +1657,15 @@ void JoinExecutor::do_merge_join_classicalgo(const std::vector<const std::vector
                 output->processResults(0, vectors1, i, vectors2, l2, false);
             }
             return;
+        } else {
+            for (size_t i = l1; i < u1; i++) {
+                for (size_t j = l2; j < u2; j++) {
+                    output->processResults(0, vectors1, i, vectors2, j, false);
+                }
+            }
+            return;
         }
     }
-
-    std::chrono::system_clock::time_point startL = std::chrono::system_clock::now();
-
-    size_t total = 0;
-    size_t max = 65536;
 
     while (l1 < u1 && l2 < u2) {
         //Are they matching?
