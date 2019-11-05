@@ -1133,10 +1133,12 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
     std::vector<uint8_t> fields2;
 
     for (uint32_t i = 0; i < joinsCoordinates.size(); ++i) {
+        // Create separate queries if the number of distinct values is very small.
+        // This causes fragmentation later on, so only do this for small numbers.
         std::vector<Term_t> distinctValues =
-            ((InmemoryFCInternalTable*)t1)->getDistinctValues(joinsCoordinates[i].first, 20);
+            ((InmemoryFCInternalTable*)t1)->getDistinctValues(joinsCoordinates[i].first, 8);
         LOG(TRACEL) << "distinctValues.size() = " << distinctValues.size();
-        if (distinctValues.size() < 20) {
+        if (distinctValues.size() < 8) {
             //std::sort(distinctValues.begin(), distinctValues.end());
             idxColumnsLowCardInMap.push_back(joinsCoordinates[i].first);
             idxColumnsLowCardInLiteral.push_back(joinsCoordinates[i].second);
