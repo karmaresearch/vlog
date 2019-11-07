@@ -302,8 +302,8 @@ void QSQR::evaluate(Predicate &pred, BindingsTable *inputTable,
     do {
         //Create rules
         createRules(pred);
-        for (int i = 0; i < program->getAllRulesByPredicate(pred.getId())->size(); ++i) {
-            RuleExecutor *exec = rules[pred.getId()][pred.getAdornment()][i];
+        for (int i = 0; i < program->getAllRulesByPredicate(pred.getId()).size(); ++i) {
+            RuleExecutor *exec = rules[pred.getId()][pred.getAdorment()][i];
             exec->evaluate(inputTable, offsetInput, this, layer);
         }
 

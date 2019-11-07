@@ -72,6 +72,49 @@ class EDBMemIterator : public EDBIterator {
         ~EDBMemIterator() {}
 };
 
+class EmptyEDBIterator final : public EDBIterator {
+        PredId_t predid;
+
+    public:
+        EmptyEDBIterator(PredId_t id) {
+            predid = id;
+        }
+
+        VLIBEXP void init1(PredId_t id, std::vector<Term_t>*, const bool c1, const Term_t vc1) {
+            predid = id;
+        }
+
+        VLIBEXP void init2(PredId_t id, const bool defaultSorting,
+                std::vector<std::pair<Term_t, Term_t>>*, const bool c1,
+                const Term_t vc1, const bool c2, const Term_t vc2,
+                const bool equalFields) {
+            predid = id;
+        }
+
+        VLIBEXP void skipDuplicatedFirstColumn() { }
+
+        VLIBEXP bool hasNext() {
+            return false;
+        }
+
+        VLIBEXP void next() {
+            throw 10;
+        }
+
+        PredId_t getPredicateID() {
+            return predid;
+        }
+
+        void moveTo(const uint8_t fieldId, const Term_t t) {}
+
+        VLIBEXP Term_t getElementAt(const uint8_t p) {
+            throw 10;
+        }
+
+        void clear() {}
+
+        ~EmptyEDBIterator() {}
+};
 
 class EDBLayer {
     private:

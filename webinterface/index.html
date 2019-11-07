@@ -1,182 +1,124 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 
 <html>
-<head>
-    <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
-    <meta name="author" content="Jacopo Urbani">
-    <meta name="description" content="VLog">
-    <script type="text/javascript" src="d3/d3.min.js">
-</script>
-    <script type="text/javascript" src="d3/radial.js">
-</script>
-    <script type="text/javascript" src="d3/d3-tip.js">
-</script>
-    <script type="text/javascript" src="jquery-min.js">
-</script>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+        <meta name="author" content="Jacopo Urbani">
+        <meta name="description" content="VLog">
+        <script type="text/javascript" src="d3/d3.min.js">
+        </script>
+        <script type="text/javascript" src="d3/radial.js">
+        </script>
+        <script type="text/javascript" src="d3/d3-tip.js">
+        </script>
+        <script type="text/javascript" src="jquery-min.js"></script>
+        <script type="text/javascript" src="bootstrap.min.js"></script>
 
 
-    <script type="text/javascript" src="mat/functions.js"></script>
-    <link href="mat/main.css" rel="stylesheet" type="text/css">
-    <link href="d3/radial.css" rel="stylesheet" type="text/css">
+        <script type="text/javascript" src="mat/functions.js"></script>
+        <link href="main.css" rel="stylesheet" type="text/css">
+        <link href="mat/main.css" rel="stylesheet" type="text/css">
+        <link href="d3/radial.css" rel="stylesheet" type="text/css">
+        <link href="bootstrap.min.css" rel="stylesheet" type="text/css">
 
-    <title>VLog</title>
-</head>
+        <title>VLog</title>
+    </head>
 
-<body>
-    <script type="text/javascript">
-    get_mem_commandline(); 
-        getEDBInfo();
-        getProgramInfo();
+    <body>
+        <script type="text/javascript">
+            get_mem_commandline();
+getEDBInfo();
+getProgramInfo();
 
-        //Code for collapsing elements
-                $(document).ready(function() {
-                  $('.nav-toggle').click(function(){
-                        //get collapse content selector
-                        var collapse_content_selector = $(this).attr('href');
+//Code for collapsing elements
+$(document).ready(function() {
+    $('.nav-toggle').click(function(){
+        //get collapse content selector
+        var collapse_content_selector = $(this).attr('href');
 
-                        //make the collapse content to be shown or hide
-                        var toggle_switch = $(this);
-                        $(collapse_content_selector).toggle(function(){
-                          if($(this).css('display')=='none'){
-                                //change the button label to be 'Show'
-                                toggle_switch.html('Show Content');
-                          }else{
-                                //change the button label to be 'Hide'
-                                toggle_switch.html('Hide Content');
-                          }
-                        });
-                  });
-                });
-    </script>
-
-    <div id="wrapper">
-        <div id="header" class="block">
-            <h1>VLog</h1>
-        </div>
+        //make the collapse content to be shown or hide
+        var toggle_switch = $(this);
+        $(collapse_content_selector).toggle(function(){
+            if($(this).css('display')=='none'){
+                //change the button label to be 'Show'
+                toggle_switch.html('Show Content');
+            }else{
+                //change the button label to be 'Hide'
+                toggle_switch.html('Hide Content');
+            }
+        });
+    });
+});
+        </script>
 
 
-        <div>
-            <button type="button" href="#leftcolumnblock" class="nav-toggle">Hide Content</button>
-        </div>
-
-
-            <div id="leftcolumn">
-                <div id="leftcolumnblock">
-                    <h3>Memory Monitor</h3>
-
-
-                    <div id="rambox">
-                        <p><i>Occupied RAM:</i> <label id="usedram"></label>/<label id="totalram"></label> MB</p>
-
-
-                        <div id="divRAM" class="radial">
-                        </div>
-                    </div>
-
-
-                    <p><i>Refresh rate (ms):</i> <input id="refreshRate" size="5" text="1000" value="1000" onchange="setRefresh(refreshMem);"></p>
-
-
-                    <p><i>Command line:</i>
-                    </p>
-
-
-                    <p><small><label id="commandline"></label></small>
-                    </p>
-                    <br>
-
-
-                    <div id="detailsedbblock">
-                        <h3>Details EDB predicates</h3>
-
-
-                        <div id="detailsedb">
-                        </div>
-                    </div>
-
-
-                    <div id="detailsprogramblock">
-                        <h3>Details current program</h3>
-
-
-                        <div id="detailsprogram">
-                        </div>
-                    </div>
-                </div>
-
-                <div id="detailsIDB" style="display: none"></div>
-                <input type="button" id="buttonSizeIDBs" value="Get size IDB tables" onclick="get_size_IDBs();" />
-                <div id="sizeidbs"></div>
-
+        <div id="wrapper" class="container-fluid">
+            <div class="row"><div id="header" class="col"><h1>VLog</h1></div>
             </div>
+            <div class="row">
+                <div id="leftcolumnblock" class="col col-md-2 show">
+                    <div id="leftcolumn">
+                        <div>
+                            <h3>Memory Monitor</h3>
+
+                            <div id="rambox">
+                                <p><i>Occupied RAM:</i> <label id="usedram"></label>/<label id="totalram"></label> MB</p>
+
+                                <div id="divRAM" class="radial">
+                                </div>
+                            </div>
 
 
-            <form name="setup" method="post" id="setup">
-                <div class="block" id="setupdatalog">
-                    <div id="finishedBox">
-                        <h3><label id="finished"></label>
-                        </h3>
+                            <p><i>Refresh rate (ms):</i> <input id="refreshRate" size="5" text="1000" value="1000" onchange="setRefresh(refreshMem);"></p>
+
+                            <p><i>Command line:</i></p>
+                            <p><small><label id="commandline"></label></small></p>
+                            <div id="detailsprogram"></div>
+
+                            <h3>EDB</h3>
+                            <div id="detailsedb"></div>
+                            <br/>
+                            <h3>IDB</h3>
+                            <input type="button" id="buttonSizeIDBs" value="Get size IDB tables" onclick="get_size_IDBs();" />
+                            <div id="detailsIDB" style="display: none"></div>
+                            <div id="sizeidbs"></div>
+
+                        </div>
                     </div>
-
-
-                    <h3>Rules</h3>
-
-
-                    <table>
-                        <tr>
-                            <td>
-                            <textarea id="rulebox" name="rules" rows="30">
-    </textarea>
-                            </td>
-                        </tr>
-
-
-                        <tr>
-                            <td>Load from file: <input type="file" id="filerule" onchange="loadfile(this, 'rulebox')"></td>
-                        </tr>
-                    </table>
-
-
-
-
-                    <table id="containerSubmit">
-                        <tr>
-                            <td><input type="button" onclick="setupProgram();" id="buttonSetup" name="submit" value="Load Rules"> <input type="button" onclick="launchMat();" id="buttonMat" name="submit" value="Launch Materialization"></td>
-                        </tr>
-                    </table>
                 </div>
-            </form>
 
-                <p>Queries to prematerialize <button type="button" href="#tableQueries" class="nav-toggle">Show Content</button></p>
+                <div class="col">
+                    <div id="messageBox">
+                    </div>
+                    <div>
+                        <ul id="menu" class="nav nav-tabs">
+                            <button type="button" data-toggle="collapse" data-target="#leftcolumnblock" class="btn-primary btn-sm">Hide/Show content</button>
 
+                            <li class="nav-item">
+                                <a class="nav-link active" data-toggle="tab" href="#tab_materialization">Materialization</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" data-toggle="tab" href="#tab_query">Query</a>
+                            </li>
+                        </ul>
 
-                <table id="tableQueries" style="display:none">
-                    <tr>
-                        <td>
-                        <textarea id="premat" name="queries" rows="7">
-</textarea>
-                        </td>
-                    </tr>
+                        <div class="tab-content">
+                            <div id="tab_materialization" class="tab-pane active">Loading ...</div>
+                            <div id="tab_query" class="tab-pane">Loading ...</div>
+                        </div>
 
+                        <script>
+                            $("#tab_materialization").load("/tab-mat.html");
+$("#tab_query").load("/tab-query.html");
+                        </script>
 
-                    <tr>
-                        <td>Load from file: <input type="file" id="queryrule" onchange="loadfile(this, 'premat')"></td>
-                    </tr>
-
-
-                    <tr>
-                        <td>Auto premat. <input id="automat" name="automat" type="checkbox" onclick="disablepremat()"></td>
-                    </tr>
-                </table>
-
-        <div id="messageBox">
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div id="frameBox">
-        </div>
-    </div>
-    <script type="text/javascript">
-setRefresh(refreshMem);
-    </script>
-</body>
+        <script type="text/javascript">
+            setRefresh(refreshMem);
+        </script>
+    </body>
 </html>

@@ -13,11 +13,7 @@ function getProgramInfo() {
         var done = 4, ok = 200;
         if (http_request.readyState === done && http_request.status === ok) {
             info = JSON.parse(http_request.responseText);
-            content = "<table>";
-            content += "<tr><td>N. Rules: <\/td><td>" + info.nrules + "<\/td><\/tr>";
-            /*content += "<tr><td>Used EBD Pred: <\/td><td>" + info.nedb+ "<\/td><\/tr>";
-            content += "<tr><td>Used IDB Pred: <\/td><td>" + info.nidb+ "<\/td><\/tr>";*/
-            content += "<\/table";
+            content = "N. loaded rules: " + info.nrules + "";
             document.getElementById('detailsprogram').innerHTML = content;
             allrules = info.rules;
         }
@@ -233,15 +229,12 @@ function refreshMat() {
             }
 
             document.getElementById('runtime').innerHTML = sHours + ":" + sMinutes + ":" + sSeconds;
-
             document.getElementById('iteration').innerHTML = stats.iteration;
             document.getElementById('rule').innerHTML = stats.rule;
 
             //Update the data for the rules output graph
             if (stats.outputrules != '') {
                 var iterations = stats.outputrules.split(';');
-                //updates are incremental
-                //ruleOutputs = [];
                 for(var i = 0; i < iterations.length; i++) {
                     var el = iterations[i].split(',');
                     ruleOutputs.push({it: +el[0], der: +el[1], rule: +el[2], timeexec: +el[3] });
@@ -251,6 +244,7 @@ function refreshMat() {
             if (stats.finished == 'true') {
                 get_size_IDBs();
                 msgbox('ok', '#messageBox', 'Materialization is finished!', 5000);
+                document.getElementById('rule').innerHTML = "Materialization is finished";
                 if (refreshMat in intervals) {
                     clearInterval(intervals[refreshMat]);
                 }
@@ -336,7 +330,7 @@ function get_size_IDBs() {
                 }
             }
             allsizes += '</table>';
-            allsizes = "<p><i>Total size: </i><label>" + Number(totalsize).toLocaleString('en') + "</label></p>" + allsizes;
+            allsizes = "<i>N. IDB facts: </i><label>" + Number(totalsize).toLocaleString('en') + "</label>" + allsizes;
             document.getElementById('sizeidbs').innerHTML = allsizes;
             document.getElementById('buttonSizeIDBs').value = 'Get size IDB tables';
         }

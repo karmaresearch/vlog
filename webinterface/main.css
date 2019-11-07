@@ -1,0 +1,69 @@
+.highlight {
+    background-color: red;
+    color: red;
+    fill: red;
+}
+
+.d3-tip {
+  line-height: 1;
+  font-size: small;
+  padding: 5px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  border-radius: 2px;
+}
+
+.axis text {
+  font: 10px sans-serif;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.yaxis text {
+  font: 10px sans-serif;
+}
+
+.yaxis path,
+.yaxis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.msgSuccess {
+    color: green;
+    font-size: Large;
+    text-align: center;
+    font-weight: bold;
+}
+
+.msgError {
+    color: red;
+    font-size: Large;
+    text-align: center;
+    font-weight: bold;
+}
+
+#header {
+    color: #FFFF00;
+	background-image:initial;
+	background-repeat-x:initial;
+	background-repeat-y:initial;
+	background-repeat:no-repeat;
+	background-attachment:initial;
+	background-position:initial initial;
+	background-position-x:initial;
+	background-position-y:initial;
+	background-origin:initial;
+	background-clip:initial;
+	background-color:#ABBEBE;
+	font-family:Arial, Helvetica, sans-serif;
+	font-size:28px;
+    text-align: center;
+}
+
