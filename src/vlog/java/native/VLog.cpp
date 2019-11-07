@@ -603,6 +603,52 @@ extern "C" {
 		return jobj;
 	}
 
+//TODO add method that receives only a predicate and returns EDBLayer.getCardinality
+
+/*
+* Class:     karmaresearch_vlog_VLog
+* Method:    nativeQuerySize
+* Signature: (I[JZZ)J;
+* @author: Larry Gonzalez
+*/
+JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_nativeQuerySize(JNIEnv * env, jobject obj, jint p, jlongArray els, jboolean includeConstants, jboolean filterBlanks) {
+    //VLogInfo *f = getVLogInfo(env, obj);
+    //if (f == NULL || f->program == NULL) {
+    //    throwNotStartedException(env, "VLog is not started yet");
+    //    return;
+    //}
+    jlong result = 0;
+    if (p == -1) {
+        throwNonExistingPredicateException(env, "Query contains non-existing predicate");
+        return result;
+    }
+    TupleIterator *iter = getQueryIter(env, obj, (PredId_t) p, els, (jboolean) includeConstants);
+    if (iter == NULL) {
+        return result;
+    }
+
+    size_t sz = iter->getTupleSize();
+    while (iter->hasNext()) {
+        iter->next();
+        if (filterBlanks) {
+            bool filterOut = false;
+            for (int i = 0; i < sz; i++) {
+                if (IS_BLANK(iter->getElementAt(i))) {
+                    filterOut = true;
+                    break;
+                }
+            }
+            if (!filterOut) {
+                ++result;
+            }
+        }
+        else {
+            ++result;
+        }
+    }
+    return result;
+}
+
 
 	/*
 	 * Class:     karmaresearch_vlog_VLog

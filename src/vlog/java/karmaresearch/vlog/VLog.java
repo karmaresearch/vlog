@@ -373,6 +373,18 @@ public class VLog {
                 query(intPred, longTerms, includeConstants, filterBlanks));
     }
 
+    public native long nativeQuerySize(int predicate, long[] terms,
+            boolean includeConstants, boolean filterBlanks)
+            throws NotStartedException, NonExistingPredicateException;
+
+    public long querySize(Atom query, boolean includeConstants, boolean filterBlanks)
+            throws NotStartedException, NonExistingPredicateException {
+        query.checkNoBlank();
+        int intPred = getPredicateId(query.getPredicate());
+        long[] longTerms = extractTerms(query.getTerms());
+        return nativeQuerySize(intPred, longTerms, includeConstants, filterBlanks);
+    }
+
     private native void queryToCsv(int predicate, long[] term, String fileName,
             boolean filterBlanks) throws IOException;
 
