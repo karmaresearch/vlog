@@ -7,9 +7,6 @@
 
 #include <zstr/zstr.hpp>
 
-void dump() {
-}
-
 std::vector<std::string> readRow(istream &ifs) {
     char buffer[65536];
     bool insideEscaped = false;
@@ -368,6 +365,7 @@ void _literal2filter(const Literal &query, std::vector<uint8_t> &posVarsToCopy,
 
 size_t InmemoryTable::getCardinality(const Literal &q) {
     if (q.getTupleSize() != arity) {
+        // TODO this should throw an error I think
         return 0;
     }
     if (q.getNUniqueVars() == q.getTupleSize()) {
