@@ -1088,7 +1088,7 @@ int main(int argc, const char** argv) {
                 //get logfile name from rules file
                 size_t dotIndex = rulesFile.find_last_of(".");
                 string logFileName = rulesFile.substr(0, dotIndex);
-                logFileName += "-training.log";
+                logFileName += "-idb-training.log";
                 // Run the queries with threshold 10s and repeat queries 3 times
                 // to take average of the running time
                 uint64_t timeout = vm["timeout"].as<unsigned int>();
@@ -1106,10 +1106,11 @@ int main(int argc, const char** argv) {
                         std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
                         reasoner.getMetrics(literal, NULL, NULL, *layer, program, m, featureDepth, idbFeatures);
                         std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
-                        LOG(INFOL) << "Query = " << query << "Vector: " << \
+                        LOG(INFOL) << "Query = " << query << " Vector: " << \
                         m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
                         << ", " << m.countIntermediateQueries << ", " << idbFeatures;
                         LOG(INFOL) << "Time taken : " << durationMetrics.count() * 1000 << "ms";
+                        LOG(INFOL) << "unmesh : " << idbFeatures;
                         stringstream strMetrics;
                         strMetrics  << std::to_string(m.cost) << ","
                             << std::to_string(m.estimate) << ","
@@ -1118,6 +1119,7 @@ int main(int argc, const char** argv) {
                             << std::to_string(m.countIntermediateQueries) << ",";
                         logMetrics << query << " " << strMetrics.str() << idbFeatures << endl;
                     }
+                    LOG(INFOL) << "unm : DONE *****";
                     if (logMetrics.fail()) {
                         LOG(ERRORL) << "Error writing to metrics log file" << logFileName;
                     }
