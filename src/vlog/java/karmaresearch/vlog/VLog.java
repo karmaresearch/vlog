@@ -373,6 +373,21 @@ public class VLog {
                 query(intPred, longTerms, includeConstants, filterBlanks));
     }
 
+    /**
+     * Queries the current, so possibly materialized, database, and returns the 
+     * number of observations associated to predicate, including nulls.
+     *
+     * @param predicateId: Id of the predicate to count rows. 
+     *
+     * @return the number of rows in an EDBTable or an FCTable, i.e. the size of
+     *  the predicate's extension
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet.
+     * @exception NonExistingPredicateException
+     *                is thrown when the query predicate does not exist.
+     */
+    public native long getExtensionSize(int predicateId);
+    
     public native long nativeQuerySize(int predicate, long[] terms,
             boolean includeConstants, boolean filterBlanks)
             throws NotStartedException, NonExistingPredicateException;

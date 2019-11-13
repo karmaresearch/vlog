@@ -603,7 +603,34 @@ extern "C" {
 		return jobj;
 	}
 
-//TODO add method that receives only a predicate and returns EDBLayer.getCardinality
+/*
+* Class:     karmaresearch_vlog_VLog
+* Method:    getPredicate
+* Signature: (I)J;
+* @author: Larry Gonzalez
+ */
+JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_getExtensionSize(JNIEnv *env, jobject obj, jint predicateId) {
+    VLogInfo *f = getVLogInfo(env, obj);
+    if (f == NULL || f->program == NULL) {
+        throwNotStartedException(env, "VLog is not started yet");
+        return 0;
+    }
+
+    //validation of predicate
+    Predicate pred = f->program->getPredicate((PredId_t) predicateId);
+    if (pred.getCardinality() == 0) {
+        return 0;
+    }
+
+    if (pred.getType() == EDB) {
+        return f->layer->getPredSize(predicateId);
+    } else if (f->sn != NULL) {
+        return f->sn->getIDBExtensionSize(predicateId);
+    } else {
+        // No materialization yet, but non-EDB predicate ... 0 then.
+        return 0;
+    }
+}
 
 /*
 * Class:     karmaresearch_vlog_VLog
