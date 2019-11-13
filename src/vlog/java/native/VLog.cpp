@@ -625,7 +625,7 @@ JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_getExtensionSize(JNIEnv *en
     if (pred.getType() == EDB) {
         return f->layer->getPredSize(predicateId);
     } else if (f->sn != NULL) {
-        return f->sn->getIDBExtensionSize(predicateId);
+        return f->sn->getSizeTable(predicateId);
     } else {
         // No materialization yet, but non-EDB predicate ... 0 then.
         return 0;
