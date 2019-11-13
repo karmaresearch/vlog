@@ -1579,6 +1579,21 @@ size_t SemiNaiver::getSizeTable(const PredId_t predid) const {
     return predicatesTables[predid]->getNAllRows();
 }
 
+//Aparently it is not necessary because it is the same as SemiNaiver::getSizeTable
+size_t SemiNaiver::getIDBExtensionSize(PredId_t predicateId) {
+    size_t result = 0;
+    FCIterator tableIt = SemiNaiver ::getTable(predicateId);
+
+    while (! tableIt.isEmpty()) {
+        std::shared_ptr<const FCInternalTable> table = tableIt.getCurrentTable();
+        result += table->getNRows();
+
+        tableIt.moveNextCount();
+    }
+
+    return result;
+}
+
 SemiNaiver::~SemiNaiver() {
     // Don't refer to program. It may already have been deallocated.
     for (int i = 0; i < predicatesTables.size(); ++i) {

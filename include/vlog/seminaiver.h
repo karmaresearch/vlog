@@ -224,6 +224,8 @@ class SemiNaiver {
 
         size_t getSizeTable(const PredId_t predid) const;
 
+        size_t getIDBExtensionSize(PredId_t predicateId);
+
         std::vector<FCBlock> &getDerivationsSoFar() {
             return listDerivations;
         }
