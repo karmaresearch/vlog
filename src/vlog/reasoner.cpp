@@ -826,12 +826,51 @@ int Reasoner::getNumberOfIDBPredicates(Literal &query, Program &program) {
 }
 
 void Reasoner::getMetrics(Literal &query, std::vector<uint8_t> *posBindings, std::vector<Term_t> *valueBindings,
-	    EDBLayer &layer, Program &program, Metrics &metrics, int maxDepth) {
+	    EDBLayer &layer, Program &program, Metrics &metrics, int maxDepth, string& idbFeatures) {
     std::unique_ptr<QSQR> evaluator = std::unique_ptr<QSQR>(
             new QSQR(layer, &program));
     memset(&metrics, 0, sizeof(Metrics));
-    std::vector<Rule> uniqueRules;
-    evaluator->estimateQuery(metrics, maxDepth, query, uniqueRules);
+    std::vector<uint32_t> uniqueRules;
+    vector<PredId_t> idbIds;
+    evaluator->estimateQuery(metrics, maxDepth, query, uniqueRules, idbIds);
+    vector<PredId_t> allPredIds =  program.getAllPredicateIDs();
+    uint32_t countPreds = allPredIds.size();
+
+    uint8_t card = query.getPredicate().getCardinality();
+    bool sub_bound = false;
+    bool obj_bound = false;
+    for (uint8_t c = 0; c < card; ++c) {
+        bool bound = !query.getTermAtPos(c).isVariable();
+        if (0 == c) {
+            sub_bound = bound;
+        } else if (1 == c) {
+            obj_bound = bound;
+        }
+    }
+    if (1 == card) {
+        obj_bound = sub_bound;
+    }
+
+    int i = 0;
+    stringstream ss;
+    ss << sub_bound ? "1" : "0";
+    ss << ",";
+    ss << obj_bound ? "1" : "0";
+    ss << ",";
+    for (auto pid : allPredIds) {
+        auto it = std::find(idbIds.begin(), idbIds.end(), pid);
+        if (it != idbIds.end()) {
+            // found
+            ss << "1";
+        } else {
+            ss << "0";
+        }
+        if (i < countPreds-1){
+            ss << ",";
+        }
+        i += 1;
+    }
+    idbFeatures = ss.str();
     metrics.countUniqueRules = uniqueRules.size();
 }
 

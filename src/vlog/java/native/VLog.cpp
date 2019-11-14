@@ -366,8 +366,9 @@ extern "C" {
 			std::vector<std::string> value;
 			jobjectArray atom = (jobjectArray) env->GetObjectArrayElement(data, (jsize) i);
 			if (atom == NULL) {
-				throwEDBConfigurationException(env, "null data");
-				return;
+				// throwEDBConfigurationException(env, "null data");
+				// return;
+				continue;	// For issue #25
 			}
 			jint arity = env->GetArrayLength(atom);
 			if (arity != (uint8_t) arity) {
@@ -739,6 +740,15 @@ extern "C" {
 			LOG(INFOL) << "Runtime materialization = " << sec.count() * 1000 << " milliseconds";
 		} catch(std::runtime_error e) {
 			throwMaterializationException(env, e.what());
+			if (f->sn != NULL) {
+				delete f->sn;
+			}
+			return false;
+		} catch(std::bad_alloc e) {
+			throwMaterializationException(env, e.what());
+			if (f->sn != NULL) {
+				delete f->sn;
+			}
 			return false;
 		}
 		f->sn->printCountAllIDBs("");
@@ -923,7 +933,7 @@ extern "C" {
 				default:
 					return env->GetStaticObjectField(resultClass, fidINCONCLUSIVE);
 			}
-		} catch(int n) {
+		} catch(int) {
 			throwIllegalArgumentException(env, "Null algorithm specified in cycle check");
 		}
 		return NULL;

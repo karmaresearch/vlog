@@ -169,7 +169,7 @@ bool TableFilterer::isEligibleForPartialSubs(
             }
 
             if (childBlocks.empty()) {
-                LOG(INFOL) << "The child predicate is empty. Let it go";
+                // LOG(INFO) << "The child predicate is empty. Let it go";
                 return false;
             }
 
