@@ -1057,6 +1057,7 @@ void Training::runQueries(vector<string>& trainingQueriesVector,
                     decisionVector,
                     featuresTimesVector);
             strResults.push_back(results);
+            features += ",0";
             strFeatures.push_back(features);
             strQsqrTime.push_back(qsqrTime);
             logTraining << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back() << endl;
@@ -1276,6 +1277,7 @@ void Training::execLiteralQueries(vector<string>& queryVector,
                     decisionVector,
                     featuresTimesVector);
             strResults.push_back(results);
+            features += ",0";
             strFeatures.push_back(features);
             strQsqrTime.push_back(qsqrTime);
             strMagicTime.push_back(magicTime);
