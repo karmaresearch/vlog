@@ -252,14 +252,13 @@ bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
     return newDer;
 }
 
-void SemiNaiver::prepare(size_t lastExecution, int singleRuleToCheck) {
+void SemiNaiver::prepare(size_t lastExecution, int singleRuleToCheck, std::vector<RuleExecutionDetails> &allrules) {
     //Prepare for the execution
 #if DEBUG
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     LOG(DEBUGL) << "Optimizing ruleset...";
 #endif
     size_t allRulesSize = 0;
-    std::vector<RuleExecutionDetails> allrules;
     for (auto& strata : allIDBRules) {
         for (auto& ruleExecDetails: strata) {
 #if DEBUG
@@ -316,7 +315,10 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
 #endif
     listDerivations.clear();
 
-    prepare(lastExecution, singleRuleToCheck);
+    std::vector<RuleExecutionDetails> allrules;
+    // Note: allrules must be declared here, not in prepare itself, since when declared there,
+    // it (and stuff inside it) will be de-allocated too early. --Ceriel
+    prepare(lastExecution, singleRuleToCheck, allrules);
 
     //Used for statistics
     std::vector<StatIteration> costRules;
