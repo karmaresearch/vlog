@@ -254,7 +254,11 @@ void ExistentialRuleProcessor::retainNonExisting(
         std::vector<ColumnWriter> writers;
         std::vector<std::unique_ptr<ColumnReader>> readers;
         for(uint8_t i = 0; i < c.size(); ++i) {
-            readers.push_back(c[i]->getReader());
+            if (c[i]) {
+                readers.push_back(c[i]->getReader());
+            } else {
+                readers.emplace_back();
+            }
         }
         writers.resize(c.size());
         uint64_t idxs = 0;
@@ -263,10 +267,12 @@ void ExistentialRuleProcessor::retainNonExisting(
             if (i < nextid) {
                 //Copy
                 for(uint8_t j = 0; j < c.size(); ++j) {
-                    if (!readers[j]->hasNext()) {
-                        throw 10;
+                    if (readers[j]) {
+                        if (!readers[j]->hasNext()) {
+                            throw 10;
+                        }
+                        writers[j].add(readers[j]->next());
                     }
-                    writers[j].add(readers[j]->next());
                 }
             } else {
                 //Move to the next ID if any
@@ -277,21 +283,36 @@ void ExistentialRuleProcessor::retainNonExisting(
                     nextid = ~0lu; //highest value -- copy the rest
                 }
                 for(uint8_t j = 0; j < c.size(); ++j) {
-                    if (!readers[j]->hasNext()) {
-                        throw 10;
+                    if (readers[j]) {
+                        if (!readers[j]->hasNext()) {
+                            throw 10;
+                        }
+                        readers[j]->next();
                     }
-                    readers[j]->next();
                 }
 
             }
         }
         //Copy back the retricted columns
         for(uint8_t i = 0; i < c.size(); ++i) {
-            c[i] = writers[i].getColumn();
+            if (c[i]) {
+                c[i] = writers[i].getColumn();
+            }
         }
         sizecolumns = 0;
         if (rowsize > 0) {
-            sizecolumns = c[0]->size();
+            bool found = false;
+            for(uint8_t i = 0; i < c.size(); ++i) {
+                if (c[i]) {
+                    sizecolumns = c[i]->size();
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                LOG(ERRORL) << "No atom without non-existential columns. I don't now how to get the size";
+                throw 10;
+            }
         }
     }
 }
