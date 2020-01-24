@@ -252,14 +252,13 @@ bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
     return newDer;
 }
 
-void SemiNaiver::prepare(size_t lastExecution, int singleRuleToCheck) {
+void SemiNaiver::prepare(size_t lastExecution, int singleRuleToCheck, std::vector<RuleExecutionDetails> &allrules) {
     //Prepare for the execution
 #if DEBUG
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     LOG(DEBUGL) << "Optimizing ruleset...";
 #endif
     size_t allRulesSize = 0;
-    std::vector<RuleExecutionDetails> allrules;
     for (auto& strata : allIDBRules) {
         for (auto& ruleExecDetails: strata) {
 #if DEBUG
@@ -316,7 +315,10 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
 #endif
     listDerivations.clear();
 
-    prepare(lastExecution, singleRuleToCheck);
+    std::vector<RuleExecutionDetails> allrules;
+    // Note: allrules must be declared here, not in prepare itself, since when declared there,
+    // it (and stuff inside it) will be de-allocated too early. --Ceriel
+    prepare(lastExecution, singleRuleToCheck, allrules);
 
     //Used for statistics
     std::vector<StatIteration> costRules;
@@ -456,13 +458,13 @@ bool SemiNaiver::executeUntilSaturation(
         }
         iteration++;
 
-		if (checkCyclicTerms) {
-			foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
-			if (foundCyclicTerms) {
-				LOG(DEBUGL) << "Found a cyclic term";
-				return newDer;
-			}
-		}
+        if (checkCyclicTerms) {
+            foundCyclicTerms = chaseMgmt->checkCyclicTerms(currentRule);
+            if (foundCyclicTerms) {
+                LOG(DEBUGL) << "Found a cyclic term";
+                return newDer;
+            }
+        }
 
         if (response) {
 
@@ -1120,7 +1122,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         std::vector<ResultJoinProcessor*> *finalResultContainer) {
     Rule rule = ruleDetails.rule;
     if (! bodyChangedSince(rule, ruleDetails.lastExecution)) {
-        LOG(INFOL) << "Rule application: " << iteration << ", rule " << rule.tostring(program, &layer) << " skipped because dependencies did not change since the previous application of this rule";
+        LOG(DEBUGL) << "Rule application: " << iteration << ", rule " << rule.tostring(program, &layer) << " skipped because dependencies did not change since the previous application of this rule";
         return false;
     }
 
@@ -1425,9 +1427,9 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     }
 
     if (prodDer) {
-        LOG(INFOL) << "Rule application: " << iteration << ", derived " << getNLastDerivationsFromList() << " new tuple(s) using rule " << rule.tostring(program, &layer);
+        LOG(DEBUGL) << "Rule application: " << iteration << ", derived " << getNLastDerivationsFromList() << " new tuple(s) using rule " << rule.tostring(program, &layer);
     } else {
-        LOG(INFOL) << "Rule application: " << iteration << ", derived no new tuples using rule " << rule.tostring(program, &layer);
+        LOG(DEBUGL) << "Rule application: " << iteration << ", derived no new tuples using rule " << rule.tostring(program, &layer);
     }
     LOG(DEBUGL) << "Combinations " << orderExecution
         << ", Processed IDB Tables=" << processedTables
