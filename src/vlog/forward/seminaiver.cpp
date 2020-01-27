@@ -1311,6 +1311,12 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 optimalOrderIdx++;
                 continue;
             }
+
+            //I don't apply semi-naive evaluation if the atom is negated.
+            if (bodyLiteral->isNegated()) {
+                min = 0;
+                max = ~0ul;
+            }
             LOG(DEBUGL) << "Evaluating atom " << optimalOrderIdx << " " << bodyLiteral->tostring() <<
                 " min=" << min << " max=" << max;
 
