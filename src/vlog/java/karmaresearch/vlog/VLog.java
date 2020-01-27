@@ -283,8 +283,8 @@ public class VLog {
      * Queries the current, so possibly materialized, database, and returns an
      * iterator that delivers the answers, one by one.
      *
-     * @param predicate
-     *            the predicate id of the query
+     * @param predicateId
+     *            the predicate id of the query.
      * @param terms
      *            the constant values or variables. If the term is negative, it
      *            is assumed to be a variable.
@@ -298,7 +298,7 @@ public class VLog {
      * @exception NonExistingPredicateException
      *                is thrown when the query predicate does not exist.
      */
-    public native QueryResultIterator query(int predicate, long[] terms,
+    public native QueryResultIterator query(int predicateId, long[] terms,
             boolean includeConstants, boolean filterBlanks)
             throws NotStartedException, NonExistingPredicateException;
 
@@ -375,18 +375,23 @@ public class VLog {
 
     /**
      * Queries the current, so possibly materialized, database, and returns the 
-     * number of observations associated to predicate, including nulls.
+     * number of observations associated to predicate.
      *
-     * @param predicateId: Id of the predicate to count rows. 
-     *
-     * @return the number of rows in an EDBTable or an FCTable, i.e. the size of
-     *  the predicate's extension
+     * @param predicate
+     *            the predicate id of the query
+     * @param terms
+     *            the constant values or variables. If the term is negative, it
+     *            is assumed to be a variable.
+     * @param includeConstants
+     *            whether to include the constants in the results.
+     * @param filterBlanks
+     *            whether results with blanks in them should be filtered out
+     * @return the size of the query answers
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      * @exception NonExistingPredicateException
      *                is thrown when the query predicate does not exist.
      */
-    public native long getExtensionSize(int predicateId);
     
     public native long nativeQuerySize(int predicate, long[] terms,
             boolean includeConstants, boolean filterBlanks)

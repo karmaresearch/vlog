@@ -581,6 +581,22 @@ extern "C" {
 		return iter;
 	}
 
+    static int numberOfUniqueVars(JNIEnv *env, jlongArray els) {
+        std::vector<uint8_t> vars;
+        jsize sz = env->GetArrayLength(els);
+        jlong *e = env->GetLongArrayElements(els, NULL);
+        uint8_t varId;
+        for (int i = 0; i < sz; i++) {
+            if (e[i] < 0) {
+                varId = (uint8_t) -e[i];
+                if(std::find(vars.begin(), vars.end(), varId) == vars.end()) {
+                    vars.push_back(varId);
+                }
+            }
+        }
+        return vars.size();
+    }
+
 	/*
 	 * Class:     karmaresearch_vlog_VLog
 	 * Method:    query
@@ -605,75 +621,54 @@ extern "C" {
 
 /*
 * Class:     karmaresearch_vlog_VLog
-* Method:    getPredicate
-* Signature: (I)J;
-* @author: Larry Gonzalez
- */
-JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_getExtensionSize(JNIEnv *env, jobject obj, jint predicateId) {
+* Method:    nativeQuerySize
+* Signature: (I[JZZ)J;
+*/
+JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_nativeQuerySize(JNIEnv * env, jobject obj, jint p, jlongArray els, jboolean includeConstants, jboolean filterBlanks) {
+    jlong result = 0;
     VLogInfo *f = getVLogInfo(env, obj);
     if (f == NULL || f->program == NULL) {
         throwNotStartedException(env, "VLog is not started yet");
-        return 0;
+        return result;
     }
-
-    //validation of predicate
-    Predicate pred = f->program->getPredicate((PredId_t) predicateId);
-    if (pred.getCardinality() == 0) {
-        return 0;
-    }
-
-    if (pred.getType() == EDB) {
-        return f->layer->getPredSize(predicateId);
-    } else if (f->sn != NULL) {
-        return f->sn->getSizeTable(predicateId);
-    } else {
-        // No materialization yet, but non-EDB predicate ... 0 then.
-        return 0;
-    }
-}
-
-/*
-* Class:     karmaresearch_vlog_VLog
-* Method:    nativeQuerySize
-* Signature: (I[JZZ)J;
-* @author: Larry Gonzalez
-*/
-JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_nativeQuerySize(JNIEnv * env, jobject obj, jint p, jlongArray els, jboolean includeConstants, jboolean filterBlanks) {
-    //VLogInfo *f = getVLogInfo(env, obj);
-    //if (f == NULL || f->program == NULL) {
-    //    throwNotStartedException(env, "VLog is not started yet");
-    //    return;
-    //}
-    jlong result = 0;
     if (p == -1) {
         throwNonExistingPredicateException(env, "Query contains non-existing predicate");
         return result;
     }
-    TupleIterator *iter = getQueryIter(env, obj, (PredId_t) p, els, (jboolean) includeConstants);
-    if (iter == NULL) {
-        return result;
-    }
+    Predicate pred = f->program->getPredicate((PredId_t) p);
 
-    size_t sz = iter->getTupleSize();
-    while (iter->hasNext()) {
-        iter->next();
-        if (filterBlanks) {
-            bool filterOut = false;
-            for (int i = 0; i < sz; i++) {
-                if (IS_BLANK(iter->getElementAt(i))) {
-                    filterOut = true;
-                    break;
+    if ((pred.getCardinality() == numberOfUniqueVars(env, els)) && !filterBlanks) {
+        if (pred.getType() == EDB) {
+            return f->layer->getPredSize(p);
+        } else if (f->sn != NULL) {
+            return f->sn->getSizeTable(p);
+        }
+    } else {
+        TupleIterator *iter = getQueryIter(env, obj, (PredId_t) p, els, (jboolean) includeConstants);
+        if (iter == NULL) {
+            return result;
+        }
+        size_t sz = iter->getTupleSize();
+        while (iter->hasNext()) {
+            iter->next();
+            if (filterBlanks) {
+                bool filterOut = false;
+                for (int i = 0; i < sz; i++) {
+                    if (IS_BLANK(iter->getElementAt(i))) {
+                        filterOut = true;
+                        break;
+                    }
+                }
+                if (!filterOut) {
+                    ++result;
                 }
             }
-            if (!filterOut) {
+            else {
                 ++result;
             }
         }
-        else {
-            ++result;
-        }
+        return result;
     }
-    return result;
 }
 
 
