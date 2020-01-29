@@ -8,13 +8,23 @@
 
 #include <trident/ml/embeddings.h>
 
+#include <unordered_map>
+
 class EmbTable : public EDBTable {
     private:
         const PredId_t predid;
         EDBLayer *layer;
-        const std::string folder;
-        const bool entityOrRel;
+        const std::string pathfile;
+        const int64_t startRange;
+        int64_t N;
         std::shared_ptr<Embeddings<double>> emb;
+        std::string prefix;
+        std::string dictPredName;
+        std::shared_ptr<EDBTable> dictTable;
+
+        bool usePredicateMappings;
+        std::unordered_map<Term_t, size_t> predIDsMap;
+        std::vector<Term_t> predIDsList;
 
     public:
         virtual uint8_t getArity() const {
@@ -26,9 +36,11 @@ class EmbTable : public EDBTable {
         }
 
         EmbTable(PredId_t predid,
+                std::string predname,
                 EDBLayer *layer,
-                std::string folder,
-                std::string typeemb);
+                std::string pathfile,
+                std::string startRange,
+                std::string dictPredName);
 
         void query(QSQQuery *query, TupleTable *outputTable,
                 std::vector<uint8_t> *posToFilter,
