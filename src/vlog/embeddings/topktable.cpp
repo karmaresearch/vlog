@@ -1,8 +1,9 @@
 #include <vlog/embeddings/topktable.h>
 
 TopKTable::TopKTable(EDBLayer *layer,
-        std::string topk) {
+        std::string topk, std::string typeprediction) {
     this->topk = stoi(topk);
+    this->typeprediction = typeprediction;
 }
 
 void TopKTable::query(QSQQuery *query, TupleTable *outputTable,

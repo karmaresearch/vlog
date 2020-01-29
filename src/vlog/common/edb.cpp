@@ -208,7 +208,7 @@ void EDBLayer::addEmbTable(const EDBConf::Table &tableConf) {
         LOG(WARNL) << "Rewriting table for predicate " << predicate;
         dbPredicates.erase(infot.id);
     }
-    infot.type = "EMB";
+    infot.type = "Embeddings";
     EmbTable *table = new EmbTable(infot.id, this,
             tableConf.params[0], tableConf.params[1]);
     infot.arity = table->getArity();
@@ -224,8 +224,9 @@ void EDBLayer::addTopKTable(const EDBConf::Table &tableConf) {
         LOG(WARNL) << "Rewriting table for predicate " << predicate;
         dbPredicates.erase(infot.id);
     }
-    infot.type = "TOPK";
-    TopKTable *table = new TopKTable(this, tableConf.params[0]);
+    infot.type = "TopK";
+    TopKTable *table = new TopKTable(this, tableConf.params[0],
+            tableConf.params[1]);
     infot.arity = table->getArity();
     infot.manager = std::shared_ptr<EDBTable>(table);
     dbPredicates.insert(make_pair(infot.id, infot));

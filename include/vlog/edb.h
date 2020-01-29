@@ -219,6 +219,10 @@ class EDBLayer {
                         addEDBonIDBTable(table);
                     } else if (table.type == "EDBimporter") {
                         addEDBimporter(table);
+                    } else if (table.type == "Embeddings") {
+                        addEmbTable(table);
+                    } else if (table.type == "TopK") {
+                        addTopKTable(table);
                     } else {
                         LOG(ERRORL) << "Type of table is not supported";
                         throw 10;
