@@ -20,6 +20,8 @@
 #include <vlog/sparql/sparqltable.h>
 #endif
 #include <vlog/inmemory/inmemorytable.h>
+#include <vlog/embeddings/embtable.h>
+#include <vlog/embeddings/topktable.h>
 #include <vlog/incremental/edb-table-from-idb.h>
 #include <vlog/incremental/edb-table-importer.h>
 
@@ -165,7 +167,6 @@ void EDBLayer::addInmemoryTable(std::string predicate, PredId_t id, std::vector<
     // table->dump(std::cerr);
 }
 
-
 void EDBLayer::addInmemoryTable(PredId_t id,
         uint8_t arity,
         std::vector<uint64_t> &rows) {
@@ -199,6 +200,36 @@ void EDBLayer::addSparqlTable(const EDBConf::Table &tableConf) {
 }
 #endif
 
+void EDBLayer::addEmbTable(const EDBConf::Table &tableConf) {
+    EDBInfoTable infot;
+    const std::string predicate = tableConf.predname;
+    infot.id = (PredId_t) predDictionary->getOrAdd(predicate);
+    if (doesPredExists(infot.id)) {
+        LOG(WARNL) << "Rewriting table for predicate " << predicate;
+        dbPredicates.erase(infot.id);
+    }
+    infot.type = "EMB";
+    EmbTable *table = new EmbTable(infot.id, this,
+            tableConf.params[0], tableConf.params[1]);
+    infot.arity = table->getArity();
+    infot.manager = std::shared_ptr<EDBTable>(table);
+    dbPredicates.insert(make_pair(infot.id, infot));
+}
+
+void EDBLayer::addTopKTable(const EDBConf::Table &tableConf) {
+    EDBInfoTable infot;
+    const std::string predicate = tableConf.predname;
+    infot.id = (PredId_t) predDictionary->getOrAdd(predicate);
+    if (doesPredExists(infot.id)) {
+        LOG(WARNL) << "Rewriting table for predicate " << predicate;
+        dbPredicates.erase(infot.id);
+    }
+    infot.type = "TOPK";
+    TopKTable *table = new TopKTable(this, tableConf.params[0]);
+    infot.arity = table->getArity();
+    infot.manager = std::shared_ptr<EDBTable>(table);
+    dbPredicates.insert(make_pair(infot.id, infot));
+}
 void EDBLayer::addEDBonIDBTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
     const string pn = tableConf.predname;

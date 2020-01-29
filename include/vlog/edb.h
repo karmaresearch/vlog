@@ -73,47 +73,47 @@ class EDBMemIterator : public EDBIterator {
 };
 
 class EmptyEDBIterator final : public EDBIterator {
-        PredId_t predid;
+    PredId_t predid;
 
     public:
-        EmptyEDBIterator(PredId_t id) {
-            predid = id;
-        }
+    EmptyEDBIterator(PredId_t id) {
+        predid = id;
+    }
 
-        VLIBEXP void init1(PredId_t id, std::vector<Term_t>*, const bool c1, const Term_t vc1) {
-            predid = id;
-        }
+    VLIBEXP void init1(PredId_t id, std::vector<Term_t>*, const bool c1, const Term_t vc1) {
+        predid = id;
+    }
 
-        VLIBEXP void init2(PredId_t id, const bool defaultSorting,
-                std::vector<std::pair<Term_t, Term_t>>*, const bool c1,
-                const Term_t vc1, const bool c2, const Term_t vc2,
-                const bool equalFields) {
-            predid = id;
-        }
+    VLIBEXP void init2(PredId_t id, const bool defaultSorting,
+            std::vector<std::pair<Term_t, Term_t>>*, const bool c1,
+            const Term_t vc1, const bool c2, const Term_t vc2,
+            const bool equalFields) {
+        predid = id;
+    }
 
-        VLIBEXP void skipDuplicatedFirstColumn() { }
+    VLIBEXP void skipDuplicatedFirstColumn() { }
 
-        VLIBEXP bool hasNext() {
-            return false;
-        }
+    VLIBEXP bool hasNext() {
+        return false;
+    }
 
-        VLIBEXP void next() {
-            throw 10;
-        }
+    VLIBEXP void next() {
+        throw 10;
+    }
 
-        PredId_t getPredicateID() {
-            return predid;
-        }
+    PredId_t getPredicateID() {
+        return predid;
+    }
 
-        void moveTo(const uint8_t fieldId, const Term_t t) {}
+    void moveTo(const uint8_t fieldId, const Term_t t) {}
 
-        VLIBEXP Term_t getElementAt(const uint8_t p) {
-            throw 10;
-        }
+    VLIBEXP Term_t getElementAt(const uint8_t p) {
+        throw 10;
+    }
 
-        void clear() {}
+    void clear() {}
 
-        ~EmptyEDBIterator() {}
+    ~EmptyEDBIterator() {}
 };
 
 class EDBLayer {
@@ -139,6 +139,10 @@ class EDBLayer {
         std::string rootPath;
 
         VLIBEXP void addTridentTable(const EDBConf::Table &tableConf, bool multithreaded);
+
+        void addTopKTable(const EDBConf::Table &tableConf);
+
+        void addEmbTable(const EDBConf::Table &tableConf);
 
 #ifdef MYSQL
         void addMySQLTable(const EDBConf::Table &tableConf);

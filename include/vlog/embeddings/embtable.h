@@ -28,7 +28,7 @@ class EmbTable : public EDBTable {
         EmbTable(PredId_t predid,
                 EDBLayer *layer,
                 std::string folder,
-                bool entityOrRel = true);
+                std::string typeemb);
 
         void query(QSQQuery *query, TupleTable *outputTable,
                 std::vector<uint8_t> *posToFilter,

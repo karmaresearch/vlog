@@ -1,11 +1,10 @@
 #include <vlog/embeddings/embtable.h>
 
-
 EmbTable::EmbTable(PredId_t predid,
         EDBLayer *layer,
         std::string folder,
-        bool entityOrRel) : predid(predid), layer(layer), folder(folder),
-    entityOrRel(entityOrRel) {
+        std::string typeemb) : predid(predid), layer(layer), folder(folder),
+    entityOrRel(typeemb == "entity") {
         if (entityOrRel) {
             emb = Embeddings<double>::load(folder + "/E");
         } else {

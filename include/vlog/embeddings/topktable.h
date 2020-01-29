@@ -11,7 +11,7 @@
 class TopKTable : public EDBTable{
     private:
         EDBLayer *layer;
-        const int64_t topk;
+        int64_t topk;
 
     public:
         virtual uint8_t getArity() const {
@@ -22,7 +22,7 @@ class TopKTable : public EDBTable{
             return true;
         }
 
-        TopKTable(EDBLayer *layer, int topk);
+        TopKTable(EDBLayer *layer, std::string topk);
 
         void query(QSQQuery *query, TupleTable *outputTable,
                 std::vector<uint8_t> *posToFilter,
