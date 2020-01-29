@@ -202,8 +202,39 @@ bool InterTableJoinProcessor::isEmpty() const {
 
 void InterTableJoinProcessor::consolidate(const bool isFinished) {
     //Add the segment to the table
-    LOG(DEBUGL) << "InterTableJoinProcessor::consolidate: currentSegmentSize = " << currentSegmentSize;
-    LOG(DEBUGL) << "  rowsize = " << (int)rowsize;
+    //LOG(DEBUGL) << "InterTableJoinProcessor::consolidate: currentSegmentSize = " << currentSegmentSize;
+    //LOG(DEBUGL) << "  rowsize = " << (int)rowsize;
+    std::vector<std::shared_ptr<const Segment>> segs;
+
+    for (uint32_t i = 0; i < currentSegmentSize; ++i) {
+        if (segments[i] != NULL && !segments[i]->isEmpty()) {
+            segs.push_back(segments[i]->getSegment());
+        }
+    }
+
+    if (segs.size() > 0) {
+        std::shared_ptr<const Segment> seg = segs.size() == 1 ? segs[0] : SegmentInserter::merge(segs);
+        if (table == NULL) {
+            table = std::shared_ptr<const FCInternalTable>(
+                    new InmemoryFCInternalTable(rowsize, 0,
+                        seg->getNRows() < 2,
+                        seg));
+        } else {
+            table = ((InmemoryFCInternalTable*)table.get())->merge(
+                        seg, nthreads);
+        }
+
+        for (uint32_t i = 0; i < currentSegmentSize; ++i) {
+            if (segments[i] != NULL && !segments[i]->isEmpty()) {
+                uint8_t rs = table->getRowSize();
+                assert(rs == rowsize);
+                segments[i] = std::shared_ptr<SegmentInserter>(
+                        new SegmentInserter(rs));
+            }
+        }
+    }
+
+    /*
     for (uint32_t i = 0; i < currentSegmentSize; ++i) {
         if (segments[i] != NULL && !segments[i]->isEmpty()) {
             if (table == NULL) {
@@ -221,6 +252,7 @@ void InterTableJoinProcessor::consolidate(const bool isFinished) {
                     new SegmentInserter(rs));
         }
     }
+    */
     //LOG(DEBUGL) << "InterTableJoinProcessor::consolidate done";
 }
 

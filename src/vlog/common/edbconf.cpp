@@ -25,7 +25,12 @@ EDBConf::EDBConf(std::string rawcontent, bool isFile) {
 }
 
 void EDBConf::setRootPath(std::string path) {
-    this->rootPath = path;
+    if (Utils::isDirectory(path)) {
+        this->rootPath = path;
+    } else {
+        LOG(DEBUGL) << "setRootPath not called with a directory; replacing with '.'";
+        this->rootPath = ".";
+    }
 }
 
 std::string EDBConf::getRootPath() const {
