@@ -20,7 +20,7 @@ EmbTable::EmbTable(PredId_t predid,
         auto dictPredId = layer->getPredID(dictPredName);
         dictTable = layer->getEDBTable(dictPredId);
 
-        std::string filemappings = pathfile + ".mappings";
+        std::string filemappings = pathfile + ".map";
         if (Utils::exists(filemappings)) {
             std::ifstream ifs(filemappings);
             std::string line;
