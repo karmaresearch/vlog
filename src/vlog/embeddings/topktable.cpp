@@ -120,8 +120,7 @@ bool TopKTable::getDictText(const uint64_t id, std::string &text) {
 }
 
 uint64_t TopKTable::getNTerms() {
-    LOG(ERRORL) << "TopKTable: Not supported";
-    throw 10;
+    return nentities*2 + nrels;
 }
 
 void TopKTable::releaseIterator(EDBIterator *itr) {
@@ -129,8 +128,8 @@ void TopKTable::releaseIterator(EDBIterator *itr) {
 }
 
 uint64_t TopKTable::getSize() {
-    LOG(ERRORL) << "TopKTable: Not supported";
-    throw 10;
+    uint64_t maxnterms = nentities * nrels * topk;
+    return maxnterms;
 }
 
 TopKTable::~TopKTable() {
