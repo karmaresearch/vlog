@@ -225,8 +225,8 @@ void EDBLayer::addTopKTable(const EDBConf::Table &tableConf) {
         dbPredicates.erase(infot.id);
     }
     infot.type = "TopK";
-    TopKTable *table = new TopKTable(this, tableConf.params[0],
-            tableConf.params[1]);
+    TopKTable *table = new TopKTable(infot.id, this, tableConf.params[0],
+            tableConf.params[1], tableConf.params[2], tableConf.params[3]);
     infot.arity = table->getArity();
     infot.manager = std::shared_ptr<EDBTable>(table);
     dbPredicates.insert(make_pair(infot.id, infot));

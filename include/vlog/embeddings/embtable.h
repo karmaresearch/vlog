@@ -24,6 +24,7 @@ class EmbTable : public EDBTable {
 
         bool usePredicateMappings;
         std::unordered_map<Term_t, size_t> predIDsMap;
+        std::unordered_map<size_t, Term_t> invPredIDsMap;
         std::vector<Term_t> predIDsList;
 
     public:
@@ -67,8 +68,18 @@ class EmbTable : public EDBTable {
 
         bool getDictText(const uint64_t id, std::string &text);
 
-        bool expensiveLayer() {
-            return true;
+        int getEmbeddingDimension() {
+            return emb->getDim();
+        }
+
+        Term_t getEntity(uint64_t embid);
+
+        std::shared_ptr<Embeddings<double>> getEmbeddings() {
+            return emb;
+        }
+
+        uint64_t getStartOffset() {
+            return startRange;
         }
 
         uint64_t getNTerms();

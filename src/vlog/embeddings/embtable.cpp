@@ -30,6 +30,7 @@ EmbTable::EmbTable(PredId_t predid,
                 auto termid = stol(line);
                 predIDsMap.insert(std::make_pair(termid, idx));
                 predIDsList.push_back(termid);
+                invPredIDsMap.insert(std::make_pair(idx, termid));
                 idx += 1;
             }
             ifs.close();
@@ -48,6 +49,15 @@ void EmbTable::query(QSQQuery *query, TupleTable *outputTable,
 
 size_t EmbTable::estimateCardinality(const Literal &query) {
     return getCardinality(query);
+}
+
+Term_t EmbTable::getEntity(uint64_t embid) {
+    embid = embid - startRange;
+    if (usePredicateMappings) {
+        return invPredIDsMap[embid];
+    } else {
+        return embid;
+    }
 }
 
 size_t EmbTable::getCardinality(const Literal &query) {

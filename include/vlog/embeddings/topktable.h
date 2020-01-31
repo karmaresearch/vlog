@@ -6,13 +6,29 @@
 #include <vlog/edbiterator.h>
 #include <vlog/segment.h>
 
+#include <vlog/embeddings/embtable.h>
+
 #include <trident/ml/embeddings.h>
+#include <trident/ml/transetester.h>
 
 class TopKTable : public EDBTable{
     private:
+        PredId_t predid;
         EDBLayer *layer;
         int64_t topk;
-        std::string typeprediction;
+        int typeprediction; //0=HEAD 1=TAIL
+
+        EmbTable* etable;
+        size_t offsetEtable;
+        EmbTable* rtable;
+        size_t offsetRtable;
+        int dim;
+        size_t nentities;
+        size_t nrels;
+
+        std::unique_ptr<TranseTester<double>> tester;
+        std::vector<std::pair<double, size_t>> scores;
+        std::unique_ptr<double[]> answer;
 
     public:
         virtual uint8_t getArity() const {
@@ -23,7 +39,9 @@ class TopKTable : public EDBTable{
             return true;
         }
 
-        TopKTable(EDBLayer *layer, std::string topk, std::string typeprediction);
+        TopKTable(PredId_t predid, EDBLayer *layer, std::string topk,
+                std::string typeprediction,
+                std::string predentities, std::string predrelations);
 
         void query(QSQQuery *query, TupleTable *outputTable,
                 std::vector<uint8_t> *posToFilter,
