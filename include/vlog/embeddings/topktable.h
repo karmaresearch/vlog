@@ -30,6 +30,8 @@ class TopKTable : public EDBTable{
         std::vector<std::pair<double, size_t>> scores;
         std::unique_ptr<double[]> answer;
 
+        void getScores(Term_t embent, Term_t embrel);
+
     public:
         virtual uint8_t getArity() const {
             return 3;

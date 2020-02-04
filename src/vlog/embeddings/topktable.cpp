@@ -70,31 +70,33 @@ bool TopKTable::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
     //relation embedding
 }
 
+void TopKTable::getScores(Term_t e, Term_t r) {
+    //Get the top-k entities
+    auto embent = e - offsetEtable;
+    auto embrel = r - offsetRtable;
+    if (typeprediction == 0) { //Trying to predict the head
+        tester->predictS(answer.get(), embrel, dim, embent, dim);
+    } else { //Trying to predict the tail
+        tester->predictO(embent, dim, embrel, dim, answer.get());
+    }
+    //Extract all the top-k answers
+    for(size_t i = 0; i < nentities; ++i) {
+        auto score = tester->closeness(answer.get(), i, dim);
+        scores[i] = std::make_pair(score, i);
+    }
+    //Sort the scores
+    std::sort(scores.begin(), scores.end(), score_sorter);
+}
+
 EDBIterator *TopKTable::getIterator(const Literal &query) {
     auto v1 = query.getTermAtPos(0);
     auto v2 = query.getTermAtPos(1);
     auto v3 = query.getTermAtPos(2);
     if (!v1.isVariable() && !v2.isVariable()) {
-        //Get the top-k entities
-        auto embent = v1.getValue() - offsetEtable;
-        auto embrel = v2.getValue() - offsetRtable;
-        if (typeprediction == 0) { //Trying to predict the head
-            tester->predictS(answer.get(), embrel, dim, embent, dim);
-        } else { //Trying to predict the tail
-            tester->predictO(embent, dim, embrel, dim, answer.get());
-        }
-        //Extract all the top-k answers
-        for(size_t i = 0; i < nentities; ++i) {
-            auto score = tester->closeness(answer.get(), i, dim);
-            scores[i] = std::make_pair(score, i);
-        }
-        //Sort the scores
-        std::sort(scores.begin(), scores.end(), score_sorter);
-
-        //Return the top-k
+        getScores(v1.getValue(), v2.getValue());
         return new TopKIterator(predid, topk,
                 etable->getEntity(v1.getValue()),
-                rtable->getEntity(v2.getValue()), scores);
+                rtable->getEntity(v2.getValue()), scores, false);
     }
     LOG(ERRORL) << "TopKTable: (getIterator) Not supported";
     throw 10;
@@ -102,6 +104,15 @@ EDBIterator *TopKTable::getIterator(const Literal &query) {
 
 EDBIterator *TopKTable::getSortedIterator(const Literal &query,
         const std::vector<uint8_t> &fields) {
+    auto v1 = query.getTermAtPos(0);
+    auto v2 = query.getTermAtPos(1);
+    auto v3 = query.getTermAtPos(2);
+    if (!v1.isVariable() && !v2.isVariable()) {
+        getScores(v1.getValue(), v2.getValue());
+        return new TopKIterator(predid, topk,
+                etable->getEntity(v1.getValue()),
+                rtable->getEntity(v2.getValue()), scores, true);
+    }
     LOG(ERRORL) << "TopKTable: (sorted iterator) Not supported";
     throw 10;
 }

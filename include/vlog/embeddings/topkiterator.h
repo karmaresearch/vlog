@@ -13,22 +13,35 @@ class TopKIterator : public EDBIterator {
         const size_t topk;
         const Term_t ent;
         const Term_t rel;
-        const std::vector<std::pair<double, size_t>> &scores;
+        std::vector<std::pair<double, size_t>> scores;
         uint64_t nextTerm;
 
     public:
+        static bool ent_sorter(const std::pair<double, int> &a, const std::pair<double, int> &b) {
+            return a.second < b.second;
+        }
+
+
         TopKIterator(PredId_t predid,
                 size_t topk,
                 Term_t ent,
                 Term_t rel,
-                std::vector<std::pair<double, size_t>> &scores) :
-            predid(predid), topk(topk),ent(ent),rel(rel),scores(scores),
+                std::vector<std::pair<double, size_t>> &scores,
+                bool sorted) :
+            predid(predid), topk(topk), ent(ent), rel(rel),
             nextTerm(0) {
                 assert(scores.size() > 0);
+                auto nelements = std::min(scores.size(), topk);
+                std::copy(scores.begin(), scores.begin() + nelements,
+                        std::back_inserter(this->scores));
+                if (sorted) {
+                    std::sort(this->scores.begin(), this->scores.end(),
+                            TopKIterator::ent_sorter);
+                }
             }
 
         bool hasNext() {
-            return nextTerm < topk && nextTerm < scores.size() - 1;
+            return nextTerm < scores.size() - 1;
         }
 
         void next() {
