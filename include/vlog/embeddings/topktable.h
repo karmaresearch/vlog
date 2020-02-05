@@ -34,7 +34,7 @@ class TopKTable : public EDBTable{
 
     public:
         virtual uint8_t getArity() const {
-            return 3;
+            return 4;
         }
 
         bool areTermsEncoded() {

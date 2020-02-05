@@ -53,9 +53,14 @@ class TopKIterator : public EDBIterator {
                 return ent;
             } else if (p == 1) {
                 return rel;
-            } else {
-                assert(p == 2);
+            } else if (p == 2) {
                 return scores[nextTerm-1].second;
+            } else if (p == 3) {
+                float value = scores[nextTerm-1].first;
+                return FLOAT32_MASK(value);
+            } else {
+                LOG(ERRORL) << "This should not have happened";
+                throw 10;
             }
         }
 
