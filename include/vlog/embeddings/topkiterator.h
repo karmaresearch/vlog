@@ -6,7 +6,6 @@
 #include <vlog/edbiterator.h>
 #include <vlog/segment.h>
 
-
 class TopKIterator : public EDBIterator {
     private:
         const PredId_t predid;

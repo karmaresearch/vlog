@@ -22,8 +22,9 @@
 #define IS_NUMBER(x) ((x) >> 61)
 #define IS_UINT(x) ((x >> 61) == 1)
 #define IS_FLOAT32(x) ((x >> 61) == 2)
-#define GET_UINT(x) (x & 0xFF00000000)
-#define GET_FLOAT32(x) (x & 0xFF00000000)
+#define GET_UINT(x) (x & 0x2000000000000000ul)
+#define GET_FLOAT32(x) (x & 0x4000000000000000ul)
+#define FLOAT32_MASK(x) ((uint32_t) x | 0x40000000FFFFFFFFul)
 
 class Column;
 class SemiNaiver;       // Why cannot I break the software hierarchy? RFHH
