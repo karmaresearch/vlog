@@ -18,6 +18,13 @@
 #include <vector>
 #include <map>
 
+//Datatype is set in the most significant three bits
+#define IS_NUMBER(x) ((x) >> 61)
+#define IS_UINT(x) ((x >> 61) == 1)
+#define IS_FLOAT32(x) ((x >> 61) == 2)
+#define GET_UINT(x) (x & 0xFF00000000)
+#define GET_FLOAT32(x) (x & 0xFF00000000)
+
 class Column;
 class SemiNaiver;       // Why cannot I break the software hierarchy? RFHH
 class EDBFCInternalTable;

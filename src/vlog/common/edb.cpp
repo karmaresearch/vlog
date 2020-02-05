@@ -1043,6 +1043,20 @@ bool EDBLayer::getOrAddDictNumber(const char *text, const size_t sizeText,
 }
 
 bool EDBLayer::getDictText(const uint64_t id, char *text) const {
+    if (IS_NUMBER(id)) {
+        if (IS_UINT(id)) {
+            uint64_t value = GET_UINT(id);
+            sprintf(text,"%d",value);
+            return true;
+        } else if (IS_FLOAT32(id)) {
+            float value = GET_FLOAT32(id);
+            sprintf(text,"%f",value);
+            return true;
+        } else {
+            LOG(ERRORL) << "Datatype for " << id << " was not found";
+            return false;
+        }
+    }
     bool resp = false;
     if (dbPredicates.size() > 0) {
         resp = dbPredicates.begin()->second.manager->getDictText(id, text);
