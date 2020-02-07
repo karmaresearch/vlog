@@ -642,6 +642,10 @@ JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_nativeQuerySize(JNIEnv * en
             return f->layer->getPredSize(p);
         } else if (f->sn != NULL) {
             return f->sn->getSizeTable(p);
+        } else {
+            // pred.getType()==IDB and f->sn==NULL
+            throwNotStartedException(env, "Materialization has not run yet");
+            return result;
         }
     } else {
         TupleIterator *iter = getQueryIter(env, obj, (PredId_t) p, els, (jboolean) includeConstants);
