@@ -59,7 +59,7 @@ class InmemoryTable : public EDBTable {
                 }
         };
 
-        std::vector<std::string> varnames;
+        std::vector<std::string> varnames; // TODO is InmemoryTable.varnames ever used?
         PredId_t predid;
         uint8_t arity;
         EDBLayer *layer;
@@ -107,8 +107,7 @@ class InmemoryTable : public EDBTable {
         EDBIterator *getSortedIterator(const Literal &query,
                 const std::vector<uint8_t> &fields);
 
-        bool getDictNumber(const char *text, const size_t sizeText,
-                uint64_t &id);
+        bool getDictNumber(const char *text, const size_t sizeText, uint64_t &id);
 
         bool getDictText(const uint64_t id, char *text);
 
