@@ -135,6 +135,7 @@ void SparqlTable::query(QSQQuery *query, TupleTable *outputTable,
     throw 10;
 }
 
+// TODO
 size_t SparqlTable::estimateCardinality(const Literal &query) {
     // return getCardinality(query);
     // Just return a high number
