@@ -889,7 +889,7 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                 //Get the arguments of the function term from the chase mgmt
                 auto *rows = ruleContainer->getRows(varID);
                 const uint64_t localCounter = COUNTER(term.getValue());
-                const uint64_t *values = rows->getRow(localCounter);
+                uint64_t *values = rows->getRow(localCounter);
                 const uint64_t nvalues = rows->getSizeRow();
                 //Map them to variables
                 const auto &nameVars = rows->getNameArgVars();
@@ -945,8 +945,15 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                         if (term.isVariable()) {
                             uint8_t varID = term.getId();
                             if (!mappings.count(varID)) {
-                                LOG(ERRORL) << "There are existential variables not defined. Must implement their retrievals";
-                                throw 10;
+                                // Here, we must create a value for the existential variable, using the same row (I think ...)
+                                auto *vrows = ruleContainer->getRows(varID);
+                                uint64_t value;
+                                bool v = vrows->existingRow(values, value);
+                                assert(v);
+                                uint64_t rulevar = RULE_SHIFT(ruleID) + VAR_SHIFT(varID);
+                                mappings.insert(std::make_pair(varID, rulevar | value));
+                                // LOG(ERRORL) << "There are existential variables not defined. Must implement their retrievals";
+                                // throw 10;
                             }
                             t.set(VTerm(0, mappings[varID]), m);
                         } else {
