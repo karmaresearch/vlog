@@ -514,7 +514,7 @@ Rule Rule::normalizeVars() const {
             ++itr) {
         newBody.push_back(itr->substitutes(subs));
     }
-    return Rule(ruleId, newheads, newBody);
+    return Rule(ruleId, newheads, newBody, egd);
 }
 
 Rule Rule::createAdornment(uint8_t headAdornment) const {
@@ -588,7 +588,7 @@ Rule Rule::createAdornment(uint8_t headAdornment) const {
     }
     std::vector<Literal> newHeads;
     newHeads.push_back(newHead);
-    return Rule(ruleId, newHeads, newBody);
+    return Rule(ruleId, newHeads, newBody, egd);
 }
 
 std::vector<uint8_t> Rule::getVarsInHead(PredId_t ignore) const {
@@ -710,6 +710,143 @@ std::string Rule::toprettystring(Program * program, EDBLayer *db, bool replaceCo
         output += body[i].toprettystring(program, db, replaceConstants);
     }
     return output;
+}
+
+void Program::singulariseEquality() {
+    std::vector<Rule> oldrules = allrules;
+    cleanAllRules();
+
+    std::string sameAsName = "<http://www.w3.org/2002/07/owl#sameAs>";
+    auto sameAsPred = getPredicate(sameAsName);
+    std::string mySameAsName = "VlogAxiomEq";
+    auto mySameAsPredId = getPredicateID(mySameAsName, 2);
+    auto mySameAsPred = getPredicate(mySameAsPredId);
+
+    //Rewrite the rules if there are multiple variable occurrences
+    for(size_t i = 0; i < oldrules.size(); ++i) {
+        Rule &r = oldrules[i];
+        LOG(DEBUGL) << "Processing rule " << r.tostring(this, kb);
+        if (r.isEGD()) {
+            //Replace the head of the rule with the new predicate
+            std::vector<Literal> head;
+            head.push_back(Literal(mySameAsPred, r.getHeads()[0].getTuple()));
+            addRule(head, r.getBody(), false, false);
+        } else {
+            //First get the largest var ID used in the rule
+            uint8_t largestVarID = 0;
+            for(auto &l : r.getBody()) {
+                for (size_t j = 0; j < l.getTupleSize(); ++j) {
+                    const auto &term = l.getTermAtPos(j);
+                    if (term.isVariable()) {
+                        if (term.getId() > largestVarID)
+                            largestVarID = term.getId();
+                    }
+                }
+            }
+            for(auto &l : r.getHeads()) {
+                for (size_t j = 0; j < l.getTupleSize(); ++j) {
+                    const auto &term = l.getTermAtPos(j);
+                    if (term.isVariable()) {
+                        if (term.getId() > largestVarID)
+                            largestVarID = term.getId();
+                    }
+                }
+            }
+            largestVarID++;
+
+            //Process the variables that appear more than once. Replace the
+            //body atoms.
+            std::map<uint8_t, std::vector<uint8_t>> multipleOccurrences;
+            std::vector<Literal> newBody;
+            for(auto &l : r.getBody()) {
+                VTuple newTuple(l.getTupleSize());
+                for (size_t j = 0; j < l.getTupleSize(); ++j) {
+                    const auto &term = l.getTermAtPos(j);
+                    if (term.isVariable()) {
+                        if (!multipleOccurrences.count(term.getId())) {
+                            multipleOccurrences.insert(std::make_pair(term.getId(),
+                                        std::vector<uint8_t>()));
+                            newTuple.set(term, j);
+                        } else {
+                            //Replace the variable with a new one
+                            newTuple.set(VTerm(largestVarID, 0), j);
+                            multipleOccurrences[term.getId()].push_back(largestVarID);
+                            largestVarID++;
+                        }
+                    } else {
+                        newTuple.set(term, j);
+                    }
+                }
+                newBody.push_back(Literal(l.getPredicate(), newTuple));
+            }
+            //Add equality atoms to the body of the rule
+            VTuple t(2);
+            for(auto &pair : multipleOccurrences) {
+                if (pair.second.size() > 0) {
+                    t.set(VTerm(pair.first, 0), 0);
+                    for(auto m : pair.second) {
+                        t.set(VTerm(m, 0), 1);
+                        Literal l(mySameAsPred, t);
+                        newBody.push_back(l);
+                    }
+                }
+            }
+
+            //Create a new rule
+            addRule(r.getHeads(), newBody);
+        }
+    }
+
+    //Add transitive rule
+    VTuple t(2);
+    t.set(VTerm(1,0), 0);
+    t.set(VTerm(3,0), 1);
+    VTuple t1(2);
+    t1.set(VTerm(1,0), 0);
+    t1.set(VTerm(2,0), 1);
+    VTuple t2(2);
+    t2.set(VTerm(2,0), 0);
+    t2.set(VTerm(3,0), 1);
+    Literal transHead(mySameAsPred, t);
+    Literal transBody1(mySameAsPred, t1);
+    Literal transBody2(mySameAsPred, t2);
+    std::vector<Literal> head;
+    head.push_back(transHead);
+    std::vector<Literal> body;
+    body.push_back(transBody1);
+    body.push_back(transBody2);
+    addRule(head, body);
+
+    //Add symmetric rule
+    VTuple t3(2);
+    t3.set(VTerm(3,0), 0);
+    t3.set(VTerm(1,0), 1);
+    body.clear();
+    body.push_back(Literal(mySameAsPred, t3));
+    addRule(head, body);
+
+    for(auto pid : getAllPredicateIDs()) {
+        if (pid != sameAsPred.getId() && pid != mySameAsPred.getId()) {
+            auto p = getPredicate(pid);
+            auto card = p.getCardinality();
+            VTuple t(card);
+            for(size_t i = 0; i < card; ++i) {
+                t.set(VTerm(i+1, 0), i);
+            }
+            Literal lp(p, t);
+            for(size_t i = 0; i < card; ++i) {
+                //Reflexivity
+                VTuple tp(2);
+                body.clear();
+                body.push_back(lp);
+                head.clear();
+                tp.set(VTerm(i + 1, 0), 0);
+                tp.set(VTerm(i + 1, 0), 1);
+                head.push_back(Literal(mySameAsPred, tp));
+                addRule(head, body);
+            }
+        }
+    }
 }
 
 bool Program::stratify(std::vector<int> &stratification, int &nClasses) {
@@ -919,6 +1056,30 @@ std::string Program::rewriteRDFOWLConstants(std::string input) {
         input = "<http://www.w3.org/2002/07/owl#" + input.substr(owlPos + 4, std::string::npos) + ">";
         return input;
     }
+    return input;
+}
+
+std::string Program::prettifyName(std::string input) {
+    std::string rdfprefix = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+    size_t rdfPos = input.find(rdfprefix);
+    if (rdfPos != std::string::npos) {
+        input = string("rdf_") + input.substr(rdfPos + rdfprefix.size(), input.size() - 1 - rdfprefix.size());
+        return input;
+    }
+
+    std::string rdfsprefix = "<http://www.w3.org/2000/01/rdf-schema#";
+    size_t rdfsPos = input.find(rdfsprefix);
+    if (rdfsPos != std::string::npos) {
+        input = string("rdfs_") + input.substr(rdfsPos + rdfsprefix.size(), input.size() - 1 - rdfsprefix.size());
+        return input;
+    }
+
+    std::string owlprefix = "<http://www.w3.org/2002/07/owl#";
+    size_t owlPos = input.find(owlprefix);
+    if (owlPos != std::string::npos) {
+        input = string("owl_") + input.substr(owlPos + owlprefix.size(), input.size() - 1 - owlprefix.size());
+        return input;
+    }
 
     return input;
 }
@@ -1053,6 +1214,7 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     }
 
     //Determine predicate
+    predicate = rewriteRDFOWLConstants(predicate);
     PredId_t predid = (PredId_t) dictPredicates.getOrAdd(predicate);
     if (cardPredicates.find(predid) == cardPredicates.end()) {
         cardPredicates.insert(std::make_pair(predid, t.size()));
@@ -1134,11 +1296,12 @@ void Program::addRule(Rule &rule) {
     allrules.push_back(rule);
 }
 
-void Program::addRule(std::vector<Literal> heads, std::vector<Literal> body, bool rewriteMultihead) {
+void Program::addRule(std::vector<Literal> heads, std::vector<Literal> body,
+        bool rewriteMultihead, bool isEGD) {
     if (rewriteMultihead && heads.size() > 1) {
         rewriteRule(heads, body);
     } else {
-        Rule rule(allrules.size(), heads, body);
+        Rule rule(allrules.size(), heads, body, isEGD);
         addRule(rule);
     }
 }
@@ -1218,13 +1381,13 @@ std::string Program::parseRule(std::string rule, bool rewriteMultihead) {
             }
             LOG(DEBUGL) << "headliteral = \"" << headLiteral << "\"";
             Literal h = parseLiteral(headLiteral, dictVariables);
-			if (h.isNegated()) {
-				throw "head literal cannot be negated";
-			}
-			Predicate pred = h.getPredicate();
-			if (pred.getType() == EDB) {
-				throw "predicate in head cannot be EDB";
-			}
+            if (h.isNegated()) {
+                throw "head literal cannot be negated";
+            }
+            Predicate pred = h.getPredicate();
+            if (pred.getType() == EDB) {
+                throw "predicate in head cannot be EDB";
+            }
             lHeads.push_back(h);
         }
 
@@ -1247,7 +1410,14 @@ std::string Program::parseRule(std::string rule, bool rewriteMultihead) {
         }
 
         //Add the rule
-        addRule(lHeads, lBody, rewriteMultihead);
+        bool isEGD = false;
+        if (lHeads.size() == 1) {
+            auto predId = lHeads[0].getPredicate().getId();
+            std::string rawValue = dictPredicates.getRawValue(predId);
+            if (rawValue == "owl::sameAs" || rawValue == "<http://www.w3.org/2002/07/owl#sameAs>")
+                isEGD = true;
+        }
+        addRule(lHeads, lBody, rewriteMultihead, isEGD);
         return "";
     } catch (std::string e) {
         return "Failed parsing rule '" + rule + "': " + e;
@@ -1343,10 +1513,10 @@ int64_t Program::getOrAddPredicate(const std::string & p, uint8_t cardinality) {
     if (cardPredicates.find(id) == cardPredicates.end()) {
         cardPredicates.insert(std::make_pair(id, cardinality));
     } else if (cardPredicates.find(id)->second == 0) {
-		cardPredicates.find(id)->second = cardinality;
-	} else if (cardPredicates.find(id)->second != cardinality) {
-		LOG(INFOL) << "Wrong cardinality for predicate " << p << ": should be " << (int) cardPredicates.find(id)->second;
-		return -1;
+        cardPredicates.find(id)->second = cardinality;
+    } else if (cardPredicates.find(id)->second != cardinality) {
+        LOG(INFOL) << "Wrong cardinality for predicate " << p << ": should be " << (int) cardPredicates.find(id)->second;
+        return -1;
     }
     if (id >= rules.size()) {
         rules.resize(id+1);
@@ -1394,6 +1564,99 @@ std::vector<PredId_t> Program::getAllIDBPredicateIds() {
     return output;
 }
 
+void Program::axiomatizeEquality() {
+    std::vector<Rule> oldrules = allrules;
+    cleanAllRules();
+
+    std::string sameAsName = "<http://www.w3.org/2002/07/owl#sameAs>";
+    auto sameAsPred = getPredicate(sameAsName);
+    std::string mySameAsName = "VlogAxiomEq";
+    auto mySameAsPredId = getPredicateID(mySameAsName, 2);
+    auto mySameAsPred = getPredicate(mySameAsPredId);
+
+    //Add transitive rule
+    VTuple t(2);
+    t.set(VTerm(1,0), 0);
+    t.set(VTerm(3,0), 1);
+    VTuple t1(2);
+    t1.set(VTerm(1,0), 0);
+    t1.set(VTerm(2,0), 1);
+    VTuple t2(2);
+    t2.set(VTerm(2,0), 0);
+    t2.set(VTerm(3,0), 1);
+
+    Literal transHead(mySameAsPred, t);
+    Literal transBody1(mySameAsPred, t1);
+    Literal transBody2(mySameAsPred, t2);
+    std::vector<Literal> head;
+    head.push_back(transHead);
+    std::vector<Literal> body;
+    body.push_back(transBody1);
+    body.push_back(transBody2);
+    addRule(head, body);
+
+    //Add symmetric rule
+    VTuple t3(2);
+    t3.set(VTerm(3,0), 0);
+    t3.set(VTerm(1,0), 1);
+    body.clear();
+    body.push_back(Literal(mySameAsPred, t3));
+    addRule(head, body);
+
+    for(auto pid : getAllPredicateIDs()) {
+        if (pid != sameAsPred.getId() && pid != mySameAsPred.getId()) {
+            auto p = getPredicate(pid);
+            auto card = p.getCardinality();
+            VTuple t(card);
+            for(size_t i = 0; i < card; ++i) {
+                t.set(VTerm(i+1, 0), i);
+            }
+            Literal lp(p, t);
+
+            for(size_t i = 0; i < card; ++i) {
+                VTuple tp(2);
+                tp.set(VTerm(i + 1, 0), 0);
+
+                if (isPredicateIDB(pid)) {
+                    //Congruence body
+                    std::vector<Literal> body;
+                    body.push_back(lp);
+                    tp.set(VTerm(card+1, 0), 1);
+                    body.push_back(Literal(mySameAsPred, tp));
+                    //Congruence head
+                    std::vector<Literal> head;
+                    VTuple tnew(card);
+                    for(size_t j = 0; j < card; ++j) {
+                        tnew.set(VTerm(j+1, 0), j);
+                    }
+                    tnew.set(VTerm(card+1, 0), i);
+                    head.push_back(Literal(p, tnew));
+                    addRule(head, body);
+                }
+
+                //Reflexivity
+                body.clear();
+                body.push_back(lp);
+                head.clear();
+                tp.set(VTerm(i + 1, 0), 1);
+                head.push_back(Literal(mySameAsPred, tp));
+                addRule(head, body);
+            }
+        }
+    }
+
+    //Replace the \approx predicate
+    for(auto &r : oldrules) {
+        if (r.isEGD()) {
+            //Replace the head of the rule with the new predicate
+            std::vector<Literal> head;
+            head.push_back(Literal(mySameAsPred, r.getHeads()[0].getTuple()));
+            addRule(head, r.getBody());
+        } else {
+            addRule(r.getHeads(), r.getBody());
+        }
+    }
+}
 
 std::string extractFileName(std::string& filePath) {
     int index = filePath.find_last_of('/');

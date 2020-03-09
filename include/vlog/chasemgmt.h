@@ -150,6 +150,8 @@ class ChaseMgmt {
 
         bool checkRecursive(uint64_t rv);
 
+        uint64_t countDepth(uint64_t id, uint64_t depth = 0);
+
         RuleContainer *getRuleContainer(size_t id) const {
             if (id < rules.size()) {
                 return rules[id].get();

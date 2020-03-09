@@ -9,9 +9,11 @@ class Checker {
     private:
         static bool JA(Program &p, bool restricted);
 
-        static bool MFA(Program &p);
+        static bool MFA(Program &p, std::string sameasAlgo = "");
 
         static bool MSA(Program &p);
+
+        static bool EMFA(Program &p);
 
         static bool RMFA(Program &p);
 
@@ -29,11 +31,16 @@ class Checker {
         static Program *getProgramForBlockingCheckRMFC(Program &p);
 
     public:
-        VLIBEXP static int check(Program &p, std::string alg, EDBLayer &db);
+        VLIBEXP static int check(Program &p, std::string alg,
+                std::string sameasAlgo, EDBLayer &db);
 
-        VLIBEXP static int checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db, bool rewriteMultihead = false);
+        VLIBEXP static int checkFromFile(std::string ruleFile,
+                std::string alg, std::string sameasAlgo,  EDBLayer &db,
+                bool rewriteMultihead = false);
 
-        VLIBEXP static int checkFromString(std::string rulesString, std::string alg, EDBLayer &db, bool rewriteMultihead = false);
+        VLIBEXP static int checkFromString(std::string rulesString,
+                std::string alg, std::string sameasAlgo,  EDBLayer &db,
+                bool rewriteMultihead = false);
 
 };
 #endif

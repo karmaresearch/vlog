@@ -59,6 +59,8 @@ class SemiNaiver {
         std::vector<int> stratification;
         int nStratificationClasses;
         Program *RMFC_program;
+        std::string sameasAlgo;
+        const bool UNA;
 
 #ifdef WEBINTERFACE
         long statsLastIteration;
@@ -109,7 +111,8 @@ class SemiNaiver {
                 const std::vector<Literal> &heads);
 
         bool executeRules(std::vector<RuleExecutionDetails> &allEDBRules,
-                std::vector<std::vector<RuleExecutionDetails>> &allIDBRules,    // one entry for each stratification class
+                std::vector<std::vector<RuleExecutionDetails>> &allIDBRules,
+                // one entry for each stratification class
                 std::vector<StatIteration> &costRules,
                 const size_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
@@ -135,7 +138,8 @@ class SemiNaiver {
         std::vector<FCTable *>predicatesTables;
         EDBLayer &layer;
         Program *program;
-        std::vector<std::vector<RuleExecutionDetails>> allIDBRules; // one entry for each stratification class
+        std::vector<std::vector<RuleExecutionDetails>> allIDBRules;
+        // one entry for each stratification class
         size_t iteration;
         int nthreads;
         uint64_t triggers;
@@ -170,17 +174,20 @@ class SemiNaiver {
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 TypeChase chase, int nthreads, bool shuffleRules,
-                bool ignoreExistentialRule, Program *RMFC_check = NULL);
+                bool ignoreExistentialRule, Program *RMFC_check = NULL,
+                std::string sameasAlgo = "",
+                bool UNA = false);
 
         //disable restricted chase
         VLIBEXP SemiNaiver(EDBLayer &layer,
                 Program *program, bool opt_intersect,
                 bool opt_filtering, bool multithreaded,
                 int nthreads, bool shuffleRules,
-                bool ignoreExistentialRules) :
+                bool ignoreExistentialRules,
+                std::string sameasAlgo = "") :
             SemiNaiver(layer, program, opt_intersect, opt_filtering,
                     multithreaded, TypeChase::SKOLEM_CHASE, nthreads, shuffleRules,
-                    ignoreExistentialRules) {
+                    ignoreExistentialRules, NULL, sameasAlgo, false) {
             }
 
         VLIBEXP void run(unsigned long *timeout = NULL,

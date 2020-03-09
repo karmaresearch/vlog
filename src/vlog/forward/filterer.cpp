@@ -293,7 +293,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs(
     // --Ceriel
     return producedDerivationInPreviousStepsWithSubs_rec(block,
             mapSubstitutions, outputQueries[0], currentQuery,
-           posHead[0].first, posVarsInLit[posLiteral[0].second]);
+            posHead[0].first, posVarsInLit[posLiteral[0].second]);
 }
 
 bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
@@ -318,7 +318,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
             throw 10;
         }
         /*** This code calculates the new current query and pos of the subs ***/
-	std::vector<Substitution> subs;
+        std::vector<Substitution> subs;
         const int nsubs = Literal::getSubstitutionsA2B(subs,
                 blockRule.getFirstHead(), currentQuery);
         if (nsubs == -1) {
@@ -341,7 +341,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
         /*** End ***/
 
         /*** This code calculates the new output query and pos of the subs ***/
-	std::vector<Substitution> subs2;
+        std::vector<Substitution> subs2;
         const int nsubs2 = Literal::getSubstitutionsA2B(subs2,
                 blockRule.getFirstHead(), outputQuery);
         VTerm tAtOutQuery = outputQuery.getTermAtPos(posHead_first);

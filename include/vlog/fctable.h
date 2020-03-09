@@ -137,9 +137,8 @@ class FCTable {
 
         FCBlock &getLastBlock();
 
-        //size_t getNRows(size_t count) const;
-
-        size_t estimateCardinality(const Literal &literal, const size_t min, const size_t max) const;
+        size_t estimateCardinality(const Literal &literal,
+                const size_t min, const size_t max) const;
 
         uint8_t getSizeRow() const {
             return sizeRow;
@@ -148,9 +147,13 @@ class FCTable {
         std::shared_ptr<const Segment> retainFrom(
                 std::shared_ptr<const Segment> t,
                 const bool dupl,
-                int nthreads) const;
+                int nthreads,
+                size_t lastIteration = ~0lu) const;
 
         void addBlock(FCBlock block);
+
+        void replaceInternalTable(const size_t iteration,
+                std::shared_ptr<const FCInternalTable> t);
 
         bool add(std::shared_ptr<const FCInternalTable> t, const Literal &literal,
                 const uint8_t posLiteralInRule, const RuleExecutionDetails *detailsRule,

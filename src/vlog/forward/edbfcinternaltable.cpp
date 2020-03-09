@@ -30,6 +30,33 @@ bool EDBFCInternalTable::isEmpty() const {
     return retval;
 }
 
+std::pair<std::shared_ptr<const Segment>,
+    std::shared_ptr<const Segment>>
+    EDBFCInternalTable::replaceAllTermsWithMap(EGDTermMap &map,
+            bool replace) const {
+
+        SegmentInserter oldTuples(nfields);
+        SegmentInserter newTuples(nfields);
+        auto itr = getSortedIterator();
+        Term_t row[nfields];
+        while (itr->hasNext()) {
+            itr->next();
+            for(size_t i = 0; i < nfields; ++i) {
+                auto v = itr->getCurrentValue(i);
+                row[i] = v;
+            }
+            replaceRow(oldTuples, replace, newTuples, row, 0, nfields, map);
+        }
+        releaseIterator(itr);
+
+        if (replace) {
+            return std::make_pair(oldTuples.getSegment(),
+                    newTuples.getSortedAndUniqueSegment());
+        } else {
+            return std::make_pair(std::shared_ptr<const Segment>(),
+                    newTuples.getSortedAndUniqueSegment());
+        }
+    }
 
 uint8_t EDBFCInternalTable::getRowSize() const {
     return nfields;

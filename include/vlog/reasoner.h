@@ -119,7 +119,9 @@ class Reasoner {
         VLIBEXP static std::shared_ptr<SemiNaiver> getSemiNaiver(EDBLayer &layer,
                 Program *p, bool opt_intersect, bool opt_filtering, bool opt_threaded,
                 TypeChase typeChase,
-                int nthreads, int interRuleThreads, bool shuffleRules, Program *RMFC_check = NULL);
+                int nthreads, int interRuleThreads, bool shuffleRules,
+                Program *RMFC_check = NULL,
+                std::string sameasAlgo = "");
 
         VLIBEXP static std::shared_ptr<TriggerSemiNaiver> getTriggeredSemiNaiver(
                 EDBLayer &layer,

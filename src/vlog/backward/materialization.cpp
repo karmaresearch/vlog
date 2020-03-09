@@ -20,7 +20,7 @@ void Materialization::loadLiteralsFromFile(Program &p, std::string filePath) {
     std::ifstream stream(filePath);
     std::string line;
     while (std::getline(stream, line)) {
-	Dictionary dictVariables;
+        Dictionary dictVariables;
         Literal l = p.parseLiteral(line, dictVariables);
         prematerializedLiterals.push_back(l);
     }
@@ -31,7 +31,7 @@ void Materialization::loadLiteralsFromString(Program &p, std::string queries) {
     std::stringstream ss(queries);
     std::string t;
     while (getline(ss, t)) {
-	Dictionary dictVariables;
+        Dictionary dictVariables;
         Literal l = p.parseLiteral(t, dictVariables);
         prematerializedLiterals.push_back(l);
     }
@@ -162,13 +162,13 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
         TupleTable **output,
         long timeoutMicros) {
 #if defined(_WIN32)
-	throw 10; //not supported
+    throw 10; //not supported
 #else
     //Create a pipe between the two processes
     int pipeID[2];
     if (pipe(pipeID) < 0) {
-	LOG(ERRORL) << "Pipe has failed";
-	exit(1);
+        LOG(ERRORL) << "Pipe has failed";
+        exit(1);
     }
     //Fork the process.
     pid_t pid = fork();
@@ -195,9 +195,9 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
         Utils::encode_int(buffer, 0, tmpTable->getSizeRow());
         Utils::encode_int(buffer, 4, tmpTable->getNRows());
         if (write(pipeID[1], buffer, 8) != 8) {
-	    LOG(ERRORL) << "write failed";
-	    exit(EXIT_FAILURE);
-	}
+            LOG(ERRORL) << "write failed";
+            exit(EXIT_FAILURE);
+        }
         //Write the bindings, one after the other
         const size_t rowSize = tmpTable->getSizeRow();
         for (size_t i = 0; i < tmpTable->getNRows(); ++i) {
@@ -206,9 +206,9 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
                 Utils::encode_long(buffer, 8 * j, row[j]);
             }
             if (write(pipeID[1], buffer, 8 * rowSize) != 8 * rowSize) {
-		LOG(ERRORL) << "write failed";
-		exit(EXIT_FAILURE);
-	    }
+                LOG(ERRORL) << "write failed";
+                exit(EXIT_FAILURE);
+            }
         }
         close(pipeID[1]);
         delete qsqr;
@@ -229,18 +229,18 @@ bool Materialization::evaluateQueryThreadedVersion(EDBLayer *kb,
                 char buffer[24];
                 //Read rowsize and n. of rows
                 if (read(pipeID[0], buffer, 8) != 8) {
-		    LOG(ERRORL) << "Read failed";
-		    exit(EXIT_FAILURE);
-		}
+                    LOG(ERRORL) << "Read failed";
+                    exit(EXIT_FAILURE);
+                }
                 const size_t rowSize = Utils::decode_int(buffer, 0);
                 const size_t nRows = Utils::decode_int(buffer, 4);
                 *output = new TupleTable(rowSize);
                 uint64_t row[3];
                 for (size_t i = 0; i < nRows; ++i) {
                     if (read(pipeID[0], buffer, 8 * rowSize) != 8 * rowSize) {
-			LOG(ERRORL) << "Read failed";
-			exit(EXIT_FAILURE);
-		    }
+                        LOG(ERRORL) << "Read failed";
+                        exit(EXIT_FAILURE);
+                    }
                     for (size_t j = 0; j < rowSize; ++j) {
                         row[j] = Utils::decode_long(buffer, j * 8);
                     }
@@ -424,7 +424,7 @@ void Materialization::rewriteLiteralInProgram(Literal & prematLiteral, Literal &
         }
 
         if (toBeAdded)
-            rewrittenRules.push_back(Rule(r.getId(), r.getHeads(), newBody));
+            rewrittenRules.push_back(Rule(r.getId(), r.getHeads(), newBody, r.isEGD()));
     }
 
     p.cleanAllRules();

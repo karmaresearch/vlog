@@ -200,7 +200,7 @@ bool InterTableJoinProcessor::isEmpty() const {
     return segments[blockId] == NULL ? 0 : segments[blockId]->getNRows();
 }*/
 
-void InterTableJoinProcessor::consolidate(const bool isFinished) {
+bool InterTableJoinProcessor::consolidate(const bool isFinished) {
     //Add the segment to the table
     //LOG(DEBUGL) << "InterTableJoinProcessor::consolidate: currentSegmentSize = " << currentSegmentSize;
     //LOG(DEBUGL) << "  rowsize = " << (int)rowsize;
@@ -254,6 +254,7 @@ void InterTableJoinProcessor::consolidate(const bool isFinished) {
     }
     */
     //LOG(DEBUGL) << "InterTableJoinProcessor::consolidate done";
+    return false;
 }
 
 std::shared_ptr<const FCInternalTable> InterTableJoinProcessor::getTable() {

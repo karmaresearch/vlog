@@ -8,7 +8,9 @@
 typedef std::pair<PredId_t, uint8_t> vpos;
 typedef std::pair<uint32_t, uint8_t> rpos;
 
-int Checker::checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db, bool rewriteMultihead) {
+int Checker::checkFromFile(std::string ruleFile, std::string alg,
+        std::string sameasAlgo,
+        EDBLayer &db, bool rewriteMultihead) {
     //Parse the rules into a program
     Program p(&db);
     std::string s = p.readFromFile(ruleFile, rewriteMultihead);
@@ -16,10 +18,12 @@ int Checker::checkFromFile(std::string ruleFile, std::string alg, EDBLayer &db, 
         LOG(ERRORL) << "Error: " << s;
         throw 10;
     }
-    return check(p, alg, db);
+    return check(p, alg, sameasAlgo, db);
 }
 
-int Checker::checkFromString(std::string rulesString, std::string alg, EDBLayer &db, bool rewriteMultihead) {
+int Checker::checkFromString(std::string rulesString, std::string alg,
+        std::string sameasAlgo,
+        EDBLayer &db, bool rewriteMultihead) {
     //Parse the rules into a program
     Program p(&db);
     std::string s = p.readFromString(rulesString, rewriteMultihead);
@@ -27,17 +31,25 @@ int Checker::checkFromString(std::string rulesString, std::string alg, EDBLayer 
         LOG(ERRORL) << "Error: " << s;
         throw 10;
     }
-    return check(p, alg, db);
+    return check(p, alg, sameasAlgo, db);
 }
 
-int Checker::check(Program &p, std::string alg, EDBLayer &db) {
+int Checker::check(Program &p, std::string alg, std::string sameasAlgo,
+        EDBLayer &db) {
     if (! p.areExistentialRules()) {
         LOG(INFOL) << "No existential rules, termination detection not run";
         return 1;
     }
+
+    if (sameasAlgo != "" && alg != "MFA" && alg != "EMFA") {
+        LOG(ERRORL) << "The only acyclicity conditions that support equality"
+            "reasoning are MFA and EMFA";
+        throw 10;
+    }
+
     if (alg == "MFA") {
         // Model Faithful Acyclic
-        return MFA(p) ? 1 : 0;
+        return MFA(p, sameasAlgo) ? 1 : 0;
     } else if (alg == "JA") {
         // Joint Acyclic
         return JA(p, false) ? 1 : 0;
@@ -61,6 +73,8 @@ int Checker::check(Program &p, std::string alg, EDBLayer &db) {
     } else if (alg == "MSA") {
         // Model Summarisation Acyclic
         return MSA(p) ? 1 : 0;
+    } else if (alg == "EMFA") {
+        return EMFA(p) ? 1 : 0;
     } else {
         LOG(ERRORL) << "Unknown algorithm: " << alg;
         throw 10;
@@ -142,17 +156,41 @@ void Checker::createCriticalInstance(Program &newProgram,
     addIDBCritical(newProgram, &layer);
 }
 
-bool Checker::MFA(Program &p) {
+bool Checker::MFA(Program &p, std::string sameasAlgo) {
     // Create  the critical instance (cdb)
     EDBLayer *db = p.getKB();
     EDBLayer layer(*db, false);
+
+    //I must rewrite the algorithms to support equality reasoning here and not
+    //later because dummy rules are added during the computation of the
+    //critical instance
+    if (sameasAlgo == "AXIOM") {
+        //Rewrite the rules to add the equality axioms
+        p.axiomatizeEquality();
+#if DEBUG
+        for(auto &r : p.getAllRules()) {
+            LOG(INFOL) << "After AXIOM " << r.tostring(&p, &layer);
+        }
+#endif
+    } else if (sameasAlgo == "SING") {
+        p.singulariseEquality();
+#if DEBUG
+        for(auto &r : p.getAllRules()) {
+            LOG(INFOL) << "After SING " << r.tostring(&p, &layer);
+        }
+#endif
+    } else if (sameasAlgo != "" && sameasAlgo != "NOTHING") {
+        LOG(ERRORL) << "Type of equality algorithm not recognized";
+        throw 10;
+    }
 
     Program newProgram(&layer);
     createCriticalInstance(newProgram, p, db, layer);
 
     //Launch the skolem chase with the check for cyclic terms
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
-            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 0, false);
+            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 0, false,
+            NULL, "");
     sn->checkAcyclicity();
     //if check succeeds then return 0 (we don't know)
     if (sn->isFoundCyclicTerms()) {
@@ -177,6 +215,26 @@ bool Checker::MSA(Program &p) {
     //if check succeeds then return 0 (we don't know)
     if (sn->isFoundCyclicTerms()) {
         return false;   // Not MSA
+    } else {
+        return true;
+    }
+}
+
+bool Checker::EMFA(Program &p) {
+    // Create  the critical instance (cdb)
+    EDBLayer *db = p.getKB();
+    EDBLayer layer(*db, false);
+
+    Program newProgram(&layer);
+    createCriticalInstance(newProgram, p, db, layer);
+
+    //Launch a simpler version of the skolem chase with the check for cyclic terms
+    std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
+            &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 0, false, NULL);
+    sn->checkAcyclicity();
+    //if check succeeds then return 0 (we don't know)
+    if (sn->isFoundCyclicTerms()) {
+        return false;
     } else {
         return true;
     }
@@ -289,7 +347,7 @@ bool Checker::RMSA(Program &originalProgram) {
             for (auto &head : heads) {
                 newHeads.push_back(head);
             }
-            newRules.push_back(Rule(rule.getId(), newHeads, rule.getBody()));
+            newRules.push_back(Rule(rule.getId(), newHeads, rule.getBody(), rule.isEGD()));
         } else {
             newRules.push_back(rule);
         }
@@ -308,7 +366,7 @@ bool Checker::RMSA(Program &originalProgram) {
     auxBody.push_back(Literal(specialPred, t));
     std::vector<Literal> auxHead;
     auxHead.push_back(Literal(specialPredTrans, t));
-    newRules.push_back(Rule(ruleCounter++, auxHead, auxBody));
+    newRules.push_back(Rule(ruleCounter++, auxHead, auxBody, false));
     //S_TRANS(X,Z) :- S_TRANS(X,Y),S(Y,Z)
     auxBody.clear();
     auxBody.push_back(Literal(specialPredTrans, t));
@@ -319,7 +377,7 @@ bool Checker::RMSA(Program &originalProgram) {
     t.set(VTerm(1, 0), 0);
     t.set(VTerm(3, 0), 1);
     auxHead.push_back(Literal(specialPredTrans, t));
-    newRules.push_back(Rule(ruleCounter++, auxHead, auxBody));
+    newRules.push_back(Rule(ruleCounter++, auxHead, auxBody, false));
 
     Program rewrittenPrg = programWithCritical.clone();
     rewrittenPrg.cleanAllRules();

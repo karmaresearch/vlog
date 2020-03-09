@@ -329,6 +329,8 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     query_options.add<bool>("","no-intersect", false, "Disable intersection optimization.",false);
     query_options.add<string>("","graphfile", "", "Path to store the rule dependency graph",false);
 
+    query_options.add<string>("","sameasAlgo", "NOTHING", "Enable equality algorithm. Techniques: NOTHING (default), AXIOM (axiomatization), SING (singularisation).",false);
+
     ProgramArgs::GroupArgs& load_options = *vm.newGroup("Options for <load>");
     load_options.add<string>("i","input", "",
             "Path to the files that contain the compressed triples. This parameter is REQUIRED if already compressed triples/dict are not provided.", false);
@@ -708,7 +710,9 @@ void launchFullMat(int argc,
                 ? TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE,
                 nthreads,
                 interRuleThreads,
-                ! vm["shufflerules"].empty());
+                ! vm["shufflerules"].empty(),
+                NULL,
+                vm["sameasAlgo"].as<string>());
 
 #ifdef WEBINTERFACE
         //Start the web interface if requested
@@ -1135,9 +1139,11 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
     runLiteralQuery(edb, p, literal, reasoner, vm);
 }
 
-void checkAcyclicity(std::string ruleFile, std::string alg, EDBLayer &db, bool rewriteMultihead) {
+void checkAcyclicity(std::string ruleFile, std::string alg,
+        std::string sameasAlgo, EDBLayer &db, bool rewriteMultihead) {
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    int response = Checker::checkFromFile(ruleFile, alg, db, rewriteMultihead);
+    int response = Checker::checkFromFile(ruleFile, alg, sameasAlgo,
+            db, rewriteMultihead);
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     std::cout << "The response is: ";
     if (response == 0) {
@@ -1520,9 +1526,10 @@ int main(int argc, const char** argv) {
         EDBConf conf(edbFile);
         conf.setRootPath(Utils::parentDir(edbFile));
         EDBLayer *layer = new EDBLayer(conf, false);
-        std::string rulesFile = vm["rules"].as<string>();
-        std::string alg = vm["alg"].as<string>();
-        checkAcyclicity(rulesFile, alg, *layer, vm["rewriteMultihead"].as<bool>());
+        string rulesFile = vm["rules"].as<string>();
+        string alg = vm["alg"].as<string>();
+        checkAcyclicity(rulesFile, alg, vm["sameasAlgo"].as<std::string>(),
+                *layer, vm["rewriteMultihead"].as<bool>());
         delete layer;
     } else if (cmd == "deps") {
         EDBConf conf(edbFile);

@@ -33,6 +33,8 @@ size_t InmemoryFCInternalTable::getNRows() const {
 }
 
 bool InmemoryFCInternalTable::isEmpty() const {
+    if (nfields == 0)
+        return false;
     return values->isEmpty() && unmergedSegments.size() == 0;
 }
 
@@ -553,6 +555,34 @@ Term_t InmemoryFCInternalTable::getValueConstantColumn(const uint8_t columnid) c
     throw 10;
 }
 
+std::pair<std::shared_ptr<const Segment>,
+    std::shared_ptr<const Segment>>
+    InmemoryFCInternalTable::replaceAllTermsWithMap(EGDTermMap &map, bool replace) const {
+
+        SegmentInserter oldTuples(nfields);
+        SegmentInserter newTuples(nfields);
+
+        auto itr = getSortedIterator();
+        Term_t row[nfields];
+        while (itr->hasNext()) {
+            itr->next();
+            for(size_t i = 0; i < nfields; ++i) {
+                auto v = itr->getCurrentValue(i);
+                row[i] = v;
+            }
+            replaceRow(oldTuples, replace, newTuples, row, 0, nfields, map);
+        }
+        releaseIterator(itr);
+
+        if (replace) {
+            return std::make_pair(oldTuples.getSegment(),
+                    newTuples.getSortedAndUniqueSegment());
+        } else {
+            return std::make_pair(std::shared_ptr<const Segment>(),
+                    newTuples.getSortedAndUniqueSegment());
+        }
+    }
+
 std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uint8_t nVarsToCopy, const uint8_t *posVarsToCopy,
         const uint8_t nConstantsToFilter, const uint8_t *posConstantsToFilter,
         const Term_t *valuesConstantsToFilter, const uint8_t nRepeatedVars,
@@ -956,11 +986,30 @@ bool MITISorter::operator ()(const size_t i1, const size_t i2) const {
     for (int i = 0; i < tuplesize; ++i) {
         Term_t v1 = iterators[i1].first->getCurrentValue(sortPos[i]);
         Term_t v2 = iterators[i2].first->getCurrentValue(sortPos[i]);
-        // LOG(TRACEL) << "i = " << i << ", i1 = " << i1 << ", v1 = " << v1 << ", i2 = " << i2 << ", v2 = " << v2;
         if (v1 > v2)
             return true;
         else if (v1 < v2)
             return false;
     }
     return false;
+}
+
+void FCInternalTable::replaceRow(SegmentInserter &oldtuples, bool replace,
+        SegmentInserter &newtuples, Term_t *row, size_t begin,
+        size_t end, EGDTermMap &map) const {
+    bool changed = false;
+    for(size_t i = begin; i < end; ++i) {
+        auto v = row[i];
+        if (map.count(v)) {
+            auto replacement = map[v];
+            row[i] = replacement.first;
+            changed = true;
+        }
+    }
+    if (replace && !changed) {
+        oldtuples.addRow(row);
+    }
+    if (changed) {
+        newtuples.addRow(row);
+    }
 }

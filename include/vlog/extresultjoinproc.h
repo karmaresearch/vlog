@@ -106,7 +106,7 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
         void processResults(const int blockid, FCInternalTableItr *first,
                 FCInternalTableItr* second, const bool unique);
 
-        void consolidate(const bool isFinished);
+        bool consolidate(const bool isFinished);
 };
 
 #endif

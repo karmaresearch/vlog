@@ -286,10 +286,25 @@ bool FCTable::isEmpty(size_t count) const {
     return true;
 }
 
+void FCTable::replaceInternalTable(const size_t iteration,
+        std::shared_ptr<const FCInternalTable> t) {
+    if (blocks.size() > 10) {
+        LOG(WARNL) << "Linear scan over " << blocks.size() << " internal tables. Binary search?";
+    }
+    for (auto &block : blocks) {
+        if (block.iteration == iteration) {
+            block.table = t;
+            cache.clear(); //Invalidate the cache over this table
+            break;
+        }
+    }
+}
+
 std::shared_ptr<const Segment> FCTable::retainFrom(
         std::shared_ptr<const Segment> t,
         const bool dupl,
-        int nthreads) const {
+        int nthreads,
+        size_t lastIteration) const {
     bool duplicates = dupl;
 
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
@@ -299,6 +314,8 @@ std::shared_ptr<const Segment> FCTable::retainFrom(
     for (std::vector<FCBlock>::const_iterator itr = blocks.cbegin();
             itr != blocks.cend();
             ++itr) {
+        if (itr->iteration >= lastIteration)
+            break;
         sz += itr->table->getNRows();
     }
     LOG(DEBUGL) << "retainFrom: t.size() = " << t->getNRows() << ", blocks.size() = " << blocks.size() << ", sz = " << sz;
@@ -307,6 +324,8 @@ std::shared_ptr<const Segment> FCTable::retainFrom(
     for (std::vector<FCBlock>::const_iterator itr = blocks.cbegin();
             itr != blocks.cend();
             ++itr) {
+        if (itr->iteration >= lastIteration)
+            break;
         t = SegmentInserter::retain(t, itr->table, duplicates, nthreads);
         //        LOG(TRACEL) << "after retain: t.size() = " << t->getNRows() << ", table size was " << itr->table->getNRows();
         duplicates = false;     // Only check for duplicates at most once.
