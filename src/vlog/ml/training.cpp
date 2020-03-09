@@ -200,7 +200,6 @@ void getAllPaths(uint16_t source, vector<Edge>& path, vector<vector<Edge>>& path
         }
     }
 }
-
 std::vector<std::pair<std::string, int>> Training::generateTrainingQueriesAllPaths(EDBConf &conf,
         EDBLayer &db,
         Program &p,
@@ -1021,8 +1020,10 @@ void Training::runQueries(vector<string>& trainingQueriesVector,
         uint8_t repeatQuery,
         vector<Metrics>& featuresVector,
         vector<int>& decisionVector,
+        vector<double>& featuresTimesVector,
         int& nMagicQueries,
-        string& logFileName) {
+        string& logFileName,
+        int featureDepth) {
 
     vector<string> strResults;
     vector<string> strFeatures;
@@ -1051,14 +1052,16 @@ void Training::runQueries(vector<string>& trainingQueriesVector,
                     magicTime,
                     timeout,
                     repeatQuery,
+                    featureDepth,
                     featuresVector,
-                    decisionVector);
-            features += ",0";
+                    decisionVector,
+                    featuresTimesVector);
             strResults.push_back(results);
             strFeatures.push_back(features);
             strQsqrTime.push_back(qsqrTime);
             logTraining << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back() << endl;
-            if (stoull(qsqrTime) == timeout && stoull(magicTime) == timeout) {
+            LOG(INFOL) << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back();
+            if (stoull(qsqrTime) == time && stoull(magicTime) == time) {
                 LOG(INFOL) << "Query timed out : " << q;
                 timedOutQueries.push_back(q);
             }
@@ -1083,13 +1086,19 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         double& accuracy,
         uint64_t timeout,
         uint8_t repeatQuery,
-        string& logFileName) {
+        string& logFileName,
+        int featureDepth) {
 
     vector<Metrics> featuresVector;
     vector<int> decisionVector;
+    vector<double> featuresTimesVector;
     int nMagicQueries = 0;
-    Training::runQueries(trainingQueriesVector, edb, p, timeout, repeatQuery, featuresVector, decisionVector,nMagicQueries, logFileName);
+    Training::runQueries(trainingQueriesVector, edb, p, timeout, repeatQuery, featuresVector, decisionVector, featuresTimesVector, nMagicQueries, logFileName, featureDepth);
 
+    double totalFeaturesTime = accumulate(featuresTimesVector.begin(), featuresTimesVector.end(), 0.0);
+    LOG(INFOL) << "Total time to generate features : " << totalFeaturesTime;
+    //TODO: do not test in cpp
+    return;
     vector<Metrics> balancedFeaturesVector;
     vector<int> balancedDecisionVector;
     vector<string> balancedTrainingQueriesVector;
@@ -1186,7 +1195,6 @@ void Training::trainAndTestModel(vector<string>& trainingQueriesVector,
         Instance instance(label, features);
         testInst.push_back(instance);
     }
-
     for (int i =0; i < testInst.size(); ++i) {
         testInst[i].x[0] = std::log1p(testInst[i].x[0]);
         testInst[i].x[1] = std::log1p(testInst[i].x[1]);
@@ -1234,6 +1242,7 @@ void Training::execLiteralQueries(vector<string>& queryVector,
 
     vector<Metrics> featuresVector;
     vector<int> decisionVector;
+    vector<double> featuresTimesVector;
     int i = 1;
     vector<string> strResults;
     vector<string> strFeatures;
@@ -1242,6 +1251,7 @@ void Training::execLiteralQueries(vector<string>& queryVector,
     vector<string> workingQueries = queryVector;
     ofstream logFile("queries-execution.log");
     vector<uint64_t> timeouts = {10000,60000,300000};
+    int featureDepth = 5;
     for (auto time : timeouts) {
         LOG(INFOL) << "For timeout = " << time << " dealing with " << workingQueries.size() << " queries";
         vector<string> timedOutQueries;
@@ -1261,14 +1271,16 @@ void Training::execLiteralQueries(vector<string>& queryVector,
                     magicTime,
                     time,
                     repeatQuery,
+                    featureDepth,
                     featuresVector,
-                    decisionVector);
+                    decisionVector,
+                    featuresTimesVector);
             strResults.push_back(results);
             strFeatures.push_back(features);
             strQsqrTime.push_back(qsqrTime);
             strMagicTime.push_back(magicTime);
             logFile << q <<" " << features << " " << qsqrTime << " " << magicTime << " " << decisionVector.back() << endl;
-            if (stoull(qsqrTime) == timeout && stoull(magicTime) == timeout) {
+            if (stoull(qsqrTime) == time && stoull(magicTime) == time) {
                 LOG(INFOL) << "Query timed out : " << q;
                 timedOutQueries.push_back(q);
             }
@@ -1298,15 +1310,24 @@ void Training::execLiteralQuery(string& literalquery,
         string& strMagicTime,
         uint64_t timeout,
         uint8_t repeatQuery,
+        int featureDepth,
         vector<Metrics>& featuresVector,
-        vector<int>& decisionVector) {
+        vector<int>& decisionVector,
+        vector<double>& featuresTimesVector) {
 
     Dictionary dictVariables;
     Literal literal = p.parseLiteral(literalquery, dictVariables);
     Reasoner reasoner(1000000);
 
     Metrics metrics;
-    reasoner.getMetrics(literal, NULL, NULL, edb, p, metrics, 5);
+    std::chrono::duration<double> durationMetrics;
+    std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
+    reasoner.getMetrics(literal, NULL, NULL, edb, p, metrics, featureDepth);
+    std::chrono::system_clock::time_point endMetrics = std::chrono::system_clock::now();
+
+    durationMetrics = endMetrics - startMetrics;
+    featuresTimesVector.push_back(durationMetrics.count() * 1000);
+
     featuresVector.push_back(metrics);
     stringstream strMetrics;
     strMetrics  << std::to_string(metrics.cost) << ","

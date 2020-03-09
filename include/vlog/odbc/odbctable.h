@@ -13,11 +13,11 @@ private:
     SQLHANDLE env;
     SQLHANDLE con;
 
-    SQLRETURN check(SQLRETURN rc, string msg);
+    SQLRETURN check(SQLRETURN rc, std::string msg);
 
 public:
-    ODBCTable(PredId_t predid, string user, string pwd, string dbname,
-               string tablename, string tablefields, EDBLayer *layer);
+    ODBCTable(PredId_t predid, std::string user, std::string pwd, std::string dbname,
+               std::string tablename, std::string tablefields, EDBLayer *layer);
 
     void executeQuery(const std::string &query, SegmentInserter *inserter);
 

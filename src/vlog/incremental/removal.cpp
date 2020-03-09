@@ -175,7 +175,7 @@ bool EDBRemoveLiterals::present(const std::vector<Term_t> &terms) const {
     }
 
 #ifdef DEBUG
-    ostringstream os;
+    std::ostringstream os;
     os << "Hit row in removed: ";
     os << "[";
     for (auto t : terms) {

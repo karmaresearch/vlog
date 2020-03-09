@@ -29,9 +29,9 @@ std::string FCTable::getSignature(const Literal &literal) {
             if (! found) {
                 existingVars.push_back(t.getId());
             }
-            out += " " + to_string(idx) + " ";
+            out += " " + std::to_string(idx) + " ";
         } else {
-            out += " " + to_string(t.getValue()) + " ";
+            out += " " + std::to_string(t.getValue()) + " ";
         }
     }
     return out;

@@ -255,7 +255,11 @@ void ExistentialRuleProcessor::retainNonExisting(
         std::vector<ColumnWriter> writers;
         std::vector<std::unique_ptr<ColumnReader>> readers;
         for(uint8_t i = 0; i < c.size(); ++i) {
-            readers.push_back(c[i]->getReader());
+            if (c[i]) {
+                readers.push_back(c[i]->getReader());
+            } else {
+                readers.emplace_back();
+            }
         }
         writers.resize(c.size());
         uint64_t idxs = 0;
@@ -264,10 +268,12 @@ void ExistentialRuleProcessor::retainNonExisting(
             if (i < nextid) {
                 //Copy
                 for(uint8_t j = 0; j < c.size(); ++j) {
-                    if (!readers[j]->hasNext()) {
-                        throw 10;
+                    if (readers[j]) {
+                        if (!readers[j]->hasNext()) {
+                            throw 10;
+                        }
+                        writers[j].add(readers[j]->next());
                     }
-                    writers[j].add(readers[j]->next());
                 }
             } else {
                 //Move to the next ID if any
@@ -278,21 +284,36 @@ void ExistentialRuleProcessor::retainNonExisting(
                     nextid = ~0lu; //highest value -- copy the rest
                 }
                 for(uint8_t j = 0; j < c.size(); ++j) {
-                    if (!readers[j]->hasNext()) {
-                        throw 10;
+                    if (readers[j]) {
+                        if (!readers[j]->hasNext()) {
+                            throw 10;
+                        }
+                        readers[j]->next();
                     }
-                    readers[j]->next();
                 }
 
             }
         }
         //Copy back the retricted columns
         for(uint8_t i = 0; i < c.size(); ++i) {
-            c[i] = writers[i].getColumn();
+            if (c[i]) {
+                c[i] = writers[i].getColumn();
+            }
         }
         sizecolumns = 0;
         if (rowsize > 0) {
-            sizecolumns = c[0]->size();
+            bool found = false;
+            for(uint8_t i = 0; i < c.size(); ++i) {
+                if (c[i]) {
+                    sizecolumns = c[i]->size();
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                LOG(ERRORL) << "No atom without non-existential columns. I don't now how to get the size";
+                throw 10;
+            }
         }
     }
 }
@@ -716,7 +737,7 @@ std::vector<uint64_t> ExistentialRuleProcessor::blocked_check_computeBodyAtoms(
 #endif
     auto bodyAtoms = plan.plan;
     int idx = 0;
-    std::vector<uint8_t> vars = ruleDetails->rule.getVarsInHeadAndBody(headPredicateToIgnore);
+    std::vector<uint8_t> vars = ruleDetails->rule.getFrontierVariables(headPredicateToIgnore);
     std::vector<uint64_t> toMatch(vars.size());
     std::vector<bool> found(vars.size());
 
@@ -869,7 +890,7 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                 //Get the arguments of the function term from the chase mgmt
                 auto *rows = ruleContainer->getRows(varID);
                 const uint64_t localCounter = COUNTER(term.getValue());
-                const uint64_t *values = rows->getRow(localCounter);
+                uint64_t *values = rows->getRow(localCounter);
                 const uint64_t nvalues = rows->getSizeRow();
                 //Map them to variables
                 const auto &nameVars = rows->getNameArgVars();
@@ -925,8 +946,15 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                         if (term.isVariable()) {
                             uint8_t varID = term.getId();
                             if (!mappings.count(varID)) {
-                                LOG(ERRORL) << "There are existential variables not defined. Must implement their retrievals";
-                                throw 10;
+                                // Here, we must create a value for the existential variable, using the same row (I think ...)
+                                auto *vrows = ruleContainer->getRows(varID);
+                                uint64_t value;
+                                bool v = vrows->existingRow(values, value);
+                                assert(v);
+                                uint64_t rulevar = RULE_SHIFT(ruleID) + VAR_SHIFT(varID);
+                                mappings.insert(std::make_pair(varID, rulevar | value));
+                                // LOG(ERRORL) << "There are existential variables not defined. Must implement their retrievals";
+                                // throw 10;
                             }
                             t.set(VTerm(0, mappings[varID]), m);
                         } else {

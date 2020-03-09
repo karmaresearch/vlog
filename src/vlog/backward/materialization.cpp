@@ -28,8 +28,8 @@ void Materialization::loadLiteralsFromFile(Program &p, std::string filePath) {
 }
 
 void Materialization::loadLiteralsFromString(Program &p, std::string queries) {
-    stringstream ss(queries);
-    string t;
+    std::stringstream ss(queries);
+    std::string t;
     while (getline(ss, t)) {
         Dictionary dictVariables;
         Literal l = p.parseLiteral(t, dictVariables);

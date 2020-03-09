@@ -8,7 +8,8 @@ using json = nlohmann::json;
 static bool curl_initialized = false;
 static int  numTables = 0;
 
-SparqlTable::SparqlTable(PredId_t predid, string repository, EDBLayer *layer, string f, string whereBody) :
+SparqlTable::SparqlTable(PredId_t predid, std::string repository,
+        EDBLayer *layer, std::string f, std::string whereBody) :
     predid(predid), repository(repository), layer(layer), whereBody(whereBody) {
         if (! curl_initialized) {
             curl_global_init(CURL_GLOBAL_ALL);
@@ -134,6 +135,7 @@ void SparqlTable::query(QSQQuery *query, TupleTable *outputTable,
     throw 10;
 }
 
+// TODO
 size_t SparqlTable::estimateCardinality(const Literal &query) {
     // return getCardinality(query);
     // Just return a high number

@@ -1,218 +1,124 @@
-<!DOCTYPE html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
 <html>
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script type="text/javascript" src="d3/d3.min.js">
-    </script>
-    <script type="text/javascript" src="d3/radial.js">
-    </script>
-    <script type="text/javascript" src="d3/d3-tip.js">
-    </script>
-    <script type="text/javascript" src="scripts.js">
-    </script>
-    <script type="text/javascript" src="functions.js">
-    </script>
-    <script type="text/javascript" src="jquery-min.js">
-    </script>
-    <link href="main.css" rel="stylesheet" type="text/css">
-    <link href="d3/radial.css" rel="stylesheet" type="text/css">
-</head>
-<body>
-
-<p><h2> VLog </h2></p>
-
-<div class="tab">
-
-<button class="tablinks" onclick="openCity(event, 'Materalization')">Materalization</button>
-<button class="tablinks" onclick="openCity(event, 'Queries')">Queries</button>
-<button class="tablinks" onclick="openCity(event, 'TrainAndTest')">Train &amp; Test</button>
-</div>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+        <meta name="author" content="Jacopo Urbani">
+        <meta name="description" content="VLog">
+        <script type="text/javascript" src="d3/d3.min.js">
+        </script>
+        <script type="text/javascript" src="d3/radial.js">
+        </script>
+        <script type="text/javascript" src="d3/d3-tip.js">
+        </script>
+        <script type="text/javascript" src="jquery-min.js"></script>
+        <script type="text/javascript" src="bootstrap.min.js"></script>
 
 
+        <script type="text/javascript" src="mat/functions.js"></script>
+        <link href="main.css" rel="stylesheet" type="text/css">
+        <link href="mat/main.css" rel="stylesheet" type="text/css">
+        <link href="d3/radial.css" rel="stylesheet" type="text/css">
+        <link href="bootstrap.min.css" rel="stylesheet" type="text/css">
 
-<div id="Materalization" class="tabcontent">
+        <title>VLog</title>
+    </head>
 
+    <body>
+        <script type="text/javascript">
+            get_mem_commandline();
+getEDBInfo();
+getProgramInfo();
 
-<div id="leftcolumn">
-<div id="leftcolumnblock">
-<h3>Memory Monitor</h3>
+//Code for collapsing elements
+$(document).ready(function() {
+    $('.nav-toggle').click(function(){
+        //get collapse content selector
+        var collapse_content_selector = $(this).attr('href');
 
-
-<div id="rambox">
-<p><i>Occupied RAM:</i> <label id="usedram"></label>/<label id="totalram"></label> MB</p>
-
-
-<div id="divRAM" class="radial">
-</div>
-</div>
-
-
-<p><i>Refresh rate (ms):</i> <input id="refreshRate" size="5" text="1000" value="1000" onchange="setRefresh(refreshMem);"></p>
-
-
-                          <p><i>Command line:</i>
-                          </p>
-
-
-                          <p><small><label id="commandline"></label></small>
-                          </p>
-                          <br>
-
-
-                          <div id="detailsedbblock">
-                          <h3>Details EDB predicates</h3>
-                          <div id="detailsedb">
-                          </div>
-                          </div>
-
-                          <div id="detailsprogramblock">
-                          <h3>Details current program</h3>
-                          <div id="detailsprogram">
-                          </div>
-                          </div>
-                          </div>
-
-                          <div id="detailsIDB" style="display: none"></div>
-                          <input type="button" id="buttonSizeIDBs" value="Get size IDB tables" onclick="get_size_IDBs();" />
-                          <div id="sizeidbs"></div>
-
-                          </div>
+        //make the collapse content to be shown or hide
+        var toggle_switch = $(this);
+        $(collapse_content_selector).toggle(function(){
+            if($(this).css('display')=='none'){
+                //change the button label to be 'Show'
+                toggle_switch.html('Show Content');
+            }else{
+                //change the button label to be 'Hide'
+                toggle_switch.html('Hide Content');
+            }
+        });
+    });
+});
+        </script>
 
 
-                          <form name="setup" method="post" id="setup">
-                          <div class="block" id="setupdatalog">
-                          <div id="finishedBox">
-                          <h3><label id="finished"></label>
-                          </h3>
-                          </div>
+        <div id="wrapper" class="container-fluid">
+            <div class="row"><div id="header" class="col"><h1>VLog</h1></div>
+            </div>
+            <div class="row">
+                <div id="leftcolumnblock" class="col col-md-2 show">
+                    <div id="leftcolumn">
+                        <div>
+                            <h3>Memory Monitor</h3>
+
+                            <div id="rambox">
+                                <p><i>Occupied RAM:</i> <label id="usedram"></label>/<label id="totalram"></label> MB</p>
+
+                                <div id="divRAM" class="radial">
+                                </div>
+                            </div>
 
 
-                          <h3>Rules</h3>
+                            <p><i>Refresh rate (ms):</i> <input id="refreshRate" size="5" text="1000" value="1000" onchange="setRefresh(refreshMem);"></p>
 
+                            <p><i>Command line:</i></p>
+                            <p><small><label id="commandline"></label></small></p>
+                            <div id="detailsprogram"></div>
 
-                          <table>
-                          <tr>
-                          <td>
-                          <textarea id="rulebox" name="rules" rows="30">
-                          </textarea>
-                          </td>
-                          </tr>
+                            <h3>EDB</h3>
+                            <div id="detailsedb"></div>
+                            <br/>
+                            <h3>IDB</h3>
+                            <input type="button" id="buttonSizeIDBs" value="Get size IDB tables" onclick="get_size_IDBs();" />
+                            <div id="detailsIDB" style="display: none"></div>
+                            <div id="sizeidbs"></div>
 
+                        </div>
+                    </div>
+                </div>
 
-                          <tr>
-                          <td>Load from file: <input type="file" id="filerule" onchange="loadfile(this, 'rulebox')"></td>
-                          </tr>
-                          </table>
+                <div class="col">
+                    <div id="messageBox">
+                    </div>
+                    <div>
+                        <ul id="menu" class="nav nav-tabs">
+                            <button type="button" data-toggle="collapse" data-target="#leftcolumnblock" class="btn-primary btn-sm">Hide/Show content</button>
 
+                            <li class="nav-item">
+                                <a class="nav-link active" data-toggle="tab" href="#tab_materialization">Materialization</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" data-toggle="tab" href="#tab_query">Query</a>
+                            </li>
+                        </ul>
 
+                        <div class="tab-content">
+                            <div id="tab_materialization" class="tab-pane active">Loading ...</div>
+                            <div id="tab_query" class="tab-pane">Loading ...</div>
+                        </div>
 
-
-                          <table id="containerSubmit">
-                          <tr>
-                          <td>
-                            <input type="button" onclick=" return setupProgram(event);" id="buttonSetup" name="submit" value="Load Rules">
-                            <input type="button" onclick="launchMat();" id="buttonMat" name="submit" value="Launch Materialization">
-                          </td>
-                          </tr>
-                          <tr> <td>Auto premat. <input id="automat" name="automat" type="checkbox" onclick="disablepremat()"></td> </tr>
-                          </table>
-                          </div>
-                          </form>
-
-                          <div id="messageBox"> </div>
-                          <div id="frameBox"> </div>
-
-                          </div>
-
-                          <div id="Queries" class="tabcontent">
-                          <p> Queries and Results </p>
-
-
-                          <table id="tableQueries" style="display:active">
-                          <tr>
-                          <td>
-                          <textarea id="textQueries" name="queries" rows="30" cols="20">
-                          </textarea>
-                          </td>
-                          </tr>
-
-
-                          <tr>
-                          <td>Load from file: <input type="file" id="queryrule" onchange="loadfile(this, 'textQueries')"></td>
-                          <td> Timeout for each query <input id="timeout" name="timeout" text="60000" value="60000"> </td>
-                          <td> Repetitions for each query <input id="repeatQuery" name="repeatQuery" text="1" value="1"> </td>
-                          </tr>
-
-                          <tr>
-                          <td><input type="button" onclick="execQuery();" id="buttonQuery" name="submit" value="Execute Query/ies"></td>
-                          </tr>
-                          </table>
-
-                          <table>
-                          <tr>
-                              <td> Results </td>
-                              <td> <textarea id="textResults" name="results" rows="30" cols="20"> </textarea> </td>
-                          </tr>
-                          <tr>
-                            <td> Features </td>
-                            <td> <textarea id="textFeatures" name="features" rows="1" cols"10"> </textarea></td>
-                          </tr>
-                          <tr>
-                            <td> QSQR times </td>
-                            <td> <textarea id="textQsqrTime" name="qsqrtime" rows="1" cols"10"> </textarea></td>
-                          </tr>
-                          <tr>
-                            <td> MAGIC times </td>
-                            <td> <textarea id="textMagicTime" name="magictime" rows="1" cols"10"> </textarea></td>
-                          </tr>
-
-                          </table>
-                          </div>
-                          <div id="TrainAndTest" class="tabcontent">
-                          <table>
-                          <tr><td>
-                          <label for="textTestQueries"> Test Queries </label>
-                          </td></tr>
-                          <tr><td>
-                          <textarea id="textTestQueries" name="queries" rows="30" cols="20">
-                          </textarea>
-                          </td></tr>
-                          <tr><td>
-                          Load test file: <input type="file" id="testqueries" onchange="loadfile(this, 'textTestQueries')">
-                          </td></tr>
-                          <tr>
-                          <td><input type="button" onclick="trainAndTest();" id="buttonTrain" name="submit" value="Train and Test Queries"></td>
-                          <td> Timeout for each query <input id="timeoutTraining" name="timeout" text="10000" value="10000"> </td>
-                          <td> Repetitions for each query <input id="repeatQueryTraining" name="repeatQuery" text="1" value="1"> </td>
-                          <td> Maximum number of training queries <input id="maxTrainingQueries" name="maxTrainingQueries" text="300" value="300"> </td>
-                          </tr>
-                          <tr>
-                              <td> Results (Accuracy)</td>
-                              <td> <textarea id="textAccuracy" name="accuracy" rows="1" cols="10"> </textarea> </td>
-                          </tr>
-                          </table>
-                          </div>
-
-                          <script>
-                          function openCity(evt, cityName) {
-                              var i, tabcontent, tablinks;
-                              tabcontent = document.getElementsByClassName("tabcontent");
-                              for (i = 0; i < tabcontent.length; i++) {
-                                  tabcontent[i].style.display = "none";
-                              }
-                              tablinks = document.getElementsByClassName("tablinks");
-                              for (i = 0; i < tablinks.length; i++) {
-                                  tablinks[i].className = tablinks[i].className.replace(" active", "");
-                              }
-                              document.getElementById(cityName).style.display = "block";
-                              evt.currentTarget.className += " active";
-                          }
-                          setRefresh(refreshMem);
-                          get_mem_commandline();
-                          getEDBInfo();
-                          getProgramInfo();
+                        <script>
+                            $("#tab_materialization").load("/tab-mat.html");
+$("#tab_query").load("/tab-query.html");
                         </script>
 
-</body>
-</html> 
+                    </div>
+                </div>
+            </div>
+        </div>
 
+        <script type="text/javascript">
+            setRefresh(refreshMem);
+        </script>
+    </body>
+</html>

@@ -18,6 +18,14 @@
 #include <vector>
 #include <map>
 
+//Datatype is set in the most significant three bits
+#define IS_NUMBER(x) ((x) >> 61)
+#define IS_UINT(x) ((x >> 61) == 1)
+#define IS_FLOAT32(x) ((x >> 61) == 2)
+#define GET_UINT(x) (x & 0x2000000000000000ul)
+#define GET_FLOAT32(x) (x & 0x4000000000000000ul)
+#define FLOAT32_MASK(x) ((uint32_t) x | 0x40000000FFFFFFFFul)
+
 class Column;
 class SemiNaiver;       // Why cannot I break the software hierarchy? RFHH
 class EDBFCInternalTable;
@@ -72,6 +80,49 @@ class EDBMemIterator : public EDBIterator {
         ~EDBMemIterator() {}
 };
 
+class EmptyEDBIterator final : public EDBIterator {
+    PredId_t predid;
+
+    public:
+    EmptyEDBIterator(PredId_t id) {
+        predid = id;
+    }
+
+    VLIBEXP void init1(PredId_t id, std::vector<Term_t>*, const bool c1, const Term_t vc1) {
+        predid = id;
+    }
+
+    VLIBEXP void init2(PredId_t id, const bool defaultSorting,
+            std::vector<std::pair<Term_t, Term_t>>*, const bool c1,
+            const Term_t vc1, const bool c2, const Term_t vc2,
+            const bool equalFields) {
+        predid = id;
+    }
+
+    VLIBEXP void skipDuplicatedFirstColumn() { }
+
+    VLIBEXP bool hasNext() {
+        return false;
+    }
+
+    VLIBEXP void next() {
+        throw 10;
+    }
+
+    PredId_t getPredicateID() {
+        return predid;
+    }
+
+    void moveTo(const uint8_t fieldId, const Term_t t) {}
+
+    VLIBEXP Term_t getElementAt(const uint8_t p) {
+        throw 10;
+    }
+
+    void clear() {}
+
+    ~EmptyEDBIterator() {}
+};
 
 class EDBLayer {
     private:
@@ -79,23 +130,27 @@ class EDBLayer {
         struct EDBInfoTable {
             PredId_t id;
             uint8_t arity;
-            string type;
+            std::string type;
             std::shared_ptr<EDBTable> manager;
         };
 
         const EDBConf &conf;
         bool loadAllData;
 
-        std::shared_ptr<Dictionary> predDictionary;
+        std::shared_ptr<Dictionary> predDictionary; //std::string, Term_t
         std::map<PredId_t, EDBInfoTable> dbPredicates;
 
         Factory<EDBMemIterator> memItrFactory;
         std::vector<IndexedTupleTable *>tmpRelations;
 
-        std::shared_ptr<Dictionary> termsDictionary;
+        std::shared_ptr<Dictionary> termsDictionary;//std::string, Term_t
         std::string rootPath;
 
         VLIBEXP void addTridentTable(const EDBConf::Table &tableConf, bool multithreaded);
+
+        void addTopKTable(const EDBConf::Table &tableConf);
+
+        void addEmbTable(const EDBConf::Table &tableConf);
 
 #ifdef MYSQL
         void addMySQLTable(const EDBConf::Table &tableConf);
@@ -172,6 +227,10 @@ class EDBLayer {
                         addEDBonIDBTable(table);
                     } else if (table.type == "EDBimporter") {
                         addEDBimporter(table);
+                    } else if (table.type == "Embeddings") {
+                        addEmbTable(table);
+                    } else if (table.type == "TopK") {
+                        addTopKTable(table);
                     } else {
                         LOG(ERRORL) << "Type of table is not supported";
                         throw 10;
@@ -189,9 +248,9 @@ class EDBLayer {
 
         uint64_t getPredSize(PredId_t id) const;
 
-        string getPredType(PredId_t id) const;
+        std::string getPredType(PredId_t id) const;
 
-        string getPredName(PredId_t id) const;
+        std::string getPredName(PredId_t id) const;
 
         uint8_t getPredArity(PredId_t id) const;
 
@@ -214,10 +273,10 @@ class EDBLayer {
             return *(predDictionary.get());
         }
 
-        std::unordered_map< PredId_t, uint8_t> getPredicateCardUnorderedMap () {
+        std::unordered_map<PredId_t, uint8_t> getPredicateCardUnorderedMap () {
             std::unordered_map< PredId_t, uint8_t> ret;
             for (auto item : dbPredicates)
-                ret.insert(make_pair(item.first, item.second.arity));
+                ret.insert(std::make_pair(item.first, item.second.arity));
             return ret;
         }
 
@@ -302,7 +361,7 @@ class EDBLayer {
             }
         }
 
-        string getTypeEDBPredicate(PredId_t id) const {
+        std::string getTypeEDBPredicate(PredId_t id) const {
             if (dbPredicates.count(id)) {
                 return dbPredicates.find(id)->second.type;
             } else {

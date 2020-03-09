@@ -171,7 +171,7 @@ size_t QSQR::estimate(int depth, Predicate &pred, BindingsTable *inputTable/*, s
     return output;
 }
 
-void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Rule> &execRules) {
+void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<uint32_t> &execRules) {
 
     LOG(DEBUGL) << "Literal " << l.tostring(program, &layer) << ", depth = " << depth;
 
@@ -191,9 +191,11 @@ void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Ru
 	metrics.estimate += result;
 	metrics.intermediateResults += result;
 	metrics.cost += result;
+	return;
     }
 
     std::vector<Rule> r = program->getAllRulesByPredicate(pred.getId());
+
     for (std::vector<Rule>::iterator itr =
 	    r.begin(); itr != r.end(); ++itr) {
 	Literal head = itr->getHead(0);
@@ -213,11 +215,12 @@ void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Ru
 	vector<Substitution> filteredSubstitutions;
 	for (int i = 0; i < nSubs; i++) {
 	    if (! substitutions[i].destination.isVariable()) {
-		 filteredSubstitutions[filterednSubs++] = substitutions[i];
+		 filteredSubstitutions.push_back(substitutions[i]);
+		 ++filterednSubs;
 	    }
 	}
 
-    estimateRule(m, depth - 1, *itr, filteredSubstitutions, filterednSubs, execRules);
+	estimateRule(m, depth - 1, *itr, filteredSubstitutions, filterednSubs, execRules);
 	metrics.estimate += m.estimate;
 	metrics.intermediateResults += m.intermediateResults;
 	metrics.countRules += m.countRules;
@@ -226,55 +229,61 @@ void QSQR::estimateQuery(Metrics &metrics, int depth, Literal &l, std::vector<Ru
     }
 }
 
-void QSQR::estimateRule(Metrics &metrics, int depth, Rule &rule, vector<Substitution>& subs, int nSubs, std::vector<Rule> &execRules) {
+void QSQR::estimateRule(Metrics &metrics, int depth, Rule &rule, vector<Substitution>& subs, int nSubs, std::vector<uint32_t> &execRules) {
     bool exists = false;
-    for (std::vector<Rule>::iterator itr = execRules.begin(); itr != execRules.end() && ! exists; itr++) {
-	exists = itr->getHead(0) == rule.getHead(0) && itr->getBody() == rule.getBody();
+    for (std::vector<uint32_t>::iterator itr = execRules.begin(); itr != execRules.end() && ! exists; itr++) {
+	exists = *itr == rule.getId();
     }
     if (!exists) {
 	LOG(DEBUGL) << "Adding rule " << rule.tostring(program, &layer);
-	execRules.push_back(rule);
+	execRules.push_back(rule.getId());
     }
     metrics.countRules++;
-    std::vector<Literal> body = rule.getBody();
-    Literal substitutedHead = rule.getHead(0).substitutes(subs);
-    std::vector<uint8_t> headVars = substitutedHead.getAllVars();
-    std::vector<uint8_t> allVars;
     bool noAnswers = false;
-    for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end(); ++itr) {
-	Metrics m;
-	memset(&m, 0, sizeof(Metrics));
-	Literal substituted = itr->substitutes(subs);
-	LOG(DEBUGL) << "Substituted literal = " << substituted.tostring(program, &layer);
-	estimateQuery(m, depth, substituted, execRules);
-	metrics.countRules += m.countRules;
-	metrics.countIntermediateQueries += m.countIntermediateQueries;
-	metrics.cost += m.cost;
-	metrics.cost += m.intermediateResults * metrics.intermediateResults;
+    std::vector<Literal> body = rule.getBody();
+    if (depth > 0) {
+	Literal substitutedHead = rule.getHead(0).substitutes(subs);
+	std::vector<uint8_t> headVars = substitutedHead.getAllVars();
+	std::vector<uint8_t> allVars;
+	for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end(); ++itr) {
+	    Metrics m;
+	    memset(&m, 0, sizeof(Metrics));
+	    Literal substituted = itr->substitutes(subs);
+	    LOG(DEBUGL) << "Substituted literal = " << substituted.tostring(program, &layer);
+	    estimateQuery(m, depth, substituted, execRules);
+	    metrics.countRules += m.countRules;
+	    metrics.countIntermediateQueries += m.countIntermediateQueries;
+	    metrics.cost += m.cost;
+	    metrics.cost += m.intermediateResults * metrics.intermediateResults;
 
-	if (m.estimate == 0) {
-	    // Should only be the case when we are sure...
-	    noAnswers = true;
-	    break;
-	}
+	    if (m.estimate == 0) {
+		// Should only be the case when we are sure...
+		noAnswers = true;
+		break;
+	    }
 
-	// Check for filtering join ...
-	std::vector<uint8_t> newAllVars = substituted.getNewVars(allVars);
-	bool contribution = newAllVars.size() > 0;
-	for (int i = 0; i < newAllVars.size(); i++) {
-	    allVars.push_back(newAllVars[i]);
-	}
-	if (contribution) {
-	    metrics.intermediateResults += m.intermediateResults;
-	    // check if the literal has variables in common with the LHS. If not, no contribution to estimate?
-	    std::vector<uint8_t> shared = substituted.getSharedVars(headVars);
-	    if (shared.size() == 0) {
-		contribution = false;
+	    // Check for filtering join ...
+	    std::vector<uint8_t> newAllVars = substituted.getNewVars(allVars);
+	    bool contribution = newAllVars.size() > 0;
+	    for (int i = 0; i < newAllVars.size(); i++) {
+		allVars.push_back(newAllVars[i]);
+	    }
+	    if (contribution) {
+		metrics.intermediateResults += m.intermediateResults;
+		// check if the literal has variables in common with the LHS. If not, no contribution to estimate?
+		std::vector<uint8_t> shared = substituted.getSharedVars(headVars);
+		if (shared.size() == 0) {
+		    contribution = false;
+		}
+	    }
+	    if (contribution) {
+		metrics.estimate += m.estimate;
 	    }
 	}
-	if (contribution) {
-	    metrics.estimate += m.estimate;
-	}
+    } else {
+	metrics.cost += body.size();
+	metrics.estimate += body.size();
+	metrics.intermediateResults += body.size();
     }
     if (noAnswers) {
 	metrics.estimate = 0;
@@ -293,8 +302,8 @@ void QSQR::evaluate(Predicate &pred, BindingsTable *inputTable,
     do {
         //Create rules
         createRules(pred);
-        for (int i = 0; i < program->getAllRulesByPredicate(pred.getId())->size(); ++i) {
-            RuleExecutor *exec = rules[pred.getId()][pred.getAdornment()][i];
+        for (int i = 0; i < program->getAllRulesByPredicate(pred.getId()).size(); ++i) {
+            RuleExecutor *exec = rules[pred.getId()][pred.getAdorment()][i];
             exec->evaluate(inputTable, offsetInput, this, layer);
         }
 

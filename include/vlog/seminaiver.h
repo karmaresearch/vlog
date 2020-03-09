@@ -64,7 +64,7 @@ class SemiNaiver {
 
 #ifdef WEBINTERFACE
         long statsLastIteration;
-        string currentRule;
+        std::string currentRule;
         PredId_t currentPredicate;
 #endif
 
@@ -163,9 +163,7 @@ class SemiNaiver {
                 size_t limitView,
                 bool fixpoint, unsigned long *timeout = NULL);
 
-        void prepare(std::vector<RuleExecutionDetails> &allrules,
-                size_t lastExecution,
-                int singleRuleToCheck);
+        void prepare(size_t lastExecution, int singleRuleToCheck, std::vector<RuleExecutionDetails> &allrules);
 
         void setIgnoreDuplicatesElimination() {
             ignoreDuplicatesElimination = true;
@@ -243,9 +241,9 @@ class SemiNaiver {
                         while (iitr->hasNext()) {
                             iitr->next();
                             std::string row = "    ";
-                            row += to_string(iitr->getCurrentIteration());
+                            row += std::to_string(iitr->getCurrentIteration());
                             for (uint8_t m = 0; m < sizeRow; ++m) {
-                                row += "\t" + to_string(iitr->getCurrentValue(m));
+                                row += "\t" + std::to_string(iitr->getCurrentValue(m));
                             }
                             os << row << std::endl;
                         }
@@ -308,16 +306,16 @@ class SemiNaiver {
 
         //Statistics methods
 
-        VLIBEXP void printCountAllIDBs(string prefix);
+        VLIBEXP void printCountAllIDBs(std::string prefix);
 
         size_t getCurrentIteration();
 
 #ifdef WEBINTERFACE
-        string getCurrentRule();
+        std::string getCurrentRule();
 
         bool isRunning();
 
-        std::vector<std::pair<string, std::vector<StatsSizeIDB>>> getSizeIDBs();
+        std::vector<std::pair<std::string, std::vector<StatsSizeIDB>>> getSizeIDBs();
 
         std::vector<StatsRule> getOutputNewIterations();
 #endif

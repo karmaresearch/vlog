@@ -13,12 +13,12 @@ bool VLogLayer::lookup(const std::string& text,
     uint64_t longId;
     bool resp = false;
     if (type == ::Type::ID::URI) {
-        string uri = "<" + text + ">";
+        std::string uri = "<" + text + ">";
         resp = edb.getDictNumber(uri.c_str(), uri.size(), longId);
     } else {
         resp = edb.getDictNumber(text.c_str(), text.size(), longId);
         if (! resp) {
-            string tp = "";
+            std::string tp = "";
             switch(type) {
                 case ::Type::ID::String:
                     tp = "http://www.w3.org/2001/XMLSchema#string";
@@ -42,7 +42,7 @@ bool VLogLayer::lookup(const std::string& text,
                     // TODO?
                     break;
             }
-            string txt = "\"" + text + "\"^^<" + tp + ">";
+            std::string txt = "\"" + text + "\"^^<" + tp + ">";
             resp = edb.getDictNumber(txt.c_str(), txt.size(), longId);
         }
     }

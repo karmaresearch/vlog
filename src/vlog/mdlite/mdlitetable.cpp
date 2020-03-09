@@ -14,16 +14,16 @@
 MDLiteCon mdconnection;
 
 /*** Methods implementations ***/
-MDLiteTable::MDLiteTable(string repository, string tablename) {
+MDLiteTable::MDLiteTable(std::string repository, std::string tablename) {
     this->tablename = tablename;
     arity = 0;
-    string schemaFile = repository + "/" + tablename + ".schema";
+    std::string schemaFile = repository + "/" + tablename + ".schema";
     ifstream ifs;
     ifs.open(schemaFile);
-    string line;
+    std::string line;
     while (std::getline(ifs, line)) {
         auto delim = line.find(':');
-        string varname = line.substr(0, delim);
+        std::string varname = line.substr(0, delim);
         varnames.push_back(varname);
         arity++;
     }

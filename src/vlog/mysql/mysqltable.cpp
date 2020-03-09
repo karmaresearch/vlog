@@ -11,8 +11,8 @@
 #include <unistd.h>
 #include <string>
 
-MySQLTable::MySQLTable(PredId_t predid, string host, string user, string pwd, string dbname,
-                       string tablename, string tablefields, EDBLayer *layer)
+MySQLTable::MySQLTable(PredId_t predid, std::string host, std::string user, std::string pwd,
+        std::string dbname, std::string tablename, std::string tablefields, EDBLayer *layer)
 	: SQLTable(predid, tablename, tablefields, layer) {
     con = NULL;
     driver = get_driver_instance();

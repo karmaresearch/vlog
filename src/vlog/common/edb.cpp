@@ -20,6 +20,8 @@
 #include <vlog/sparql/sparqltable.h>
 #endif
 #include <vlog/inmemory/inmemorytable.h>
+#include <vlog/embeddings/embtable.h>
+#include <vlog/embeddings/topktable.h>
 #include <vlog/incremental/edb-table-from-idb.h>
 #include <vlog/incremental/edb-table-importer.h>
 
@@ -44,8 +46,8 @@ std::vector<PredId_t> EDBLayer::getAllEDBPredicates() {
 
 void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithreaded) {
     EDBInfoTable infot;
-    const string pn = tableConf.predname;
-    const string kbpath = tableConf.params[0];
+    const std::string pn = tableConf.predname;
+    const std::string kbpath = tableConf.params[0];
     if (!Utils::exists(kbpath) || !Utils::exists(kbpath + DIR_SEP + "p0")) {
         LOG(ERRORL) << "The KB at " << kbpath << " does not exist. Check the edb.conf file.";
         throw 10;
@@ -62,7 +64,7 @@ void EDBLayer::addTridentTable(const EDBConf::Table &tableConf, bool multithread
 #ifdef MYSQL
 void EDBLayer::addMySQLTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
-    const string pn = tableConf.predname;
+    const std::string pn = tableConf.predname;
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.arity = 3;
     infot.type = tableConf.type;
@@ -76,7 +78,7 @@ void EDBLayer::addMySQLTable(const EDBConf::Table &tableConf) {
 #ifdef ODBC
 void EDBLayer::addODBCTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
-    const string pn = tableConf.predname;
+    const std::string pn = tableConf.predname;
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.arity = 3;
     infot.type = tableConf.type;
@@ -90,7 +92,7 @@ void EDBLayer::addODBCTable(const EDBConf::Table &tableConf) {
 #ifdef MAPI
 void EDBLayer::addMAPITable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
-    const string pn = tableConf.predname;
+    const std::string pn = tableConf.predname;
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.arity = 3;
     infot.type = tableConf.type;
@@ -104,7 +106,7 @@ void EDBLayer::addMAPITable(const EDBConf::Table &tableConf) {
 #ifdef MDLITE
 void EDBLayer::addMDLiteTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
-    const string pn = tableConf.predname;
+    const std::string pn = tableConf.predname;
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.type = tableConf.type;
     MDLiteTable *table = new MDLiteTable(infot.id, tableConf.params[0], tableConf.params[1], this);
@@ -116,7 +118,7 @@ void EDBLayer::addMDLiteTable(const EDBConf::Table &tableConf) {
 
 void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
-    const string pn = tableConf.predname;
+    const std::string pn = tableConf.predname;
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.type = tableConf.type;
     string repository = tableConf.params[0];
@@ -165,7 +167,6 @@ void EDBLayer::addInmemoryTable(std::string predicate, PredId_t id, std::vector<
     // table->dump(std::cerr);
 }
 
-
 void EDBLayer::addInmemoryTable(PredId_t id,
         uint8_t arity,
         std::vector<uint64_t> &rows) {
@@ -185,7 +186,7 @@ void EDBLayer::addInmemoryTable(PredId_t id,
 #ifdef SPARQL
 void EDBLayer::addSparqlTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
-    const string predicate = tableConf.predname;
+    const std::string predicate = tableConf.predname;
     infot.id = (PredId_t) predDictionary->getOrAdd(predicate);
     if (doesPredExists(infot.id)) {
         LOG(WARNL) << "Rewriting table for predicate " << predicate;
@@ -199,6 +200,37 @@ void EDBLayer::addSparqlTable(const EDBConf::Table &tableConf) {
 }
 #endif
 
+void EDBLayer::addEmbTable(const EDBConf::Table &tableConf) {
+    EDBInfoTable infot;
+    const std::string predicate = tableConf.predname;
+    infot.id = (PredId_t) predDictionary->getOrAdd(predicate);
+    if (doesPredExists(infot.id)) {
+        LOG(WARNL) << "Rewriting table for predicate " << predicate;
+        dbPredicates.erase(infot.id);
+    }
+    infot.type = "Embeddings";
+    EmbTable *table = new EmbTable(infot.id, predicate, this,
+            tableConf.params[0], tableConf.params[1], tableConf.params[2]);
+    infot.arity = table->getArity();
+    infot.manager = std::shared_ptr<EDBTable>(table);
+    dbPredicates.insert(make_pair(infot.id, infot));
+}
+
+void EDBLayer::addTopKTable(const EDBConf::Table &tableConf) {
+    EDBInfoTable infot;
+    const std::string predicate = tableConf.predname;
+    infot.id = (PredId_t) predDictionary->getOrAdd(predicate);
+    if (doesPredExists(infot.id)) {
+        LOG(WARNL) << "Rewriting table for predicate " << predicate;
+        dbPredicates.erase(infot.id);
+    }
+    infot.type = "TopK";
+    TopKTable *table = new TopKTable(infot.id, this, tableConf.params[0],
+            tableConf.params[1], tableConf.params[2], tableConf.params[3]);
+    infot.arity = table->getArity();
+    infot.manager = std::shared_ptr<EDBTable>(table);
+    dbPredicates.insert(make_pair(infot.id, infot));
+}
 void EDBLayer::addEDBonIDBTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
     const string pn = tableConf.predname;
@@ -257,6 +289,8 @@ void EDBLayer::query(QSQQuery *query, TupleTable *outputTable,
     if (dbPredicates.count(predid)) {
         auto el = dbPredicates.find(predid);
         el->second.manager->query(query, outputTable, posToFilter, valuesToFilter);
+    } else if (tmpRelations.size() <= predid) {
+        // nothing
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
         uint8_t size = rel->getSizeTuple();
@@ -488,6 +522,8 @@ EDBIterator *EDBLayer::getIterator(const Literal &query) {
             return itr;
         }
 
+    } else if (tmpRelations.size() <= predid) {
+        return new EmptyEDBIterator(predid);
     } else {
         bool equalFields = query.hasRepeatedVars();
         IndexedTupleTable *rel = tmpRelations[predid];
@@ -541,7 +577,9 @@ EDBIterator *EDBLayer::getSortedIterator(const Literal &query,
         } else {
             LOG(DEBUGL) << "EDBLayer=" << name << " No wrap of an EDBRemovalIterator for " << literal->tostring();
         }
-
+        return itr;
+    } else if (tmpRelations.size() <= predid) {
+        return new EmptyEDBIterator(predid);
     } else {
         bool equalFields = false;
         if (query.hasRepeatedVars()) {
@@ -601,6 +639,8 @@ size_t EDBLayer::getCardinalityColumn(const Literal &query,
     if (dbPredicates.count(predid)) {
         auto p = dbPredicates.find(predid);
         return p->second.manager->getCardinalityColumn(query, posColumn);
+    } else if (tmpRelations.size() <= predid) {
+        return 0;
     } else {
         // throw 10;
         IndexedTupleTable *rel = tmpRelations[predid];
@@ -614,6 +654,8 @@ size_t EDBLayer::getCardinality(const Literal &query) {
     if (dbPredicates.count(predid)) {
         auto p = dbPredicates.find(predid);
         return p->second.manager->getCardinality(query);
+    } else if (tmpRelations.size() <= predid) {
+        return 0;
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
         if (literal->getNVars() == literal->getTupleSize()) {
@@ -665,6 +707,8 @@ size_t EDBLayer::estimateCardinality(const Literal &query) {
     if (dbPredicates.count(predid)) {
         auto p = dbPredicates.find(predid);
         return p->second.manager->estimateCardinality(query);
+    } else if (tmpRelations.size() <= predid) {
+        return 0;
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
         return rel->getNTuples();
@@ -678,6 +722,8 @@ bool EDBLayer::isEmpty(const Literal &query, std::vector<uint8_t> *posToFilter,
     if (dbPredicates.count(predid)) {
         auto p = dbPredicates.find(predid);
         return p->second.manager->isEmpty(query, posToFilter, valuesToFilter);
+    } else if (tmpRelations.size() <= predid) {
+        return true;
     } else {
         IndexedTupleTable *rel = tmpRelations[predid];
         if (!rel) {
@@ -783,8 +829,7 @@ void EDBLayer::releaseIterator(EDBIterator * itr) {
 }
 
 std::vector<std::shared_ptr<Column>> EDBLayer::checkNewIn(
-        std::vector <
-        std::shared_ptr<Column >> &valuesToCheck,
+        std::vector<std::shared_ptr<Column>> &valuesToCheck,
         const Literal &l,
         std::vector<uint8_t> &posInL) {
     if (!dbPredicates.count(l.getPredicate().getId())) {
@@ -998,6 +1043,20 @@ bool EDBLayer::getOrAddDictNumber(const char *text, const size_t sizeText,
 }
 
 bool EDBLayer::getDictText(const uint64_t id, char *text) const {
+    if (IS_NUMBER(id)) {
+        if (IS_UINT(id)) {
+            uint64_t value = GET_UINT(id);
+            sprintf(text,"%llu",value);
+            return true;
+        } else if (IS_FLOAT32(id)) {
+            float value = GET_FLOAT32(id);
+            sprintf(text,"%f",value);
+            return true;
+        } else {
+            LOG(ERRORL) << "Datatype for " << id << " was not found";
+            return false;
+        }
+    }
     bool resp = false;
     if (dbPredicates.size() > 0) {
         resp = dbPredicates.begin()->second.manager->getDictText(id, text);
@@ -1014,6 +1073,19 @@ bool EDBLayer::getDictText(const uint64_t id, char *text) const {
 }
 
 std::string EDBLayer::getDictText(const uint64_t id) const {
+   if (IS_NUMBER(id)) {
+        if (IS_UINT(id)) {
+            uint64_t value = GET_UINT(id);
+            return std::to_string(value);
+        } else if (IS_FLOAT32(id)) {
+            float value = GET_FLOAT32(id);
+            return std::to_string(value);
+        } else {
+            LOG(ERRORL) << "Datatype for " << id << " was not found";
+            return "";
+        }
+    }
+
     std::string t = "";
     bool resp = false;
     if (dbPredicates.size() > 0) {
@@ -1059,14 +1131,14 @@ uint64_t EDBLayer::getPredSize(PredId_t id) const {
     return 0;
 }
 
-string EDBLayer::getPredType(PredId_t id) const {
+std::string EDBLayer::getPredType(PredId_t id) const {
     if (dbPredicates.count(id)) {
         return dbPredicates.at(id).type;
     }
     return 0;
 }
 
-string EDBLayer::getPredName(PredId_t id) const {
+std::string EDBLayer::getPredName(PredId_t id) const {
     if (dbPredicates.count(id)) {
         return predDictionary->getRawValue(id);
     }
@@ -1282,7 +1354,7 @@ std::vector<std::shared_ptr<Column>> EDBTable::checkNewIn(const Literal &l1,
 
 std::vector<std::shared_ptr<Column>> EDBTable::checkNewIn(
         std::vector <
-        std::shared_ptr<Column >> &checkValues,
+        std::shared_ptr<Column>> &checkValues,
         const Literal &l,
         std::vector<uint8_t> &posInL) {
 

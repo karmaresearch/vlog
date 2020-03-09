@@ -2,6 +2,7 @@
 #include <trident/model/table.h>
 
 #include <cstring>
+#include <algorithm>
 
 Term_t const * const EMPTY_TUPLE = {0};
 BindingsRow EMPTY_ROW(0, EMPTY_TUPLE);
@@ -377,7 +378,7 @@ std::vector<Term_t> BindingsTable::getUniqueSortedProjection(std::vector<uint8_t
         const uint8_t p2 = pos[1];
         for (int i = 0; i < size; ++i) {
             Term_t *startTuple = rawBindings->getOffset(i * nPosToCopy);
-            pairs.push_back(make_pair(startTuple[p1], startTuple[p2]));
+            pairs.push_back(std::make_pair(startTuple[p1], startTuple[p2]));
         }
         sort(pairs.begin(), pairs.end());
         outputVector.push_back(pairs[0].first);
@@ -420,8 +421,8 @@ void BindingsTable::print() {
     for (int i = 0; i < size; ++i) {
         Term_t *startTuple = rawBindings->getOffset(i * nPosToCopy);
         for (int j = 0; j < nPosToCopy; ++j)
-            cout << startTuple[j] << " ";
-        cout << endl;
+            std::cout << startTuple[j] << " ";
+        std::cout << std::endl;
     }
 }
 

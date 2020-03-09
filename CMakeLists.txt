@@ -53,6 +53,7 @@ file(GLOB vlog_SRC
     "src/vlog/forward/*.cpp"
     "src/vlog/magic/*.cpp"
     "src/vlog/incremental/*.cpp"
+    "src/vlog/embeddings/*.cpp"
     "src/vlog/inmemory/*.cpp"
     "src/vlog/trident/*.cpp"
     "src/vlog/cycles/*.cpp"
@@ -90,9 +91,7 @@ ELSE()
         DOWNLOAD_DIR .
         SOURCE_DIR trident
         BUILD_IN_SOURCE 1
-        CMAKE_ARGS 
-		-DSPARQL=1
-		-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+        CMAKE_ARGS "-DSPARQL=1" "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
         INSTALL_COMMAND ""
         )
     ExternalProject_Get_Property(git-trident SOURCE_DIR)
@@ -125,19 +124,19 @@ IF (${sparsehash} STREQUAL "sparsehash-NOTFOUND")
 ENDIF()
 
 #LZ4
-find_library(lz4 lz4)
-find_path(lz4h lz4.h)
-IF (${lz4h} STREQUAL "lz4h-NOTFOUND")
-#    message("Could not find LZ4. I'm going to use the version from kognac")
+# find_library(lz4 lz4)
+# find_path(lz4h lz4.h)
+# IF (${lz4h} STREQUAL "lz4h-NOTFOUND")
+#     message("Could not find LZ4. I'm going to use the version from kognac")
     message("I'm going to use LZ4 the version from kognac")
     include_directories(${KOGNAC_LIB}/external/lz4/lib/)
     LINK_DIRECTORIES(${KOGNAC_LIB}/external/lz4/lib)
     add_library(lz4 STATIC IMPORTED)
     set_property(TARGET lz4 PROPERTY IMPORTED_LOCATION ${KOGNAC_LIB}/external/lz4/lib/${CMAKE_STATIC_LIBRARY_PREFIX}lz4${CMAKE_STATIC_LIBRARY_SUFFIX})
-ELSE()
-    include_directories(lz4h)
-    message("-- Found LZ4")
-ENDIF()
+# ELSE()
+# include_directories(lz4h)
+#    message("-- Found LZ4")
+# ENDIF()
 
 IF (JAVA)
     find_package(Java REQUIRED)
@@ -175,6 +174,8 @@ IF(MAPI)
 ENDIF()
 
 IF(SPARQL)
+    find_package(CURL REQUIRED)
+    include_directories(${CURL_INCLUDE_DIR})
     file(GLOB vlog_sparqlSRC "src/vlog/sparql/*.cpp")
     set(vlog_SRC ${vlog_sparqlSRC} ${vlog_SRC})
     set(COMPILE_FLAGS "${COMPILE_FLAGS} -DSPARQL=1")

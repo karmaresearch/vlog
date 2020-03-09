@@ -11,11 +11,11 @@ private:
     Mapi con;
 
 public:
-    MAPITable(PredId_t predid, string host, int port,
-                        string user, string pwd, string dbname,
-                        string tablename, string tablefields, EDBLayer *layer);
+    MAPITable(PredId_t predid, std::string host, int port,
+                        std::string user, std::string pwd, std::string dbname,
+                        std::string tablename, std::string tablefields, EDBLayer *layer);
 
-    static MapiHdl doquery(Mapi dbh, string q);
+    static MapiHdl doquery(Mapi dbh, std::string q);
 
     void executeQuery(const std::string &query, SegmentInserter *inserter);
 

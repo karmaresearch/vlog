@@ -30,9 +30,9 @@ private:
 public:
     Exporter(std::shared_ptr<SemiNaiver> sn) : sn(sn) {}
 
-    VLIBEXP void generateTridentDiffIndex(string outputdir);
+    VLIBEXP void generateTridentDiffIndex(std::string outputdir);
 
-    //void generateTridentDiffIndexTabByTab(string outputdir);
+    //void generateTridentDiffIndexTabByTab(std::string outputdir);
 
-    VLIBEXP void generateNTTriples(string outputdir, bool decompress);
+    VLIBEXP void generateNTTriples(std::string outputdir, bool decompress);
 };
