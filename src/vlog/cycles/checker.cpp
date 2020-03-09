@@ -335,6 +335,10 @@ bool Checker::RMSA(Program &originalProgram) {
             &rewrittenPrg, true, true, false, TypeChase::SUM_RESTRICTED_CHASE, 1, 0, false);
     sn->checkAcyclicity(-1, specialPredId); //run(0, 1, NULL);
 
+    if (sn->isFoundCyclicTerms()) {
+	return false;
+    }
+
     //Parse the content of the special relation. If we find a cycle, then we stop
     bool foundCycles = false;
     auto itr = sn->getTable(specialPredTransId);

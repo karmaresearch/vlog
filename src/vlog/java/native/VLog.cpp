@@ -581,6 +581,22 @@ extern "C" {
 		return iter;
 	}
 
+    static int numberOfUniqueVars(JNIEnv *env, jlongArray els) {
+        std::vector<uint8_t> vars;
+        jsize sz = env->GetArrayLength(els);
+        jlong *e = env->GetLongArrayElements(els, NULL);
+        uint8_t varId;
+        for (int i = 0; i < sz; i++) {
+            if (e[i] < 0) {
+                varId = (uint8_t) -e[i];
+                if(std::find(vars.begin(), vars.end(), varId) == vars.end()) {
+                    vars.push_back(varId);
+                }
+            }
+        }
+        return vars.size();
+    }
+
 	/*
 	 * Class:     karmaresearch_vlog_VLog
 	 * Method:    query
@@ -602,6 +618,62 @@ extern "C" {
 
 		return jobj;
 	}
+
+/*
+* Class:     karmaresearch_vlog_VLog
+* Method:    nativeQuerySize
+* Signature: (I[JZZ)J;
+*/
+JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_nativeQuerySize(JNIEnv * env, jobject obj, jint p, jlongArray els, jboolean includeConstants, jboolean filterBlanks) {
+    jlong result = 0;
+    VLogInfo *f = getVLogInfo(env, obj);
+    if (f == NULL || f->program == NULL) {
+        throwNotStartedException(env, "VLog is not started yet");
+        return result;
+    }
+    if (p == -1) {
+        throwNonExistingPredicateException(env, "Query contains non-existing predicate");
+        return result;
+    }
+    Predicate pred = f->program->getPredicate((PredId_t) p);
+
+    if ((pred.getCardinality() == numberOfUniqueVars(env, els)) && !filterBlanks) {
+        if (pred.getType() == EDB) {
+            return f->layer->getPredSize(p);
+        } else if (f->sn != NULL) {
+            return f->sn->getSizeTable(p);
+        } else {
+            // pred.getType()==IDB and f->sn==NULL
+            throwNotStartedException(env, "Materialization has not run yet");
+            return result;
+        }
+    } else {
+        TupleIterator *iter = getQueryIter(env, obj, (PredId_t) p, els, (jboolean) includeConstants);
+        if (iter == NULL) {
+            return result;
+        }
+        size_t sz = iter->getTupleSize();
+        while (iter->hasNext()) {
+            iter->next();
+            if (filterBlanks) {
+                bool filterOut = false;
+                for (int i = 0; i < sz; i++) {
+                    if (IS_BLANK(iter->getElementAt(i))) {
+                        filterOut = true;
+                        break;
+                    }
+                }
+                if (!filterOut) {
+                    ++result;
+                }
+            }
+            else {
+                ++result;
+            }
+        }
+        return result;
+    }
+}
 
 
 	/*
