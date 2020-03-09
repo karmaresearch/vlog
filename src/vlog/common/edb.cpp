@@ -20,6 +20,8 @@
 #include <vlog/sparql/sparqltable.h>
 #endif
 #include <vlog/inmemory/inmemorytable.h>
+#include <vlog/embeddings/embtable.h>
+#include <vlog/embeddings/topktable.h>
 #include <vlog/incremental/edb-table-from-idb.h>
 #include <vlog/incremental/edb-table-importer.h>
 
@@ -165,7 +167,6 @@ void EDBLayer::addInmemoryTable(std::string predicate, PredId_t id, std::vector<
     // table->dump(std::cerr);
 }
 
-
 void EDBLayer::addInmemoryTable(PredId_t id,
         uint8_t arity,
         std::vector<uint64_t> &rows) {
@@ -199,6 +200,37 @@ void EDBLayer::addSparqlTable(const EDBConf::Table &tableConf) {
 }
 #endif
 
+void EDBLayer::addEmbTable(const EDBConf::Table &tableConf) {
+    EDBInfoTable infot;
+    const std::string predicate = tableConf.predname;
+    infot.id = (PredId_t) predDictionary->getOrAdd(predicate);
+    if (doesPredExists(infot.id)) {
+        LOG(WARNL) << "Rewriting table for predicate " << predicate;
+        dbPredicates.erase(infot.id);
+    }
+    infot.type = "Embeddings";
+    EmbTable *table = new EmbTable(infot.id, predicate, this,
+            tableConf.params[0], tableConf.params[1], tableConf.params[2]);
+    infot.arity = table->getArity();
+    infot.manager = std::shared_ptr<EDBTable>(table);
+    dbPredicates.insert(make_pair(infot.id, infot));
+}
+
+void EDBLayer::addTopKTable(const EDBConf::Table &tableConf) {
+    EDBInfoTable infot;
+    const std::string predicate = tableConf.predname;
+    infot.id = (PredId_t) predDictionary->getOrAdd(predicate);
+    if (doesPredExists(infot.id)) {
+        LOG(WARNL) << "Rewriting table for predicate " << predicate;
+        dbPredicates.erase(infot.id);
+    }
+    infot.type = "TopK";
+    TopKTable *table = new TopKTable(infot.id, this, tableConf.params[0],
+            tableConf.params[1], tableConf.params[2], tableConf.params[3]);
+    infot.arity = table->getArity();
+    infot.manager = std::shared_ptr<EDBTable>(table);
+    dbPredicates.insert(make_pair(infot.id, infot));
+}
 void EDBLayer::addEDBonIDBTable(const EDBConf::Table &tableConf) {
     EDBInfoTable infot;
     const string pn = tableConf.predname;
@@ -1011,6 +1043,20 @@ bool EDBLayer::getOrAddDictNumber(const char *text, const size_t sizeText,
 }
 
 bool EDBLayer::getDictText(const uint64_t id, char *text) const {
+    if (IS_NUMBER(id)) {
+        if (IS_UINT(id)) {
+            uint64_t value = GET_UINT(id);
+            sprintf(text,"%llu",value);
+            return true;
+        } else if (IS_FLOAT32(id)) {
+            float value = GET_FLOAT32(id);
+            sprintf(text,"%f",value);
+            return true;
+        } else {
+            LOG(ERRORL) << "Datatype for " << id << " was not found";
+            return false;
+        }
+    }
     bool resp = false;
     if (dbPredicates.size() > 0) {
         resp = dbPredicates.begin()->second.manager->getDictText(id, text);
@@ -1027,6 +1073,19 @@ bool EDBLayer::getDictText(const uint64_t id, char *text) const {
 }
 
 std::string EDBLayer::getDictText(const uint64_t id) const {
+   if (IS_NUMBER(id)) {
+        if (IS_UINT(id)) {
+            uint64_t value = GET_UINT(id);
+            return std::to_string(value);
+        } else if (IS_FLOAT32(id)) {
+            float value = GET_FLOAT32(id);
+            return std::to_string(value);
+        } else {
+            LOG(ERRORL) << "Datatype for " << id << " was not found";
+            return "";
+        }
+    }
+
     std::string t = "";
     bool resp = false;
     if (dbPredicates.size() > 0) {

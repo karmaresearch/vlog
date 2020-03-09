@@ -1136,9 +1136,9 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
 }
 
 void checkAcyclicity(std::string ruleFile, std::string alg, EDBLayer &db, bool rewriteMultihead) {
-	std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
     int response = Checker::checkFromFile(ruleFile, alg, db, rewriteMultihead);
-	std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
     std::cout << "The response is: ";
     if (response == 0) {
         std::cout << "Unknown";
@@ -1148,8 +1148,8 @@ void checkAcyclicity(std::string ruleFile, std::string alg, EDBLayer &db, bool r
         std::cout << "Does not always terminate.";
     }
     std::cout << std::endl;
-	std::cout << "Runtime " << alg << " check = " <<
-                sec.count() * 1000 << " milliseconds" << std::endl;
+    std::cout << "Runtime " << alg << " check = " <<
+        sec.count() * 1000 << " milliseconds" << std::endl;
 }
 
 void detectDeps(std::string ruleFile, EDBLayer &db) {

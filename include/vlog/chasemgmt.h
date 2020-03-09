@@ -64,7 +64,7 @@ class ChaseMgmt {
                 uint64_t *currentblock;
                 std::unordered_map<ChaseRow, uint64_t, hash_ChaseRow> rows;
                 TypeChase typeChase;
-				std::set<uint64_t> deps;	// For SUM chases.
+                std::set<uint64_t> deps;    // For SUM chases.
 
             public:
                 Rows(uint64_t startCounter, uint8_t sizerow,
