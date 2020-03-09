@@ -916,7 +916,7 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
     std::string predicate = trim(l.substr(0, posBeginTuple));
     if (predicate.substr(0,1) == "~") {
         negated = true;
-        predicate = trim(l.substr(1));
+        predicate = trim(predicate.substr(1));
     }
     std::string tuple = l.substr(posBeginTuple + 1, std::string::npos);
     if (tuple[tuple.size() - 1] != ')') {

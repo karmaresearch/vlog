@@ -1584,7 +1584,11 @@ FCIterator SemiNaiver::getTable(const PredId_t predid) {
 }
 
 size_t SemiNaiver::getSizeTable(const PredId_t predid) const {
-    return predicatesTables[predid]->getNAllRows();
+    if (predicatesTables[predid] != NULL) {
+        return predicatesTables[predid]->getNAllRows();
+    } else {
+        return 0;
+    }
 }
 
 SemiNaiver::~SemiNaiver() {
