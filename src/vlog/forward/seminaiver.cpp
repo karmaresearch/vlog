@@ -1324,6 +1324,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 std::chrono::system_clock::time_point startFirstA = std::chrono::system_clock::now();
                 // if (lastLiteral || bodyLiteral->getNVars() > 0) {
                 if (lastLiteral
+                        || plan.sizeOutputRelation[optimalOrderIdx] != 0
                         || plan.posFromFirst[optimalOrderIdx].size() > 0
                         || plan.joinCoordinates[optimalOrderIdx].size() > 0) {
                     processRuleFirstAtom(nBodyLiterals, bodyLiteral,
