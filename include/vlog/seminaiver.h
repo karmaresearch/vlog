@@ -222,7 +222,7 @@ class SemiNaiver {
 
         VLIBEXP FCIterator getTable(const PredId_t predid);
 
-        size_t getSizeTable(const PredId_t predid) const;
+        VLIBEXP size_t getSizeTable(const PredId_t predid) const;
 
         std::vector<FCBlock> &getDerivationsSoFar() {
             return listDerivations;
