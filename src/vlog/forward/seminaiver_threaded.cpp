@@ -249,7 +249,7 @@ void SemiNaiverThreaded::saveDerivationIntoDerivationList(FCTable *endTable) {
     SemiNaiver::saveDerivationIntoDerivationList(endTable);
 }
 
-long SemiNaiverThreaded::getNLastDerivationsFromList() {
+size_t SemiNaiverThreaded::getNLastDerivationsFromList() {
     std::lock_guard<std::mutex> lock(mutexListDer);
     return SemiNaiver::getNLastDerivationsFromList();
 }

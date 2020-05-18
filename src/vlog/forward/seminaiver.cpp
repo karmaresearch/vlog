@@ -1454,7 +1454,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     return prodDer;
 }
 
-long SemiNaiver::getNLastDerivationsFromList() {
+size_t SemiNaiver::getNLastDerivationsFromList() {
     return listDerivations.back().table->getNRows();
 }
 
@@ -1612,11 +1612,11 @@ SemiNaiver::~SemiNaiver() {
 }
 
 size_t SemiNaiver::countAllIDBs() {
-    long c = 0;
+    size_t c = 0;
     for (PredId_t i = 0; i < program->getNPredicates(); ++i) {
         if (predicatesTables[i] != NULL) {
             if (program->isPredicateIDB(i)) {
-                long count = predicatesTables[i]->getNAllRows();
+                size_t count = predicatesTables[i]->getNAllRows();
                 c += count;
             }
         }
@@ -1646,7 +1646,7 @@ std::vector<std::pair<string, std::vector<StatsSizeIDB>>> SemiNaiver::getSizeIDB
                     out.push_back(std::make_pair(program->getPredicateName(i), stats));
                 }
 
-                //long count = predicatesTables[i]->getNAllRows();
+                //size_t count = predicatesTables[i]->getNAllRows();
                 //out.push_back(std::make_pair(program->getPredicateName(i), count));
             }
         }
@@ -1656,12 +1656,12 @@ std::vector<std::pair<string, std::vector<StatsSizeIDB>>> SemiNaiver::getSizeIDB
 #endif
 
 void SemiNaiver::printCountAllIDBs(std::string prefix) {
-    long c = 0;
+    size_t c = 0;
     long emptyRel = 0;
     for (PredId_t i = 0; i < program->getNPredicates(); ++i) {
         if (predicatesTables[i] != NULL) {
             if (program->isPredicateIDB(i)) {
-                long count = predicatesTables[i]->getNAllRows();
+                size_t count = predicatesTables[i]->getNAllRows();
                 if (count == 0) {
                     emptyRel++;
                 }

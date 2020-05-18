@@ -94,7 +94,7 @@ class SemiNaiverThreaded: public SemiNaiver {
         }
 
     protected:
-        long getNLastDerivationsFromList();
+        size_t getNLastDerivationsFromList();
 
         void saveDerivationIntoDerivationList(FCTable *endTable);
 

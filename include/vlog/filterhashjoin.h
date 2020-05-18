@@ -19,7 +19,7 @@ struct FilterHashJoinSorter {
 
     bool operator() (const Term_t *r1, const Term_t *r2) const {
         for (uint8_t i = 0; i < nfields; ++i) {
-            long diff = r1[fields[i]] - r2[fields[i]];
+            int64_t diff = r1[fields[i]] - r2[fields[i]];
             if (diff < 0)
                 return true;
             else if (diff > 0)
