@@ -194,8 +194,8 @@ class InterTableJoinProcessor: public ResultJoinProcessor {
     private:
         uint32_t currentSegmentSize;
         std::shared_ptr<SegmentInserter> *segments;
-
         std::shared_ptr<const FCInternalTable> table;
+        bool nonEmptyZeroRowsize;
 
         void enlargeArray(const uint32_t blockid) {
             if (blockid >= currentSegmentSize) {
@@ -220,12 +220,17 @@ class InterTableJoinProcessor: public ResultJoinProcessor {
             enlargeArray(blockid);
             if (rowsize == 0) {
                 LOG(DEBUGL) << "Added empty row!";
+                nonEmptyZeroRowsize = true;
             }
             segments[blockid]->addRow(row, rowsize);
         }
 #endif
 
     public:
+
+        bool getNonEmptyZeroRowsize() {
+            return nonEmptyZeroRowsize;
+        }
 
 #if DEBUG
         void checkSizes() const {

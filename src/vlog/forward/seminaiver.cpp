@@ -1215,7 +1215,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 
         /*******************************************************************/
 
-        std::shared_ptr<const FCInternalTable> currentResults;
+        std::shared_ptr<const FCInternalTable> currentResults = NULL;
         int optimalOrderIdx = 0;
 
         bool first = true;
@@ -1320,13 +1320,16 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             LOG(DEBUGL) << "Evaluating atom " << optimalOrderIdx << " " << bodyLiteral->tostring() <<
                 " min=" << min << " max=" << max;
 
-            if (first) {
-                std::chrono::system_clock::time_point startFirstA = std::chrono::system_clock::now();
-                // if (lastLiteral || bodyLiteral->getNVars() > 0) {
+            if (first || currentResults == NULL) {
+                // Added the case "currentResults == NULL", which may occur when part of a body is processed,
+                // but this part does not contribute anything to the rest of the processing of the rule.
+                // In that case, we process the rest of the body  as if we begin a new body.
+                // --Ceriel
                 if (lastLiteral
                         || plan.sizeOutputRelation[optimalOrderIdx] != 0
                         || plan.posFromFirst[optimalOrderIdx].size() > 0
                         || plan.joinCoordinates[optimalOrderIdx].size() > 0) {
+                    std::chrono::system_clock::time_point startFirstA = std::chrono::system_clock::now();
                     processRuleFirstAtom(nBodyLiterals, bodyLiteral,
                             heads, min, max, processedTables,
                             lastLiteral,
@@ -1369,9 +1372,11 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 durationConsolidation += d;
             }
 
+            bool notEmptyZeroRowsize = false;
             //Prepare for the processing of the next atom (if any)
             if (!lastLiteral && !first) {
                 currentResults = ((InterTableJoinProcessor*)joinOutput)->getTable();
+                notEmptyZeroRowsize = ((InterTableJoinProcessor*)joinOutput)->getNonEmptyZeroRowsize();
             }
             if (lastLiteral && finalResultContainer) {
                 finalResultContainer->push_back(joinOutput);
@@ -1380,7 +1385,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
             }
             optimalOrderIdx++;
 
-            if (!lastLiteral && ! first && (currentResults == NULL ||
+            if (!lastLiteral && ! first && ! notEmptyZeroRowsize && (currentResults == NULL ||
                         currentResults->isEmpty())) {
                 LOG(DEBUGL) << "The evaluation of atom " <<
                     (optimalOrderIdx - 1) << " returned no result";
