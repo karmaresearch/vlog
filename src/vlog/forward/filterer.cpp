@@ -326,6 +326,10 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
         }
         VTerm tAtCurQuery = currentQuery.getTermAtPos(posLit_second);
         uint8_t idVarCurQuery = tAtCurQuery.getId();
+        if (idVarCurQuery == 0) {
+            // Giving up
+            return false;
+        }
         for (int i = 0; i < nsubs; ++i) {
             if (subs[i].origin == idVarCurQuery) {
                 idVarCurQuery = subs[i].destination.getId();
@@ -334,9 +338,24 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
         const Literal childCurrentQuery = blockRule.getBody()[0].substitutes(
                 subs);
         uint8_t childPosLit_second;
+        bool found = false;
         for (int i = 0; i < childCurrentQuery.getTupleSize(); ++i) {
-            if (childCurrentQuery.getTermAtPos(i).getId() == idVarCurQuery)
+            if (childCurrentQuery.getTermAtPos(i).getId() == idVarCurQuery) {
                 childPosLit_second = i;
+                found = true;
+            }
+        }
+        if (! found) {
+            // Giving up.
+            return false;
+            // LOG(ERRORL) << "May use uninitialized variable childPosLit_second";
+            // LOG(ERRORL) << "posHead_first = " << posHead_first << ", posLit_second = " << posLit_second;
+            // LOG(ERRORL) << "idVarCurQuery = " << (int) idVarCurQuery;
+            // LOG(ERRORL) << "nsubs = " << nsubs;
+            // LOG(ERRORL) << "Rule = " << blockRule.tostring();
+            // LOG(ERRORL) << "currentQuery = " << currentQuery.tostring();
+            // LOG(ERRORL) << "outputQuery = " << outputQuery.tostring();
+            // LOG(ERRORL) << "childCurrentQuery = " << childCurrentQuery.tostring();
         }
         /*** End ***/
 
@@ -346,6 +365,10 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
                 blockRule.getFirstHead(), outputQuery);
         VTerm tAtOutQuery = outputQuery.getTermAtPos(posHead_first);
         uint8_t idVarOutQuery = tAtOutQuery.getId();
+        if (idVarOutQuery == 0) {
+            // Giving up
+            return false;
+        }
         for (int i = 0; i < nsubs2; ++i) {
             if (subs2[i].origin == idVarOutQuery) {
                 idVarOutQuery = subs2[i].destination.getId();
@@ -354,9 +377,24 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
         const Literal childOutputQuery = blockRule.getBody()[0].substitutes(
                 subs2);
         uint8_t childPosHead_first;
+        found = false;
         for (int i = 0; i < childOutputQuery.getTupleSize(); ++i) {
-            if (childOutputQuery.getTermAtPos(i).getId() == idVarOutQuery)
+            if (childOutputQuery.getTermAtPos(i).getId() == idVarOutQuery) {
                 childPosHead_first = i;
+                found = true;
+            }
+        }
+        if (! found) {
+            // Giving up
+            return false;
+            // LOG(ERRORL) << "May use uninitialized variable childPosHead_first";
+            // LOG(ERRORL) << "posHead_first = " << posHead_first << ", posLit_second = " << posLit_second;
+            // LOG(ERRORL) << "idVarOutQuery = " << (int) idVarOutQuery;
+            // LOG(ERRORL) << "nsubs2 = " << nsubs2;
+            // LOG(ERRORL) << "Rule = " << blockRule.tostring();
+            // LOG(ERRORL) << "currentQuery = " << currentQuery.tostring();
+            // LOG(ERRORL) << "outputQuery = " << outputQuery.tostring();
+            // LOG(ERRORL) << "childOutputQuery = " << childOutputQuery.tostring();
         }
         /*** End ***/
 
