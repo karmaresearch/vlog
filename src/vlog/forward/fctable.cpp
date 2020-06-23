@@ -157,6 +157,7 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal,
         FCCache::iterator cacheItr = cache.find(signature);
         if (cacheItr != cache.end()) {
             output = cacheItr->second.table;
+            LOG(TRACEL) << "Found cache entry for " + signature;
 
             //First update the entry if there are more entries. Otherwise return
             if (cacheItr->second.end < blocks[blocks.size() - 1].iteration) {
@@ -211,9 +212,10 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal,
             std::chrono::system_clock::time_point timeFilter = std::chrono::system_clock::now();
             bool shouldFilter = filterer == NULL ||
                 TableFilterer::intersection(literal, *itr);
+            LOG(TRACEL) << "Block query = " << itr->query.tostring(NULL, NULL);
 
             std::chrono::duration<double> secFilter = std::chrono::system_clock::now() - timeFilter;
-            LOG(TRACEL) << "Time intersection " << secFilter.count() * 1000;
+            LOG(TRACEL) << "Time intersection " << secFilter.count() * 1000 << ", shouldfilter = " << shouldFilter;
 #else
             bool shouldFilter = filterer == NULL ||
                 TableFilterer::intersection(literal, *itr);
@@ -230,6 +232,7 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal,
                             repeatedVars,
                             nthreads);
 
+                LOG(TRACEL) << "has filteredTable: " << (filteredTable != NULL);
                 if (filteredTable != NULL) {
                     output->add(filteredTable, literal, itr->posQueryInRule,
                             itr->rule, itr->ruleExecOrder, itr->iteration, true, nthreads);
@@ -374,16 +377,22 @@ bool FCTable::add(std::shared_ptr<const FCInternalTable> t,
 
         if (lastItr == iteration) {
             FCBlock *lastBlock = &blocks[sz - 1];
-            lastBlock->table = lastBlock->table->merge(t, nthreads);
+            // Note: for multiple-head rules, the predicate may appear more than once in the head, with different
+            // variables/constants. In that case, we may not merge the blocks.
+            if (posLiteralInRule == lastBlock->posQueryInRule) {
+                lastBlock->table = lastBlock->table->merge(t, nthreads);
 
-            //Invalidate possible subtables which contain partial results
-            for (FCCache::iterator itr = cache.begin(); itr != cache.end(); ++itr) {
-                if (itr->second.end == lastItr) {
-                    itr->second.end = std::max<Term_t>(0, lastItr - 1);
-                    itr->second.table->removeBlock(lastItr);
+                //Invalidate possible subtables which contain partial results
+                for (FCCache::iterator itr = cache.begin(); itr != cache.end(); ++itr) {
+                    if (itr->second.end == lastItr) {
+                        itr->second.end = std::max<Term_t>(0, lastItr - 1);
+                        itr->second.table->removeBlock(lastItr);
+                    }
                 }
+                return false;
+            } else {
+                LOG(TRACEL) << "Creating new block for repeated predicate in head";
             }
-            return false;
         }
     }
 

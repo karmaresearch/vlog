@@ -151,7 +151,7 @@ class SemiNaiver {
 
         virtual FCIterator getTableFromEDBLayer(const Literal & literal);
 
-        virtual long getNLastDerivationsFromList();
+        virtual size_t getNLastDerivationsFromList();
 
         virtual void saveDerivationIntoDerivationList(FCTable *endTable);
 
@@ -263,7 +263,7 @@ class SemiNaiver {
 
         VLIBEXP FCIterator getTable(const PredId_t predid);
 
-        size_t getSizeTable(const PredId_t predid) const;
+        VLIBEXP size_t getSizeTable(const PredId_t predid) const;
 
         bool isEmpty(const PredId_t predid) const;
 

@@ -19,7 +19,6 @@ public class VLog {
     private static final AtomicInteger VlogCounter = new AtomicInteger(0);
 
     static {
-        // loadLibrary("kognac-log");
         loadLibrary("kognac-core");
         loadLibrary("trident-core");
         loadLibrary("trident-sparql");
@@ -69,9 +68,6 @@ public class VLog {
                 try {
                     loadFromJar(jarFile, libName, os);
                 } catch (Throwable e1) {
-                    // System.err.println("Could not load library " + s
-                    // + ", exceptions are temporarily disabled to accomodate
-                    // windows version");
                     throw (UnsatisfiedLinkError) new UnsatisfiedLinkError(
                             "while loading " + s + ": " + e1.getMessage())
                                     .initCause(e1.getCause());
@@ -85,7 +81,6 @@ public class VLog {
         if (dir == null) {
             dir = ".";
         }
-        // Only support one size, i.e. 64-bit?
         String lib = dir + File.separator + libName;
         System.load(lib);
     }
@@ -302,6 +297,52 @@ public class VLog {
             boolean includeConstants, boolean filterBlanks)
             throws NotStartedException, NonExistingPredicateException;
 
+    /**
+     * Queries the current, so possibly materialized, database, and returns an
+     * iterator that delivers the answers, one by one.
+     *
+     * TODO: deal with not-found predicates, terms.
+     *
+     * @param query
+     *            the query, as an atom.
+     * @param includeConstants
+     *            whether to include the constants in the results.
+     * @param filterBlanks
+     *            whether results with blanks in them should be filtered out
+     * @return the result iterator.
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet.
+     * @exception NonExistingPredicateException
+     *                is thrown when the query predicate does not exist.
+     */
+    public QueryResultIterator getQueryIter(Atom query,
+            boolean includeConstants, boolean filterBlanks)
+            throws NotStartedException, NonExistingPredicateException {
+        query.checkNoBlank();
+        int intPred = getPredicateId(query.getPredicate());
+        long[] longTerms = extractTerms(query.getTerms());
+        return query(intPred, longTerms, includeConstants, filterBlanks);
+    }
+
+    /**
+     * Queries the current, so possibly materialized, database, and returns an
+     * iterator that delivers the answers, one by one.
+     *
+     * TODO: deal with not-found predicates, terms.
+     *
+     * @param query
+     *            the query, as an atom
+     * @return the result iterator.
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet.
+     * @exception NonExistingPredicateException
+     *                is thrown when the query predicate does not exist.
+     */
+    public QueryResultIterator getQueryIter(Atom query)
+            throws NotStartedException, NonExistingPredicateException {
+        return getQueryIter(query, true, false);
+    }
+
     private long[] extractTerms(Term[] terms) throws NotStartedException {
         ArrayList<String> variables = new ArrayList<>();
         long[] longTerms = new long[terms.length];
@@ -341,7 +382,7 @@ public class VLog {
      *                is thrown when the query predicate does not exist.
      */
     public TermQueryResultIterator query(Atom query)
-            throws NotStartedException, NonExistingPredicateException { 
+            throws NotStartedException, NonExistingPredicateException {
         return query(query, true, false);
     }
 
@@ -365,7 +406,8 @@ public class VLog {
      */
 
     public TermQueryResultIterator query(Atom query, boolean includeConstants,
-            boolean filterBlanks) throws NotStartedException, NonExistingPredicateException {
+            boolean filterBlanks)
+            throws NotStartedException, NonExistingPredicateException {
         query.checkNoBlank();
         int intPred = getPredicateId(query.getPredicate());
         long[] longTerms = extractTerms(query.getTerms());
@@ -374,35 +416,53 @@ public class VLog {
     }
 
     /**
-     * Queries the current, so possibly materialized, database, and returns the 
+     * Queries the current, so possibly materialized, database, and returns the
      * number of observations associated to predicate.
      *
      * @param predicate
      *            the predicate id of the query
      * @param terms
      *            the constant values or variables. If the term is negative, it
-     *            is assumed to be a variable.
+     *            is assumed to be a variable
      * @param includeConstants
-     *            whether to include the constants in the results.
+     *            whether to include the constants in the result count
      * @param filterBlanks
      *            whether results with blanks in them should be filtered out
-     * @return the size of the query answers
+     * @return the number of query answers
      * @exception NotStartedException
      *                is thrown when vlog is not started yet.
      * @exception NonExistingPredicateException
      *                is thrown when the query predicate does not exist.
      */
-    
+
     public native long nativeQuerySize(int predicate, long[] terms,
             boolean includeConstants, boolean filterBlanks)
             throws NotStartedException, NonExistingPredicateException;
 
-    public long querySize(Atom query, boolean includeConstants, boolean filterBlanks)
+    /**
+     * Queries the current, so possibly materialized, database, and returns the
+     * number of observations associated to predicate.
+     *
+     * @param query
+     *            the query
+     * @param includeConstants
+     *            whether to include the constants in the result count
+     * @param filterBlanks
+     *            whether results with blanks in them should be filtered out
+     * @return the number of query answers
+     * @exception NotStartedException
+     *                is thrown when vlog is not started yet.
+     * @exception NonExistingPredicateException
+     *                is thrown when the query predicate does not exist.
+     */
+    public long querySize(Atom query, boolean includeConstants,
+            boolean filterBlanks)
             throws NotStartedException, NonExistingPredicateException {
         query.checkNoBlank();
         int intPred = getPredicateId(query.getPredicate());
         long[] longTerms = extractTerms(query.getTerms());
-        return nativeQuerySize(intPred, longTerms, includeConstants, filterBlanks);
+        return nativeQuerySize(intPred, longTerms, includeConstants,
+                filterBlanks);
     }
 
     private native void queryToCsv(int predicate, long[] term, String fileName,
@@ -425,7 +485,8 @@ public class VLog {
      *                is thrown when the query predicate does not exist.
      */
     public void writeQueryResultsToCsv(Atom query, String fileName)
-            throws NotStartedException, NonExistingPredicateException, IOException {
+            throws NotStartedException, NonExistingPredicateException,
+            IOException {
         writeQueryResultsToCsv(query, fileName, false);
     }
 
@@ -448,7 +509,8 @@ public class VLog {
      *                is thrown when the query predicate does not exist.
      */
     public void writeQueryResultsToCsv(Atom query, String fileName,
-            boolean filterBlanks) throws NotStartedException, NonExistingPredicateException, IOException {
+            boolean filterBlanks) throws NotStartedException,
+            NonExistingPredicateException, IOException {
         query.checkNoBlank();
         int intPred = getPredicateId(query.getPredicate());
         long[] longTerms = extractTerms(query.getTerms());
