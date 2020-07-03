@@ -80,7 +80,7 @@ bool TableFilterer::isEligibleForPartialSubs(
 
     //Minimum requirements for the rule at hand
     if ((currentResults != NULL && currentResults->getNRows() > 10000000) ||
-            nPosFromFirst != 1  || nPosFromSecond == 0) {
+            nPosFromFirst != 1  || nPosFromSecond != 1) {
         //if (currentResults->getNRows() > 10000000)
         //    LOG(WARNL) << "Current results too large: " << currentResults->getNRows();
         return false;
