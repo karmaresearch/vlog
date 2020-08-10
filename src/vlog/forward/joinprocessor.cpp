@@ -653,16 +653,55 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
         const std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
         int &processedTables) {
 
-    //Change the position in the output container since we replace a number of variables with constants.
-    std::pair<uint8_t, uint8_t> *posFromSecond = resultsContainer->getPosFromSecond();
-    for (int i = 0; i < resultsContainer->getNCopyFromSecond(); ++i) {
-        if (njoinfields == 2 && posFromSecond[i].second > idxJoinField2) {
-            posFromSecond[i].second--;
+    //Go through the literal. Every constant increase the index
+    uint8_t idxJoinFieldInLiteral1 = idxJoinField1;
+    uint8_t idxJoinFieldInLiteral2 = idxJoinField2;
+    if (njoinfields < 2) {
+        uint8_t nvars = 0;
+        for (uint8_t i = 0; nvars <= idxJoinField1; ++i) {
+            if (!literal.getTermAtPos(i).isVariable()) {
+                idxJoinFieldInLiteral1++;
+            } else {
+                nvars++;
+            }
         }
-        if (posFromSecond[i].second > idxJoinField1) {
-            posFromSecond[i].second--;
+    } else {
+        uint8_t nvars = 0;
+        for (uint8_t i = 0; nvars <= idxJoinField1 || nvars <= idxJoinField2; ++i) {
+            if (!literal.getTermAtPos(i).isVariable()) {
+                if (nvars <= idxJoinField1)
+                    idxJoinFieldInLiteral1++;
+                if (nvars <= idxJoinField2)
+                    idxJoinFieldInLiteral2++;
+            } else {
+                nvars++;
+            }
+        }
+        assert(idxJoinFieldInLiteral1 < idxJoinFieldInLiteral2);
+    }
+
+    //Change the position in the output container since we replace a number of variables with constants.
+    //This is tricky, since these variables may occur more than once.
+    std::vector<uint8_t> correction;
+    uint8_t correction_count = 0;
+    uint8_t v1 = literal.getTermAtPos(idxJoinFieldInLiteral1).getId();
+    uint8_t v2 = njoinfields < 2 ? 0 : literal.getTermAtPos(idxJoinFieldInLiteral2).getId();
+    for (int i = 0; i < literal.getTupleSize(); i++) {
+        if (literal.getTermAtPos(i).isVariable()) {
+            correction.push_back(correction_count);
+            uint8_t v = literal.getTermAtPos(i).getId();
+            if (v == v1 || (njoinfields == 2 && v == v2)) {
+                correction_count++;
+            }
         }
     }
+
+    std::pair<uint8_t, uint8_t> *posFromSecond = resultsContainer->getPosFromSecond();
+    for (int i = 0; i < resultsContainer->getNCopyFromSecond(); ++i) {
+        // LOG(DEBUGL) << "posFromSecond[i].second = " << (int) posFromSecond[i].second << ", correction is " << (int) correction[posFromSecond[i].second];
+        posFromSecond[i].second -= correction[posFromSecond[i].second];
+    }
+
     {
         //Rewrite the positions to sort
         std::vector<uint8_t> newPosToSort;
@@ -687,33 +726,6 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                     newPosToSort.push_back(possort);
                 }
             }
-        }
-
-        //Go through the literal. Every constant increase the index
-        uint8_t idxJoinFieldInLiteral1 = idxJoinField1;
-        uint8_t idxJoinFieldInLiteral2 = idxJoinField2;
-        if (njoinfields < 2) {
-            uint8_t nvars = 0;
-            for (uint8_t i = 0; nvars <= idxJoinField1; ++i) {
-                if (!literal.getTermAtPos(i).isVariable()) {
-                    idxJoinFieldInLiteral1++;
-                } else {
-                    nvars++;
-                }
-            }
-        } else {
-            uint8_t nvars = 0;
-            for (uint8_t i = 0; nvars <= idxJoinField1 || nvars <= idxJoinField2; ++i) {
-                if (!literal.getTermAtPos(i).isVariable()) {
-                    if (nvars <= idxJoinField1)
-                        idxJoinFieldInLiteral1++;
-                    if (nvars <= idxJoinField2)
-                        idxJoinFieldInLiteral2++;
-                } else {
-                    nvars++;
-                }
-            }
-            assert(idxJoinFieldInLiteral1 < idxJoinFieldInLiteral2);
         }
 
         //We need these to filter duplicates
