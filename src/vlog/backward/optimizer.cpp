@@ -3,7 +3,7 @@
 
 std::vector<const Literal*> Optimizer::calculateBestPlan(
     std::vector<const Literal*> &existingPlan,
-    std::vector<uint8_t> boundVars, std::vector<uint8_t> &existingVars,
+    std::vector<Var_t> boundVars, std::vector<Var_t> &existingVars,
     std::vector<const Literal*> &remainingLiterals) {
 
     if (remainingLiterals.size() == 0) {
@@ -34,8 +34,8 @@ std::vector<const Literal*> Optimizer::calculateBestPlan(
         const Literal *l = *itr;
         for (int i = 0; i < l->getTupleSize(); ++i) {
             if (l->getTermAtPos(i).isVariable()) {
-                uint8_t id = l->getTermAtPos(i).getId();
-                for (std::vector<uint8_t>::iterator itr = existingVars.begin();
+                Var_t id = l->getTermAtPos(i).getId();
+                for (std::vector<Var_t>::iterator itr = existingVars.begin();
                         itr != existingVars.end();
                         ++itr) {
                     if (id == *itr) {
@@ -43,7 +43,7 @@ std::vector<const Literal*> Optimizer::calculateBestPlan(
                         allBounds++;
                     }
                 }
-                for (std::vector<uint8_t>::iterator itr = boundVars.begin();
+                for (std::vector<Var_t>::iterator itr = boundVars.begin();
                         itr != boundVars.end();
                         ++itr) {
                     if (id == *itr) {
@@ -89,9 +89,9 @@ std::vector<const Literal*> Optimizer::calculateBestPlan(
     //add all new variables
     for (int i = 0; i < chosenLiteral->getTupleSize(); ++i) {
         if (chosenLiteral->getTermAtPos(i).isVariable()) {
-            uint8_t varid = chosenLiteral->getTermAtPos(i).getId();
+            Var_t varid = chosenLiteral->getTermAtPos(i).getId();
             bool isNew = true;
-            for (std::vector<uint8_t>::iterator itr = existingVars.begin();
+            for (std::vector<Var_t>::iterator itr = existingVars.begin();
                     itr != existingVars.end();
                     ++itr) {
                 if (*itr == varid) {
@@ -117,11 +117,11 @@ bool selectivitySorter(const Literal *l1, const Literal *l2) {
     return l1->getNVars() < l2->getNVars();
 }
 
-std::vector<const Literal*> Optimizer::rearrangeBodyAfterAdornment(std::vector<uint8_t>
+std::vector<const Literal*> Optimizer::rearrangeBodyAfterAdornment(std::vector<Var_t>
         &boundVars, const std::vector<Literal> &body) {
     std::vector<const Literal*> initialPlan;
     std::vector<const Literal*> remainingLiterals;
-    std::vector<uint8_t> existingVars;
+    std::vector<Var_t> existingVars;
     std::copy(boundVars.begin(), boundVars.end(), std::back_inserter(existingVars));
 
     std::vector<const Literal*> output;
@@ -141,7 +141,7 @@ std::vector<const Literal*> Optimizer::rearrangeBodyAfterAdornment(std::vector<u
     //Add the variables of the first pattern in case there is no bound variable
     if (boundVars.size() == 0 && remainingLiterals.size() > 1) {
         initialPlan.push_back(remainingLiterals.front());
-        std::vector<uint8_t> vars = remainingLiterals.front()->getAllVars();
+        std::vector<Var_t> vars = remainingLiterals.front()->getAllVars();
         std::copy(vars.begin(), vars.end(), std::back_inserter(existingVars));
         remainingLiterals.erase(remainingLiterals.begin());
     }

@@ -62,11 +62,11 @@ RuleExecutionPlan RuleExecutionPlan::reorder(std::vector<uint8_t> &order,
 
 void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &heads,
         bool copyAllVars) {
-    std::vector<uint8_t> existingVariables;
+    std::vector<Var_t> existingVariables;
 
     //Get all variables in the head, and dependencies if they are existential
     //{head_variable_id:[idx_in_term_list_in_head]}
-    std::map<uint8_t,std::vector<uint8_t>> variablesNeededForHead;
+    std::map<Var_t,std::vector<uint8_t>> variablesNeededForHead;
     uint32_t countVars = 0;
     for (auto &headLiteral : heads) {
         for (uint8_t headPos = 0; headPos < headLiteral.getTupleSize(); ++headPos) {
@@ -84,7 +84,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
         std::vector<std::pair<uint8_t, uint8_t>> jc;
         std::vector<std::pair<uint8_t, uint8_t>> pf;
         std::vector<std::pair<uint8_t, uint8_t>> ps;
-        std::vector<uint8_t> newExistingVariables;
+        std::vector<Var_t> newExistingVariables;
 
         //Should I copy all the previous variables
         /*if (copyAllVars) {
@@ -137,7 +137,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
         std::vector<std::pair<uint8_t,uint8_t>> v2p;
         //Put in join coordinates between the previous and the current literal
         uint8_t litVars = 0;
-        std::set<uint8_t> varSoFar; //This set is used to avoid that repeated
+        std::set<Var_t> varSoFar; //This set is used to avoid that repeated
         //variables in the literal produce multiple copies in the head
         for (uint8_t x = 0; x < currentLiteral->getTupleSize(); ++x) {
             const VTerm t = currentLiteral->getTermAtPos(x);
@@ -193,9 +193,9 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                         v2p.push_back(std::make_pair(x, newExistingVariables.size() + litVars));
                     } else if (isVariableNeeded || copyAllVars) {
                         //Add it to the next list of bindings if it is not already present
-                        std::vector<uint8_t>::iterator iter2 = std::find(newExistingVariables.begin(), newExistingVariables.end(), t.getId());
+                        std::vector<Var_t>::iterator iter2 = std::find(newExistingVariables.begin(), newExistingVariables.end(), t.getId());
                         if (iter2 != newExistingVariables.end()){ //found
-                            v2p.push_back(std::make_pair(x, (uint8_t)(iter2 - newExistingVariables.begin())));
+                            v2p.push_back(std::make_pair(x, (Var_t)(iter2 - newExistingVariables.begin())));
                         } else {
                             ps.push_back(std::make_pair(newExistingVariables.size(), litVars));
                             v2p.push_back(std::make_pair(x, newExistingVariables.size()));
@@ -215,7 +215,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
             sizeOutputRelation.push_back(~0);
 
             //Calculate the positions of the dependencies for the chase
-            std::map<uint8_t, std::vector<uint8_t>> extvars2pos;
+            std::map<Var_t, std::vector<uint8_t>> extvars2pos;
             for(const auto &pair : dependenciesExtVars) {
                 for(const auto& v : pair.second) {
                     //Search first the existingVariables
@@ -253,7 +253,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
             extvars2posFromSecond = extvars2pos;
         } else {
             existingVariables = newExistingVariables;
-            sizeOutputRelation.push_back((uint8_t) existingVariables.size());
+            sizeOutputRelation.push_back(existingVariables.size());
         }
         joinCoordinates.push_back(jc);
         posFromFirst.push_back(pf);

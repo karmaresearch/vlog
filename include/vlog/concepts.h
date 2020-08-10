@@ -20,7 +20,9 @@
 #define IDB 1
 #define MAX_NPREDS (2048*1024)
 
+
 typedef uint32_t PredId_t;
+typedef uint32_t Var_t;
 
 class EDBLayer;
 
@@ -39,18 +41,18 @@ inline std::string fields2str(const std::vector<uint8_t> &fields) {
 /*** TERMS ***/
 class VTerm {
     private:
-        uint8_t id; //ID != 0 => variable. ID==0 => const value
+        Var_t id; //ID != 0 => variable. ID==0 => const value
         uint64_t value;
     public:
         VTerm() : id(0), value(0) {}
-        VTerm(const uint8_t id, const uint64_t value) : id(id), value(value) {}
-        uint8_t getId() const {
+        VTerm(const Var_t id, const uint64_t value) : id(id), value(value) {}
+        Var_t getId() const {
             return id;
         }
         uint64_t getValue() const {
             return value;
         }
-        void setId(const uint8_t i) {
+        void setId(const Var_t i) {
             id = i;
         }
         void setValue(const uint64_t v) {
@@ -251,10 +253,10 @@ class Predicate {
 
 /*** SUBSTITUTIONS ***/
 struct Substitution {
-    uint8_t origin;
+    Var_t origin;
     VTerm destination;
     Substitution() {}
-    Substitution(uint8_t origin, VTerm destination) : origin(origin), destination(destination) {}
+    Substitution(Var_t origin, VTerm destination) : origin(origin), destination(destination) {}
 };
 
 VLIBEXP std::vector<Substitution> concat(std::vector<Substitution>&, std::vector<Substitution>&);
@@ -325,12 +327,12 @@ class Literal {
 
         std::vector<std::pair<uint8_t, uint8_t>> getRepeatedVars() const;
 
-        std::vector<uint8_t> getSharedVars(const std::vector<uint8_t> &vars) const;
+        std::vector<Var_t> getSharedVars(const std::vector<Var_t> &vars) const;
 
-        std::vector<uint8_t> getNewVars(std::vector<uint8_t> &vars) const;
+        std::vector<Var_t> getNewVars(std::vector<Var_t> &vars) const;
 
-        std::vector<uint8_t> getAllVars() const;
-        bool containsVariable(uint8_t variableId) const;
+        std::vector<Var_t> getAllVars() const;
+        bool containsVariable(Var_t variableId) const;
 
         std::string tostring(Program *program, EDBLayer *db) const;
 
@@ -357,7 +359,7 @@ class Rule {
                 const std::vector<Literal> &body);
 
     public:
-        bool doesVarAppearsInFollowingPatterns(int startingPattern, uint8_t value) const;
+        bool doesVarAppearsInFollowingPatterns(int startingPattern, Var_t value) const;
 
         Rule(uint32_t ruleId, const std::vector<Literal> heads,
                 std::vector<Literal> body) :
@@ -400,13 +402,13 @@ class Rule {
 
         bool isExistential() const;
 
-        std::vector<uint8_t> getVarsInHead(PredId_t ignore = -1) const;
-        std::vector<uint8_t> getVarsInBody() const;
-        std::vector<uint8_t> getExistentialVariables() const;
+        std::vector<Var_t> getVarsInHead(PredId_t ignore = -1) const;
+        std::vector<Var_t> getVarsInBody() const;
+        std::vector<Var_t> getExistentialVariables() const;
 
-        std::vector<uint8_t> getFrontierVariables(PredId_t ignore = -1) const;
+        std::vector<Var_t> getFrontierVariables(PredId_t ignore = -1) const;
 
-        std::map<uint8_t, std::vector<uint8_t>> calculateDependencies() const;
+        std::map<Var_t, std::vector<Var_t>> calculateDependencies() const;
 
         const std::vector<Literal> &getBody() const {
             return body;

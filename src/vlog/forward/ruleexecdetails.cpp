@@ -12,7 +12,7 @@ void RuleExecutionDetails::rearrangeLiterals(std::vector<const Literal*> &vector
         subset.push_back(vector[i]);
     }
     const Literal *idxPointer = vector[idx];
-    std::vector<uint8_t> startVars = idxPointer->getAllVars();
+    std::vector<Var_t> startVars = idxPointer->getAllVars();
     std::vector<const Literal*> leftLiterals;
 
     //Group the left side (the one that has EDB literals)
@@ -26,7 +26,7 @@ void RuleExecutionDetails::rearrangeLiterals(std::vector<const Literal*> &vector
     std::copy(vector.begin() + idx + 1, vector.end(), std::back_inserter(subset2));
 
     for (const auto& literalPointer : subset) {
-        std::vector<uint8_t> newVars = literalPointer->getNewVars(startVars);
+        std::vector<Var_t> newVars = literalPointer->getNewVars(startVars);
         std::copy(newVars.begin(), newVars.end(), std::back_inserter(startVars));
     }
     std::vector<const Literal*> leftLiterals2;
@@ -51,7 +51,7 @@ void RuleExecutionDetails::rearrangeLiterals(std::vector<const Literal*> &vector
     }
 }
 
-void RuleExecutionDetails::groupLiteralsBySharedVariables(std::vector<uint8_t> &startVars,
+void RuleExecutionDetails::groupLiteralsBySharedVariables(std::vector<Var_t> &startVars,
         std::vector<const Literal *> &set, std::vector<const Literal*> &leftelements) {
     if (set.size() == 0)
         return;
@@ -60,17 +60,17 @@ void RuleExecutionDetails::groupLiteralsBySharedVariables(std::vector<uint8_t> &
             leftelements.push_back(set[0]);
             set.clear();
         }
-        std::vector<uint8_t> newVars = set[0]->getNewVars(startVars);
+        std::vector<Var_t> newVars = set[0]->getNewVars(startVars);
         std::copy(newVars.begin(), newVars.end(), std::back_inserter(startVars));
         return;
     }
 
-    std::vector<uint8_t> varsBestMatching(startVars);
+    std::vector<Var_t> varsBestMatching(startVars);
     std::vector<const Literal*> bestMatching;
     std::vector<const Literal*> bestMatchingLeft(set);
 
     for (const auto& literalPointer : set) {
-        std::vector<uint8_t> sharedVars = literalPointer->getSharedVars(startVars);
+        std::vector<Var_t> sharedVars = literalPointer->getSharedVars(startVars);
         if (sharedVars.size() > 0 || startVars.size() == 0) {
             //copy the remaining
             std::vector<const Literal*> newSet;
@@ -82,8 +82,8 @@ void RuleExecutionDetails::groupLiteralsBySharedVariables(std::vector<uint8_t> &
             }
 
             //copy the new vars
-            std::vector<uint8_t> newVars(startVars);
-            std::vector<uint8_t> nv = literalPointer->getNewVars(newVars);
+            std::vector<Var_t> newVars(startVars);
+            std::vector<Var_t> nv = literalPointer->getNewVars(newVars);
             std::copy(nv.begin(), nv.end(), std::back_inserter(newVars));
 
             groupLiteralsBySharedVariables(newVars, newSet, newLeftElements);
@@ -130,8 +130,8 @@ void RuleExecutionDetails::checkFilteringStrategy(
     //Two conditions: head and last literals must be compatible, and they must
     //share at least one variable in the same position
 
-    std::vector<uint8_t> vars = literal.getAllVars();
-    std::vector<uint8_t> sharedVars = head.getSharedVars(vars);
+    std::vector<Var_t> vars = literal.getAllVars();
+    std::vector<Var_t> sharedVars = head.getSharedVars(vars);
     if (!sharedVars.empty()) {
         hv.lastLiteralSharesWithHead = true;
     } else {
@@ -189,7 +189,7 @@ void RuleExecutionDetails::calculateNVarsInHeadFromEDB() {
 
         //Group the occurrences by EDB literal
         for (uint8_t idxVar = 0; idxVar < posEDBVarsInHead.size(); ++idxVar) {
-            uint8_t var = posEDBVarsInHead[idxVar];
+            Var_t var = posEDBVarsInHead[idxVar];
             for (uint8_t idxPattern = 0;
                     idxPattern < occEDBVarsInHead[idxVar].size();
                     ++idxPattern) {
@@ -310,7 +310,7 @@ void RuleExecutionDetails::createExecutionPlans(
     }
 
     //Calculate the dependencies of the existential variables to the variables in the body
-    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars = rule.calculateDependencies();
+    std::map<Var_t, std::vector<Var_t>> dependenciesExtVars = rule.calculateDependencies();
 
     //Create a single execution plan
     RuleExecutionPlan p;
@@ -337,7 +337,7 @@ void RuleExecutionDetails::createExecutionPlans(bool copyAllVars) {
     }
 
     //Calculate the dependencies of the existential variables to the variables in the body
-    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars = rule.calculateDependencies();
+    std::map<Var_t, std::vector<Var_t>> dependenciesExtVars = rule.calculateDependencies();
 
     if (nIDBs > 0) {
         //Collect the IDB predicates
