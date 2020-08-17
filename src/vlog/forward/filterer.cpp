@@ -99,8 +99,8 @@ bool TableFilterer::isEligibleForPartialSubs(
     if (bodyLiterals.size() == 2) {
         // Check the join: may have only one join position.
         int count = 0;
-        std::vector<uint8_t> v1 = bodyLiterals[0].getAllVars();
-        std::vector<uint8_t> v2 = bodyLiterals[1].getAllVars();
+        std::vector<Var_t> v1 = bodyLiterals[0].getAllVars();
+        std::vector<Var_t> v2 = bodyLiterals[1].getAllVars();
         for (int i = 0; i < v1.size(); i++) {
             for (int j = 0; j < v2.size(); j++) {
                 if (v1[i] == v2[j]) {
@@ -217,7 +217,7 @@ bool TableFilterer::isEligibleForPartialSubs(
 
     //Check if the small literal shares variables with the recursive literal
     if (foundSmall) {
-        std::vector<uint8_t> allvars = bodyLiterals[idxRecursive].getAllVars();
+        std::vector<Var_t> allvars = bodyLiterals[idxRecursive].getAllVars();
         if (bodyLiterals[idxSmall].getSharedVars(allvars).size() == 0)
             return false;
     }
@@ -293,7 +293,7 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs(
     // --Ceriel
     return producedDerivationInPreviousStepsWithSubs_rec(block,
             mapSubstitutions, outputQueries[0], currentQuery,
-           posHead[0].first, posVarsInLit[posLiteral[0].second]);
+            posHead[0].first, posVarsInLit[posLiteral[0].second]);
 }
 
 bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
@@ -318,14 +318,14 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
             throw 10;
         }
         /*** This code calculates the new current query and pos of the subs ***/
-	std::vector<Substitution> subs;
+        std::vector<Substitution> subs;
         const int nsubs = Literal::getSubstitutionsA2B(subs,
                 blockRule.getFirstHead(), currentQuery);
         if (nsubs == -1) {
             throw 10;
         }
         VTerm tAtCurQuery = currentQuery.getTermAtPos(posLit_second);
-        uint8_t idVarCurQuery = tAtCurQuery.getId();
+        Var_t idVarCurQuery = tAtCurQuery.getId();
         if (idVarCurQuery == 0) {
             // Giving up
             return false;
@@ -360,11 +360,11 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
         /*** End ***/
 
         /*** This code calculates the new output query and pos of the subs ***/
-	std::vector<Substitution> subs2;
+        std::vector<Substitution> subs2;
         const int nsubs2 = Literal::getSubstitutionsA2B(subs2,
                 blockRule.getFirstHead(), outputQuery);
         VTerm tAtOutQuery = outputQuery.getTermAtPos(posHead_first);
-        uint8_t idVarOutQuery = tAtOutQuery.getId();
+        Var_t idVarOutQuery = tAtOutQuery.getId();
         if (idVarOutQuery == 0) {
             // Giving up
             return false;

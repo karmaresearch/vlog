@@ -43,14 +43,14 @@ struct RuleExecutionPlan {
     //quantified. This map keeps trace, for each of such variable, whether
     //they are linked to
     //any variable in the body. I need it to construct function terms.
-    std::map<uint8_t, std::vector<uint8_t>> extvars2posFromSecond;
+    std::map<Var_t, std::vector<uint8_t>> extvars2posFromSecond;
 
     //The sequence of body literals to evaluate
     std::vector<const Literal*> plan;
     std::vector<std::pair<size_t, size_t>> ranges;
 
     //Created by RuleExecutionDetails::createExecutionPlan
-    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars;
+    std::map<Var_t, std::vector<Var_t>> dependenciesExtVars;
 
     //Check if we can apply filtering HashMap. See comment above
     void checkIfFilteringHashMapIsPossible(const Literal &head);

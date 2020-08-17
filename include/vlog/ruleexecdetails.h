@@ -41,7 +41,7 @@ struct RuleExecutionDetails {
 
     void rearrangeLiterals(std::vector<const Literal*> &vector, const size_t idx);
 
-    void groupLiteralsBySharedVariables(std::vector<uint8_t> &startVars,
+    void groupLiteralsBySharedVariables(std::vector<Var_t> &startVars,
             std::vector<const Literal *> &set,
             std::vector<const Literal*> &leftelements);
 

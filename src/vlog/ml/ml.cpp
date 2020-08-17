@@ -72,7 +72,7 @@ PredId_t ML::getMatchingIDB(EDBLayer& db, Program &p, vector<uint64_t>& tuple) {
         if (!p.isPredicateIDB(temp.getId())){
             int matched = 0;
             for (int c = 0; c < temp.getCardinality(); ++c) {
-                uint8_t tempid = body[0].getTermAtPos(c).getId();
+                Var_t tempid = body[0].getTermAtPos(c).getId();
                 if(tempid == 0) {
                     uint64_t tempvalue = body[0].getTermAtPos(c).getValue();
                     char supportText[MAX_TERM_SIZE];
