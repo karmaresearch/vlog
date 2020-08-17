@@ -548,13 +548,16 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
         const std::vector<uint8_t> &fields) {
     std::vector<uint8_t> offsets;
     int nConstantsSeen = 0;
-    int varNo = 0;
     for (int i = 0; i < query.getTupleSize(); i++) {
         if (! query.getTermAtPos(i).isVariable()) {
             nConstantsSeen++;
         } else {
             offsets.push_back(nConstantsSeen);
         }
+    }
+    if (offsets.size() == 0) {
+        // Apparently, getSortedIterator can be called with a query containing only constants.
+        return getSortedIterator2(query, fields);
     }
     std::vector<uint8_t> newFields;
     for (auto f : fields) {
