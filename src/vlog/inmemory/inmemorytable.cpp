@@ -95,14 +95,20 @@ InmemoryTable::InmemoryTable(std::string repository, std::string tablename,
     istream *ifs = NULL;
     if (Utils::exists(gz)) {
         ifs = new zstr::ifstream(gz);
+        if (ifs->fail()) {
+            std::string e = "While importing data for predicate \"" + layer->getPredName(predid) + "\": could not open file " + gz;
+            LOG(ERRORL) << e;
+            throw (e);
+        }
     } else if (Utils::exists(tablefile)) {
         ifs = new std::ifstream(tablefile, ios_base::in | ios_base::binary);
+        if (ifs->fail()) {
+            std::string e = "While importing data for predicate \"" + layer->getPredName(predid) + "\": could not open file " + tablefile;
+            LOG(ERRORL) << e;
+            throw (e);
+        }
     }
     if (ifs != NULL) {
-        if (ifs->fail()) {
-            LOG(ERRORL) << "Could not open " << tablefile;
-            throw ("Could not open file " + tablefile + " for reading");
-        }
         LOG(DEBUGL) << "Reading " << tablefile;
         while (! ifs->eof()) {
             std::vector<std::string> row = readRow(*ifs);
@@ -141,8 +147,9 @@ InmemoryTable::InmemoryTable(std::string repository, std::string tablename,
             f.path = tablefile;
             f.splittable = true;
         } else {
-            LOG(ERRORL) << "Could not find " << tablename;
-            throw("Could not find " + tablename);
+            std::string e = "While importing data for predicate \"" + layer->getPredName(predid) + "\": could not open file " + tablefile + " nor " + (repository + "/" + tablename + ".csv") + " nor gzipped versions";
+            LOG(ERRORL) << e;
+            throw(e);
         }
         FileReader reader(f);
         while (reader.parseTriple()) {

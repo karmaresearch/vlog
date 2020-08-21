@@ -954,14 +954,11 @@ std::string EDBLayer::getPredType(PredId_t id) {
     if (dbPredicates.count(id)) {
         return dbPredicates[id].type;
     }
-    return 0;
+    return NULL;
 }
 
 std::string EDBLayer::getPredName(PredId_t id) {
-    if (dbPredicates.count(id)) {
-        return predDictionary->getRawValue(id);
-    }
-    return 0;
+    return predDictionary->getRawValue(id);
 }
 
 uint8_t EDBLayer::getPredArity(PredId_t id) {
