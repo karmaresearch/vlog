@@ -243,8 +243,8 @@ void QSQR::estimateRule(Metrics &metrics, int depth, Rule &rule, vector<Substitu
     std::vector<Literal> body = rule.getBody();
     if (depth > 0) {
 	Literal substitutedHead = rule.getHead(0).substitutes(subs);
-	std::vector<uint8_t> headVars = substitutedHead.getAllVars();
-	std::vector<uint8_t> allVars;
+	std::vector<Var_t> headVars = substitutedHead.getAllVars();
+	std::vector<Var_t> allVars;
 	for (std::vector<Literal>::const_iterator itr = body.begin(); itr != body.end(); ++itr) {
 	    Metrics m;
 	    memset(&m, 0, sizeof(Metrics));
@@ -263,7 +263,7 @@ void QSQR::estimateRule(Metrics &metrics, int depth, Rule &rule, vector<Substitu
 	    }
 
 	    // Check for filtering join ...
-	    std::vector<uint8_t> newAllVars = substituted.getNewVars(allVars);
+	    std::vector<Var_t> newAllVars = substituted.getNewVars(allVars);
 	    bool contribution = newAllVars.size() > 0;
 	    for (int i = 0; i < newAllVars.size(); i++) {
 		allVars.push_back(newAllVars[i]);
@@ -271,7 +271,7 @@ void QSQR::estimateRule(Metrics &metrics, int depth, Rule &rule, vector<Substitu
 	    if (contribution) {
 		metrics.intermediateResults += m.intermediateResults;
 		// check if the literal has variables in common with the LHS. If not, no contribution to estimate?
-		std::vector<uint8_t> shared = substituted.getSharedVars(headVars);
+		std::vector<Var_t> shared = substituted.getSharedVars(headVars);
 		if (shared.size() == 0) {
 		    contribution = false;
 		}

@@ -257,7 +257,7 @@ void Checker::addBlockCheckTargets(Program &p, PredId_t ignorePredId) {
                 }
             }
 
-            std::vector<uint8_t> headvars = rule.getFrontierVariables(ignorePredId);
+            std::vector<Var_t> headvars = rule.getFrontierVariables(ignorePredId);
             std::string newPred = "__GENERATED_PRED__" + std::to_string(rule.getId());
             Predicate newp = p.getPredicate(p.getOrAddPredicate(newPred, headvars.size()));
             VTuple t(headvars.size());
@@ -498,12 +498,12 @@ static void getAllExtPropagatePositions(Program &p, std::map<rpos, std::vector<v
         if (rule.isExistential()) {
             // First, get the predicate positions of the existential variables in the head(s)
             std::vector<vpos> predPositions[256];
-            std::vector<uint8_t> extVars = rule.getExistentialVariables();
+            std::vector<Var_t> extVars = rule.getExistentialVariables();
             for (auto head : rule.getHeads()) {
                 VTuple tpl = head.getTuple();
                 for (int i = 0; i < tpl.getSize(); i++) {
                     VTerm term = tpl.get(i);
-                    uint8_t id = term.getId();
+                    Var_t id = term.getId();
                     if (id != 0) {
                         auto pos = std::find(extVars.begin(), extVars.end(), id);
                         if (pos != extVars.end()) {
@@ -532,7 +532,7 @@ static void getAllExtPropagatePositions(Program &p, std::map<rpos, std::vector<v
 
 static void generateConstants(Program &p, std::map<PredId_t, std::vector<std::vector<std::string>>> &edbSet,
         int &constantCount,
-        std::map<uint8_t, std::string> &varConstantMap,
+        std::map<Var_t, std::string> &varConstantMap,
         const std::vector<Literal> &toAdd) {
     for (auto lit : toAdd) {
         std::vector<std::string> value;
@@ -541,7 +541,7 @@ static void generateConstants(Program &p, std::map<PredId_t, std::vector<std::ve
         for (int i = 0; i < tpl.getSize(); i++) {
             VTerm t = tpl.get(i);
             if (t.isVariable()) {
-                uint8_t id = t.getId();
+                Var_t id = t.getId();
                 auto pair = varConstantMap.find(id);
                 std::string val;
                 if (pair == varConstantMap.end()) {
@@ -560,11 +560,11 @@ static void generateConstants(Program &p, std::map<PredId_t, std::vector<std::ve
     }
 }
 
-static bool rja_check(Program &p, Program &nongen_program, const Rule &rulev, const Rule &rulew, uint8_t x, uint8_t v, uint8_t w) {
+static bool rja_check(Program &p, Program &nongen_program, const Rule &rulev, const Rule &rulew, Var_t x, Var_t v, Var_t w) {
     std::map<PredId_t, std::vector<std::vector<std::string>>> edbSet;
     int constantCount = 0;
-    std::map<uint8_t, std::string> varConstantMapw;
-    std::map<uint8_t, std::string> varConstantMapv;
+    std::map<Var_t, std::string> varConstantMapw;
+    std::map<Var_t, std::string> varConstantMapv;
 
     generateConstants(p, edbSet, constantCount, varConstantMapw, rulew.getBody());
 
@@ -614,7 +614,7 @@ static bool rja_check(Program &p, Program &nongen_program, const Rule &rulev, co
             }
             std::string val;
             if (t.isVariable()) {
-                uint8_t id = t.getId();
+                Var_t id = t.getId();
                 auto pair = varConstantMapw.find(id);
                 if (pair == varConstantMapw.end()) {
                     if (id == w) {
@@ -721,16 +721,16 @@ bool Checker::JA(Program &p, bool restricted) {
         for (auto &it : allExtVarsPos) {
             int dest = 0;
             const Rule &rulev = p.getRule(it.first.first);
-            std::vector<uint8_t> extVars = rulev.getExistentialVariables();
-            uint8_t v = extVars[it.first.second];
+            std::vector<Var_t> extVars = rulev.getExistentialVariables();
+            Var_t v = extVars[it.first.second];
             LOG(TRACEL) << "Src = " << src << ", rule " << rulev.tostring(&p, p.getKB());
             for (auto &it2: allExtVarsPos) {
                 const Rule &rulew = p.getRule(it2.first.first);
                 auto body = rulew.getBody();
                 extVars = rulew.getExistentialVariables();
-                uint8_t w = extVars[it2.first.second];
+                Var_t w = extVars[it2.first.second];
                 LOG(TRACEL) << "Trying " << dest << ", rule " << rulew.tostring(&p, p.getKB());
-                std::map<uint8_t, std::vector<vpos>> positions;
+                std::map<Var_t, std::vector<vpos>> positions;
                 for (auto lit: body) {
                     for (int i = 0; i < lit.getTupleSize(); i++) {
                         VTerm t = lit.getTermAtPos(i);
@@ -746,7 +746,7 @@ bool Checker::JA(Program &p, bool restricted) {
                     auto ipos = std::set_intersection(it.second.begin(), it.second.end(), pair.second.begin(), pair.second.end(), intersect.begin());
                     if (ipos - intersect.begin() == pair.second.size()) {
                         // For this variable, all positions in the right-hand-side occur in the propagations of the existential variable.
-                        uint8_t x = pair.first;
+                        Var_t x = pair.first;
                         LOG(TRACEL) << "We have a match for variable " << (int) x;
                         // Now try the materialization and the test.
                         // First compute the EDB set to materialize on.
@@ -814,7 +814,7 @@ bool Checker::MFC(Program &prg, bool restricted) {
                     VTerm t = tpl.get(i);
                     std::string val;
                     if (t.isVariable()) {
-                        uint8_t id = t.getId();
+                        Var_t id = t.getId();
                         val = "_GENC" + std::to_string(id);
                     } else {
                         val = p.getKB()->getDictText(t.getValue());
@@ -909,7 +909,7 @@ Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
     size_t count = 0;
     for (auto rule : rules) {
         std::string output = "";
-        std::vector<uint8_t> existentials = rule.getExistentialVariables();
+        std::vector<Var_t> existentials = rule.getExistentialVariables();
         bool first = true;
         for(const auto& head : rule.getHeads()) {
             if (! first) {
@@ -967,7 +967,7 @@ Program *Checker::getProgramForBlockingCheckRMFC(Program &p) {
             // Add negated term allowing for exclusion of a specific binding
             output += ", ~";
             output += "__EXCLUDE_DUMMY__" + std::to_string(count) + "(";
-            std::vector<uint8_t> vars = rule.getFrontierVariables();
+            std::vector<Var_t> vars = rule.getFrontierVariables();
             bool f = true;
             for (int i = 0; i < vars.size(); i++) {
                 if (! f) {

@@ -98,16 +98,21 @@ InmemoryTable::InmemoryTable(std::string repository, std::string tablename,
     istream *ifs = NULL;
     if (Utils::exists(gz)) {
         ifs = new zstr::ifstream(gz);
+        if (ifs->fail()) {
+            std::string e = "While importing data for predicate \"" + layer->getPredName(predid) + "\": could not open file " + gz;
+            LOG(ERRORL) << e;
+            throw (e);
+        }
     } else if (Utils::exists(tablefile)) {
         ifs = new std::ifstream(tablefile, ios_base::in | ios_base::binary);
+        if (ifs->fail()) {
+            std::string e = "While importing data for predicate \"" + layer->getPredName(predid) + "\": could not open file " + tablefile;
+            segment = NULL;
+            LOG(ERRORL) << e;
+            throw (e);
+        }
     }
     if (ifs != NULL) {
-        if (ifs->fail()) {
-            LOG(INFOL) << "Could not open " << tablefile;
-            segment = NULL;
-            // throw ("Could not open file " + tablefile + " for reading");
-            return;
-        }
         LOG(DEBUGL) << "Reading " << tablefile;
         while (! ifs->eof()) {
             std::vector<std::string> row = readRow(*ifs, sep);
@@ -149,10 +154,10 @@ InmemoryTable::InmemoryTable(std::string repository, std::string tablename,
             f.path = tablefile;
             f.splittable = true;
         } else {
-            LOG(INFOL) << "Could not find " << tablename;
+            std::string e = "While importing data for predicate \"" + layer->getPredName(predid) + "\": could not open file " + tablefile + " nor " + (repository + "/" + tablename + ".csv") + " nor gzipped versions";
+            LOG(ERRORL) << e;
             segment = NULL;
-            // throw("Could not find " + tablename);
-            return;
+            throw(e);
         }
         FileReader reader(f);
         while (reader.parseTriple()) {
@@ -604,13 +609,16 @@ EDBIterator *InmemoryTable::getSortedIterator(const Literal &query,
 
     std::vector<uint8_t> offsets;
     int nConstantsSeen = 0;
-    int varNo = 0;
     for (int i = 0; i < query.getTupleSize(); i++) {
         if (! query.getTermAtPos(i).isVariable()) {
             nConstantsSeen++;
         } else {
             offsets.push_back(nConstantsSeen);
         }
+    }
+    if (offsets.size() == 0) {
+        // Apparently, getSortedIterator can be called with a query containing only constants.
+        return getSortedIterator2(query, fields);
     }
     std::vector<uint8_t> newFields;
     for (auto f : fields) {

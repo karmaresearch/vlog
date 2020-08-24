@@ -13,7 +13,7 @@
 #include <fstream>
 
 bool Literal::hasRepeatedVars() const {
-    std::vector<uint8_t> variables;
+    std::vector<Var_t> variables;
     for (uint8_t i = 0; i < getTupleSize(); ++i) {
         VTerm t = getTermAtPos(i);
         if (t.isVariable()){
@@ -73,7 +73,7 @@ std::vector<int> Literal::getVarnumInLiteral() const {
 /* Returns the number of different variables in the Literal
  * */
 uint8_t Literal::getNUniqueVars() const {
-    std::set<uint8_t> variables;
+    std::set<Var_t> variables;
     for (int i = 0; i < tuple.getSize(); ++i) {
         if (tuple.get(i).isVariable()) {
             variables.insert(tuple.get(i).getId());
@@ -242,8 +242,8 @@ std::vector<std::pair<uint8_t, uint8_t>> Literal::getRepeatedVars() const {
 
 bool Literal::sameVarSequenceAs(const Literal &l) const {
     if (getNVars() == l.getNVars()) {
-        std::vector<uint8_t> v1 = getAllVars();
-        std::vector<uint8_t> v2 = l.getAllVars();
+        std::vector<Var_t> v1 = getAllVars();
+        std::vector<Var_t> v2 = l.getAllVars();
         if (v1.size() != v2.size()) {
             // Apparently, one has duplicates
             return false;
@@ -364,8 +364,8 @@ Literal Literal::substitutes(std::vector<Substitution> &subs, int *nsubs) const 
     return Literal(pred, newTuple);
 }
 
-std::vector<uint8_t> Literal::getSharedVars(const std::vector<uint8_t> &vars) const {
-    std::vector<uint8_t> output;
+std::vector<Var_t> Literal::getSharedVars(const std::vector<Var_t> &vars) const {
+    std::vector<Var_t> output;
     for (int i = 0; i < getTupleSize(); ++i) {
         VTerm t = getTermAtPos(i);
         if (t.isVariable() &&
@@ -377,47 +377,47 @@ std::vector<uint8_t> Literal::getSharedVars(const std::vector<uint8_t> &vars) co
     return output;
 }
 
-std::vector<uint8_t> Literal::getNewVars(std::vector<uint8_t> &vars) const {
-    std::vector<uint8_t> output;
+std::vector<Var_t> Literal::getNewVars(std::vector<Var_t> &vars) const {
+    std::vector<Var_t> output;
     for (int i = 0; i < getTupleSize(); ++i) {
         VTerm t = getTermAtPos(i);
         // if t is variable and t.id not in vars and t.id not in output
         if (t.isVariable() &&
                 std::find(vars.begin(), vars.end(), t.getId()) == vars.end() &&
                 std::find(output.begin(), output.end(), t.getId()) == output.end()) {
-                output.push_back(t.getId());
-            }
+            output.push_back(t.getId());
         }
+    }
     return output;
 }
 
-static std::vector<uint8_t> getAllVars(std::vector<Literal> &lits) {
-    std::vector<uint8_t> output;
+static std::vector<Var_t> getAllVars(std::vector<Literal> &lits) {
+    std::vector<Var_t> output;
     for (Literal lit : lits) {
         for (int i = 0; i < lit.getTupleSize(); ++i) {
             VTerm t = lit.getTermAtPos(i);
             if (t.isVariable() &&
                     std::find(output.begin(), output.end(), t.getId()) == output.end()) {
-                    output.push_back(t.getId());
+                output.push_back(t.getId());
             }
         }
     }
     return output;
 }
 
-std::vector<uint8_t> Literal::getAllVars() const {
-    std::vector<uint8_t> output;
+std::vector<Var_t> Literal::getAllVars() const {
+    std::vector<Var_t> output;
     for (int i = 0; i < getTupleSize(); ++i) {
         VTerm t = getTermAtPos(i);
         if (t.isVariable() &&
                 std::find(output.begin(), output.end(), t.getId()) == output.end()) {
-                output.push_back(t.getId());
-            }
+            output.push_back(t.getId());
         }
+    }
     return output;
 }
 
-bool Literal::containsVariable(uint8_t variableId) const {
+bool Literal::containsVariable(Var_t variableId) const {
     auto variables = Literal::getAllVars();
     return std::find(variables.begin(), variables.end(), variableId) != variables.end();
 }
@@ -453,7 +453,7 @@ void Rule::checkRule() const {
     int varCount = 0;
     for (int i = 0; i < body.size(); ++i) {
         Literal l = body[i];
-        std::vector<uint8_t> v = l.getAllVars();
+        std::vector<Var_t> v = l.getAllVars();
         for (int j = 0; j < v.size(); j++) {
             if (! vars[v[j]]) {
                 vars[v[j]] = true;
@@ -464,7 +464,7 @@ void Rule::checkRule() const {
     LOG(DEBUGL) << "Rule " << this->tostring() << " has " << varCount << " variables";
 }
 
-bool Rule::doesVarAppearsInFollowingPatterns(int startingPattern, uint8_t value) const {
+bool Rule::doesVarAppearsInFollowingPatterns(int startingPattern, Var_t value) const {
     for (int i = startingPattern; i < body.size(); ++i) {
         Literal l = body[i];
         for (int j = 0; j < l.getTupleSize(); ++j) {
@@ -484,17 +484,17 @@ bool Rule::doesVarAppearsInFollowingPatterns(int startingPattern, uint8_t value)
 }
 
 Rule Rule::normalizeVars() const {
-    std::set<uint8_t> s_vars;
+    std::set<Var_t> s_vars;
     for(auto &h : heads) {
         for(auto &v : h.getAllVars()) {
             s_vars.insert(v);
         }
     }
-    std::vector<uint8_t> vars; //Converts in a vector
+    std::vector<Var_t> vars; //Converts in a vector
     for(auto v : s_vars) vars.push_back(v);
     for (std::vector<Literal>::const_iterator itr = body.cbegin(); itr != body.cend();
             ++itr) {
-        std::vector<uint8_t> newvars = itr->getNewVars(vars);
+        std::vector<Var_t> newvars = itr->getNewVars(vars);
         for (int i = 0; i < newvars.size(); i++) {
             vars.push_back(newvars[i]);
         }
@@ -526,7 +526,7 @@ Rule Rule::createAdornment(uint8_t headAdornment) const {
     Literal head = heads[0];
     //Assign the adornment to the head
     Literal newHead(Predicate(head.getPredicate(), headAdornment), head.getTuple());
-    std::vector<uint8_t> boundVars;
+    std::vector<Var_t> boundVars;
     for (int i = 0; i < head.getTupleSize(); ++i) {
         if (headAdornment >> i & 1) {
             VTerm t = head.getTermAtPos(i);
@@ -553,11 +553,11 @@ Rule Rule::createAdornment(uint8_t headAdornment) const {
     for (int j = 0; j < body.size(); ++j) {
         const Literal *literal = rearragendBody.at(j);
         uint8_t adornment = 0;
-        std::vector<uint8_t> uniqueVars;
+        std::vector<Var_t> uniqueVars;
         for (int i = 0; i < literal->getTupleSize(); ++i) {
             if (literal->getTermAtPos(i).isVariable()) {
                 bool found = false;
-                for (std::vector<uint8_t>::iterator itr = boundVars.begin();
+                for (std::vector<Var_t>::iterator itr = boundVars.begin();
                         itr != boundVars.end(); ++itr) {
                     if (*itr == literal->getTermAtPos(i).getId()) {
                         found = true;
@@ -568,7 +568,7 @@ Rule Rule::createAdornment(uint8_t headAdornment) const {
                     adornment |= 1 << i;
                 } else {
                     bool isUnique = true;
-                    for (std::vector<uint8_t>::iterator itr = uniqueVars.begin();
+                    for (std::vector<Var_t>::iterator itr = uniqueVars.begin();
                             itr != uniqueVars.end(); ++itr) {
                         if (*itr == literal->getTermAtPos(i).getId()) {
                             isUnique = false;
@@ -591,8 +591,8 @@ Rule Rule::createAdornment(uint8_t headAdornment) const {
     return Rule(ruleId, newHeads, newBody, egd);
 }
 
-std::vector<uint8_t> Rule::getVarsInHead(PredId_t ignore) const {
-    std::vector<uint8_t> headVars;
+std::vector<Var_t> Rule::getVarsInHead(PredId_t ignore) const {
+    std::vector<Var_t> headVars;
     for (const auto& head : heads) {
         if (head.getPredicate().getId() != ignore) {
             for (auto& variable : head.getAllVars()){
@@ -604,8 +604,8 @@ std::vector<uint8_t> Rule::getVarsInHead(PredId_t ignore) const {
     }
     return headVars;
 }
-std::vector<uint8_t> Rule::getVarsInBody() const {
-    std::vector<uint8_t> bodyVars;
+std::vector<Var_t> Rule::getVarsInBody() const {
+    std::vector<Var_t> bodyVars;
     for (const auto& literal : body) {
         for (auto& variable : literal.getAllVars()){
             if (std::find(bodyVars.begin(), bodyVars.end(),variable) == bodyVars.end()){
@@ -619,9 +619,9 @@ std::vector<uint8_t> Rule::getVarsInBody() const {
 /* Check if every variable in the head appears in the body
  * @returns a list of unique existentially quantified variable_ids
  */
-std::vector<uint8_t> Rule::getExistentialVariables() const{
-    std::vector<uint8_t> out;
-    std::vector<uint8_t> bodyVars = getVarsInBody();
+std::vector<Var_t> Rule::getExistentialVariables() const{
+    std::vector<Var_t> out;
+    std::vector<Var_t> bodyVars = getVarsInBody();
     for(const auto& head : heads) {
         for(auto var : head.getAllVars()) {
             //Does var appear in the body?
@@ -636,10 +636,10 @@ std::vector<uint8_t> Rule::getExistentialVariables() const{
 /* Check if every variable in the head appears in the body
  * @returns a list of non-unique frontier variables
  */
-std::vector<uint8_t> Rule::getFrontierVariables(PredId_t ignore) const {
-    std::vector<uint8_t> out;
-    std::vector<uint8_t> bodyVars = getVarsInBody();
-    std::vector<uint8_t> headVars = getVarsInHead(ignore);
+std::vector<Var_t> Rule::getFrontierVariables(PredId_t ignore) const {
+    std::vector<Var_t> out;
+    std::vector<Var_t> bodyVars = getVarsInBody();
+    std::vector<Var_t> headVars = getVarsInHead(ignore);
     for(const auto& var : headVars) {
         if (std::find(bodyVars.begin(), bodyVars.end(),var) != bodyVars.end()) {
             out.push_back(var);
@@ -651,16 +651,16 @@ std::vector<uint8_t> Rule::getFrontierVariables(PredId_t ignore) const {
 /* Calculate the dependencies of the existential variables to the variables in the body
  * @return {var_id:[var_id]} the variable dependences of an existentially quantified variable
  * */
-std::map<uint8_t, std::vector<uint8_t>> Rule::calculateDependencies() const {
-    std::map<uint8_t, std::vector<uint8_t>> dependenciesExtVars;
+std::map<Var_t, std::vector<Var_t>> Rule::calculateDependencies() const {
+    std::map<Var_t, std::vector<Var_t>> dependenciesExtVars;
     auto frontierVars = getFrontierVariables();
-    std::map<uint8_t, std::vector<uint8_t>>::iterator itr;
+    std::map<Var_t, std::vector<Var_t>>::iterator itr;
     for (const auto& extVar : getExistentialVariables()){
         for (const auto& frontierVar : frontierVars) {
             if ((itr = dependenciesExtVars.find(extVar)) != dependenciesExtVars.end()){
-               if (std::find(itr->second.begin(), itr->second.end(), frontierVar) == itr->second.end()) {
-                   itr->second.push_back(frontierVar);
-               }
+                if (std::find(itr->second.begin(), itr->second.end(), frontierVar) == itr->second.end()) {
+                    itr->second.push_back(frontierVar);
+                }
             } else {
                 dependenciesExtVars[extVar].push_back(frontierVar);
             }
@@ -1185,10 +1185,10 @@ Literal Program::parseLiteral(std::string l, Dictionary &dictVariables) {
         //Parse the term
         if (std::isupper(term.at(0))) {
             uint64_t v = dictVariables.getOrAdd(term);
-            if (v != (uint8_t) v) {
+            if (v != (Var_t) v) {
                 throw "Too many variables in rule (> 255)";
             }
-            t.push_back(VTerm((uint8_t) v, 0));
+            t.push_back(VTerm((Var_t) v, 0));
         } else {
             //Constant
             term = rewriteRDFOWLConstants(term);
@@ -1428,7 +1428,7 @@ std::string Program::parseRule(std::string rule, bool rewriteMultihead) {
 
 void Program::rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lBody) {
 
-    std::vector<uint8_t> allHeadVars = getAllVars(lHeads);
+    std::vector<Var_t> allHeadVars = getAllVars(lHeads);
 
     // First, create a rule with a new head, containing all variables of the heads of the original rule.
 

@@ -220,7 +220,7 @@ class VectorFCInternalTableItr final : public FCInternalTableItr {
         }
 
         uint8_t getNColumns() const {
-            return vectors.size();
+            return (uint8_t)vectors.size();
         }
 
         std::vector<std::shared_ptr<Column>> getColumn(const uint8_t ncolumns,
@@ -518,7 +518,7 @@ class InmemoryFCInternalTable final : public FCInternalTable {
 
         bool isEDB() const {
             if (values != NULL) {
-                for (int i = 0; i < nfields; ++i) {
+                for (uint8_t i = 0; i < nfields; ++i) {
                     if (!values->getColumn(i)->isEDB()) {
                         return false;
                     }

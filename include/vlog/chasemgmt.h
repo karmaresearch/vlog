@@ -57,7 +57,7 @@ class ChaseMgmt {
             private:
                 const uint64_t startCounter;
                 const uint8_t sizerow;
-                std::vector<uint8_t> nameArgVars;
+                std::vector<Var_t> nameArgVars;
                 uint64_t currentcounter;
                 std::vector<std::unique_ptr<uint64_t[]>> blocks;
                 uint32_t blockCounter;
@@ -68,7 +68,7 @@ class ChaseMgmt {
 
             public:
                 Rows(uint64_t startCounter, uint8_t sizerow,
-                        std::vector<uint8_t> nameArgVars,
+                        std::vector<Var_t> nameArgVars,
                         TypeChase typeChase) :
                     startCounter(startCounter), sizerow(sizerow),
                     nameArgVars(nameArgVars) {
@@ -84,7 +84,7 @@ class ChaseMgmt {
 
                 uint64_t *getRow(size_t id);
 
-                const std::vector<uint8_t> &getNameArgVars() {
+                const std::vector<Var_t> &getNameArgVars() {
                     return nameArgVars;
                 }
 
@@ -98,15 +98,15 @@ class ChaseMgmt {
 
         class RuleContainer {
             private:
-                std::map<uint8_t, std::vector<uint8_t>> dependencies;
-                std::map<uint8_t, ChaseMgmt::Rows> vars2rows;
+                std::map<Var_t, std::vector<Var_t>> dependencies;
+                std::map<Var_t, ChaseMgmt::Rows> vars2rows;
                 uint64_t ruleBaseCounter;
                 Rule const * rule;
                 TypeChase chase;
 
             public:
                 RuleContainer(uint64_t ruleBaseCounter,
-                        std::map<uint8_t, std::vector<uint8_t>> dep,
+                        std::map<Var_t, std::vector<Var_t>> dep,
                         Rule const * rule,
                         TypeChase chase) {
                     this->ruleBaseCounter = ruleBaseCounter;
@@ -119,7 +119,7 @@ class ChaseMgmt {
                     return rule;
                 }
 
-                ChaseMgmt::Rows *getRows(uint8_t var);
+                ChaseMgmt::Rows *getRows(Var_t var);
         };
 
         std::vector<std::unique_ptr<ChaseMgmt::RuleContainer>> rules;
@@ -142,7 +142,7 @@ class ChaseMgmt {
 
         std::shared_ptr<Column> getNewOrExistingIDs(
                 uint32_t ruleid,
-                uint8_t var,
+                Var_t var,
                 std::vector<std::shared_ptr<Column>> &columns,
                 uint64_t size);
 

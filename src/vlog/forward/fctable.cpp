@@ -13,7 +13,7 @@ FCTable::FCTable(std::mutex *mutex, const uint8_t sizeRow) :
 
 std::string FCTable::getSignature(const Literal &literal) {
     std::string out = "";
-    std::vector<uint8_t> existingVars;
+    std::vector<Var_t> existingVars;
     for (uint8_t i = 0; i < literal.getTupleSize(); ++i) {
         VTerm t = literal.getTermAtPos(i);
         if (t.isVariable()) {

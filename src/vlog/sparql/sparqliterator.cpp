@@ -16,7 +16,12 @@ std::string getString(json &jref) {
                 std::string datatype = jref["datatype"];
                 val = "\"" + val + "\"^^<" + datatype +">";
             } else {
-                val = "\"" + val + "\"^^<http://www.w3.org/2001/XMLSchema#string>";
+                if (jref.count("xml:lang") > 0) {
+                    std::string languageTag = jref["xml:lang"];
+                    val = "\"" + val + "\"@" + languageTag;
+                } else {
+                    val = "\"" + val + "\"^^<http://www.w3.org/2001/XMLSchema#string>";
+                }
             }
         }
         return val;

@@ -16,11 +16,11 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
         uint8_t posConstantColumns[256];
         uint8_t nKnownColumns;
         uint8_t posKnownColumns[256];
-        std::map<uint8_t, std::vector<uint8_t>> posExtColumns;
+        std::map<Var_t, std::vector<uint8_t>> posExtColumns;
         std::unique_ptr<SegmentInserter> tmpRelation;
         //In the above case, I store the data in a temporary segment, and assign
         //existential IDs when I consolidate
-        std::vector<uint8_t> varsUsedForExt;
+        std::vector<Var_t> varsUsedForExt;
         std::vector<int> colsForExt;
 
         static void filterDerivations(FCTable *t,

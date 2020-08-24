@@ -25,7 +25,7 @@ void RuleExecutor::calculateJoinsSizeIntermediateRelations() {
     joins.clear();
     posFromHeadToFirstSupplRelation.clear();
 
-    std::vector<uint8_t> boundVars;
+    std::vector<Var_t> boundVars;
 
     int nBoundInAdornment = 0;
     int nBoundVarInAdornment = 0;
@@ -74,7 +74,7 @@ void RuleExecutor::calculateJoinsSizeIntermediateRelations() {
     for (size_t j = 0; j < body.size(); ++j) {
         Literal literal = body.at(j);
         uint8_t adornmentLiteral = literal.getPredicate().getAdornment();
-        std::vector<uint8_t> currentSignature;
+        std::vector<Var_t> currentSignature;
         std::vector<int> posToSupplRel;
         std::vector<std::pair<uint8_t, uint8_t>> boundFromLiteral;
         std::vector<std::pair<uint8_t, uint8_t>> boundFromSuppl;
@@ -116,11 +116,11 @@ void RuleExecutor::calculateJoinsSizeIntermediateRelations() {
 
         //Add to currentSignature all variables in the previous rounds that are used later
         int pos = nvars;
-        for (std::vector<uint8_t>::iterator itr = boundVars.begin(); itr != boundVars.end();
+        for (std::vector<Var_t>::iterator itr = boundVars.begin(); itr != boundVars.end();
                 ++itr) {
             //Check the variables is not already in the current signature
             bool found = false;
-            for (std::vector<uint8_t>::iterator itr2 = currentSignature.begin();
+            for (std::vector<Var_t>::iterator itr2 = currentSignature.begin();
                     itr2 != currentSignature.end();
                     ++itr2) {
                 if (*itr2 == *itr) {
@@ -151,7 +151,7 @@ void RuleExecutor::calculateJoinsSizeIntermediateRelations() {
             //Search position of the variable in boundVars
             uint8_t k = 0;
             bool found = false;
-            for (std::vector<uint8_t>::iterator itr = boundVars.begin();
+            for (std::vector<Var_t>::iterator itr = boundVars.begin();
                     itr != boundVars.end(); ++itr) {
                 if (*itr == t.getId()) {
                     projectionLastSuppl.push_back(k);

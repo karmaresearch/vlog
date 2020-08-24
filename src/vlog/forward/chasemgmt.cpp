@@ -71,7 +71,7 @@ static bool checkValue(uint64_t target, uint64_t v, std::set<uint64_t> &toCheck)
 //************** END ROWS *************
 
 //************** RULE CONTAINER ***************
-ChaseMgmt::Rows *ChaseMgmt::RuleContainer::getRows(uint8_t var) {
+ChaseMgmt::Rows *ChaseMgmt::RuleContainer::getRows(Var_t var) {
     if (!vars2rows.count(var)) {
         uint8_t sizerow = dependencies[var].size();
         uint64_t startCounter = ruleBaseCounter;
@@ -182,7 +182,7 @@ bool ChaseMgmt::checkRecursive(uint64_t rv) {
 
 std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
         uint32_t ruleid,
-        uint8_t var,
+        Var_t var,
         std::vector<std::shared_ptr<Column>> &columns,
         uint64_t sizecolumns) {
     assert(sizecolumns > 0);

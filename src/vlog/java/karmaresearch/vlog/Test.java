@@ -21,6 +21,10 @@ class Test {
             + "EDB1_predname=MotherOf\n" + "EDB1_type=SPARQL\n"
             + "EDB1_param0=http://query.wikidata.org/sparql\n"
             + "EDB1_param1=b,a\n" + "EDB1_param2=?a p:P25 ?b\n";
+    private static String edbConf1 = "EDB0_predname=lighthouse\n"
+            + "EDB0_type=SPARQL\n"
+            + "EDB0_param0=http://query.wikidata.org/sparql\n"
+            + "EDB0_param1=subject,subjectLabel\n" + "EDB0_param2=?subject wdt:P31 wd:Q39715; rdfs:label ?subjectLabel\n";
     private static Atom isMotherOf = new Atom("MotherOf",
             new Term(TermType.VARIABLE, "a"), new Term(TermType.VARIABLE, "b"));
     private static Atom isFatherOf = new Atom("FatherOf",
@@ -58,8 +62,22 @@ class Test {
         }
     }
 
+    public static void testlanguagetag() throws Exception {
+        VLog vlog = new VLog();
+        vlog.setLogLevel(LogLevel.INFO);
+        vlog.start(edbConf1, false);
+        try (TermQueryResultIterator e = vlog.query(
+                new Atom("lighthouse", new Term(Term.TermType.VARIABLE, "A"), new Term(TermType.VARIABLE, "B")))) {
+            while (e.hasNext()) {
+                Term[] t = e.next();
+                System.out.println(Arrays.toString(t));
+            }
+        }
+    }
+
     static void runTest() throws Exception {
         testEmpty();
+        testlanguagetag();
         VLog vlog = new VLog();
         vlog.setLogLevel(LogLevel.INFO);
         try {

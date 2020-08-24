@@ -1003,8 +1003,8 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
  * @param plan:  &RuleExecutionPlan
  * @param heads: vector < Literal >
  * */
-void SemiNaiver::reorderPlanForNegatedLiterals(RuleExecutionPlan &plan, const std::vector<Literal> &heads){
-    std::set<uint8_t> bounded_vars;
+void SemiNaiver::reorderPlanForNegatedLiterals(RuleExecutionPlan &plan, const std::vector<Literal> &heads) {
+    std::set<Var_t> bounded_vars;
     std::vector<uint8_t> literal_indexes;
     std::vector<uint8_t> new_order;
     bounded_vars.clear();
@@ -1021,12 +1021,12 @@ void SemiNaiver::reorderPlanForNegatedLiterals(RuleExecutionPlan &plan, const st
     while(!literal_indexes.empty()) {
         int i;
         const Literal *literal_i;
-        std::vector<uint8_t> vars_i;
+        std::vector<Var_t> vars_i;
 
         for (i=0; i < literal_indexes.size(); ++i){
             literal_i = plan.plan[literal_indexes[i]];
             vars_i = literal_i->getAllVars(); // unique variables ordered by appearing order
-            std::set<uint8_t> s_vars_i(vars_i.begin(), vars_i.end()); //set
+            std::set<Var_t> s_vars_i(vars_i.begin(), vars_i.end()); //set
 
             c1 = literal_i->isNegated();
             c2 = std::includes(std::begin(bounded_vars), std::end(bounded_vars),
@@ -1069,7 +1069,7 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
     //Ensure there are always variables
     std::vector<std::pair<uint8_t, size_t>> adaptedPosCards;
     adaptedPosCards.push_back(positionCards.front());
-    std::vector<uint8_t> vars = plan.plan[
+    std::vector<Var_t> vars = plan.plan[
         positionCards[0].first]
             ->getAllVars();
     // LOG(DEBUGL) << "Added vars of " << plan.plan[positionCards[0].first]->tostring(NULL, NULL);
@@ -1092,7 +1092,7 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
             break;
         }
         adaptedPosCards.push_back(positionCards[saved]);
-        std::vector<uint8_t> newvars = plan.plan[positionCards[saved].first]->getAllVars();
+        std::vector<Var_t> newvars = plan.plan[positionCards[saved].first]->getAllVars();
         std::copy(newvars.begin(), newvars.end(), std::back_inserter(vars));
         // LOG(DEBUGL) << "Added vars of " << plan.plan[positionCards[0].first]->tostring(NULL, NULL);
         positionCards.erase(positionCards.begin() + saved);
@@ -1383,7 +1383,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                             joinOutput);
                     durationFirstAtom += std::chrono::system_clock::now() - startFirstA;
                     first = false;
-                } else { 
+                } else {
                     // We have an atom without variables (or none that we need further on), and we already
                     // checked that the atoms are not empty.
                 }

@@ -2,7 +2,7 @@
 #include <vlog/ruleexecdetails.h>
 #include <vlog/seminaiver.h>
 
-static bool isPresent(uint8_t el, std::vector<uint8_t> &v) {
+static bool isPresent(Var_t el, std::vector<Var_t> &v) {
     for (int i = 0; i < v.size(); i++) {
         if (el == v[i]) {
             return true;
@@ -429,7 +429,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
 
     //Create existential columns
     // assert(literal.getTupleSize() == c.size()); ???? not correct, I think.
-    std::map<uint8_t, std::shared_ptr<Column>> extvars;
+    std::map<Var_t, std::shared_ptr<Column>> extvars;
     uint8_t count = 0;
     for(const auto &at : atomTables) {
         std::vector<std::shared_ptr<Column>> cols;
@@ -624,7 +624,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
 
     //Create existential columns store them in a vector with the corresponding
     //var ID
-    std::map<uint8_t, std::shared_ptr<Column>> extvars;
+    std::map<Var_t, std::shared_ptr<Column>> extvars;
     int count = 0;
     for(const auto &at : atomTables) {
         const auto &literal = at->getLiteral();
@@ -652,8 +652,8 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     //I sort the columns according the order where they appear
                     //in the head
                     sort(depc_t.begin(), depc_t.end(),
-                            [](const std::pair<uint8_t, std::shared_ptr<Column>>& a,
-                                const std::pair<uint8_t, std::shared_ptr<Column>>& b) -> bool {
+                            [](const std::pair<Var_t, std::shared_ptr<Column>>& a,
+                                const std::pair<Var_t, std::shared_ptr<Column>>& b) -> bool {
                             return a.first < b.first;
                             });
                     //Now that the columns are sorted, I no longer care
@@ -737,7 +737,7 @@ std::vector<uint64_t> ExistentialRuleProcessor::blocked_check_computeBodyAtoms(
 #endif
     auto bodyAtoms = plan.plan;
     int idx = 0;
-    std::vector<uint8_t> vars = ruleDetails->rule.getFrontierVariables(headPredicateToIgnore);
+    std::vector<Var_t> vars = ruleDetails->rule.getFrontierVariables(headPredicateToIgnore);
     std::vector<uint64_t> toMatch(vars.size());
     std::vector<bool> found(vars.size());
 
@@ -747,7 +747,7 @@ std::vector<uint64_t> ExistentialRuleProcessor::blocked_check_computeBodyAtoms(
         for(int i = 0; i < v2p.size(); ++i) {
             auto pair = v2p[i];
             tuple.set(VTerm(0, row[pair.second]), pair.first);
-            uint8_t varNo = atom->getTermAtPos(pair.first).getId();
+            Var_t varNo = atom->getTermAtPos(pair.first).getId();
             for (int j = 0; j < vars.size(); j++) {
                 if (vars[j] == varNo) {
                     if (! found[j]) {
@@ -894,7 +894,7 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                 const uint64_t nvalues = rows->getSizeRow();
                 //Map them to variables
                 const auto &nameVars = rows->getNameArgVars();
-                std::map<uint8_t, uint64_t> mappings;
+                std::map<Var_t, uint64_t> mappings;
                 for(int i = 0; i < nvalues; ++i) {
                     mappings.insert(std::make_pair(nameVars[i], values[i]));
                 }
@@ -907,7 +907,7 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                         for(uint8_t m = 0; m < bLiteral.getTupleSize(); ++m) {
                             const VTerm term = bLiteral.getTermAtPos(m);
                             if (term.isVariable()) {
-                                uint8_t varID = term.getId();
+                                Var_t varID = term.getId();
                                 if (!mappings.count(varID)) {
                                     if (rmfa) {
                                         mappings.insert(
@@ -944,7 +944,7 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
                     for(uint8_t m = 0; m < hLiteral.getTupleSize(); ++m) {
                         const VTerm term = hLiteral.getTermAtPos(m);
                         if (term.isVariable()) {
-                            uint8_t varID = term.getId();
+                            Var_t varID = term.getId();
                             if (!mappings.count(varID)) {
                                 // Here, we must create a value for the existential variable, using the same row (I think ...)
                                 auto *vrows = ruleContainer->getRows(varID);
