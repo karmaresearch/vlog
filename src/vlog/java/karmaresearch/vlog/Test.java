@@ -1,5 +1,6 @@
 package karmaresearch.vlog;
 
+import java.io.IOException;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -58,8 +59,22 @@ class Test {
         }
     }
 
+    public static void testNonExisting() throws Exception {
+        String edbConf = "EDB0_predname=TE\nEDB0_type=Trident\nEDB0_param0=nonExisting\n";
+        VLog vlog = new VLog();
+        vlog.setLogLevel(LogLevel.INFO);
+        try {
+            vlog.start(edbConf, false);
+        } catch(IOException e) {
+            // OK
+            return;
+        }
+        System.err.println("vlog should have thrown an exception on non-existing trident db");
+    }
+
     static void runTest() throws Exception {
         testEmpty();
+        testNonExisting();
         VLog vlog = new VLog();
         vlog.setLogLevel(LogLevel.INFO);
         try {
