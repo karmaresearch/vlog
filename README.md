@@ -43,7 +43,7 @@ docker run -ti karmaresearch/vlog
 Please check:
 * The [Wiki](https://github.com/karmaresearch/vlog/wiki) for instructions on **how to run VLog from the command line**
 * A [screencast](https://iccl.inf.tu-dresden.de/w/images/1/18/Vlog-demo-iswc2016.mp4) was presented at *ISWC'16, Posters and Demos*.
-* You can **use VLog in Java** through the [VLog4j](https://github.com/knowsys/vlog4j) library, which also supports additional input formats for rules and data
+* You can **use VLog in Java** through the [Rulewerk](https://github.com/knowsys/rulewerk/) library, which also supports additional input formats for rules and data
 
 ## License
 
