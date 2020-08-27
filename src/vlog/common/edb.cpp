@@ -1327,14 +1327,8 @@ std::shared_ptr<Column> EDBTable::checkIn(
     //    }
 
     LOG(DEBUGL) << "EDBTable::checkIn, literal = " << l.tostring() << ", posInL = " << (int) posInL;
-//    std::vector<uint8_t> posVars = l.getPosVars();
+    std::vector<uint8_t> posVars = l.getPosVars();
     std::vector<uint8_t> fieldsToSort;
-//    for (int i = 0; i < posVars.size(); i++) {
-//        if (i == posInL) {
-//            fieldsToSort.push_back(i);
-//            break;
-//        }
-//    }
     fieldsToSort.push_back(posInL);
     EDBIterator *iter = getSortedIterator(l, fieldsToSort);
 
@@ -1344,7 +1338,7 @@ std::shared_ptr<Column> EDBTable::checkIn(
     sizeOutput = 0;
     while (iter->hasNext()) {
         iter->next();
-        const Term_t v2 = iter->getElementAt(posInL);
+        const Term_t v2 = iter->getElementAt(posVars[posInL]);
         while (values[idx1] < v2) {
             idx1++;
             if (idx1 == values.size()) {
