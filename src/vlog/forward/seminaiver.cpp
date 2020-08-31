@@ -1487,11 +1487,7 @@ size_t SemiNaiver::estimateCardTable(const Literal &literal,
             return 0;
         }
     } else {
-        size_t estimate = table->estimateCardinality(literal, minIteration, maxIteration);
-        if (estimate == 0) {
-            return 0;
-        }
-        return estimate;
+        return table->estimateCardinality(literal, minIteration, maxIteration);
         // Was: return table->estimateCardInRange(minIteration, maxIteration);
     }
 }
