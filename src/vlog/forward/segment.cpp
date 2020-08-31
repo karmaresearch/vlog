@@ -77,8 +77,6 @@ size_t Segment::estimate(const uint8_t nconstantsToFilter,
         const Term_t *valuesConstantsToFilter,
         const uint8_t nfields) const {
 
-    // Note: we can only return non-zero if we are sure.
-
     if (nconstantsToFilter == 0) {
         return columns[0]->estimateSize();
     }
@@ -93,7 +91,7 @@ size_t Segment::estimate(const uint8_t nconstantsToFilter,
     //linear scan
 
     size_t processedRows = 0;
-    while (estimate == 0 || processedRows < 100) {
+    while (processedRows < 100) {
         bool cond = true;
         for (int i = 0; i < nconstantsToFilter && cond; ++i) {
             // cond = cond && readers[i]->hasNext();
@@ -117,7 +115,7 @@ size_t Segment::estimate(const uint8_t nconstantsToFilter,
         readers[i]->clear();
     }
 
-    if (estimate == 0 || processedRows < 100) {
+    if (processedRows < 100) {
         return estimate;
     } else {
         size_t minSize = 1;

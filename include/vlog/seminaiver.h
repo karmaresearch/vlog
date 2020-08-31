@@ -128,6 +128,8 @@ class SemiNaiver {
                 const size_t minIteration,
                 const size_t maxIteration);
 
+	bool checkEmpty(const Literal *lit);
+
     protected:
         std::vector<FCTable *>predicatesTables;
         EDBLayer &layer;
