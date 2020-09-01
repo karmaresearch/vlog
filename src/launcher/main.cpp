@@ -269,7 +269,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     query_options.add<int>("","port", 8080, "Port to use for the web interface. Default is 8080",false);
 #endif
 
-    query_options.add<bool>("","no-filtering", false, "Disable filter optimization.",false);
+    query_options.add<bool>("","no-filtering", true, "Disable filter optimization.",false);
     query_options.add<bool>("","no-intersect", false, "Disable intersection optimization.",false);
     query_options.add<string>("","graphfile", "", "Path to store the rule dependency graph",false);
 

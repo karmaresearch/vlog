@@ -1342,10 +1342,11 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 } else {
                     // We have an atom without variables (or none that we need further on), and we already
                     // checked that the atoms are not empty.
-		    // No we did not! The estimate said it was not empty, but that is just an estimate.
-		    if (checkEmpty(bodyLiteral)) {
-			break;
-		    }
+                    // No we did not! The estimate said it was not empty, but that is just an estimate.
+                    if (checkEmpty(bodyLiteral)) {
+                        delete joinOutput;
+                        break;
+                    }
                 }
             } else {
                 //Perform the join

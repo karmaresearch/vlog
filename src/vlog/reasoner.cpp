@@ -594,7 +594,7 @@ TupleIterator *Reasoner::getMagicIterator(Literal &query,
 #endif
 
     SemiNaiver *naiver = new SemiNaiver(
-            edb, magicProgram.get(), true, true, false, -1, false, false) ;
+            edb, magicProgram.get(), true, false, false, -1, false, false) ;
 
     //Add all the input tuples in the input relation
     Predicate pred = magicProgram->getPredicate(inputOutputRelIDs.first);
@@ -703,7 +703,7 @@ TupleIterator *Reasoner::getMaterializationIterator(Literal &query,
 
     // Run materialization
     SemiNaiver *sn = new SemiNaiver(
-            edb, &program, true, true,
+            edb, &program, true, false,
             false, -1, false, false);
 
     sn->run();
