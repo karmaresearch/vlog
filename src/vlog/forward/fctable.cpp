@@ -72,40 +72,75 @@ FCIterator FCTable::read(const size_t mincount, const size_t maxcount) const {
 }
 
 void FCTable::collapseBlocks(size_t maxIter, int nThreads) {
-    std::vector<FCBlock>::const_iterator last = blocks.begin();
+    std::vector<FCBlock>::iterator last = blocks.begin();
+    std::vector<std::vector<FCBlock *>> splitBlocks;
+
     while (last != blocks.end() && last->iteration < maxIter) {
         last++;
     }
-
-    if (last - blocks.begin() < 10) {
-        // Only collapse if it saves significantly on the number of blocks.
+    size_t count = last - blocks.begin();
+    if (count < 8) {
+        LOG(DEBUGL) << "Not enough reduction in blocks to collapse";
         return;
     }
-    std::vector<FCBlock>::const_iterator itr = last - 1;
 
-    std::shared_ptr<const FCInternalTable> currentTable(new InmemoryFCInternalTable(itr->table->getRowSize(), itr->iteration));
-
-    itr = last;
+    // We only collapse blocks with the same rule, ruleExecOrder and posQueryInRule
     do {
-        itr--;
-        currentTable = currentTable->merge(itr->table, nThreads);
-    } while (itr != blocks.begin());
+        last--;
+        bool found = false;
+        for (int i = 0; i < splitBlocks.size(); i++) {
+             if (splitBlocks[i][0]->rule == last->rule
+                     && splitBlocks[i][0]->posQueryInRule == last->posQueryInRule
+                     && splitBlocks[i][0]->ruleExecOrder == last->ruleExecOrder) {
+                 found = true;
+                 splitBlocks[i].push_back(&last[0]);
+             }
+        }
+        if (! found) {
+            std::vector<FCBlock *> temp;
+            temp.push_back(&last[0]);
+            splitBlocks.push_back(temp);
+        }
+    } while (last != blocks.begin());
 
-    // blocks.erase(blocks.begin(), last-1);    // Does not compile.
-
-    itr = last-1;
     std::vector<FCBlock> newBlocks;
+
+    bool collapsed = false;
+    for (int i = 0; i < splitBlocks.size(); i++) {
+        if (splitBlocks[i].size() > 1) {
+            auto itr = splitBlocks[i][0];
+            std::shared_ptr<const FCInternalTable> currentTable(new InmemoryFCInternalTable(itr->table->getRowSize(), itr->iteration));
+            for (int j = 0; j < splitBlocks[i].size(); j++) {
+                itr = splitBlocks[i][j];
+                currentTable = currentTable->merge(itr->table, nThreads);
+            }
+            splitBlocks[i][0]->table = currentTable;
+            collapsed = true;
+        }
+    }
+
+    if (! collapsed) {
+        LOG(DEBUGL) << "No collapsing opportunitiees";
+        return;
+    }
+
+    // Take care of iteration order
+    for (int i = splitBlocks.size() - 1; i >= 0; i--) {
+        newBlocks.push_back(*(splitBlocks[i][0]));
+    }
+
+    auto itr = blocks.begin() + count;
     while (itr != blocks.end()) {
         newBlocks.push_back(*itr);
         itr++;
     }
+
     blocks.clear();
     itr = newBlocks.begin();
     while (itr != newBlocks.end()) {
         blocks.push_back(*itr);
         itr++;
     }
-    blocks.begin()->table = currentTable;
 }
 
 FCBlock &FCTable::getLastBlock() {
