@@ -463,16 +463,16 @@ void WebInterface::processRequest(std::string req, std::string &resp) {
             //Start a materialization
             if (program) {
                 if (!sn || !sn->isRunning()) {
-                    bool multithreaded = !vm["multithreaded"].empty();
+                    bool multithreaded = vm["multithreaded"].as<bool>();
                     sn = Reasoner::getSemiNaiver(*edb.get(),
-                            program.get(), vm["no-intersect"].empty(),
-                            vm["no-filtering"].empty(),
+                            program.get(), ! vm["no-intersect"].as<bool>(),
+                            ! vm["no-filtering"].as<bool>(),
                             multithreaded,
                             vm["restrictedChase"].as<bool>()
                             ? TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE,
                             multithreaded ? vm["nthreads"].as<int>() : -1,
                             multithreaded ? vm["interRuleThreads"].as<int>() : 0,
-                            !vm["shufflerules"].empty());
+                            vm["shufflerules"].as<bool>());
                     cvMatRunner.notify_one(); //start the computation
                     page = getPage("/mat/infobox.html");
                 } else {
