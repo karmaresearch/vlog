@@ -413,9 +413,6 @@ bool FCTable::add(std::shared_ptr<const FCInternalTable> t,
     }
 
     //There is no tuple with the same iteration in the table. Add a new block
-    if (!t->isSorted() && t->getNRows() > 1) {
-        throw 10;
-    }
 
     FCBlock block(iteration, t, literal, posLiteralInRule,
             rule, ruleExecOrder, isCompleted);
