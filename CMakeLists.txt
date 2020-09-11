@@ -217,8 +217,8 @@ if (CMAKE_THREAD_LIBS_INIT)
 endif()
 
 #Set compiler options
-set(CLANG_ONLY_COMPILE_FLAGS "-Wimplicit-int-conversion")
-set(GNUCXX_ONLY_COMPILE_FLAGS "-Wconversion")
+# set(CLANG_ONLY_COMPILE_FLAGS "-Wimplicit-int-conversion")
+# set(GNUCXX_ONLY_COMPILE_FLAGS "-Wconversion")
 if((${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang") OR (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU"))
     set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3")
     set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -DDEBUG")

@@ -435,8 +435,11 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
                 for (int i = 0; i < rLit->getTupleSize(); ++i) {
                     VTerm t2 = rLit->getTermAtPos(i);
                     if (t2.isVariable() && t.getId() == t2.getId()) {
-                        if (foundJoin)
-                            throw 10; //there should be only one
+                        if (foundJoin) {
+                            // throw 10; //there should be only one
+			    // Apparently we don't understand this case. Giving up.
+			    return false;
+			}
                         joinRandNRLits.first = j;
                         joinRandNRLits.second = i;
                         foundJoin = true;
@@ -446,8 +449,11 @@ bool TableFilterer::producedDerivationInPreviousStepsWithSubs_rec(
                 for (int i = 0; i < headBlockRule.getTupleSize(); ++i) {
                     VTerm t2 = headBlockRule.getTermAtPos(i);
                     if (t2.isVariable() && t.getId() == t2.getId()) {
-                        if (foundHead)
-                            throw 10;
+                        if (foundHead) {
+                            // throw 10;
+			    // Apparently we don't understand this case. Giving up.
+			    return false;
+			}
                         joinHeadAndNRLits.first = i;
                         joinHeadAndNRLits.second = j;
                         foundHead = true;

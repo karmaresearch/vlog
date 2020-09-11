@@ -251,27 +251,21 @@ bool EDBColumn::isEmptyRemovals() const {
 }
 
 size_t EDBColumn::estimateSize() const {
-    QSQQuery query(l);
     if (!unq) {
-        return layer.getCardinality(*query.getLiteral());
+        return layer.getCardinality(l);
     } else {
-        return layer.getCardinalityColumn(*query.getLiteral(), posColumn);
+        return layer.getCardinalityColumn(l, l.getPosVars()[posColumn]);
     }
 }
 
 size_t EDBColumn::size() const {
-    // TODO: check this! It seems to assume that arity == 3? --Ceriel
-    QSQQuery query(l);
     size_t retval;
     if (!unq) {
-        if (l.getNVars() == 2) {
-            retval = layer.getCardinality(*query.getLiteral());
-        } else if (l.getNVars() == 1) {
-            retval = layer.getCardinality(*query.getLiteral());
-        } else {
-            retval = EDBColumnReader(l, posColumn, presortPos, layer, unq).size();
-        }
+        retval = layer.getCardinality(l);
     } else {
+        retval = layer.getCardinalityColumn(l, l.getPosVars()[posColumn]);
+        /*
+        // TODO: check this! It seems to assume that arity == 3? --Ceriel
         if (l.getNVars() == 2) {
             retval = layer.getCardinalityColumn(*query.getLiteral(), l.getPosVars()[posColumn]);
         } else {
@@ -279,6 +273,7 @@ size_t EDBColumn::size() const {
                 " to count the size";
             retval = EDBColumnReader(l, posColumn, presortPos, layer, unq).size();
         }
+        */
     }
 #if DEBUG
     if (layer.hasRemoveLiterals(pred_id)) {

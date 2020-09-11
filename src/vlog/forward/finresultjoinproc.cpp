@@ -507,8 +507,12 @@ bool SingleHeadFinalRuleProcessor::consolidate(const bool isFinished,
         return false;
     }
 
-    if (t->nBlocks() > 32) {
+    /*
+     * Note that a side effect of collapsing is that we lose the iteration number of derivations.
+     */
+    if (t->nBlocks() > 16) {
         t->collapseBlocks(ruleDetails->lastExecution, nthreads);
+        LOG(DEBUGL) << "collapsed blocks until iteration " << ruleDetails->lastExecution << ", number of blocks is now " << t->nBlocks();
     }
     if (utmpt != NULL) {
         for (int i = 0; i < nbuffers; ++i) {

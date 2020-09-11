@@ -1386,6 +1386,11 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 } else {
                     // We have an atom without variables (or none that we need further on), and we already
                     // checked that the atoms are not empty.
+                    // No we did not! The estimate said it was not empty, but that is just an estimate.
+                    if (checkEmpty(bodyLiteral)) {
+                        delete joinOutput;
+                        break;
+                    }
                 }
             } else {
                 //Perform the join
@@ -1521,6 +1526,42 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
     return newDerivations;
 }
 
+bool SemiNaiver::checkEmpty(const Literal *lit) {
+    FCIterator tableIt = getTable(lit->getPredicate().getId());
+    VTuple tuple = lit->getTuple();
+    std::vector<std::pair<uint8_t, uint8_t>> repeated = lit->getRepeatedVars();
+
+    while (! tableIt.isEmpty()) {
+	std::shared_ptr<const FCInternalTable> table = tableIt.getCurrentTable();
+	FCInternalTableItr *itrTable = table->getIterator();
+	while (itrTable->hasNext()) {
+	    itrTable->next();
+	    bool found = true;
+	    for (int i = 0; i < tuple.getSize(); i++) {
+		if (! tuple.get(i).isVariable()) {
+		    if (itrTable->getCurrentValue(i) != tuple.get(i).getValue()) {
+			found = false;
+			break;
+		    }
+		}
+		for (uint8_t i = 0; i < repeated.size(); ++i) {
+		    if (itrTable->getCurrentValue(repeated[i].first) != itrTable->getCurrentValue(repeated[i].second)) {
+			found = false;
+			break;
+		    }
+		}
+	    }
+	    if (found) {
+		table->releaseIterator(itrTable);
+		return false;
+	    }
+	}
+	table->releaseIterator(itrTable);
+	tableIt.moveNextCount();
+    }
+    return true;
+}
+
 size_t SemiNaiver::getNLastDerivationsFromList() {
     return listDerivations.back().table->getNRows();
 }
@@ -1549,11 +1590,7 @@ size_t SemiNaiver::estimateCardTable(const Literal &literal,
             return 0;
         }
     } else {
-        size_t estimate = table->estimateCardinality(literal, minIteration, maxIteration);
-        if (estimate == 0) {
-            return 0;
-        }
-        return estimate;
+        return table->estimateCardinality(literal, minIteration, maxIteration);
         // Was: return table->estimateCardInRange(minIteration, maxIteration);
     }
 }

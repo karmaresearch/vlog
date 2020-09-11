@@ -794,7 +794,7 @@ JNIEXPORT jlong JNICALL Java_karmaresearch_vlog_VLog_nativeQuerySize(JNIEnv * en
 
 		LOG(INFOL) << "Starting full materialization";
 		try {
-			f->sn = new SemiNaiver(*(f->layer), f->program, true, true, false,
+			f->sn = new SemiNaiver(*(f->layer), f->program, true, false, false,
 					(bool) skolem ?
 					TypeChase::SKOLEM_CHASE : TypeChase::RESTRICTED_CHASE,
 					-1, false, false);

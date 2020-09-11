@@ -127,6 +127,8 @@ class SemiNaiver {
                 const size_t minIteration,
                 const size_t maxIteration);
 
+	bool checkEmpty(const Literal *lit);
+
     protected:
         TypeChase typeChase;
         bool checkCyclicTerms;

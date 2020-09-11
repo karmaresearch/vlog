@@ -325,7 +325,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     query_options.add<int>("","port", 8080, "Port to use for the web interface. Default is 8080",false);
 #endif
 
-    query_options.add<bool>("","no-filtering", false, "Disable filter optimization.",false);
+    query_options.add<bool>("","no-filtering", true, "Disable filter optimization.",false);
     query_options.add<bool>("","no-intersect", false, "Disable intersection optimization.",false);
     query_options.add<string>("","graphfile", "", "Path to store the rule dependency graph",false);
 
@@ -523,11 +523,11 @@ void launchTriggeredMat(int argc,
     }
 
     int nthreads = vm["nthreads"].as<int>();
-    if (vm["multithreaded"].empty()) {
+    if (! vm["multithreaded"].as<bool>()) {
         nthreads = -1;
     }
     int interRuleThreads = vm["interRuleThreads"].as<int>();
-    if (vm["multithreaded"].empty()) {
+    if (! vm["multithreaded"].as<bool>()) {
         interRuleThreads = 0;
     }
 
@@ -670,7 +670,7 @@ void launchFullMat(int argc,
 
     //Set up the ruleset and perform the pre-materialization if necessary
     {
-        if (!vm["automat"].empty()) {
+        if (vm["automat"].as<bool>()) {
             //Automatic prematerialization
             std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
             Materialization mat;
@@ -693,24 +693,24 @@ void launchFullMat(int argc,
         }
 
         int nthreads = vm["nthreads"].as<int>();
-        if (vm["multithreaded"].empty()) {
+        if (! vm["multithreaded"].as<bool>()) {
             nthreads = -1;
         }
         int interRuleThreads = vm["interRuleThreads"].as<int>();
-        if (vm["multithreaded"].empty()) {
+        if (! vm["multithreaded"].as<bool>()) {
             interRuleThreads = 0;
         }
 
         //Prepare the materialization
         std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(db,
-                &p, vm["no-intersect"].empty(),
-                vm["no-filtering"].empty(),
-                !vm["multithreaded"].empty(),
+                &p, ! vm["no-intersect"].as<bool>(),
+                ! vm["no-filtering"].as<bool>(),
+                vm["multithreaded"].as<bool>(),
                 vm["restrictedChase"].as<bool>()
                 ? TypeChase::RESTRICTED_CHASE : TypeChase::SKOLEM_CHASE,
                 nthreads,
                 interRuleThreads,
-                ! vm["shufflerules"].empty(),
+                ! vm["shufflerules"].as<bool>(),
                 NULL,
                 vm["sameasAlgo"].as<string>());
 
@@ -876,7 +876,7 @@ void execSPARQLQuery(EDBLayer &edb, ProgramArgs &vm) {
 
     //Set up the ruleset and perform the pre-materialization if necessary
     if (!pathRules.empty()) {
-        if (!vm["automat"].empty()) {
+        if (vm["automat"].as<bool>()) {
             //Automatic prematerialization
             std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
             Materialization *mat = new Materialization();
@@ -1096,7 +1096,7 @@ void execLiteralQuery(EDBLayer &edb, ProgramArgs &vm) {
 
     //Set up the ruleset and perform the pre-materialization if necessary
     if (!pathRules.empty()) {
-        if (!vm["automat"].empty()) {
+        if (vm["automat"].as<bool>()) {
             //Automatic prematerialization
             std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
             Materialization *mat = new Materialization();
@@ -1291,7 +1291,7 @@ int main(int argc, const char** argv) {
     } else if (cmd == "mat") {
         EDBConf conf(edbFile);
         conf.setRootPath(Utils::parentDir(edbFile));
-        EDBLayer *layer = new EDBLayer(conf, ! vm["multithreaded"].empty());
+        EDBLayer *layer = new EDBLayer(conf, vm["multithreaded"].as<bool>());
         EDBRemoveLiterals *rm;
         if (! vm["rm"].empty()) {
             std::string path(vm["rm"].as<string>());
@@ -1318,7 +1318,7 @@ int main(int argc, const char** argv) {
     } else if (cmd == "mat_tg") {
         EDBConf conf(edbFile);
         conf.setRootPath(Utils::parentDir(edbFile));
-        EDBLayer *layer = new EDBLayer(conf, ! vm["multithreaded"].empty());
+        EDBLayer *layer = new EDBLayer(conf, vm["multithreaded"].as<bool>());
         launchTriggeredMat(argc, argv, full_path, *layer, vm,
                 vm["rules"].as<string>(), vm["trigger_paths"].as<string>());
         delete layer;

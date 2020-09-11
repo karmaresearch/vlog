@@ -59,7 +59,7 @@ FCInternalTableItr *InmemoryFCInternalTable::getIterator() const {
 
     assert(values == NULL || values->getNColumns() == nfields);
 
-    std::shared_ptr<const Segment> allValues = InmemoryFCInternalTable::mergeUnmergedSegments(values, sorted, unmergedSegments, false, 1);
+    std::shared_ptr<const Segment> allValues = mergeUnmergedSegments(1);
     InmemoryFCInternalTableItr *itr = new InmemoryFCInternalTableItr();
     itr->init(nfields, iteration, allValues);
     return itr;
@@ -185,13 +185,12 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::merge(
         if (!values->isEmpty()) {
             found = colAIsContainedInColB(seg.get(), values.get());
             if (found) {
-
                 std::vector<std::shared_ptr<const Segment>> segmentsToMerge;
                 if (!sorted) {
-                    segmentsToMerge.push_back(values->sortBy(NULL));
-                } else {
-                    segmentsToMerge.push_back(values);
+                    values = values->sortBy(NULL);
+                    sorted = true;
                 }
+                segmentsToMerge.push_back(values);
                 segmentsToMerge.push_back(seg);
                 newValues = SegmentInserter::merge(segmentsToMerge);
             }
@@ -222,15 +221,14 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::merge(
             if (!isEmpty()) {
                 std::vector<std::shared_ptr<const Segment>> segmentsToMerge;
                 if (unmergedSegments.size() > 0) {
-                    std::shared_ptr<const Segment> allValues =
-                        InmemoryFCInternalTable::mergeUnmergedSegments(
-                                values, sorted, unmergedSegments, true, nthreads);
-
-                    segmentsToMerge.push_back(allValues);
+                    values = mergeUnmergedSegments(nthreads);
+                    if (!isSorted()) {
+                        values = values->sortBy(NULL);
+                        sorted = true;
+                    }
                     newUnmergedSegments.clear();
-                } else {
-                    segmentsToMerge.push_back(values);
                 }
+                segmentsToMerge.push_back(values);
                 segmentsToMerge.push_back(seg);
                 newValues = SegmentInserter::merge(segmentsToMerge);
             } else {
@@ -251,11 +249,7 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::merge(
 }
 
 std::shared_ptr<const Segment> InmemoryFCInternalTable::mergeUnmergedSegments(
-        std::shared_ptr<const Segment> values,
-        bool isSorted,
-        const std::vector<InmemoryFCInternalTableUnmergedSegment> &unmergedSegments,
-        const bool outputSorted,
-        const int nthreads) {
+        const int nthreads) const {
     if (unmergedSegments.size() > 0) {
         //Copy the original values in mergedValues
         std::vector<std::shared_ptr<const Segment>> allSegments;
@@ -271,16 +265,17 @@ std::shared_ptr<const Segment> InmemoryFCInternalTable::mergeUnmergedSegments(
         }
 
         SegmentInserter inserter(allSegments[0]->getNColumns());
-        if (outputSorted) {
+        // Maintain sortedness if it already was.
+        if (sorted) {
             //merge
-            return inserter.merge(allSegments);
+            values = inserter.merge(allSegments);
         } else {
             //concatenate
-            return inserter.concatenate(allSegments, nthreads);
+            values = inserter.concatenate(allSegments, nthreads);
         }
-    } else {
-        return values;
+        unmergedSegments.clear();
     }
+    return values;
 }
 
 void InmemoryFCInternalTable::readArray(Term_t *dest, std::vector<Term_t>::iterator & itr) {
@@ -379,21 +374,21 @@ size_t InmemoryFCInternalTable::estimateNRows(
 }
 
 bool InmemoryFCInternalTable::isPrimarySorting(const std::vector<uint8_t> &fields) const {
-    int prev = -1;
 
-    if (fields.size() > 0) {
-        for (uint8_t i = 0; i < fields[0]; ++i) {
-            if (!values->getColumn(i)->isConstant()) {
-                return false;
-            }
-        }
+    assert(unmergedSegments.size() == 0);
 
-        for (std::vector<uint8_t>::const_iterator itr = fields.begin(); itr != fields.end(); ++itr) {
-            if (*itr != prev + 1)
-                return false;
-            prev = *itr;
+    int currCol = 0;
+
+    for (std::vector<uint8_t>::const_iterator itr = fields.begin(); itr != fields.end(); ++itr) {
+        while (currCol < *itr && values->getColumn(currCol)->isConstant()) {
+            currCol++;
         }
+        if (*itr != currCol) {
+            return false;
+        }
+        currCol++;
     }
+
     return true;
 }
 
@@ -768,72 +763,99 @@ if (filteredSegment != NULL && !filteredSegment->isEmpty()) {
 }
 
 FCInternalTableItr *InmemoryFCInternalTable::getSortedIterator() const {
-    std::shared_ptr<const Segment> sortedValues;
-
     if (unmergedSegments.size() > 0) {
-        sortedValues = InmemoryFCInternalTable::mergeUnmergedSegments(values, sorted, unmergedSegments, true, 1);
-        assert(sortedValues->getNColumns() == nfields);
-    } else {
-        if (!isSorted()) {
-            sortedValues = values->sortBy(NULL);
-        } else {
-            sortedValues = values;
-        }
+        values = mergeUnmergedSegments(1);
+    }
+    if (!isSorted()) {
+        values = values->sortBy(NULL);
+        sorted = true;
     }
 
     InmemoryFCInternalTableItr *itr = new InmemoryFCInternalTableItr();
-    itr->init(nfields, iteration, sortedValues);
+    itr->init(nfields, iteration, values);
     return itr;
 }
 
 FCInternalTableItr *InmemoryFCInternalTable::getSortedIterator(int nthreads) const {
-    std::shared_ptr<const Segment> sortedValues;
-
     if (unmergedSegments.size() > 0) {
-        sortedValues = InmemoryFCInternalTable::mergeUnmergedSegments(values, sorted, unmergedSegments, true, nthreads);
-        assert(sortedValues->getNColumns() == nfields);
-    } else {
-        if (!isSorted()) {
-            sortedValues = values->sortBy(NULL, nthreads, false);
-        } else {
-            sortedValues = values;
-        }
+        values = mergeUnmergedSegments(nthreads);
+    }
+    if (!isSorted()) {
+        values = values->sortBy(NULL, nthreads, false);
     }
 
     InmemoryFCInternalTableItr *itr = new InmemoryFCInternalTableItr();
-    itr->init(nfields, iteration, sortedValues);
+    itr->init(nfields, iteration, values);
     return itr;
 }
 
+#if INMEMINTERNALCACHE
+static uint32_t __getKeyFromFields(const std::vector<uint8_t> &fields, uint8_t sz) {
+    uint32_t key = 0;
+    for(uint8_t i = 0; i < sz; ++i) {
+        uint8_t field = fields[i];
+        key = (key << 8) + (uint32_t)(field+1);
+    }
+    return key;
+}
+#endif
+
 FCInternalTableItr *InmemoryFCInternalTable::sortBy(const std::vector<uint8_t> &fields) const {
-    bool primarySort = isPrimarySorting(fields);
+
     std::shared_ptr<const Segment> sortedValues;
 
     LOG(TRACEL) << "InmemoryFCInternalTable::sortBy";
 
     if (unmergedSegments.size() > 0) {
         LOG(TRACEL) << "InmemoryFCInternalTable::mergeUnmergedSegments";
-        sortedValues = InmemoryFCInternalTable::mergeUnmergedSegments(values, sorted, unmergedSegments, primarySort, 1);
-    } else {
-        if (primarySort && !isSorted()) {
-            LOG(TRACEL) << "InmemoryFCInternalTable::sorting";
-            HiResTimer t_sortby("InmemoryFCInternalTable::sorting");
-            t_sortby.start();
-            sortedValues = values->sortBy(NULL);
-            t_sortby.stop();
-            LOG(TRACEL) << t_sortby.tostring();
-        } else {
-            sortedValues = values;
-        }
+        values = mergeUnmergedSegments(1);
     }
 
-    if (!primarySort) {
-        LOG(TRACEL) << "InmemoryFCInternalTable::sorting2";
+    bool primarySort = isPrimarySorting(fields);
+
+    if (primarySort) {
+        if (! isSorted()) {
+            HiResTimer t_sortby("InmemoryFCInternalTable::sorting");
+            t_sortby.start();
+            values = values->sortBy(NULL);
+            t_sortby.stop();
+            LOG(TRACEL) << t_sortby.tostring();
+            sorted = true;
+        }
+        sortedValues = values;
+    } else {
+#if INMEMINTERNALCACHE
+        if (fields.size() <= 3) {
+            uint64_t filterByKey = __getKeyFromFields(fields, fields.size());
+            if (cachedSorted.count(filterByKey)) {
+                sortedValues = cachedSorted[filterByKey];
+            } else {
+                LOG(TRACEL) << "InmemoryFCInternalTable::sorting2";
+                sortedValues = values->sortBy(&fields);
+                cachedSorted[filterByKey] = sortedValues;
+                //If we are adding one in the cache that is say, sorted on fields 1, 2, 3,
+                //this one is also sorted on fields 1, 2, and also sorted on field 1.
+                //So, we add those to the hashtable as well.
+                for (uint8_t i = 1; i < fields.size(); i++) {
+                    filterByKey = __getKeyFromFields(fields, i);
+                    cachedSorted[filterByKey] = sortedValues;
+                }
+            }
+        } else {
+            // Too many fields for the hash.
+            HiResTimer t_sort2("InmemoryFCInternalTable::sorting2");
+            t_sort2.start();
+            sortedValues = values->sortBy(&fields);
+            t_sort2.stop();
+            LOG(TRACEL) << t_sort2.tostring();
+        }
+#else
         HiResTimer t_sort2("InmemoryFCInternalTable::sorting2");
         t_sort2.start();
         sortedValues = sortedValues->sortBy(&fields);
         t_sort2.stop();
         LOG(TRACEL) << t_sort2.tostring();
+#endif
     }
 
     InmemoryFCInternalTableItr *tableItr = new InmemoryFCInternalTableItr();
@@ -848,26 +870,51 @@ FCInternalTableItr *InmemoryFCInternalTable::sortBy(
         return sortBy(fields);
     }
 
-    bool primarySort = isPrimarySorting(fields);
     std::shared_ptr<const Segment> sortedValues;
 
     LOG(TRACEL) << "InmemoryFCInternalTable::sortBy (parallel version)";
 
     if (unmergedSegments.size() > 0) {
         LOG(TRACEL) << "InmemoryFCInternalTable::mergeUnmergedSegments";
-        sortedValues = InmemoryFCInternalTable::mergeUnmergedSegments(values, sorted, unmergedSegments, primarySort, nthreads);
-    } else {
-        if (primarySort && !isSorted()) {
-            LOG(TRACEL) << "InmemoryFCInternalTable::sorting";
-            sortedValues = values->sortBy(NULL, nthreads, false);
-        } else {
-            sortedValues = values;
-        }
+        values = mergeUnmergedSegments(nthreads);
     }
 
-    if (!primarySort) {
-        LOG(TRACEL) << "InmemoryFCInternalTable::sorting2 (parallel)";
-        sortedValues = sortedValues->sortBy(&fields, nthreads, false);
+    bool primarySort = isPrimarySorting(fields);
+
+    if (primarySort) {
+        if (! isSorted()) {
+            LOG(TRACEL) << "InmemoryFCInternalTable::sorting";
+            values = values->sortBy(NULL, nthreads, false);
+            sorted = true;
+        }
+        sortedValues = values;
+    } else {
+#if INMEMINTERNALCACHE
+        if (fields.size() <= 3) {
+            uint64_t filterByKey = __getKeyFromFields(fields, fields.size());
+            if (cachedSorted.count(filterByKey)) {
+                sortedValues = cachedSorted[filterByKey];
+            } else {
+                LOG(TRACEL) << "InmemoryFCInternalTable::sorting2";
+                sortedValues = values->sortBy(&fields, nthreads, false);
+                cachedSorted[filterByKey] = sortedValues;
+                //If we are adding one in the cache that is say, sorted on fields 1, 2, 3,
+                //this one is also sorted on fields 1, 2, and also sorted on field 1.
+                //So, we add those to the hashtable as well.
+                for (uint8_t i = 1; i < fields.size(); i++) {
+                    filterByKey = __getKeyFromFields(fields, i);
+                    cachedSorted[filterByKey] = sortedValues;
+                }
+            }
+        } else {
+            // Too many fields for the hash.
+            LOG(TRACEL) << "InmemoryFCInternalTable::sorting2";
+            sortedValues = values->sortBy(&fields, nthreads, false);
+        }
+#else
+        // Too many fields for the hash.
+        LOG(TRACEL) << "InmemoryFCInternalTable::sorting2";
+#endif
     }
 
     InmemoryFCInternalTableItr *tableItr = new InmemoryFCInternalTableItr();

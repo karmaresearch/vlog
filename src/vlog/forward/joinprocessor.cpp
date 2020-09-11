@@ -314,6 +314,7 @@ void JoinExecutor::verificativeJoinOneColumn(
         //to the EDB layer
         std::shared_ptr<const Column> column = table->
             getColumn(hv.joinCoordinates[currentLiteral][0].second);
+        column = column->sort();
         // LOG(TRACEL) << "Count = " << count;
         try {
             itr->reset();
@@ -587,7 +588,8 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
             LOG(TRACEL) << "i = " << i << ", first = " << (int) joinsCoordinates[i].first << ", second = " << (int) joinsCoordinates[i].second;
         }
 #endif
-        if (t1->estimateNRows() <= factor * THRESHOLD_HASHJOIN
+        //No hash joins if there are functors
+        /*if (t1->estimateNRows() <= factor * THRESHOLD_HASHJOIN
                 && joinsCoordinates.size() < 3 && joinsCoordinates.size() > 0
                 && (factor != 1 || joinsCoordinates.size() > 1 ||
                     joinsCoordinates[0].first != joinsCoordinates[0].second ||
@@ -599,14 +601,14 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
 #ifdef DEBUG
             output->checkSizes();
 #endif
-        } else {
+        } else {*/
             LOG(TRACEL) << "Executing mergejoin.";
             mergejoin(t1, naiver, outputLiterals, literal, min, max,
                     joinsCoordinates, output, nthreads);
 #ifdef DEBUG
             output->checkSizes();
 #endif
-        }
+        /*}*/
     }
 }
 

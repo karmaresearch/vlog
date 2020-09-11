@@ -11,6 +11,9 @@
 #include <unordered_map>
 #include <set>
 
+// Enable(1) or disable(0) a cache for sorted InmemoryFCInternalTable.
+#define INMEMINTERNALCACHE 1
+
 class FCInternalTableItr {
     public:
         virtual size_t getCurrentIteration() const = 0;
@@ -405,8 +408,6 @@ class MergerInternalTableItr final : public FCInternalTableItr {
 
 };
 
-typedef std::unordered_map<std::string, std::shared_ptr<Segment>, std::hash<std::string>, std::equal_to<std::string>> SortingCache;
-
 #define _INMEMORYUNMSEGM_MAXCONSTS 20
 struct InmemoryFCInternalTableUnmergedSegment {
     private:
@@ -444,11 +445,14 @@ class InmemoryFCInternalTable final : public FCInternalTable {
         const uint8_t nfields;
         const size_t iteration;
 
-        std::shared_ptr<const Segment> values;
-        std::vector<InmemoryFCInternalTableUnmergedSegment> unmergedSegments;
+        mutable std::shared_ptr<const Segment> values;
+        mutable std::vector<InmemoryFCInternalTableUnmergedSegment> unmergedSegments;
+#if INMEMINTERNALCACHE
+        mutable std::map<uint32_t, std::shared_ptr<const Segment>> cachedSorted;
+#endif
 
         //size_t nrows;
-        bool sorted;
+        mutable bool sorted;
 
         InmemoryFCInternalTable(const size_t iteration, const uint8_t nfields,
                 const bool sorted,
@@ -473,11 +477,8 @@ class InmemoryFCInternalTable final : public FCInternalTable {
         void copyRawValues(const std::vector<const Term_t*> *rowIdx,
                 const uint8_t nfields, std::vector<Term_t> &output);
 
-        static std::shared_ptr<const Segment> mergeUnmergedSegments(
-                std::shared_ptr<const Segment> values, bool isSorted,
-                const std::vector <
-                InmemoryFCInternalTableUnmergedSegment > &unmergedSegments,
-                const bool outputSorted, const int nthreads);
+        std::shared_ptr<const Segment> mergeUnmergedSegments(
+                const int nthreads) const;
 
         int cmp(FCInternalTableItr *itr1, FCInternalTableItr *itr2) const;
 
