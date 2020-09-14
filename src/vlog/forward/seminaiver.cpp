@@ -219,37 +219,80 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
 #endif
     }
 
-bool SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
+void SemiNaiver::executeRules(std::vector<RuleExecutionDetails> &edbRuleset,
+        std::vector<RuleExecutionDetails> &extEdbRuleset,
         std::vector<std::vector<RuleExecutionDetails>> &ruleset,
+        std::vector<std::vector<RuleExecutionDetails>> &extruleset,
         std::vector<StatIteration> &costRules,
-        const size_t limitView,
-        bool fixpoint, unsigned long *timeout) {
-#if DEBUG
-    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-#endif
-    bool newDer = false;
-    for (size_t i = 0; i < edbRuleset.size(); ++i) {
-        newDer |= executeRule(edbRuleset[i], iteration, limitView, NULL);
-        if (timeout != NULL && *timeout != 0) {
-            std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
-            if (s.count() > *timeout) {
-                *timeout = 0;   // To indicate materialization was stopped because of timeout.
-                return newDer;
-            }
-        }
-        iteration++;
-    }
-#if DEBUG
-    std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
-    LOG(DEBUGL) << "Runtime EDB rules ms = " << sec.count() * 1000;
-#endif
+        unsigned long *timeout) {
+    bool mayHaveTimeout = timeout != NULL && *timeout != 0;
 
     for (int i = 0; i < ruleset.size(); i++) {
-        if (ruleset[i].size() > 0) {
-            newDer |= executeUntilSaturation(ruleset[i], costRules, limitView,  fixpoint, timeout);
+        bool newDer = true;
+        bool first = true;
+
+        while (newDer) {
+            newDer = false;
+            int limitView = 0;
+            if (first) {
+#if DEBUG
+                std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+#endif
+                for (size_t j = 0; j < edbRuleset.size(); ++j) {
+                    newDer |= executeRule(edbRuleset[j], iteration, limitView, NULL);
+                    if (timeout != NULL && *timeout != 0) {
+                        std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
+                        if (s.count() > *timeout) {
+                            *timeout = 0;   // To indicate materialization was stopped because of timeout.
+                            return;
+                        }
+                    }
+                    iteration++;
+                }
+#if DEBUG
+                std::chrono::duration<double> sec = std::chrono::system_clock::now() - start;
+                LOG(DEBUGL) << "Runtime EDB rules ms = " << sec.count() * 1000;
+#endif
+            }
+        
+            if (ruleset[i].size() > 0) {
+                newDer |= executeUntilSaturation(ruleset[i], costRules, limitView,  true, timeout);
+            }
+
+            if ((typeChase == TypeChase::RESTRICTED_CHASE ||
+                    typeChase == TypeChase::SUM_RESTRICTED_CHASE)) {
+                limitView = iteration == 0 ? 1 : iteration;
+            }
+
+            if (first) {
+                for (size_t j = 0; j < extEdbRuleset.size(); ++j) {
+                    newDer |= executeRule(extEdbRuleset[j], iteration, limitView,  NULL);
+                    if (timeout != NULL && *timeout != 0) {
+                        std::chrono::duration<double> s = std::chrono::system_clock::now() - startTime;
+                        if (s.count() > *timeout) {
+                            *timeout = 0;   // To indicate materialization was stopped because of timeout.
+                            return;
+                        }
+                    }
+                }
+                first = false;
+            }
+
+            if (extruleset[i].size() > 0) {
+                newDer |= executeUntilSaturation(extruleset[i], costRules, limitView, 
+                        (typeChase != TypeChase::RESTRICTED_CHASE
+                         && typeChase != TypeChase::SUM_RESTRICTED_CHASE),
+                        timeout);
+            }
+            if (foundCyclicTerms && typeChase != TypeChase::SUM_RESTRICTED_CHASE) {
+                return;
+            }
+            if (mayHaveTimeout && *timeout == 0) {
+                return;
+            }
         }
     }
-    return newDer;
+    return;
 }
 
 void SemiNaiver::prepare(size_t lastExecution, int singleRuleToCheck, std::vector<RuleExecutionDetails> &allrules) {
@@ -361,32 +404,11 @@ void SemiNaiver::run(size_t lastExecution, size_t it, unsigned long *timeout,
                 }
             }
         }
-        int loopNr = 0;
-        std::vector<RuleExecutionDetails> emptyRuleset;
-        bool mayHaveTimeout = timeout != NULL && *timeout != 0;
-        while (true) {
-            bool resp1;
-            if (loopNr == 0)
-                resp1 = executeRules(tmpEDBRules, tmpIDBRules, costRules, 0, true, timeout);
-            else
-                resp1 = executeRules(emptyRuleset, tmpIDBRules, costRules, 0, true, timeout);
-            bool resp2;
-            if (loopNr == 0)
-                resp2 = executeRules(tmpExtEDBRules, tmpExtIDBRules,
-                        costRules, iteration == 0 ? 1 : iteration, false, timeout);
-            else
-                resp2 = executeRules(emptyRuleset, tmpExtIDBRules, costRules,
-                        iteration == 0 ? 1 : iteration, false, timeout);
-            if ((!resp1 && !resp2) || (foundCyclicTerms && typeChase != TypeChase::SUM_RESTRICTED_CHASE)) {
-                break; //Fix-point
-            }
-            loopNr++;
-            if (mayHaveTimeout && *timeout == 0) {
-                break;
-            }
-        }
+        executeRules(tmpEDBRules, tmpExtEDBRules, tmpIDBRules, tmpExtIDBRules, costRules, timeout);
     } else {
-        executeRules(allEDBRules, allIDBRules, costRules, 0, true, timeout);
+        std::vector<RuleExecutionDetails> emptyRuleset;
+        std::vector<std::vector<RuleExecutionDetails>> emptyExtIDBRules(nStratificationClasses);
+        executeRules(allEDBRules, emptyRuleset, allIDBRules, emptyExtIDBRules, costRules, timeout);
     }
 
     running = false;
