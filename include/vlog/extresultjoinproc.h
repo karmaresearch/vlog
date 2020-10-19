@@ -26,6 +26,7 @@ class ExistentialRuleProcessor : public FinalRuleProcessor {
         static void filterDerivations(FCTable *t,
                 std::vector<std::shared_ptr<Column>> &tobeRetained,
                 std::vector<uint8_t> &columnsToCheck,
+                std::vector<std::pair<int,int>> &duplicates,
                 std::vector<uint64_t> &outputProc);
 
         static void filterDerivations(
