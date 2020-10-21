@@ -97,7 +97,7 @@ void ExistentialRuleProcessor::filterDerivations(const Literal &literal,
     std::vector<std::shared_ptr<Column>> tobeRetained;
     std::vector<uint8_t> columnsToCheck;
     const uint8_t rowsize = literal.getTupleSize();
-    LOG(DEBUGL) << "filterDerivations() : rowsize : " << rowsize;
+    std::vector<std::pair<int,int>> duplicateExts;
     for (int i = 0; i < rowsize; ++i) {
         auto t = literal.getTermAtPos(i);
         if (!t.isVariable()) {
@@ -119,6 +119,14 @@ void ExistentialRuleProcessor::filterDerivations(const Literal &literal,
                 //Add a dummy column since this is an existential variable
                 tobeRetained.push_back(std::shared_ptr<Column>(
                             new CompressedColumn(0, sizecolumns)));
+                for (int j = 0; j < i; j++) {
+                    auto t1 = literal.getTermAtPos(j);
+                    if (t1.isVariable() && t.getId() == t1.getId()) {
+                        // Duplicate existential variable. We have to check those as well.
+                        duplicateExts.push_back(std::pair<int, int>(i, j));
+                        break;
+                    }
+                }
             } else {
                 tobeRetained.push_back(std::shared_ptr<Column>(c[posToCopy]));
                 columnsToCheck.push_back(i);
@@ -126,12 +134,13 @@ void ExistentialRuleProcessor::filterDerivations(const Literal &literal,
         }
     }
 
-    filterDerivations(t, tobeRetained, columnsToCheck, outputProc);
+    filterDerivations(t, tobeRetained, columnsToCheck, duplicateExts, outputProc);
 }
 
 void ExistentialRuleProcessor::filterDerivations(FCTable *t,
         std::vector<std::shared_ptr<Column>> &tobeRetained,
         std::vector<uint8_t> &columnsToCheck,
+        std::vector<std::pair<int,int>> &duplicateExts,
         std::vector<uint64_t> &outputProc) {
     std::vector<uint64_t> output;
 
@@ -163,8 +172,28 @@ void ExistentialRuleProcessor::filterDerivations(FCTable *t,
                 if (itr2Ok)
                     itr2->next();
             } else if (cmp <= 0) {
-                if (cmp == 0)
+                if (cmp == 0) {
+                    // Check duplicate existentials
+                    if (duplicateExts.size() > 0) {
+                        bool diff = false;
+                        for (int i = 0; i < duplicateExts.size(); i++) {
+                            auto t1 = itr2->getCurrentValue(duplicateExts[i].first);
+                            auto t2 = itr2->getCurrentValue(duplicateExts[i].second);
+                            if (t1 != t2) {
+                                diff = true;
+                                break;
+                            }
+                        }
+                        if (diff) {
+                            // Shift the table.
+                            itr2Ok = itr2->hasNext();
+                            if (itr2Ok)
+                                itr2->next();
+                            continue;
+                        }
+                    }
                     output.push_back(idx);
+                }
                 itr1Ok = itr1->hasNext();
                 if (itr1Ok)
                     itr1->next();
@@ -1130,6 +1159,7 @@ bool ExistentialRuleProcessor::consolidate(const bool isFinished) {
                     const auto &h = at->getLiteral();
                     std::vector<std::shared_ptr<Column>> tobeRetained;
                     std::vector<uint8_t> columnsToCheck;
+                    std::vector<std::pair<int,int>> duplicateExts;
                     for(int i = 0; i < h.getTupleSize(); ++i) {
                         tobeRetained.push_back(allColumns[count + i]);
                         if (h.getTermAtPos(i).isVariable()) {
@@ -1143,6 +1173,14 @@ bool ExistentialRuleProcessor::consolidate(const bool isFinished) {
                                     std::shared_ptr<Column>(
                                             new CompressedColumn(0,
                                                 nrows));
+                                for (int j = 0; j < i; j++) {
+                                    auto t1 = h.getTermAtPos(j);
+                                    if (t1.isVariable() && t1.getId() == h.getTermAtPos(i).getId()) {
+                                        // Duplicate existential variable. We have to check those as well.
+                                        duplicateExts.push_back(std::pair<int, int>(i, j));
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }
@@ -1152,6 +1190,7 @@ bool ExistentialRuleProcessor::consolidate(const bool isFinished) {
                             h.getPredicate().getCardinality());
                     filterDerivations(t, tobeRetained,
                             columnsToCheck,
+                            duplicateExts,
                             filterRows);
 
                     count += h.getTupleSize();
