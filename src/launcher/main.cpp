@@ -1025,8 +1025,13 @@ int main(int argc, const char** argv) {
         EDBConf conf(edbFile);
         EDBLayer *layer = new EDBLayer(conf, vm["multithreaded"].as<bool>());
         // EDBLayer layer(conf, false);
-        launchFullMat(argc, argv, full_path, *layer, vm,
-                vm["rules"].as<string>());
+        try {
+            launchFullMat(argc, argv, full_path, *layer, vm,
+                    vm["rules"].as<string>());
+        } catch(char const *e) {
+            cout << e << endl;
+            exit(1);
+        }
         delete layer;
     } else if (cmd == "mat_tg") {
         EDBConf conf(edbFile);

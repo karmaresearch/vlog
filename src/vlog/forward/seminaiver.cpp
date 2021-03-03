@@ -98,7 +98,7 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
 
         if (! program->stratify(stratification, nStratificationClasses)) {
             LOG(ERRORL) << "Program could not be stratified";
-            throw std::runtime_error("Program could not be stratified");
+            throw ("Program could not be stratified");
         }
         LOG(DEBUGL) << "nStratificationClasses = " << nStratificationClasses;
 
@@ -1032,8 +1032,10 @@ void SemiNaiver::reorderPlanForNegatedLiterals(RuleExecutionPlan &plan, const st
             if (!c1 || (c1 && c2))
                 break;
         }
-        if (i >= literal_indexes.size())
-            throw std::runtime_error("Input Negation Error. Impossible to bound variables in negated atom.");
+        if (i >= literal_indexes.size()) {
+            LOG(ERRORL) << "Input Negation Error. Impossible to bind variables in negated atom.";
+            throw ("Input Negation Error. Impossible to bind variables in negated atom.");
+        }
 
         for (auto ele: vars_i)
             bounded_vars.insert(ele);
