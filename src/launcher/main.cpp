@@ -156,6 +156,11 @@ bool checkParams(ProgramArgs &vm, int argc, const char** argv) {
                 return false;
             }
 
+            if (vm["nindices"].as<int>() < 1 || vm["nindices"].as<int>() > 6) {
+                printErrorMsg("The number of indices should be between 1 and 6");
+                return false;
+            }
+
         } else if (cmd == "gentq") {
             if (!vm["rules"].as<string>().empty()) {
                 std::string path = vm["rules"].as<string>();
@@ -283,6 +288,8 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
             "Sets the maximum number of threads to use during the compression. Default is the number of physical cores",false);
     load_options.add<int>("","readThreads", 2,
             "Sets the number of concurrent threads that reads the raw input. Default is '2'",false);
+    load_options.add<int>("","nindices", 6,
+            "Sets the number of indices to produce. Default is '6'",false);
     load_options.add<string>("","comprinput", "",
             "Path to a file that contains a list of compressed triples.",false);
     load_options.add<string>("","comprdict", "",
@@ -1051,7 +1058,6 @@ int main(int argc, const char** argv) {
         int sampleMethod = PARSE_COUNTMIN;
         std::string dictMethod = DICT_HEURISTICS;
         int popArg = 1000;
-        int nindices = 6;
         bool aggrIndices = false;
         int fixedStrat = FIXEDSTRAT5;
         bool enableFixedStrat = true;
@@ -1081,7 +1087,7 @@ int main(int argc, const char** argv) {
             p.parallelThreads = vm["maxThreads"].as<int>();
             p.maxReadingThreads = vm["readThreads"].as<int>();
             p.dictionaries = ndicts;
-            p.nindices = nindices;
+            p.nindices = vm["nindices"].as<int>();
             p.createIndicesInBlocks = false;    // true not working???
             p.aggrIndices = aggrIndices;
             p.canSkipTables = canSkipTables;
@@ -1119,7 +1125,7 @@ int main(int argc, const char** argv) {
             p.parallelThreads = vm["maxThreads"].as<int>();
             p.maxReadingThreads = vm["readThreads"].as<int>();
             p.dictionaries = ndicts;
-            p.nindices = nindices;
+            p.nindices = vm["nindices"].as<int>();
             p.createIndicesInBlocks = false;    // true not working???
             p.aggrIndices = aggrIndices;
             p.canSkipTables = canSkipTables;
