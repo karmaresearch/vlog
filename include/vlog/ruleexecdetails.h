@@ -13,7 +13,7 @@ struct RuleExecutionDetails {
     bool failedBecauseEmpty = false;
     const Literal *atomFailure = NULL;
 
-    uint8_t nIDBs = 0;
+    uint32_t nIDBs = 0;
     std::vector<RuleExecutionPlan> orderExecutions;
 
     std::vector<uint8_t> posEDBVarsInHead;
@@ -22,7 +22,14 @@ struct RuleExecutionDetails {
         std::vector<std::pair<uint8_t, uint8_t>>>> edbLiteralPerHeadVars;
 
 
-    RuleExecutionDetails(Rule rule, size_t ruleid) : rule(rule), ruleid(ruleid) {}
+    RuleExecutionDetails(Rule rule, size_t ruleid) : rule(rule), ruleid(ruleid) {
+        std::vector<Literal> bodyLiterals = rule.getBody();
+        for (const auto& literal : bodyLiterals){
+            if (literal.getPredicate().getType() == IDB) {
+                nIDBs++;
+            }
+        }
+    }
 
     void createExecutionPlans(bool copyAllVars);
 

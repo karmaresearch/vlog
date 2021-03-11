@@ -112,12 +112,6 @@ SemiNaiver::SemiNaiver(EDBLayer &layer,
         }
         for (const auto& rule : ruleset){
             RuleExecutionDetails *d = new RuleExecutionDetails(rule, ruleid++);
-            std::vector<Literal> bodyLiterals = rule.getBody();
-            for (const auto& literal : bodyLiterals){
-                if (literal.getPredicate().getType() == IDB) {
-                    d->nIDBs++;
-                }
-            }
             if (d->nIDBs != 0) {
                 PredId_t id = rule.getFirstHead().getPredicate().getId();
                 this->allIDBRules[nStratificationClasses == 1 ? 0 : stratification[id]].push_back(*d);
@@ -475,6 +469,7 @@ bool SemiNaiver::executeUntilSaturation(
             // Don't use iteration here, because lastExecution determines which data we'll look at during the next round,
             // and limitView determines which data we are considering now. There should not be a gap.
             ruleset[currentRule].lastExecution = limitView;
+            LOG(DEBUGL) << "Setting lastExecution of this rule to " << limitView;
         } else {
             ruleset[currentRule].lastExecution = iteration;
         }
@@ -592,7 +587,7 @@ void SemiNaiver::storeOnFile(std::string path, const PredId_t pred, const bool d
     if (table != NULL && !table->isEmpty()) {
         FCIterator itr = table->read(0);
         if (! itr.isEmpty()) {
-            const uint8_t sizeRow = table->getSizeRow();
+            const int sizeRow = table->getSizeRow();
             while (!itr.isEmpty()) {
                 std::shared_ptr<const FCInternalTable> t = itr.getCurrentTable();
                 FCInternalTableItr *iitr = t->getIterator();
@@ -603,7 +598,7 @@ void SemiNaiver::storeOnFile(std::string path, const PredId_t pred, const bool d
                         row = to_string(iitr->getCurrentIteration());
                     }
                     bool first = true;
-                    for (uint8_t m = 0; m < sizeRow; ++m) {
+                    for (int m = 0; m < sizeRow; ++m) {
                         if (decompress || csv) {
                             if (layer.getDictText(iitr->getCurrentValue(m), buffer)) {
                                 if (csv) {
@@ -727,7 +722,7 @@ bool SemiNaiver::checkIfAtomsAreEmpty(const RuleExecutionDetails &ruleDetails,
         const RuleExecutionPlan &plan,
         size_t limitView,
         std::vector<size_t> &cards) {
-    const uint8_t nBodyLiterals = (uint8_t) plan.plan.size();
+    const int nBodyLiterals = plan.plan.size();
     bool isOneRelEmpty = false;
     //First I check if there are tuples in each relation.
     //And if there are, then I count how many
@@ -1012,7 +1007,7 @@ void SemiNaiver::reorderPlanForNegatedLiterals(RuleExecutionPlan &plan, const st
     bool c1; // isnegated
     bool c2; // are variables bounded?
 
-    for (uint8_t i=0; i < plan.plan.size(); ++i)
+    for (int i=0; i < plan.plan.size(); ++i)
         literal_indexes.push_back(i);
 
     // literal_indexes[i] is the index --from plan.plan-- of the next literal
@@ -1060,7 +1055,7 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
         bool copyAllVars) {
     //Reorder the atoms in terms of cardinality.
     std::vector<std::pair<uint8_t, size_t>> positionCards;
-    for (uint8_t i = 0; i < cards.size(); ++i) {
+    for (int i = 0; i < cards.size(); ++i) {
         LOG(DEBUGL) << "Atom " << (int) i << " has card " << cards[i];
         positionCards.push_back(std::make_pair(i, cards[i]));
     }
@@ -1322,6 +1317,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                 min = ruleDetails.lastExecution;
             if (max == 1)
                 max = ruleDetails.lastExecution - 1;
+            /*
             if (limitView != 0) {
                 // For execution of the restricted chase, we must limit the
                 // view: we may not include data from the current round.
@@ -1331,6 +1327,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                     max = limitView - 1;
                 }
             }
+            */
             if (min > max) {
                 optimalOrderIdx++;
                 continue;
@@ -1506,7 +1503,7 @@ bool SemiNaiver::checkEmpty(const Literal *lit) {
 			break;
 		    }
 		}
-		for (uint8_t i = 0; i < repeated.size(); ++i) {
+		for (int i = 0; i < repeated.size(); ++i) {
 		    if (itrTable->getCurrentValue(repeated[i].first) != itrTable->getCurrentValue(repeated[i].second)) {
 			found = false;
 			break;
@@ -1607,7 +1604,7 @@ FCIterator SemiNaiver::getTableFromEDBLayer(const Literal & literal) {
 
         VTuple t = literal.getTuple();
         //Add all different variables
-        for (uint8_t i = 0; i < t.getSize(); ++i) {
+        for (int i = 0; i < t.getSize(); ++i) {
             t.set(VTerm(i + 1, 0), i);
         }
         Literal mostGenericLiteral(literal.getPredicate(), t);
