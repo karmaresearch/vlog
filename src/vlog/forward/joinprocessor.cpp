@@ -1249,14 +1249,23 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
             for (uint32_t j = 0; j < idxColumnsLowCardInLiteral.size(); ++j) {
                 uint8_t idxInLiteral = 0;
                 uint8_t nvars = 0;
-                Var_t var = 0;
                 for (uint8_t r = 0; r < literalToQuery.getTupleSize(); ++r) {
                     if (literalToQuery.getTermAtPos(r).isVariable()) {
-                        if (nvars == idxColumnsLowCardInLiteral[j]) {
-                            idxInLiteral = r;
-                            var = literalToQuery.getTermAtPos(r).getId();
+                        Var_t var = literalToQuery.getTermAtPos(r).getId();
+                        bool usedBefore = false;
+                        for (uint8_t k = 0; k < r; k++) {
+                            if (literalToQuery.getTermAtPos(k).isVariable() && var == literalToQuery.getTermAtPos(k).getId()) {
+                                usedBefore = true;
+                                break;
+                            }
                         }
-                        nvars++;
+                        if (! usedBefore) {
+                            if (nvars == idxColumnsLowCardInLiteral[j]) {
+                                idxInLiteral = r;
+                                break;
+                            }
+                            nvars++;
+                        }
                     }
                 }
                 // t.set(VTerm(0, bagValuesColumns[j][idxs[j]]), idxInLiteral);
