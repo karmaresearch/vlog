@@ -351,7 +351,7 @@ void _literal2filter(const Literal &query, std::vector<uint8_t> &posVarsToCopy,
             for(uint8_t j = 0; j < posVarsToCopy.size(); ++j) {
                 auto var = query.getTermAtPos(posVarsToCopy[j]);
                 if (var.getId() == term.getId()) {
-                    repeatedVars.push_back(std::make_pair(i, j));
+                    repeatedVars.push_back(std::make_pair(i, posVarsToCopy[j]));
                     unique = false;
                     break;
                 }
