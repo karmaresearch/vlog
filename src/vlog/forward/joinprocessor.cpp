@@ -1178,20 +1178,32 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
     //remove all constants from fields2 and update all the others
     std::vector<uint8_t> sortedIdx = idxColumnsLowCardInLiteral;
     std::sort(sortedIdx.begin(), sortedIdx.end());
+    std::vector<uint8_t> posVars = literalToQuery.getPosVars();
     for (int i = sortedIdx.size() - 1; i >= 0; --i) {
+        //Count how many times this var occurs in the literal.
+        int cnt = 1;
+        Var_t id = literalToQuery.getTermAtPos(posVars[sortedIdx[i]]).getId();
+        for (int j = posVars[sortedIdx[i]] + 1; j < literalToQuery.getTupleSize(); j++) {
+            VTerm t = literalToQuery.getTermAtPos(j);
+            if (t.isVariable() && t.getId() == id) {
+                cnt++;
+            }
+        }
+        
+
         //Adapt outputCopyCoordinates
         const uint8_t nPosFromSecond = output->getNCopyFromSecond();
         std::pair<uint8_t, uint8_t> *posFromSecond = output->getPosFromSecond();
         for (uint8_t m = 0; m < nPosFromSecond; ++m) {
             if (posFromSecond[m].second > sortedIdx[i]) {
-                posFromSecond[m].second--;
+                posFromSecond[m].second -= cnt;
             }
         }
 
         //Remove constants from fields2
         for (uint32_t j = 0; j < fields2.size(); ++j) {
             if (fields2[j] > sortedIdx[i]) {
-                fields2[j]--;
+                fields2[j] -= cnt;
             }
         }
     }
