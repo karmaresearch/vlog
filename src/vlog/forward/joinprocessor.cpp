@@ -560,6 +560,20 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
         const int currentLiteral,
         const int nthreads) {
 
+#ifdef DEBUG
+    LOG(TRACEL) << "joinsCoordinates.size() = " << joinsCoordinates.size();
+    for (int i = 0; i < joinsCoordinates.size(); i++) {
+        LOG(TRACEL) << "i = " << i << ", first = " << (int) joinsCoordinates[i].first << ", second = " << (int) joinsCoordinates[i].second;
+    }
+    LOG(TRACEL) << "posFromFirst.size = " << output->getNCopyFromFirst();
+    for (int i = 0; i < output->getNCopyFromFirst(); i++) {
+        LOG(TRACEL) << "i = " << i << ", first = " << (int) output->getPosFromFirst()[i].first << ", second = " << (int) output->getPosFromFirst()[i].second;
+    }
+    LOG(TRACEL) << "posFromSecond.size = " << output->getNCopyFromSecond();
+    for (int i = 0; i < output->getNCopyFromSecond(); i++) {
+        LOG(TRACEL) << "i = " << i << ", first = " << (int) output->getPosFromSecond()[i].first << ", second = " << (int) output->getPosFromSecond()[i].second;
+    }
+#endif
     // Input Negation. We check if the literal is negated before calling
     // isJoinVerificative and isJoinTwoToOneJoin. Check performance issues.
     if (literal.isNegated()) {
@@ -581,12 +595,6 @@ void JoinExecutor::join(SemiNaiver * naiver, const FCInternalTable * t1,
         //This code is to execute more generic joins. We do hash join if
         //keys are few and there is no ordering. Otherwise, merge join.
         int factor = literalIsExpensive(literal, naiver->getEDBLayer()) ? 50 : 1;
-#ifdef DEBUG
-        LOG(TRACEL) << "joinsCoordinates.size() = " << joinsCoordinates.size();
-        for (int i = 0; i < joinsCoordinates.size(); i++) {
-            LOG(TRACEL) << "i = " << i << ", first = " << (int) joinsCoordinates[i].first << ", second = " << (int) joinsCoordinates[i].second;
-        }
-#endif
         //No hash joins if there are functors
         /*if (t1->estimateNRows() <= factor * THRESHOLD_HASHJOIN
                 && joinsCoordinates.size() < 3 && joinsCoordinates.size() > 0
