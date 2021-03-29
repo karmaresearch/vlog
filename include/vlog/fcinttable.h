@@ -112,6 +112,64 @@ class FCInternalTableItr {
         virtual ~FCInternalTableItr() {}
 };
 
+class SelectingFCInternalTableItr : public FCInternalTableItr {
+    private:
+        FCInternalTableItr *itr;
+        std::vector<uint8_t> toCopy;
+    public:
+        SelectingFCInternalTableItr(FCInternalTableItr *itr, std::vector<uint8_t> toCopy) : itr(itr), toCopy(toCopy) {
+        }
+
+        size_t getCurrentIteration() const {
+            return itr->getCurrentIteration();
+        }
+
+        Term_t getCurrentValue(const uint8_t pos) {
+            return itr->getCurrentValue(toCopy[pos]);
+        }
+
+        bool hasNext() {
+            return itr->hasNext();
+        }
+
+        uint8_t getNColumns() const {
+            return toCopy.size();
+        }
+
+        std::vector<std::shared_ptr<Column>> getColumn(const uint8_t ncolumns,
+                const uint8_t *columns) {
+            std::vector<std::shared_ptr<Column>> c;
+            std::vector<uint8_t> toget;
+            for (int i = 0; i < ncolumns; i++) {
+                toget.push_back(toCopy[columns[i]]);
+            }
+            return itr->getColumn(ncolumns, &toget[0]);
+        }
+
+        std::vector<std::shared_ptr<Column>> getAllColumns() {
+            return itr->getColumn(toCopy.size(), &toCopy[0]);
+        }
+
+        void next() {
+            itr->next();
+        }
+
+        void clear() {
+            itr->clear();
+        }
+
+        FCInternalTableItr *copy() const {
+            return new SelectingFCInternalTableItr(itr->copy(), toCopy);
+        }
+
+        void reset() {
+            itr->reset();
+        }
+
+        ~SelectingFCInternalTableItr() {
+        }
+};
+
 class FCInternalTable {
     private:
         //    int references;

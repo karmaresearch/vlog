@@ -859,7 +859,29 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
 
             literalItr.moveNextCount();
         }
-    } else if (nBodyLiterals == 1) {
+        return;
+    } 
+
+    // When the literal has repeated variables, we only need one copy of these variables.
+    bool hasRepeated = bodyLiteral->hasRepeatedVars();
+    std::vector<uint8_t> toCopy;
+    if (hasRepeated) {
+        std::set<Var_t> vars;
+        int cnt = 0;
+        for (int i = 0; i < bodyLiteral->getTupleSize(); i++) {
+            VTerm t = bodyLiteral->getTermAtPos(i);
+            if (t.isVariable()) {
+                Var_t v = t.getId();
+                if (vars.find(v) == vars.end()) {
+                    vars.insert(v);
+                    toCopy.push_back(cnt);
+                }
+                cnt++;
+            }
+        }
+    }
+    
+    if (nBodyLiterals == 1) {
         const bool uniqueResults =
             ! ruleDetails.rule.isExistential()
             && firstHeadLiteral.getNUniqueVars() == bodyLiteral->getNUniqueVars()
@@ -876,17 +898,25 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
 
                 std::shared_ptr<const FCInternalTable> table =
                     literalItr.getCurrentTable();
+
                 FCInternalTableItr *interitr = table->getIterator();
+                FCInternalTableItr *selectinginteritr = interitr;
+                if (hasRepeated) {
+                    selectinginteritr = new SelectingFCInternalTableItr(interitr, toCopy);
+                }
 
                 bool unique = uniqueResults && firstEndTable->isEmpty();
                 bool sorted = uniqueResults && firstHeadLiteral.
                     sameVarSequenceAs(*bodyLiteral);
-                joinOutput->addColumns(0, interitr,
+                joinOutput->addColumns(0, selectinginteritr,
                         unique,
                         sorted,
                         literalItr.getNTables() == 1);
 
                 table->releaseIterator(interitr);
+                if (hasRepeated) {
+                    delete selectinginteritr;
+                }
             }
             // No else-clause here? Yes, can only be duplicates
             literalItr.moveNextCount();
@@ -903,6 +933,10 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
             std::shared_ptr<const FCInternalTable> table = literalItr.getCurrentTable();
             LOG(DEBUGL) << "Creating iterator";
             FCInternalTableItr *interitr = table->getIterator();
+            FCInternalTableItr *selectinginteritr = interitr;
+            if (hasRepeated) {
+                selectinginteritr = new SelectingFCInternalTableItr(interitr, toCopy);
+            }
             std::pair<uint8_t, uint8_t> *fv = NULL;
             std::pair<uint8_t, uint8_t> psColumnsToFilter;
             if (filterValueVars != NULL) {
@@ -913,7 +947,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
             }
 
             std::vector<const std::vector<Term_t> *> vectors;
-            vectors = interitr->getAllVectors(nthreads);
+            vectors = selectinginteritr->getAllVectors(nthreads);
 
             if (vectors.size() > 0) {
                 size_t sz = vectors[0]->size();
@@ -957,14 +991,14 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
                         }
                     }
                 }
-                interitr->deleteAllVectors(vectors);
+                selectinginteritr->deleteAllVectors(vectors);
             } else {
-                while (interitr->hasNext()) {
-                    interitr->next();
+                while (selectinginteritr->hasNext()) {
+                    selectinginteritr->next();
                     if (fv != NULL) {
                         //otherwise I miss others
-                        if (interitr->getCurrentValue(fv->first) ==
-                                interitr->getCurrentValue(
+                        if (selectinginteritr->getCurrentValue(fv->first) ==
+                                selectinginteritr->getCurrentValue(
                                     fv->second)) {
                             continue;
                         }
@@ -972,11 +1006,14 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
 
                     joinOutput->processResults(0,
                             (FCInternalTableItr*)NULL,
-                            interitr, uniqueResults);
+                            selectinginteritr, uniqueResults);
                 }
             }
             LOG(DEBUGL) << "Releasing iterator";
             table->releaseIterator(interitr);
+            if (hasRepeated) {
+                delete selectinginteritr;
+            }
             literalItr.moveNextCount();
         }
     }

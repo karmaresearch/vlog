@@ -137,6 +137,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
         std::vector<std::pair<uint8_t,uint8_t>> v2p;
         //Put in join coordinates between the previous and the current literal
         uint8_t litVars = 0;
+        uint8_t skipped = 0;
         std::set<Var_t> processed; // This set is used to avoid repeated variables in the literal.
         for (int x = 0; x < currentLiteral->getTupleSize(); ++x) {
             const VTerm t = currentLiteral->getTermAtPos(x);
@@ -144,6 +145,11 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
             if (t.isVariable()) {
                 // Check if it is a repeated variable. In that case, we skip it.
                 if (processed.count(t.getId())) {
+                    if (i != 0) {
+                        // i == 0 is a special case for the output coordinates (processRuleFirstAtom in
+                        // seminaiver.cpp).
+                        skipped++;
+                    }
                     continue;
                 }
                 processed.insert(t.getId());
@@ -179,7 +185,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                             // the variable number in the pattern.
                             auto p = variablesNeededForHead.find(t.getId());
                             for(auto &el : p->second) {
-                                ps.push_back(std::make_pair(el, litVars));
+                                ps.push_back(std::make_pair(el, litVars + skipped));
                             }
                         }
                         v2p.push_back(std::make_pair(x, newExistingVariables.size() + litVars));
@@ -189,7 +195,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                         if (iter2 != newExistingVariables.end()){ //found
                             v2p.push_back(std::make_pair(x, (Var_t)(iter2 - newExistingVariables.begin())));
                         } else {
-                            ps.push_back(std::make_pair(newExistingVariables.size(), litVars));
+                            ps.push_back(std::make_pair(newExistingVariables.size(), litVars + skipped));
                             v2p.push_back(std::make_pair(x, newExistingVariables.size()));
                             newExistingVariables.push_back(t.getId());
                             LOG(TRACEL) << "New variable: " << (int) t.getId();
