@@ -227,12 +227,13 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal,
                 valuesConstantsToFilter[nConstantsToFilter++] = t.getValue();
             } else {
                 //Is it repeated?
-                for (uint8_t j = i + 1; j < (uint8_t) literal.getTupleSize(); ++j) {
+                for (uint8_t j = 0; j < i; ++j) {
                     if (literal.getTermAtPos(j).isVariable() &&
                             literal.getTermAtPos(j).getId() == t.getId()) {
-                        repeatedVars[nRepeatedVars].first = i;
-                        repeatedVars[nRepeatedVars].second = j;
+                        repeatedVars[nRepeatedVars].first = j;
+                        repeatedVars[nRepeatedVars].second = i;
                         nRepeatedVars++;
+                        break;
                     }
                 }
 
