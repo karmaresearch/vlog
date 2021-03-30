@@ -1180,31 +1180,34 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
     std::sort(sortedIdx.begin(), sortedIdx.end());
     std::vector<uint8_t> posVars = literalToQuery.getPosVars();
     for (int i = sortedIdx.size() - 1; i >= 0; --i) {
-        //Count how many times this var occurs in the literal. We need to count this, because we replace
-        //each of the occurences with a constant, so we have to adapt outputCopyCoordinates and fields2
-        // accordingly.
-        int cnt = 1;
         Var_t id = literalToQuery.getTermAtPos(posVars[sortedIdx[i]]).getId();
-        for (int j = posVars[sortedIdx[i]] + 1; j < literalToQuery.getTupleSize(); j++) {
-            VTerm t = literalToQuery.getTermAtPos(j);
-            if (t.isVariable() && t.getId() == id) {
-                cnt++;
-            }
-        }
-        
-
         //Adapt outputCopyCoordinates
+        //Note that variables to be replaced can occur more than once.
         const uint8_t nPosFromSecond = output->getNCopyFromSecond();
         std::pair<uint8_t, uint8_t> *posFromSecond = output->getPosFromSecond();
         for (uint8_t m = 0; m < nPosFromSecond; ++m) {
+            int cnt = 1;
             if (posFromSecond[m].second > sortedIdx[i]) {
+                for (int j = sortedIdx[i] + 1; j < posFromSecond[m].second; j++) {
+                    Var_t t = literalToQuery.getTermAtPos(posVars[j]).getId();
+                    if (t == id) {
+                        cnt++;
+                    }
+                }
                 posFromSecond[m].second -= cnt;
             }
         }
 
         //Remove constants from fields2
         for (uint32_t j = 0; j < fields2.size(); ++j) {
+            int cnt = 1;
             if (fields2[j] > sortedIdx[i]) {
+                for (int k = sortedIdx[i] + 1; k < fields2[j]; k++) {
+                    Var_t t = literalToQuery.getTermAtPos(posVars[k]).getId();
+                    if (t == id) {
+                        cnt++;
+                    }
+                }
                 fields2[j] -= cnt;
             }
         }
