@@ -1180,7 +1180,9 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
     std::sort(sortedIdx.begin(), sortedIdx.end());
     std::vector<uint8_t> posVars = literalToQuery.getPosVars();
     for (int i = sortedIdx.size() - 1; i >= 0; --i) {
-        //Count how many times this var occurs in the literal.
+        //Count how many times this var occurs in the literal. We need to count this, because we replace
+        //each of the occurences with a constant, so we have to adapt outputCopyCoordinates and fields2
+        // accordingly.
         int cnt = 1;
         Var_t id = literalToQuery.getTermAtPos(posVars[sortedIdx[i]]).getId();
         for (int j = posVars[sortedIdx[i]] + 1; j < literalToQuery.getTupleSize(); j++) {
