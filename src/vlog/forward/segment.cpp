@@ -148,17 +148,17 @@ size_t Segment::estimate(const uint8_t nconstantsToFilter,
 }
 
 bool Segment::areAllColumnsPartOftheSameQuery(EDBLayer **edb, const Literal **l,
-        std::vector<uint8_t> *outputpos) const {
+        std::vector<uint8_t> *position) const {
     bool sameLiteral = true;
     const Literal *lit;
     EDBLayer *layer;
-    std::vector<uint8_t> posInLiteral;
+    std::vector<uint8_t> pos;
     for (int i = 0; i < nfields; ++i) {
         if (columns[i]->isEDB()) {
             EDBColumn *edbC = (EDBColumn*) columns[i].get();
             if (i == 0) {
                 lit = &(edbC->getLiteral());
-                posInLiteral.push_back(edbC->posColumnInLiteral());
+                pos.push_back(edbC->getPosColumn());
                 layer = &(edbC->getEDBLayer());
             } else {
                 //Check the literal is the same
@@ -166,7 +166,7 @@ bool Segment::areAllColumnsPartOftheSameQuery(EDBLayer **edb, const Literal **l,
                 std::vector<Substitution> subs;
                 if (Literal::subsumes(subs, *newlit, *lit) != -1
                         && Literal::subsumes(subs, *lit, *newlit) != -1) {
-                    posInLiteral.push_back(edbC->posColumnInLiteral());
+                    pos.push_back(edbC->getPosColumn());
                 } else {
                     sameLiteral = false;
                     break;
@@ -178,10 +178,10 @@ bool Segment::areAllColumnsPartOftheSameQuery(EDBLayer **edb, const Literal **l,
         }
     }
 
-    if (sameLiteral && lit->getNVars() <= posInLiteral.size()) {
-        //I check also that every posInLiteral is unique because the
+    if (sameLiteral && lit->getNVars() <= pos.size()) {
+        //I check also that every posis unique because the
         //procedure below does not work for repeated fields
-        std::vector<uint8_t> test = posInLiteral;
+        std::vector<uint8_t> test = pos;
         std::sort(test.begin(), test.end());
         std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
         auto newlim = std::unique(test.begin(), test.end());
@@ -195,7 +195,7 @@ bool Segment::areAllColumnsPartOftheSameQuery(EDBLayer **edb, const Literal **l,
         if (edb != NULL) {
             *edb = layer;
             *l = lit;
-            *outputpos = posInLiteral;
+            *position = pos;
         }
         return true;
     }
@@ -214,8 +214,8 @@ std::shared_ptr<Segment> Segment::sortBy(const std::vector<uint8_t> *fields,
         //Check they are all EDB and part of the same literal
         EDBLayer *layer;
         const Literal *lit;
-        std::vector<uint8_t> posInLiteral;
-        bool sameLiteral = areAllColumnsPartOftheSameQuery(&layer, &lit, &posInLiteral);
+        std::vector<uint8_t> position;
+        bool sameLiteral = areAllColumnsPartOftheSameQuery(&layer, &lit, &position);
 
         if (sameLiteral) {
             //I can sort the segment by re-creating the columns according
@@ -228,10 +228,10 @@ std::shared_ptr<Segment> Segment::sortBy(const std::vector<uint8_t> *fields,
                 //The flag unique is set to false because we have multiple fields
                 //and therefore the field itself cannot be unique
                 columns[i] = std::shared_ptr<Column>(
-                        new EDBColumn(*layer, *lit, posInLiteral[i],
+                        new EDBColumn(*layer, *lit, position[i],
                             posPresorting,
                             false));
-                posPresorting.push_back(posInLiteral[i]);
+                posPresorting.push_back(position[i]);
             }
 
             std::shared_ptr<Segment> newSeg(new Segment(nfields,

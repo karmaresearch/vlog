@@ -169,11 +169,11 @@ class Segment {
 
         Segment& operator =(const std::shared_ptr<Column> *v);
 
-        bool areAllColumnsPartOftheSameQuery(EDBLayer **layer, const Literal **lit,
-                std::vector<uint8_t> *posInLiteral)
-            const;
-
         size_t getRepresentationSize(std::set<uint64_t> &IDs) const;
+
+        bool areAllColumnsPartOftheSameQuery(EDBLayer **layer, const Literal **lit,
+                std::vector<uint8_t> *position)
+            const;
 
 #if DEBUG
         void checkSizes() const;

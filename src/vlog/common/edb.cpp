@@ -699,24 +699,12 @@ static std::vector<std::shared_ptr<Column>> checkNewInGeneric(const Literal &l1,
         std::vector<uint8_t> &posInL1,
         const Literal &l2,
         std::vector<uint8_t> &posInL2, EDBTable *p, EDBTable *p2) {
-    std::vector<uint8_t> posVars1 = l1.getPosVars();
-    std::vector<uint8_t> fieldsToSort1;
-    for (int i = 0; i < posInL1.size(); i++) {
-        fieldsToSort1.push_back(posVars1[posInL1[i]]);
-    }
-    std::vector<uint8_t> posVars2 = l2.getPosVars();
-    std::vector<uint8_t> fieldsToSort2;
     std::vector<uint64_t> savedVal;
-    for (int i = 0; i < posInL2.size(); i++) {
-        fieldsToSort2.push_back(posVars2[posInL2[i]]);
-    }
-    // EDBIterator *itr1 = p->getSortedIterator(l1, fieldsToSort1);
-    // EDBIterator *itr2 = p2->getSortedIterator(l2, fieldsToSort2);
     EDBIterator *itr1 = p->getSortedIterator(l1, posInL1);
     EDBIterator *itr2 = p2->getSortedIterator(l2, posInL2);
 
     std::vector<std::shared_ptr<ColumnWriter>> cols;
-    for (int i = 0; i < fieldsToSort1.size(); i++) {
+    for (int i = 0; i < posInL1.size(); i++) {
         cols.push_back(std::shared_ptr<ColumnWriter>(new ColumnWriter()));
     }
 
@@ -727,10 +715,10 @@ static std::vector<std::shared_ptr<Column>> checkNewInGeneric(const Literal &l1,
         while (true) {
             bool equal = true;
             bool lt = false;
-            for (int i = 0; i < fieldsToSort1.size(); i++) {
-                if (itr1->getElementAt(fieldsToSort1[i]) != itr2->getElementAt(fieldsToSort2[i])) {
+            for (int i = 0; i < posInL1.size(); i++) {
+                if (itr1->getElementAt(posInL1[i]) != itr2->getElementAt(posInL2[i])) {
                     equal = false;
-                    lt = itr1->getElementAt(fieldsToSort1[i]) < itr2->getElementAt(fieldsToSort2[i]);
+                    lt = itr1->getElementAt(posInL1[i]) < itr2->getElementAt(posInL2[i]);
                     break;
                 }
             }
@@ -742,20 +730,20 @@ static std::vector<std::shared_ptr<Column>> checkNewInGeneric(const Literal &l1,
                 }
             } else if (lt) {
                 if (savedVal.size() == 0) {
-                    for (int i = 0; i < fieldsToSort1.size(); i++) {
-                        savedVal.push_back(itr1->getElementAt(fieldsToSort1[i]));
+                    for (int i = 0; i < posInL1.size(); i++) {
+                        savedVal.push_back(itr1->getElementAt(posInL1[i]));
                         cols[i]->add(savedVal[i]);
                     }
                 } else {
                     bool present = true;
-                    for (int i = 0; i < fieldsToSort1.size(); i++) {
-                        if (savedVal[i] != itr1->getElementAt(fieldsToSort1[i])) {
+                    for (int i = 0; i < posInL1.size(); i++) {
+                        if (savedVal[i] != itr1->getElementAt(posInL1[i])) {
                             present = false;
-                            savedVal[i] = itr1->getElementAt(fieldsToSort1[i]);
+                            savedVal[i] = itr1->getElementAt(posInL1[i]);
                         }
                     }
                     if (! present) {
-                        for (int i = 0; i < fieldsToSort1.size(); i++) {
+                        for (int i = 0; i < posInL1.size(); i++) {
                             cols[i]->add(savedVal[i]);
                         }
                     }
@@ -780,20 +768,20 @@ static std::vector<std::shared_ptr<Column>> checkNewInGeneric(const Literal &l1,
 
     while (more) {
         if (savedVal.size() == 0) {
-            for (int i = 0; i < fieldsToSort1.size(); i++) {
-                savedVal.push_back(itr1->getElementAt(fieldsToSort1[i]));
+            for (int i = 0; i < posInL1.size(); i++) {
+                savedVal.push_back(itr1->getElementAt(posInL1[i]));
                 cols[i]->add(savedVal[i]);
             }
         } else {
             bool present = true;
-            for (int i = 0; i < fieldsToSort1.size(); i++) {
-                if (savedVal[i] != itr1->getElementAt(fieldsToSort1[i])) {
+            for (int i = 0; i < posInL1.size(); i++) {
+                if (savedVal[i] != itr1->getElementAt(posInL1[i])) {
                     present = false;
-                    savedVal[i] = itr1->getElementAt(fieldsToSort1[i]);
+                    savedVal[i] = itr1->getElementAt(posInL1[i]);
                 }
             }
             if (! present) {
-                for (int i = 0; i < fieldsToSort1.size(); i++) {
+                for (int i = 0; i < posInL1.size(); i++) {
                     cols[i]->add(savedVal[i]);
                 }
             }
@@ -1168,19 +1156,12 @@ std::vector<std::shared_ptr<Column>> EDBTable::checkNewIn(
 
     LOG(DEBUGL) << "checkNewIn version 2";
 
-    std::vector<uint8_t> posVars = l.getPosVars();
-    std::vector<uint8_t> fieldsToSort;
-    for (int i = 0; i < posInL.size(); i++) {
-        fieldsToSort.push_back(posVars[posInL[i]]);
-    }
-
-    // EDBIterator *iter = getSortedIterator(l, fieldsToSort);
     EDBIterator *iter = getSortedIterator(l, posInL);
 
     int sz = checkValues.size();
 
     std::vector<std::shared_ptr<ColumnWriter>> cols;
-    for (int i = 0; i < fieldsToSort.size(); i++) {
+    for (int i = 0; i < posInL.size(); i++) {
         cols.push_back(std::shared_ptr<ColumnWriter>(new ColumnWriter()));
     }
 
@@ -1214,7 +1195,7 @@ std::vector<std::shared_ptr<Column>> EDBTable::checkNewIn(
 
         while (true) {
             for (int i = 0; i < sz; i++) {
-                vi[i] = iter->getElementAt(fieldsToSort[i]);
+                vi[i] = iter->getElementAt(posInL[i]);
             }
             equal = true;
             bool lt = false;
@@ -1327,7 +1308,6 @@ std::shared_ptr<Column> EDBTable::checkIn(
     //    }
 
     LOG(DEBUGL) << "EDBTable::checkIn, literal = " << l.tostring() << ", posInL = " << (int) posInL;
-    std::vector<uint8_t> posVars = l.getPosVars();
     std::vector<uint8_t> fieldsToSort;
     fieldsToSort.push_back(posInL);
     EDBIterator *iter = getSortedIterator(l, fieldsToSort);
@@ -1338,7 +1318,7 @@ std::shared_ptr<Column> EDBTable::checkIn(
     sizeOutput = 0;
     while (iter->hasNext()) {
         iter->next();
-        const Term_t v2 = iter->getElementAt(posVars[posInL]);
+        const Term_t v2 = iter->getElementAt(posInL);
         while (values[idx1] < v2) {
             idx1++;
             if (idx1 == values.size()) {
