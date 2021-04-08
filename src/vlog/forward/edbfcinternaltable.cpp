@@ -218,7 +218,7 @@ std::vector<std::shared_ptr<Column>> EDBFCInternalTableItr::getColumn(
         }
 
         output.push_back(std::shared_ptr<Column>(
-                    new EDBColumn(*layer, *query, columnNo, columnpresort, false)));
+                    new EDBColumn(*layer, *query, posFields[columnNo], columnpresort, false)));
         //Add it only if it is not there
         bool found = false;
         for(int j = 0; j < presortFields.size() && !found; ++j)

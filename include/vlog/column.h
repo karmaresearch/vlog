@@ -740,7 +740,7 @@ class EDBColumn final : public Column {
         }
 
         uint8_t posColumnInLiteral() const {
-            return posColumn;
+            return l.getPosVars()[posColumn];
         }
 
         std::vector<uint8_t> getPresortPos() const {
