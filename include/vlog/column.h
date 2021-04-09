@@ -635,6 +635,7 @@ class EDBColumnReader final : public ColumnReader {
     private:
         const Literal &l;
         EDBLayer &layer;
+        // Note: posColumn only counts variables in the literal
         const uint8_t posColumn;
         const std::vector<uint8_t> presortPos;
         const bool unq;
@@ -692,6 +693,7 @@ class EDBColumn final : public Column {
     private:
         EDBLayer &layer;
         const Literal l;
+        // Note: posColumn only counts variables in the literal
         const uint8_t posColumn;
         const std::vector<uint8_t> presortPos;
         bool unq;
