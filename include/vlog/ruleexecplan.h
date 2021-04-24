@@ -61,7 +61,7 @@ struct RuleExecutionPlan {
     void calculateJoinsCoordinates(const std::vector<Literal> &heads,
             bool copyAllVars);
 
-    RuleExecutionPlan reorder(std::vector<uint8_t> &order,
+    RuleExecutionPlan reorder(std::vector<int> &order,
             const std::vector<Literal> &heads,
             bool copyAllVars) const;
 

@@ -173,8 +173,8 @@ void RuleExecutionDetails::calculateNVarsInHeadFromEDB() {
             VTerm t = head.getTermAtPos(i);
             if (t.isVariable()) {
                 //Check if this variable appears on some edb terms
-                std::vector<std::pair<uint8_t, uint8_t>> edbLiterals;
-                uint8_t idxLiteral = 0;
+                std::vector<std::pair<int, uint8_t>> edbLiterals;
+                int idxLiteral = 0;
                 for (const auto & literal : bodyLiterals) {
                     if (literal.getPredicate().getType() == EDB) {
                         for (int j = 0; j < literal.getTupleSize(); ++j) {
@@ -209,7 +209,7 @@ void RuleExecutionDetails::calculateNVarsInHeadFromEDB() {
                 for (int i = 0; i < edbLiteralPerHeadVars.size() &&
                         !found; ++i) {
                     std::pair<uint8_t,
-                        std::vector<std::pair<uint8_t, uint8_t>>> el =
+                        std::vector<std::pair<int, uint8_t>>> el =
                             edbLiteralPerHeadVars[i];
                     if (el.first == patternAndPos.first) {
                         edbLiteralPerHeadVars[i].second.push_back(
@@ -218,7 +218,7 @@ void RuleExecutionDetails::calculateNVarsInHeadFromEDB() {
                     }
                 }
                 if (!found) {
-                    edbLiteralPerHeadVars.push_back(std::make_pair(patternAndPos.first, std::vector<std::pair<uint8_t, uint8_t>>()));
+                    edbLiteralPerHeadVars.push_back(std::make_pair(patternAndPos.first, std::vector<std::pair<int, uint8_t>>()));
                     edbLiteralPerHeadVars.back().second.push_back(std::make_pair(var, patternAndPos.second));
                 }
             }
@@ -351,8 +351,8 @@ void RuleExecutionDetails::createExecutionPlans(bool copyAllVars) {
 
     if (nIDBs > 0) {
         //Collect the IDB predicates
-        std::vector<uint8_t> posMagicAtoms;
-        std::vector<uint8_t> posIdbLiterals;
+        std::vector<int> posMagicAtoms;
+        std::vector<int> posIdbLiterals;
         orderExecutions.resize(nIDBs);
 
         for (int i = 0; i < bodyLiterals.size(); ++i){

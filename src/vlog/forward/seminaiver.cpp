@@ -676,7 +676,7 @@ void SemiNaiver::storeOnFiles(std::string path, const bool decompress,
     }
 }
 
-bool _sortCards(const std::pair<uint8_t, size_t> &v1, const std::pair<uint8_t, size_t> &v2) {
+bool _sortCards(const std::pair<int, size_t> &v1, const std::pair<int, size_t> &v2) {
     return v1.second < v2.second;
 }
 
@@ -807,7 +807,7 @@ struct CreateParallelFirstAtom {
     }
 };
 
-void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
+void SemiNaiver::processRuleFirstAtom(const int nBodyLiterals,
         const Literal *bodyLiteral,
         std::vector<Literal> &heads,
         const size_t min,
@@ -816,7 +816,7 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
         const bool lastLiteral,
         const size_t iteration,
         const RuleExecutionDetails &ruleDetails,
-        const uint8_t orderExecution,
+        const int orderExecution,
         std::vector<std::pair<uint8_t, uint8_t>> *filterValueVars,
         ResultJoinProcessor *joinOutput) {
     //If the rule has only one body literal, has the same bindings list of the head,
@@ -1035,8 +1035,8 @@ void SemiNaiver::processRuleFirstAtom(const uint8_t nBodyLiterals,
  * */
 void SemiNaiver::reorderPlanForNegatedLiterals(RuleExecutionPlan &plan, const std::vector<Literal> &heads) {
     std::set<Var_t> bounded_vars;
-    std::vector<uint8_t> literal_indexes;
-    std::vector<uint8_t> new_order;
+    std::vector<int> literal_indexes;
+    std::vector<int> new_order;
     bounded_vars.clear();
     literal_indexes.clear();
     new_order.clear();
@@ -1091,7 +1091,7 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
         const std::vector<Literal> &heads,
         bool copyAllVars) {
     //Reorder the atoms in terms of cardinality.
-    std::vector<std::pair<uint8_t, size_t>> positionCards;
+    std::vector<std::pair<int, size_t>> positionCards;
     for (int i = 0; i < cards.size(); ++i) {
         LOG(DEBUGL) << "Atom " << (int) i << " has card " << cards[i];
         positionCards.push_back(std::make_pair(i, cards[i]));
@@ -1099,7 +1099,7 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
     sort(positionCards.begin(), positionCards.end(), _sortCards);
 
     //Ensure there are always variables
-    std::vector<std::pair<uint8_t, size_t>> adaptedPosCards;
+    std::vector<std::pair<int, size_t>> adaptedPosCards;
     adaptedPosCards.push_back(positionCards.front());
     std::vector<Var_t> vars = plan.plan[
         positionCards[0].first]
@@ -1144,7 +1144,7 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
         }
     }
     if (toReorder) {
-        std::vector<uint8_t> orderLiterals;
+        std::vector<int> orderLiterals;
         for (int i = 0; i < adaptedPosCards.size(); ++i) {
             LOG(DEBUGL) << "Reordered plan is " << (int)adaptedPosCards[i].first;
             orderLiterals.push_back(adaptedPosCards[i].first);
@@ -1153,7 +1153,7 @@ void SemiNaiver::reorderPlan(RuleExecutionPlan &plan,
     }
 }
 
-FCTable *SemiNaiver::getTable(const PredId_t pred, const uint8_t card) {
+FCTable *SemiNaiver::getTable(const PredId_t pred, const int card) {
     FCTable *endTable;
     if (predicatesTables[pred] != NULL) {
         endTable = predicatesTables[pred];
@@ -1247,7 +1247,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
         //Auxiliary relations to perform the joins
         std::vector<size_t> cards;
         RuleExecutionPlan plan = orderExecutions->at(orderExecution);
-        const uint8_t nBodyLiterals = (uint8_t) plan.plan.size();
+        const int nBodyLiterals = plan.plan.size();
 
         //**** Should I skip the evaluation because some atoms are empty? ***
         bool isOneRelEmpty = checkIfAtomsAreEmpty(ruleDetails, plan, limitView, cards);
@@ -1308,7 +1308,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                             plan.posFromSecond[optimalOrderIdx],
                             listDerivations,
                             heads, &ruleDetails,
-                            (uint8_t) orderExecution, iteration,
+                            orderExecution, iteration,
                             finalResultContainer == NULL,
                             !multithreaded ? -1 : nthreads,
                             this,
@@ -1327,7 +1327,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                                 heads[0],
                                 0,
                                 &ruleDetails,
-                                (uint8_t) orderExecution,
+                                orderExecution,
                                 iteration,
                                 finalResultContainer == NULL,
                                 !multithreaded ? -1 : nthreads,
@@ -1338,7 +1338,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
                                 plan.posFromSecond[optimalOrderIdx],
                                 listDerivations,
                                 heads, &ruleDetails,
-                                (uint8_t) orderExecution, iteration,
+                                orderExecution, iteration,
                                 finalResultContainer == NULL,
                                 !multithreaded ? -1 : nthreads, this,
                                 ignoreDuplicatesElimination);

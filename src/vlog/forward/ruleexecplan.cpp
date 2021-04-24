@@ -40,7 +40,7 @@ void RuleExecutionPlan::checkIfFilteringHashMapIsPossible(const Literal &head) {
     filterLastHashMap = true;
 }
 
-RuleExecutionPlan RuleExecutionPlan::reorder(std::vector<uint8_t> &order,
+RuleExecutionPlan RuleExecutionPlan::reorder(std::vector<int> &order,
         const std::vector<Literal> &heads, bool copyAllVars) const {
     RuleExecutionPlan newPlan;
     newPlan.lastLiteralSharesWithHead = false;
