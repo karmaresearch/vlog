@@ -23,7 +23,7 @@ struct LessTwoTuples {
     LessTwoTuples(const uint8_t sizeTuple, const std::vector<Term_t> &values) : sizeTuple(sizeTuple), values(values) {}
 
     bool operator() (const size_t r1, const size_t r2) const {
-        for (uint8_t i = 0; i < sizeTuple; ++i)
+        for (int i = 0; i < sizeTuple; ++i)
             if (values[r1 + i] != values[r2 + i])
                 return values[r1 + i] < values[r2 + i];
         return false;

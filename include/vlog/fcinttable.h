@@ -470,7 +470,7 @@ struct InmemoryFCInternalTableUnmergedSegment {
             nconstants(values->getNConstantFields()) {
                 this->values = values;
                 uint8_t j = 0;
-                for (uint8_t i = 0; i < nfields; ++i) {
+                for (int i = 0; i < nfields; ++i) {
                     if (values->isConstantField(i)) {
                         constants[j++] = std::make_pair(i, values->firstInColumn(i));
                     }
@@ -482,7 +482,7 @@ struct InmemoryFCInternalTableUnmergedSegment {
                 const uint8_t nfields, std::shared_ptr<Column> *columns)
             : nconstants(nconstants), values(new Segment(nfields, columns)) {
                 assert(columns[0] != NULL);
-                for (uint8_t i = 0; i < nconstants; ++i) {
+                for (int i = 0; i < nconstants; ++i) {
                     this->constants[i] = constants[i];
                 }
                 assert(nconstants <= _INMEMORYUNMSEGM_MAXCONSTS);
@@ -568,7 +568,7 @@ class InmemoryFCInternalTable final : public FCInternalTable {
 
         bool isEDB() const {
             if (values != NULL) {
-                for (uint8_t i = 0; i < nfields; ++i) {
+                for (int i = 0; i < nfields; ++i) {
                     if (!values->getColumn(i)->isEDB()) {
                         return false;
                     }

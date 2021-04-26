@@ -364,7 +364,7 @@ void TridentTable::getQueryFromEDBRelation0(QSQQuery *query,
     const uint8_t npos = query->getNPosToCopy();
     while (itr.hasNext()) {
         itr.next();
-        for (uint8_t i = 0; i < npos; ++i) {
+        for (int i = 0; i < npos; ++i) {
             row[i] = itr.getElementAt(pos[i]);
         }
         outputTable->addRow(row);

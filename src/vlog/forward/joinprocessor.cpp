@@ -386,7 +386,7 @@ void JoinExecutor::verificativeJoinOneColumn(
                             }
                             for (; rowId < limit; rowId++, idx2++) {
                                 assert(next);
-                                for (uint8_t i = 0; i < intResSizeRow; ++i) {
+                                for (int i = 0; i < intResSizeRow; ++i) {
                                     outputRow[i] = itr->getCurrentValue(i);
                                 }
 #if DEBUG
@@ -464,7 +464,7 @@ void JoinExecutor::verificativeJoinOneColumn(
                             idx2++;
                         }
                         for (; rowId < limit; rowId++, idx2++) {
-                            for (uint8_t i = 0; i < intResSizeRow; ++i) {
+                            for (int i = 0; i < intResSizeRow; ++i) {
                                 outputRow[i] = itr->getCurrentValue(i);
                             }
 #if DEBUG
@@ -667,7 +667,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
     uint8_t idxJoinFieldInLiteral2 = idxJoinField2;
     if (njoinfields < 2) {
         uint8_t nvars = 0;
-        for (uint8_t i = 0; nvars <= idxJoinField1; ++i) {
+        for (int i = 0; nvars <= idxJoinField1; ++i) {
             if (!literal.getTermAtPos(i).isVariable()) {
                 idxJoinFieldInLiteral1++;
             } else {
@@ -676,7 +676,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
         }
     } else {
         uint8_t nvars = 0;
-        for (uint8_t i = 0; nvars <= idxJoinField1 || nvars <= idxJoinField2; ++i) {
+        for (int i = 0; nvars <= idxJoinField1 || nvars <= idxJoinField2; ++i) {
             if (!literal.getTermAtPos(i).isVariable()) {
                 if (nvars <= idxJoinField1)
                     idxJoinFieldInLiteral1++;
@@ -723,7 +723,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                 }
             }
         } else {
-            for (uint8_t i = 0; i < (uint8_t) posToSort.size(); ++i) {
+            for (int i = 0; i < (uint8_t) posToSort.size(); ++i) {
                 uint8_t possort = posToSort[i];
                 if (possort != idxJoinField1 && possort != idxJoinField2) {
                     if (possort > idxJoinField2) {
@@ -831,7 +831,7 @@ void JoinExecutor::execSelectiveHashJoin(const RuleExecutionDetails & currentRul
                 // Note that this code is essential for correct functioning ... --Ceriel
                 while (outputLiterals != NULL && outputLiterals->size() == 1 &&  start < end) {
                     VTuple t = (*outputLiterals)[0].getTuple();
-                    for (uint8_t i = 0; i < nPosFromFirst; ++i) {
+                    for (int i = 0; i < nPosFromFirst; ++i) {
                         Var_t var = t.get(posFromFirst[i].first).getId();
                         // t.set(VTerm(0, values[start + posFromFirst[i].second]), posFromFirst[i].first);
                         // Watch out: variable could be used more than once --Ceriel
@@ -1034,7 +1034,7 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
                     currentKey = newKey;
                     startpos = values.size();
                 }
-                for (uint8_t j = 0; j < t1->getRowSize(); ++j) {
+                for (int j = 0; j < t1->getRowSize(); ++j) {
                     values.push_back(t2->getCurrentValue(j));
                 }
             }
@@ -1072,7 +1072,7 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
                         startpos = values.size();
                     }
                 }
-                for (uint8_t j = 0; j < t1->getRowSize(); ++j)
+                for (int j = 0; j < t1->getRowSize(); ++j)
                     values.push_back(t2->getCurrentValue(j));
             }
 
@@ -1106,7 +1106,7 @@ void JoinExecutor::hashjoin(const FCInternalTable * t1, SemiNaiver * naiver,
 }
 
 int JoinExecutor::cmp(const Term_t *r1, const Term_t *r2, const uint8_t s) {
-    for (uint8_t i = 0; i < s; ++i)
+    for (int i = 0; i < s; ++i)
         if (r1[i] != r2[i])
             return r1[i] - r2[i];
     return 0;
@@ -1185,7 +1185,7 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
         //Note that variables to be replaced can occur more than once.
         const uint8_t nPosFromSecond = output->getNCopyFromSecond();
         std::pair<uint8_t, uint8_t> *posFromSecond = output->getPosFromSecond();
-        for (uint8_t m = 0; m < nPosFromSecond; ++m) {
+        for (int m = 0; m < nPosFromSecond; ++m) {
             int cnt = 1;
             if (posFromSecond[m].second > sortedIdx[i]) {
                 for (int j = sortedIdx[i] + 1; j < posFromSecond[m].second; j++) {
@@ -1256,7 +1256,7 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
     } else {
         //Positions to return when filtering the input query
         std::vector<uint8_t> posToCopy;
-        for (uint8_t i = 0; i < (uint8_t) t1->getRowSize(); ++i) {
+        for (int i = 0; i < (uint8_t) t1->getRowSize(); ++i) {
             posToCopy.push_back(i);
         }
 
@@ -1274,11 +1274,11 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
             for (uint32_t j = 0; j < idxColumnsLowCardInLiteral.size(); ++j) {
                 uint8_t idxInLiteral = 0;
                 uint8_t nvars = 0;
-                for (uint8_t r = 0; r < literalToQuery.getTupleSize(); ++r) {
+                for (int r = 0; r < literalToQuery.getTupleSize(); ++r) {
                     if (literalToQuery.getTermAtPos(r).isVariable()) {
                         Var_t var = literalToQuery.getTermAtPos(r).getId();
                         bool usedBefore = false;
-                        for (uint8_t k = 0; k < r; k++) {
+                        for (int k = 0; k < r; k++) {
                             if (literalToQuery.getTermAtPos(k).isVariable() && var == literalToQuery.getTermAtPos(k).getId()) {
                                 usedBefore = true;
                                 break;
@@ -1313,9 +1313,9 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
                 //For now we limit to one additional variable. More will require additional code that does not seem necessary
                 std::vector<uint8_t> idxOtherPos;
                 std::vector<std::vector<Term_t>> valueOtherPos;
-                for (uint8_t i = 0; i < filteredT1->getRowSize() && idxOtherPos.size() == 0; ++i) {
+                for (int i = 0; i < filteredT1->getRowSize() && idxOtherPos.size() == 0; ++i) {
                     bool found = false;
-                    for (uint8_t j = 0; j < joinsCoordinates.size(); ++j) {
+                    for (int j = 0; j < joinsCoordinates.size(); ++j) {
                         if (i == joinsCoordinates[j].first) {
                             found = true;
                             break;
@@ -1458,7 +1458,7 @@ void JoinExecutor::do_merge_join_classicalgo(FCInternalTableItr * sortedItr1,
             size_t count = 0;
             std::vector<Term_t> rowsToJoin;
             for (;;) {
-                for (uint8_t idxInItr = 0; idxInItr < sortedItr1->getNColumns();
+                for (int idxInItr = 0; idxInItr < sortedItr1->getNColumns();
                         ++idxInItr) {
                     Term_t v1 = sortedItr1->getCurrentValue(idxInItr);
                     rowsToJoin.push_back(v1);
@@ -1528,7 +1528,7 @@ void JoinExecutor::do_merge_join_classicalgo(FCInternalTableItr * sortedItr1,
         //Go to the end of the first iterator
         uint32_t count = 1;
         std::vector<Term_t> rowsToJoin;
-        for (uint8_t idxInItr = 0; idxInItr < sortedItr1->getNColumns();
+        for (int idxInItr = 0; idxInItr < sortedItr1->getNColumns();
                 ++idxInItr) {
             Term_t v1 = sortedItr1->getCurrentValue(idxInItr);
             rowsToJoin.push_back(v1);
@@ -1539,7 +1539,7 @@ void JoinExecutor::do_merge_join_classicalgo(FCInternalTableItr * sortedItr1,
             sortedItr1->next();
             if (!sortedItr1->sameAs(rowsToJoin, fields1))
                 break;
-            for (uint8_t idxInItr = 0; idxInItr < sortedItr1->getNColumns();
+            for (int idxInItr = 0; idxInItr < sortedItr1->getNColumns();
                     ++idxInItr) {
                 Term_t v1 = sortedItr1->getCurrentValue(idxInItr);
                 rowsToJoin.push_back(v1);
@@ -1862,7 +1862,7 @@ void JoinExecutor::do_merge_join_fasteralgo(FCInternalTableItr * sortedItr1,
     //Add the constant in the resultcontainer to avoid continuos additions
     assert(output->getNCopyFromFirst() == 1);
     const uint8_t posBlocksInResult = output->getPosFromFirst()[0].first;
-    for (uint8_t i = 0; i < nValBlocks; ++i) {
+    for (int i = 0; i < nValBlocks; ++i) {
         if (counts[i] != 0) {
             std::shared_ptr<Column> column(new CompressedColumn(valBlocks[i], counts[i]));
             output->addColumn(i, posBlocksInResult, column, false, false);
@@ -1870,18 +1870,18 @@ void JoinExecutor::do_merge_join_fasteralgo(FCInternalTableItr * sortedItr1,
     }
 
     //Add all other constants that were set in row but do not come from the two sides
-    for (uint8_t i = 0; i < output->getRowSize(); ++i) {
+    for (int i = 0; i < output->getRowSize(); ++i) {
         if (i != posBlocksInResult) {
             //Does it come from the literal?
             bool found = false;
-            for (uint8_t j = 0; j < output->getNCopyFromSecond() && !found; ++j) {
+            for (int j = 0; j < output->getNCopyFromSecond() && !found; ++j) {
                 if (i == output->getPosFromSecond()[j].first) {
                     found = true;
                 }
             }
             if (!found) {
                 //Add it as constant
-                for (uint8_t m = 0; m < nValBlocks; ++m) {
+                for (int m = 0; m < nValBlocks; ++m) {
                     if (counts[m] != 0) {
                         std::shared_ptr<Column> column(new CompressedColumn(output->getRawRow()[i], counts[m]));
                         output->addColumn(m, i, column, false, true);
@@ -2293,7 +2293,7 @@ bool DuplicateContainers::exists(const Term_t *v) {
 }
 
 int DuplicateContainers::cmp(FCInternalTableItr * itr, const Term_t *v) const {
-    for (uint8_t i = 0; i < nfields; ++i) {
+    for (int i = 0; i < nfields; ++i) {
         if (itr->getCurrentValue(i) != v[i]) {
             return itr->getCurrentValue(i) - v[i];
         }

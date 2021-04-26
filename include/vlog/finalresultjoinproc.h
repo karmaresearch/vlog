@@ -6,7 +6,7 @@
 class SingleHeadFinalRuleProcessor: public ResultJoinProcessor {
     private:
         std::vector<FCBlock> &listDerivations;
-        const uint8_t ruleExecOrder;
+        const unsigned ruleExecOrder;
 
         const size_t iteration;
 
@@ -25,7 +25,7 @@ class SingleHeadFinalRuleProcessor: public ResultJoinProcessor {
         FCTable *t;
         const RuleExecutionDetails *ruleDetails;
         const Literal literal;
-        const uint8_t posLiteralInRule;
+        const unsigned posLiteralInRule;
 
         SegmentInserter **tmpt;
 
@@ -39,7 +39,7 @@ class SingleHeadFinalRuleProcessor: public ResultJoinProcessor {
                 FCTable *t,
                 Literal &head, const uint8_t posHeadInRule,
                 const RuleExecutionDetails *detailsRule,
-                const uint8_t ruleExecOrder,
+                const unsigned ruleExecOrder,
                 const size_t iteration,
                 const bool addToEndTable,
                 const int nthreads,
@@ -54,7 +54,7 @@ class SingleHeadFinalRuleProcessor: public ResultJoinProcessor {
                 FCTable *t,
                 Literal &head, const uint8_t posHeadInRule,
                 const RuleExecutionDetails *detailsRule,
-                const uint8_t ruleExecOrder,
+                const unsigned ruleExecOrder,
                 const size_t iteration,
                 const bool addToEndTable,
                 const int nthreads,
@@ -174,7 +174,7 @@ class FinalRuleProcessor: public ResultJoinProcessor {
     protected:
         std::vector<std::unique_ptr<SingleHeadFinalRuleProcessor>> atomTables;
         const RuleExecutionDetails *ruleDetails;
-        const uint8_t ruleExecOrder;
+        const unsigned ruleExecOrder;
         bool addToEndTable;
 
     public:
@@ -184,7 +184,7 @@ class FinalRuleProcessor: public ResultJoinProcessor {
                 std::vector<FCBlock> &listDerivations,
                 std::vector<Literal> &heads,
                 const RuleExecutionDetails *detailsRule,
-                const uint8_t ruleExecOrder,
+                const unsigned ruleExecOrder,
                 const size_t iteration,
                 const bool addToEndTable,
                 const int nthreads,

@@ -17,10 +17,10 @@ void TridentIterator::init(PredId_t id, Querier * q, const Literal & literal, co
     VTuple tuple = literal.getTuple();
     if (fields.size() > 0) {
         std::vector<uint8_t> sortedFields;
-        for (uint8_t i = 0; i < fields.size(); ++i) {
-            uint8_t pos = fields[i];
-            uint8_t nvars = 0;
-            for (uint8_t j = 0; j < literal.getTupleSize(); ++j) {
+        for (int i = 0; i < fields.size(); ++i) {
+            int pos = fields[i];
+            int nvars = 0;
+            for (int j = 0; j < literal.getTupleSize(); ++j) {
                 if (literal.getTermAtPos(j).isVariable()) {
                     if (pos == nvars)
                         sortedFields.push_back(j);

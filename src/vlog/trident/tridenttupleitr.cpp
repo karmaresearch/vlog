@@ -72,7 +72,7 @@ void TridentTupleItr::init(Querier *querier, const VTuple *t,
 
     if (onlyVars) {
         int idx = 0;
-        for (uint8_t j = 0; j < 3; ++j) {
+        for (int j = 0; j < 3; ++j) {
             if (!t->get(j).isVariable()) {
                 idx++;
             } else {
@@ -81,7 +81,7 @@ void TridentTupleItr::init(Querier *querier, const VTuple *t,
         }
         sizeTuple = (uint8_t) (3 - idx);
     } else {
-        for (uint8_t j = 0; j < 3; ++j) {
+        for (int j = 0; j < 3; ++j) {
             varsPos[j] = (uint8_t) invPerm[j];
         }
         sizeTuple = 3;

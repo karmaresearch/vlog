@@ -108,10 +108,10 @@ class VTuple {
 
         std::vector<std::pair<uint8_t, uint8_t>> getRepeatedVars() const {
             std::vector<std::pair<uint8_t, uint8_t>> output;
-            for (uint8_t i = 0; i < sizetuple; ++i) {
+            for (int i = 0; i < sizetuple; ++i) {
                 VTerm t1 = get(i);
                 if (t1.isVariable()) {
-                    for (uint8_t j = i + 1; j < sizetuple; ++j) {
+                    for (int j = i + 1; j < sizetuple; ++j) {
                         VTerm t2 = get(j);
                         if (t2.getId() == t1.getId()) {
                             output.push_back(std::make_pair(i, j));

@@ -8,13 +8,13 @@ QSQQuery::QSQQuery(const Literal literal) : literal(literal) {
     uint8_t nExistingVars = 0;
     std::pair<uint8_t, uint8_t> existingVars[256]; //value,pos
 
-    for (uint8_t i = 0; i < (uint8_t) literal.getTupleSize(); ++i) {
+    for (int i = 0; i < (uint8_t) literal.getTupleSize(); ++i) {
         if (literal.getTermAtPos(i).isVariable()) {
             posToCopy[nPosToCopy++] = i;
 
             int8_t posRepeated = -1;
             if (nExistingVars > 0) {
-                for (uint8_t j = 0; j < nExistingVars; ++j) {
+                for (int j = 0; j < nExistingVars; ++j) {
                     if (literal.getTermAtPos(i).getId() == existingVars[j].first) {
                         posRepeated = j;
                         break;
