@@ -220,7 +220,7 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal,
         uint8_t nVarsToCopy = 0;
         uint8_t posVarsToCopy[256];
 
-        for (int i = 0; i < (uint8_t) literal.getTupleSize(); ++i) {
+        for (int i = 0; i < literal.getTupleSize(); ++i) {
             VTerm t = literal.getTermAtPos(i);
             if (!t.isVariable()) {
                 posConstantsToFilter[nConstantsToFilter] = i;
@@ -363,9 +363,9 @@ std::shared_ptr<const Segment> FCTable::retainFrom(
 
 bool FCTable::add(std::shared_ptr<const FCInternalTable> t,
         const Literal &literal,
-        const uint8_t posLiteralInRule,
+        const unsigned posLiteralInRule,
         const RuleExecutionDetails *rule,
-        const uint8_t ruleExecOrder,
+        const unsigned ruleExecOrder,
         const size_t iteration, const bool isCompleted,
         int nthreads) {
     assert(t->getRowSize() == this->getSizeRow());
