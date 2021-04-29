@@ -137,7 +137,6 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
         std::vector<std::pair<uint8_t,uint8_t>> v2p;
         //Put in join coordinates between the previous and the current literal
         uint8_t litVars = 0;
-        uint8_t skipped = 0;
         std::set<Var_t> processed; // This set is used to avoid repeated variables in the literal.
         for (int x = 0; x < currentLiteral->getTupleSize(); ++x) {
             const VTerm t = currentLiteral->getTermAtPos(x);
@@ -148,7 +147,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                     if (i != 0) {
                         // i == 0 is a special case for the output coordinates (processRuleFirstAtom in
                         // seminaiver.cpp).
-                        skipped++;
+                        litVars++;
                     }
                     continue;
                 }
@@ -185,7 +184,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                             // the variable number in the pattern.
                             auto p = variablesNeededForHead.find(t.getId());
                             for(auto &el : p->second) {
-                                ps.push_back(std::make_pair(el, litVars + skipped));
+                                ps.push_back(std::make_pair(el, litVars));
                             }
                         }
                         v2p.push_back(std::make_pair(x, newExistingVariables.size() + litVars));
@@ -195,7 +194,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                         if (iter2 != newExistingVariables.end()){ //found
                             v2p.push_back(std::make_pair(x, (Var_t)(iter2 - newExistingVariables.begin())));
                         } else {
-                            ps.push_back(std::make_pair(newExistingVariables.size(), litVars + skipped));
+                            ps.push_back(std::make_pair(newExistingVariables.size(), litVars));
                             v2p.push_back(std::make_pair(x, newExistingVariables.size()));
                             newExistingVariables.push_back(t.getId());
                             LOG(TRACEL) << "New variable: " << (int) t.getId();
@@ -231,18 +230,18 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
 
                     //Then search among the last literal
                     if (!found) {
-                        int litVars = 0;
+                        int lv = 0;
                         for (int x = 0; x < currentLiteral->getTupleSize(); ++x) {
                             const VTerm t = currentLiteral->getTermAtPos(x);
                             if (t.isVariable()) {
                                 if (t.getId() == v) {
                                     extvars2pos[pair.first].push_back(
-                                            existingVariables.size() + litVars);
-                                    LOG(TRACEL) << "Position = " << (int) (existingVariables.size() + litVars);
+                                            existingVariables.size() + lv);
+                                    LOG(TRACEL) << "Position = " << (int) (existingVariables.size() + lv);
                                     found = true;
                                     break;
                                 }
-                                litVars++;
+                                lv++;
                             }
                         }
                     }

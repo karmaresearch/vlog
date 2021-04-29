@@ -1289,8 +1289,8 @@ void JoinExecutor::mergejoin(const FCInternalTable * t1, SemiNaiver * naiver,
                                 idxInLiteral = r;
                                 break;
                             }
-                            nvars++;
                         }
+                        nvars++;
                     }
                 }
                 // t.set(VTerm(0, bagValuesColumns[j][idxs[j]]), idxInLiteral);
