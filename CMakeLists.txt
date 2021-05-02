@@ -61,6 +61,29 @@ file(GLOB vlog_SRC
     "src/launcher/vlogscan.cpp"
     )
 
+#PARSER GENERATOR
+find_package(BISON 3.0 REQUIRED)
+find_package(FLEX 2.6 REQUIRED)
+
+add_custom_target(parserdirectory ALL COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/parser)
+
+BISON_TARGET(ruleparser
+             src/parser/ruleparser.yy
+             ${CMAKE_CURRENT_BINARY_DIR}/parser/ruleparser.tab.cc)
+FLEX_TARGET(rulelexer
+            src/parser/rulelexer.l
+            ${CMAKE_CURRENT_BINARY_DIR}/parser/rulelexer.yy.cc)
+ADD_FLEX_BISON_DEPENDENCY(rulelexer ruleparser)
+
+add_library(parsergenerator SHARED
+    src/parser/ruledriver.cpp
+    ${FLEX_rulelexer_OUTPUTS}
+    ${BISON_ruleparser_OUTPUTS}
+    )
+add_dependencies(parsergenerator parserdirectory)
+
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/parser)
+
 #ZLIB
 find_package(ZLIB REQUIRED)
 
@@ -198,6 +221,7 @@ ENDIF()
 #Create both a library and the executable program
 add_library(vlog-core SHARED ${vlog_SRC})
 add_executable(vlog src/launcher/main.cpp)
+add_executable(localruleparser src/parser/rulemain.cpp)
 
 IF(SPARQL)
     target_link_libraries(vlog-core ${CURL_LIBRARIES})
@@ -211,6 +235,9 @@ endif()
 if (CMAKE_THREAD_LIBS_INIT)
     target_link_libraries(vlog-core "${CMAKE_THREAD_LIBS_INIT}")
 endif()
+
+target_link_libraries(vlog-core parsergenerator)
+target_link_libraries(localruleparser parsergenerator)
 
 #Set compiler options
 # set(CLANG_ONLY_COMPILE_FLAGS "-Wimplicit-int-conversion")

@@ -860,6 +860,186 @@ std::string Program::readFromFile(std::string pathFile, bool rewriteMultihead) {
     return "";
 }
 
+//TODO use rewrite Multihead
+void Program::parseRuleFile(std::string pathFile, bool rewriteMultihead) {
+    MC::RuleDriver driver;
+    driver.parse(pathFile);
+    MC::RuleAST *root = driver.get_root();
+    //root->print();
+    parseAST(root, rewriteMultihead, NULL, NULL, NULL);
+}
+
+void Program::parseAST(MC::RuleAST *root, bool rewriteMultihead, Dictionary *dictVariables, std::vector<Literal> *listOfLiterals, std::vector<VTerm> *terms){
+    //TODO transform this to integers and use a switch
+    std::string type = root->getType();
+    if (type == "LISTOFRULES") {
+        //LOG(DEBUGL) << "L. starting rulelist parsing";
+        MC::RuleAST *first = root->getFirst();
+        if (first != NULL) {
+            parseAST(first, rewriteMultihead, dictVariables, listOfLiterals, terms);
+        }
+        MC::RuleAST *second = root->getSecond();
+        if (second != NULL) {
+            parseAST(second, rewriteMultihead, dictVariables, listOfLiterals, terms);
+        }
+        //LOG(DEBUGL) << "L. rulelist parsing completed";
+    } else if (type == "RULE") {
+        //LOG(DEBUGL) << "L. starting rule parsing";
+        Dictionary dVariables;
+        MC::RuleAST * headAST = root->getFirst();
+        if (headAST ==NULL)
+            throw "Error, headAST can not be null";
+        MC::RuleAST * bodyAST = root->getSecond();
+        if (bodyAST ==NULL)
+            throw "Error, bodyAST can not be null";
+        std::vector<Literal> listOfHeadLiterals;
+        std::vector<Literal> listOfBodyLiterals;
+        parseAST(headAST, rewriteMultihead, &dVariables, &listOfHeadLiterals, terms);
+        parseAST(bodyAST, rewriteMultihead, &dVariables, &listOfBodyLiterals, terms);
+        //Add the rule
+        addRule(listOfHeadLiterals, listOfBodyLiterals);
+    } else if (type == "LISTOFLITERALS") {
+        //LOG(DEBUGL) <<  "L. starting listofliterals parsing";
+        MC::RuleAST *firstLiteral = root->getFirst();
+        if (firstLiteral != NULL) {
+            parseAST(firstLiteral, rewriteMultihead, dictVariables, listOfLiterals, NULL);
+        }
+        MC::RuleAST *rest = root->getSecond();
+        if (rest != NULL) {
+            parseAST(rest, rewriteMultihead, dictVariables, listOfLiterals, NULL);
+        }
+        //LOG(DEBUGL) <<  "L. listofliterals parsing completed";
+    } else if (type == "POSITIVELITERAL") {
+        //LOG(DEBUGL) <<  "L starting positive literal parsing";
+        std::string predicate = root->getValue();
+        std::vector<VTerm> t;
+        MC::RuleAST *listOfTerms = root->getFirst();
+        parseAST(listOfTerms, rewriteMultihead, dictVariables, listOfLiterals, &t);
+        if (t.size() != (uint8_t) t.size()) {
+            throw "Arity of predicate " + predicate + " is too high (" + std::to_string(t.size()) + " > 255)";
+        }
+
+        VTuple t1((uint8_t) t.size());
+        int pos = 0;
+        for (std::vector<VTerm>::iterator itr = t.begin(); itr != t.end(); ++itr) {
+            t1.set(*itr, pos++);
+        }
+
+        //Check if predicate starts with "neg_".
+        //bool negated = false;
+        //if (predicate.substr(0,4) == "neg_") {
+        //    negated = true;
+        //    predicate = predicate.substr(4);
+        //}
+
+        //Determine predicate
+        PredId_t predid = (PredId_t) dictPredicates.getOrAdd(predicate);
+        if (cardPredicates.find(predid) == cardPredicates.end()) {
+            cardPredicates.insert(std::make_pair(predid, t.size()));
+        } else {
+            if (cardPredicates.find(predid)->second != t.size()) {
+                throw ("Wrong arity in predicate \""+ predicate + "\". It should be " + std::to_string((int) cardPredicates.find(predid)->second) +".");
+            }
+        }
+        Predicate pred(predid, Predicate::calculateAdornment(t1), kb->doesPredExists(predid) ? EDB : IDB, (uint8_t) t.size());
+        LOG(DEBUGL) << "Predicate : " << predicate << ", type = " << ((pred.getType() == EDB) ? "EDB" : "IDB");
+
+        Literal literal(pred, t1, false);
+        listOfLiterals->push_back(literal);
+        //LOG(DEBUGL) <<  "L. positive literal parsing completed";
+    } else if (type == "NEGATEDLITERAL") {
+        //LOG(DEBUGL) <<  "L. starting negative literal parsing";
+        std::string predicate = root->getValue();
+        std::vector<VTerm> t;
+        MC::RuleAST *listOfTerms = root->getFirst();
+        parseAST(listOfTerms, rewriteMultihead, dictVariables, listOfLiterals, &t);
+        if (t.size() != (uint8_t) t.size()) {
+            throw "Arity of predicate " + predicate + " is too high (" + std::to_string(t.size()) + " > 255)";
+        }
+
+        VTuple t1((uint8_t) t.size());
+        int pos = 0;
+        for (std::vector<VTerm>::iterator itr = t.begin(); itr != t.end(); ++itr) {
+            t1.set(*itr, pos++);
+        }
+
+        //Check if predicate starts with "neg_".
+        //bool negated = false;
+        //if (predicate.substr(0,4) == "neg_") {
+        //    negated = true;
+        //    predicate = predicate.substr(4);
+        //}
+
+        //Determine predicate
+        PredId_t predid = (PredId_t) dictPredicates.getOrAdd(predicate);
+        if (cardPredicates.find(predid) == cardPredicates.end()) {
+            cardPredicates.insert(std::make_pair(predid, t.size()));
+        } else {
+            if (cardPredicates.find(predid)->second != t.size()) {
+                throw ("Wrong arity in predicate \""+ predicate + "\". It should be " + std::to_string((int) cardPredicates.find(predid)->second) +".");
+            }
+        }
+        Predicate pred(predid, Predicate::calculateAdornment(t1), kb->doesPredExists(predid) ? EDB : IDB, (uint8_t) t.size());
+        LOG(DEBUGL) << "Predicate : " << predicate << ", type = " << ((pred.getType() == EDB) ? "EDB" : "IDB");
+
+        Literal literal(pred, t1, true);
+        listOfLiterals->push_back(literal);
+        //LOG(DEBUGL) <<  "L. negative literal parsing completed";
+    } else if (type == "LISTOFTERMS") {
+        //LOG(DEBUGL) <<  "L starting listofterms parsing";
+        MC::RuleAST *firstTerm = root->getFirst();
+        if (firstTerm != NULL) {
+            parseAST(firstTerm, rewriteMultihead, dictVariables, listOfLiterals, terms);
+        }
+        MC::RuleAST *rest = root->getSecond();
+        if (rest != NULL) {
+            parseAST(rest, rewriteMultihead, dictVariables, listOfLiterals, terms);
+        }
+        //LOG(DEBUGL) <<  "L. listofterms parsing completed";
+    } else if (type == "VARIABLE") {
+        parseVariableAST(root, dictVariables, terms);
+    } else if (type == "CONSTANT") {
+        parseConstantAST(root, terms);
+    } else {
+        //LOG(DEBUGL) << "L. ERROR: " << type;
+        throw "parseAST error";
+    }
+}
+
+void Program::parseVariableAST(MC::RuleAST *root, Dictionary *dictVariables, std::vector<VTerm> *terms){
+    //LOG(DEBUGL) << "L. starting variable parsing";
+    if (dictVariables == NULL)
+        throw "parseVariableAST error. dictVariables can not be null";
+    if (terms == NULL)
+        throw "parseVariableAST error. terms can not be null";
+    std::string variable = root->getValue();
+    uint64_t v = dictVariables->getOrAdd(variable);
+    if (v != (uint8_t) v) {
+        throw "Too many variables in rule (> 255)";
+    }
+    terms->push_back(VTerm((uint8_t) v, 0));
+    //LOG(DEBUGL) << "L. variable parsing complete";
+}
+
+void Program::parseConstantAST(MC::RuleAST *root, std::vector<VTerm> *terms){
+    //LOG(DEBUGL) << "L. starting constant parsing";
+    std::string constant = rewriteRDFOWLConstants(root->getValue());
+    //LOG(DEBUGL) << "L. constant" << constant;
+    uint64_t dictTerm;
+    if (!kb->getOrAddDictNumber(constant.c_str(), constant.size(), dictTerm)) {
+        //Get an ID from the temporary dictionary
+        //dictTerm = additionalConstants.getOrAdd(term);
+        throw 10; //Could not add a term? Why?
+    }
+    if (terms == NULL)
+        throw "parseConstantAST error. Terms can not be null";
+    terms->push_back(VTerm(0, dictTerm));
+    //MC::RuleAST * next = root->getFirst();
+    //if (next != NULL)
+    LOG(DEBUGL) << "L constant parsing completed";
+}
+
+
 std::string Program::readFromString(std::string rules, bool rewriteMultihead) {
     std::stringstream ss(rules);
     std::string rule;
@@ -918,6 +1098,14 @@ std::string Program::rewriteRDFOWLConstants(std::string input) {
         return input;
     }
 
+    //is this the correct way of saying that something is a literal of type string?
+    //this should be equivalent to convertString function (inmemorytable file)
+    if (input.at(0)!='<' || input.at(input.length()-1)!='>'){
+        if (input.at(0)=='"' && input.at(input.length()-1)=='"')
+            input += "^^<http://www.w3.org/2001/XMLSchema#string>";
+        else
+            input = '"' + input + "\"^^<http://www.w3.org/2001/XMLSchema#string>";
+    }
     return input;
 }
 

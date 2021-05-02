@@ -277,6 +277,7 @@ bool initParams(int argc, const char** argv, ProgramArgs &vm) {
     query_options.add<bool>("","no-filtering", true, "Disable filter optimization.",false);
     query_options.add<bool>("","no-intersect", false, "Disable intersection optimization.",false);
     query_options.add<string>("","graphfile", "", "Path to store the rule dependency graph",false);
+    query_options.add<bool>("","useParserGenerator", false, "Use flex + bison as parser generator for rule, and (in the future) data", false);
 
     ProgramArgs::GroupArgs& load_options = *vm.newGroup("Options for <load>");
     load_options.add<string>("i","input", "",
@@ -544,10 +545,18 @@ void launchFullMat(int argc,
         std::string pathRules) {
     //Load a program with all the rules
     Program p(&db);
-    std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
-    if (!s.empty()) {
-        LOG(ERRORL) << s;
-        return;
+
+    if (vm["useParserGenerator"].as<bool>()){
+        //use parser generator
+        p.parseRuleFile(pathRules, vm["useParserGenerator"].as<bool>());
+    }
+    else {
+        //use previous method to parse rules
+        std::string s = p.readFromFile(pathRules,vm["rewriteMultihead"].as<bool>());
+        if (!s.empty()) {
+            LOG(ERRORL) << s;
+            return;
+        }
     }
 
     //Existential check
