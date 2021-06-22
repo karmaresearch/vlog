@@ -8,9 +8,9 @@ EDBFCInternalTable::EDBFCInternalTable(const size_t iteration,
     query(QSQQuery(literal)),
     layer(layer) {
 
-        uint8_t j = 0;
+        int j = 0;
         defaultSorting.clear();
-        for (uint8_t i = 0; i < literal.getTupleSize(); ++i) {
+        for (int i = 0; i < literal.getTupleSize(); ++i) {
             VTerm t = literal.getTermAtPos(i);
             if (t.isVariable()) {
                 defaultSorting.push_back(j);
@@ -95,7 +95,7 @@ size_t EDBFCInternalTable::estimateNRows(const uint8_t nconstantsToFilter,
 
     //Create a new literal adding the constants
     VTuple t = query.getLiteral()->getTuple();
-    for (uint8_t i = 0; i < nconstantsToFilter; ++i) {
+    for (int i = 0; i < nconstantsToFilter; ++i) {
         t.set(VTerm(0, valuesConstantsToFilter[i]), posConstantsToFilter[i]);
     }
     const Literal newLiteral(query.getLiteral()->getPredicate(), t);
@@ -107,12 +107,12 @@ std::shared_ptr<Column> EDBFCInternalTable::getColumn(
         const uint8_t columnIdx) const {
     //bool unq = query.getLiteral()->getNVars() == 2;
     std::vector<uint8_t> presortFields;
-    for (uint8_t i = 0; i < columnIdx; ++i)
+    for (int i = 0; i < columnIdx; ++i)
         presortFields.push_back(i);
 
     return std::shared_ptr<Column>(new EDBColumn(*layer,
                 *query.getLiteral(),
-                posFields[columnIdx],
+                columnIdx,
                 presortFields,
                 //unq));
            false));
@@ -134,10 +134,10 @@ std::shared_ptr<const FCInternalTable> EDBFCInternalTable::filter(
 
     //Create a new literal adding the constants
     VTuple t = query.getLiteral()->getTuple();
-    for (uint8_t i = 0; i < nPosToFilter; ++i) {
+    for (int i = 0; i < nPosToFilter; ++i) {
         t.set(VTerm(0, valuesConstantsToFilter[i]), posConstantsToFilter[i]);
     }
-    for (uint8_t i = 0; i < nRepeatedVars; ++i) {
+    for (int i = 0; i < nRepeatedVars; ++i) {
         t.set(t.get(repeatedVars[i].first), repeatedVars[i].second);
     }
     const Literal newLiteral(query.getLiteral()->getPredicate(), t);
@@ -234,7 +234,7 @@ std::vector<std::shared_ptr<Column>> EDBFCInternalTableItr::getColumn(
 
     //Fields are the fields on which this table should be sorted
     std::vector<uint8_t> presortFields = fields;
-    for (uint8_t i = 0; i < ncolumns; ++i) {
+    for (int i = 0; i < ncolumns; ++i) {
         int columnNo = columns[i];
         std::vector<uint8_t> columnpresort;
         for(int j = 0; j < presortFields.size(); ++j) {
@@ -261,7 +261,7 @@ std::vector<std::shared_ptr<Column>> EDBFCInternalTableItr::getColumn(
 
 std::vector<std::shared_ptr<Column>> EDBFCInternalTableItr::getAllColumns() {
     std::vector<uint8_t> idxs;
-    for (uint8_t i = 0; i < nfields; ++i) {
+    for (int i = 0; i < nfields; ++i) {
         idxs.push_back(i);
     }
     return getColumn(nfields, &(idxs[0]));

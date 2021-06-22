@@ -6,11 +6,11 @@ void SingleHeadFinalRuleProcessor::processResults(std::vector<int> &blockid, Ter
         std::vector<bool> &unique, std::mutex *m) {
 
     for (int j = 0; j < blockid.size(); j++) {
-        for (uint8_t i = 0; i < nCopyFromFirst; ++i) {
+        for (int i = 0; i < nCopyFromFirst; ++i) {
             row[posFromFirst[i].first] = *p;
             p++;
         }
-        for (uint8_t i = 0; i < nCopyFromSecond; ++i) {
+        for (int i = 0; i < nCopyFromSecond; ++i) {
             row[posFromSecond[i].first] = *p;
             p++;
         }
@@ -27,7 +27,7 @@ SingleHeadFinalRuleProcessor::SingleHeadFinalRuleProcessor(
         FCTable *table, Literal &head,
         const uint8_t posHeadInRule,
         const RuleExecutionDetails *ruleDetails,
-        const uint8_t ruleExecOrder,
+        const unsigned ruleExecOrder,
         const size_t iteration,
         const bool addToEndTable,
         const int nthreads,
@@ -50,7 +50,7 @@ SingleHeadFinalRuleProcessor::SingleHeadFinalRuleProcessor(
         FCTable *table, Literal &head,
         const uint8_t posHeadInRule,
         const RuleExecutionDetails *ruleDetails,
-        const uint8_t ruleExecOrder,
+        const unsigned ruleExecOrder,
         const size_t iteration,
         const bool addToEndTable,
         const int nthreads,
@@ -288,7 +288,7 @@ void SingleHeadFinalRuleProcessor::addColumns(const int blockid,
         }
 
         uint8_t columns[256];
-        for (uint32_t i = 0; i < nCopyFromSecond; ++i) {
+        for (int i = 0; i < nCopyFromSecond; ++i) {
             columns[i] = posFromSecond[i].second;
         }
         std::vector<std::shared_ptr<Column>> c =
@@ -374,7 +374,7 @@ void SingleHeadFinalRuleProcessor::processResults(const int blockid, const bool 
         if (rowsHash != NULL) {
             std::vector<Term_t> hashRow(rowsize);
 
-            for (uint8_t i = 0; i < rowsize; i++) {
+            for (int i = 0; i < rowsize; i++) {
                 hashRow[i] = row[i];
             }
             if (! rowsHash->insert(hashRow).second) {
@@ -411,7 +411,7 @@ void SingleHeadFinalRuleProcessor::processResults(const int blockid, const bool 
             while (itr->hasNext()) {
                 std::vector<Term_t> hashRow(rowsize);
                 itr->next();
-                for (uint8_t i = 0; i < rowsize; i++) {
+                for (int i = 0; i < rowsize; i++) {
                     hashRow[i] = itr->get(i);
                 }
                 rowsHash->insert(hashRow);
@@ -424,7 +424,7 @@ void SingleHeadFinalRuleProcessor::processResults(const int blockid, const bool 
             delete tmpt[blockid];
             tmpt[blockid] = new SegmentInserter(rowsize);
             for (HashSet::iterator itr = rowsHash->begin(); itr != rowsHash->end(); itr++) {
-                for (uint8_t i = 0; i < rowsize; i++) {
+                for (int i = 0; i < rowsize; i++) {
                     row[i] = (*itr)[i];
                 }
                 tmpt[blockid]->addRow(row);
@@ -708,7 +708,7 @@ FinalRuleProcessor::FinalRuleProcessor(
         std::vector<FCBlock> &listDerivations,
         std::vector<Literal> &heads,
         const RuleExecutionDetails *ruleDetails,
-        const uint8_t ruleExecOrder,
+        const unsigned ruleExecOrder,
         const size_t iteration,
         const bool addToEndTable,
         const int nthreads,
@@ -787,11 +787,11 @@ void FinalRuleProcessor::processResults(const int blockid, const bool unique,
 void FinalRuleProcessor::processResults(std::vector<int> &blockid, Term_t *p,
         std::vector<bool> &unique, std::mutex *m) {
     for (int j = 0; j < blockid.size(); j++) {
-        for (uint8_t i = 0; i < nCopyFromFirst; ++i) {
+        for (int i = 0; i < nCopyFromFirst; ++i) {
             row[posFromFirst[i].first] = *p;
             p++;
         }
-        for (uint8_t i = 0; i < nCopyFromSecond; ++i) {
+        for (int i = 0; i < nCopyFromSecond; ++i) {
             row[posFromSecond[i].first] = *p;
             p++;
         }

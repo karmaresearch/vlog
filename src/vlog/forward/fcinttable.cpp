@@ -68,7 +68,7 @@ FCInternalTableItr *InmemoryFCInternalTable::getIterator() const {
 bool InmemoryFCInternalTable::colAIsContainedInColB(const Segment *a,
         const Segment *b) const {
     assert(a->getNColumns() == b->getNColumns());
-    for (uint8_t i = 0; i < nfields; ++i) {
+    for (int i = 0; i < nfields; ++i) {
         assert(!b->isEmpty());
         assert(!a->isEmpty());
         if (b->isConstantField(i)) {
@@ -303,7 +303,7 @@ void InmemoryFCInternalTable::readArray(Term_t *dest, std::vector<Term_t>::const
 
 int InmemoryFCInternalTable::cmp(FCInternalTableItr * itr1,
         FCInternalTableItr * itr2) const {
-    for (uint8_t i = 0; i < nfields; ++i) {
+    for (int i = 0; i < nfields; ++i) {
         if (itr1->getCurrentValue(i) != itr2->getCurrentValue(i))
             return itr1->getCurrentValue(i) - itr2->getCurrentValue(i);
     }
@@ -323,7 +323,7 @@ void InmemoryFCInternalTable::copyRawValues(const std::vector<const Term_t*> *ro
         const uint8_t nfields, std::vector<Term_t> &output) {
     for (std::vector<const Term_t*>::const_iterator itr =  rowIdx->begin(); itr != rowIdx->end(); ++itr) {
         const Term_t *ri = *itr;
-        for (uint8_t i = 0; i < nfields; ++i) {
+        for (int i = 0; i < nfields; ++i) {
             output.push_back(ri[i]);
         }
     }
@@ -340,10 +340,10 @@ size_t InmemoryFCInternalTable::estimateNRows(
         //If the segment is compatible with the constraints, then we count all triples
         bool subsumes = true;
         uint8_t ncOutsidePattern = 0;
-        for (uint8_t j = 0; j < nconstantsToFilter; ++j) {
+        for (int j = 0; j < nconstantsToFilter; ++j) {
             uint8_t posConstant = posConstantsToFilter[j];
             bool found = false;
-            for (uint8_t i = 0; i < itr->nconstants; ++i) {
+            for (int i = 0; i < itr->nconstants; ++i) {
                 if (posConstant == itr->constants[i].first) {
                     found = true;
                     if (valuesConstantsToFilter[j] != itr->constants[i].second) {
@@ -406,14 +406,14 @@ std::shared_ptr<const Segment> InmemoryFCInternalTable::filter_row(SegmentIterat
     while (itr->hasNext()) {
         itr->next();
         bool ok = true;
-        for (uint8_t m = 0; m < nConstantsToFilter; ++m) {
+        for (int m = 0; m < nConstantsToFilter; ++m) {
             if (itr->get(posConstantsToFilter[m]) != valuesConstantsToFilter[m]) {
                 ok = false;
                 break;
             }
         }
         if (ok) {
-            for (uint8_t m = 0; m < nRepeatedVars; ++m) {
+            for (int m = 0; m < nRepeatedVars; ++m) {
                 if (itr->get(repeatedVars[m].first) !=
                         itr->get(repeatedVars[m].second)) {
                     ok = false;
@@ -590,12 +590,12 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
     bool match = true;
     /*
        LOG(TRACEL) << "nConstantsToFilter = " << (int) nConstantsToFilter;
-       for (uint8_t i = 0; i < nConstantsToFilter; ++i) {
+       for (int i = 0; i < nConstantsToFilter; ++i) {
        LOG(TRACEL) << "posConstantsToFilter[" << (int) i << "] = " << (int) posConstantsToFilter[i];
        LOG(TRACEL) << "valuesConstantsToFilter[" << (int) i << "] = " << valuesConstantsToFilter[i];
        }
        */
-    for (uint8_t i = 0; i < nConstantsToFilter && match; ++i) {
+    for (int i = 0; i < nConstantsToFilter && match; ++i) {
         if (values->getColumn(posConstantsToFilter[i])->isConstant()) {
             const Term_t v = values->getColumn(posConstantsToFilter[i])->first();
             if (v != valuesConstantsToFilter[i]) {
@@ -615,7 +615,7 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
     // LOG(TRACEL) << "P0: match = " << match << ", isSetBigger = " << isSetBigger << ", values size = " << values->getNRows();
 
     if (match && !isSetBigger && nRepeatedVars > 0) {
-        for (uint8_t i = 0; i < nRepeatedVars; ++i) {
+        for (int i = 0; i < nRepeatedVars; ++i) {
             //Check the values in the two positions. If they are both constants
             //then I check the value
             Column *c1 = values->getColumn(repeatedVars[i].first).get();
@@ -653,7 +653,7 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
         isSetBigger = false;
         match = true;
 
-        for (uint8_t i = 0; i < nConstantsToFilter && match; ++i) {
+        for (int i = 0; i < nConstantsToFilter && match; ++i) {
             bool found = false;
             uint8_t j = 0;
             for (; j < itr->nconstants; ++j) {
@@ -674,7 +674,7 @@ std::shared_ptr<const FCInternalTable> InmemoryFCInternalTable::filter(const uin
 
         //Check repeated variables
         if (match && !isSetBigger && nRepeatedVars > 0) {
-            for (uint8_t i = 0; i < nRepeatedVars; ++i) {
+            for (int i = 0; i < nRepeatedVars; ++i) {
                 //Check the values in the two positions. If they are both constants
                 //then I check the value
                 Column *c1 = itr->values->getColumn(repeatedVars[i].first).get();
@@ -744,7 +744,7 @@ if (filteredSegment != NULL && !filteredSegment->isEmpty()) {
     //Do the projection
     if (nVarsToCopy > 0 && nVarsToCopy < nfields && filteredSegment != NULL) {
         SegmentInserter newSegment(nVarsToCopy);
-        for (uint8_t i = 0; i < nVarsToCopy; ++i) {
+        for (int i = 0; i < nVarsToCopy; ++i) {
             newSegment.addColumn(i,
                     filteredSegment->
                     getColumn(posVarsToCopy[i]), true);
@@ -836,7 +836,7 @@ FCInternalTableItr *InmemoryFCInternalTable::sortBy(const std::vector<uint8_t> &
                 //If we are adding one in the cache that is say, sorted on fields 1, 2, 3,
                 //this one is also sorted on fields 1, 2, and also sorted on field 1.
                 //So, we add those to the hashtable as well.
-                for (uint8_t i = 1; i < fields.size(); i++) {
+                for (int i = 1; i < fields.size(); i++) {
                     filterByKey = __getKeyFromFields(fields, i);
                     cachedSorted[filterByKey] = sortedValues;
                 }
@@ -901,7 +901,7 @@ FCInternalTableItr *InmemoryFCInternalTable::sortBy(
                 //If we are adding one in the cache that is say, sorted on fields 1, 2, 3,
                 //this one is also sorted on fields 1, 2, and also sorted on field 1.
                 //So, we add those to the hashtable as well.
-                for (uint8_t i = 1; i < fields.size(); i++) {
+                for (int i = 1; i < fields.size(); i++) {
                     filterByKey = __getKeyFromFields(fields, i);
                     cachedSorted[filterByKey] = sortedValues;
                 }
@@ -942,7 +942,7 @@ void InmemoryFCInternalTableItr::init(const uint8_t nfields, const size_t iterat
 std::vector<std::shared_ptr<Column>> InmemoryFCInternalTableItr::getColumn(
         const uint8_t ncolumns, const uint8_t *columns) {
     std::vector<std::shared_ptr<Column>> output;
-    for (uint8_t i = 0; i < ncolumns; ++i) {
+    for (int i = 0; i < ncolumns; ++i) {
         output.push_back(values->getColumn(columns[i]));
     }
     return output;
@@ -954,7 +954,7 @@ uint8_t InmemoryFCInternalTableItr::getNColumns() const {
 
 std::vector<std::shared_ptr<Column>> InmemoryFCInternalTableItr::getAllColumns() {
     std::vector<uint8_t> idxs;
-    for (uint8_t i = 0; i < nfields; ++i) {
+    for (int i = 0; i < nfields; ++i) {
         idxs.push_back(i);
     }
     return getColumn(nfields, &(idxs[0]));
@@ -966,14 +966,14 @@ std::vector<std::shared_ptr<Column>> MergerInternalTableItr::getColumn(
 
     while (hasNext()) {
         next();
-        for (uint8_t i = 0; i < ncolumns; ++i) {
+        for (int i = 0; i < ncolumns; ++i) {
             seg.addAt(i, getCurrentValue(columns[i]));
         }
     }
 
     auto segment = seg.getSegment();
     std::vector<std::shared_ptr<Column>> output;
-    for (uint8_t i = 0; i < ncolumns; ++i) {
+    for (int i = 0; i < ncolumns; ++i) {
         output.push_back(segment->getColumn(i));
     }
     return output;
@@ -985,7 +985,7 @@ uint8_t MergerInternalTableItr::getNColumns() const {
 
 std::vector<std::shared_ptr<Column>> MergerInternalTableItr::getAllColumns() {
     std::vector<uint8_t> idxs;
-    for (uint8_t i = 0; i < nfields; ++i) {
+    for (int i = 0; i < nfields; ++i) {
         idxs.push_back(i);
     }
     return getColumn(nfields, &(idxs[0]));
@@ -1002,7 +1002,7 @@ MergerInternalTableItr::MergerInternalTableItr(const std::vector<std::pair<FCInt
         for (size_t i = 0; i < iterators.size(); ++i) {
             indices.push_back(i);
         }
-        for (uint8_t i = 0; i < positionsToSort.size(); ++i)
+        for (int i = 0; i < positionsToSort.size(); ++i)
             sortPos[i] = positionsToSort[i];
         std::sort(indices.begin(), indices.end(), std::ref(sorter));
         first = iterators[indices.back()].first;

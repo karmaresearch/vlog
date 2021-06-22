@@ -14,7 +14,7 @@
 
 bool Literal::hasRepeatedVars() const {
     std::vector<Var_t> variables;
-    for (uint8_t i = 0; i < getTupleSize(); ++i) {
+    for (int i = 0; i < getTupleSize(); ++i) {
         VTerm t = getTermAtPos(i);
         if (t.isVariable()){
             if (std::find(variables.begin(), variables.end(), t.getId()) != variables.end()){
@@ -32,7 +32,7 @@ bool Literal::hasRepeatedVars() const {
  * */
 uint8_t Literal::getNVars() const {
     uint8_t n = 0;
-    for (uint8_t i = 0; i < getTupleSize(); ++i) {
+    for (int i = 0; i < getTupleSize(); ++i) {
         if (tuple.get(i).isVariable())
             n++;
     }
@@ -49,7 +49,7 @@ uint8_t Literal::getNConstants() const {
  * */
 std::vector<uint8_t> Literal::getPosVars() const {
     std::vector<uint8_t> out;
-    for (uint8_t i = 0; i < getTupleSize(); ++i) {
+    for (int i = 0; i < getTupleSize(); ++i) {
         if (tuple.get(i).isVariable())
             out.push_back(i);
     }
@@ -248,7 +248,7 @@ bool Literal::sameVarSequenceAs(const Literal &l) const {
             // Apparently, one has duplicates
             return false;
         }
-        for (uint8_t i = 0; i < v1.size(); ++i) {
+        for (int i = 0; i < v1.size(); ++i) {
             if (v1[i] != v2[i])
                 return false;
         }
@@ -341,7 +341,7 @@ int Literal::getSubstitutionsA2B(std::vector<Substitution> &substitutions,
 Literal Literal::substitutes(std::vector<Substitution> &subs, int *nsubs) const {
     VTuple newTuple((uint8_t) this->tuple.getSize());
     int ns = 0;
-    for (uint8_t i = 0; i < newTuple.getSize(); ++i) {
+    for (int i = 0; i < newTuple.getSize(); ++i) {
         bool found = false;
         int j = 0;
         while (j < subs.size() && !found) {
@@ -425,7 +425,7 @@ bool Literal::containsVariable(Var_t variableId) const {
 bool Literal::operator==(const Literal & other) const {
     if (pred.getId() != other.pred.getId())
         return false;
-    for (uint8_t i = 0; i < tuple.getSize(); ++i) {
+    for (int i = 0; i < tuple.getSize(); ++i) {
         if (tuple.get(i) != other.tuple.get(i))
             return false;
     }

@@ -396,7 +396,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
 
             for (size_t i = 0; i < sizecolumns; ++i) {
                 //Fill the row
-                for (uint8_t j = 0; j < c.size(); ++j) {
+                for (int j = 0; j < c.size(); ++j) {
                     if (!columnReaders[j]->hasNext()) {
                         LOG(ERRORL) << "This should not happen";
                     }
@@ -595,7 +595,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
 
             for (size_t i = 0; i < sizecolumns; ++i) {
                 //Fill the row
-                for (uint8_t j = 0; j < c.size(); ++j) {
+                for (int j = 0; j < c.size(); ++j) {
                     if (!columnReaders[j]->hasNext()) {
                         LOG(ERRORL) << "This should not happen";
                     }

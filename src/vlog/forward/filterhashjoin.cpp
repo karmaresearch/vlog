@@ -2,7 +2,7 @@
 #include <vlog/joinprocessor.h>
 
 FilterHashJoinSorter::FilterHashJoinSorter(const uint8_t s, const std::pair<uint8_t, uint8_t> *positions) : nfields(s) {
-    for (uint8_t i = 0; i < s; ++i) {
+    for (int i = 0; i < s; ++i) {
         fields[i] = positions[i].second;
     }
 }
@@ -62,7 +62,7 @@ inline void FilterHashJoin::doJoin_join(const Term_t *constantValues,
                     for (std::vector<Term_t>::iterator itr = otherVariablesContainer.begin();
                             ok && itr != otherVariablesContainer.end();) {
                         bool same = true;
-                        for (uint8_t i = 0; i < nValuesHashHead; ++i) {
+                        for (int i = 0; i < nValuesHashHead; ++i) {
                             if (row[posValuesHashHead[i].second] != *itr) {
                                 same = false;
                             }
@@ -72,7 +72,7 @@ inline void FilterHashJoin::doJoin_join(const Term_t *constantValues,
                     }
                     if (ok) {
                         //output and add it to the list of used values
-                        for (uint8_t i = 0; i < nValuesHashHead; ++i) {
+                        for (int i = 0; i < nValuesHashHead; ++i) {
                             Term_t r = row[posValuesHashHead[i].second];
                             otherVariablesContainer.push_back(r);
                             // potentialOutput[posValuesHashHead[i].first] = r;
@@ -101,7 +101,7 @@ inline void FilterHashJoin::doJoin_join(const Term_t *constantValues,
                     for (std::vector<Term_t>::iterator itr = otherVariablesContainer.begin();
                             ok && itr != otherVariablesContainer.end();) {
                         bool same = true;
-                        for (uint8_t i = 0; i < nValuesHashHead; ++i) {
+                        for (int i = 0; i < nValuesHashHead; ++i) {
                             if (row[posValuesHashHead[i].second] != *itr) {
                                 same = false;
                             }
@@ -111,7 +111,7 @@ inline void FilterHashJoin::doJoin_join(const Term_t *constantValues,
                     }
                     if (ok) {
                         //output and add it to the list of used values
-                        for (uint8_t i = 0; i < nValuesHashHead; ++i) {
+                        for (int i = 0; i < nValuesHashHead; ++i) {
                             Term_t r = row[posValuesHashHead[i].second];
                             otherVariablesContainer.push_back(r);
                             // potentialOutput[posValuesHashHead[i].first] = r;
@@ -131,7 +131,7 @@ inline void FilterHashJoin::doJoin_join(const Term_t *constantValues,
     if (matches.size() > 0) {
         Term_t *potentialOutput = output->getRawRow();
         //Add the group variables
-        for (uint8_t i = 0; i < nValuesHead; ++i) {
+        for (int i = 0; i < nValuesHead; ++i) {
             potentialOutput[posValuesHead[i].first] = constantValues[i];
         }
 
@@ -143,7 +143,7 @@ inline void FilterHashJoin::doJoin_join(const Term_t *constantValues,
 
         int i = 0;
         for (std::vector<const Term_t*>::iterator itr = matches.begin(); itr != matches.end(); ++itr) {
-            for (uint8_t i = 0; i < nValuesHashHead; ++i) {
+            for (int i = 0; i < nValuesHashHead; ++i) {
                 potentialOutput[posValuesHashHead[i].first] = (*itr)[posValuesHashHead[i].second];
             }
             output->processResults(i, isDerivationUnique);
@@ -169,7 +169,7 @@ inline void FilterHashJoin::doJoin_cartprod(const Term_t *constantValues,
             if (potentialOutput == NULL) {
                 potentialOutput = output->getRawRow();
                 //Add the group variables
-                for (uint8_t i = 0; i < nValuesHead; ++i) {
+                for (int i = 0; i < nValuesHead; ++i) {
                     potentialOutput[posValuesHeadRowEdition[i].first] = constantValues[i];
                 }
             }
@@ -179,7 +179,7 @@ inline void FilterHashJoin::doJoin_cartprod(const Term_t *constantValues,
             for (std::vector<Term_t>::iterator itr = otherVariablesContainer.begin();
                     ok && itr != otherVariablesContainer.end();) {
                 bool same = true;
-                for (uint8_t i = 0; i < nValuesHashHead; ++i) {
+                for (int i = 0; i < nValuesHashHead; ++i) {
                     if (row[posValuesHashHead[i].second] != *itr) {
                         same = false;
                     }
@@ -190,7 +190,7 @@ inline void FilterHashJoin::doJoin_cartprod(const Term_t *constantValues,
 
             if (ok) {
                 //output and add it to the list of used values
-                for (uint8_t i = 0; i < nValuesHashHead; ++i) {
+                for (int i = 0; i < nValuesHashHead; ++i) {
                     Term_t r = row[posValuesHashHead[i].second];
                     otherVariablesContainer.push_back(r);
                     potentialOutput[posValuesHashHead[i].first] = r;
@@ -222,7 +222,7 @@ void FilterHashJoin::run(const std::vector<FilterHashJoinBlock> &inputTables, co
     uint8_t nconstants = 0; //I need to remove constants when I calculate the positions on the last literal
     if (literalSubsumesHead) {
         int j = 0;
-        for (uint8_t i = 0; i < nValuesHashHead; ++i) {
+        for (int i = 0; i < nValuesHashHead; ++i) {
             while (j < posValuesHashHead[i].first) {
                 if (!literal->getTermAtPos(j).isVariable())
                     nconstants++;
@@ -260,7 +260,7 @@ void FilterHashJoin::run(const std::vector<FilterHashJoinBlock> &inputTables, co
         std::vector<uint8_t> sortingCriteria;
         if (posToSort.size() == 0 && inputTables.size() > 0) {
             //Sort by all columns
-            for (uint8_t i = 0; i < inputTables.back().table->getRowSize(); ++i) {
+            for (int i = 0; i < inputTables.back().table->getRowSize(); ++i) {
                 sortingCriteria.push_back(i);
             }
         } else {
@@ -316,15 +316,15 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
     uint8_t pos = 0;
     uint8_t otherPos[256];
 
-    for (uint8_t i = 0; i < columns.size(); ++i) {
+    for (int i = 0; i < columns.size(); ++i) {
         bool found = false;
-        for (uint8_t j = 0; j < nValuesHashHead && !found; ++j) {
+        for (int j = 0; j < nValuesHashHead && !found; ++j) {
             if (posValuesHashHead[j].first == i) {
                 LOG(TRACEL) << "Found HashHead " << (int) j << " at position " << (int) i << ", second = " << (int) posValuesHashHead[j].second;
                 found = true;
             }
         }
-        for (uint8_t j = 0; j < nValuesHead && !found; ++j) {
+        for (int j = 0; j < nValuesHead && !found; ++j) {
             if (posValuesHead[j].first == i) {
                 LOG(TRACEL) << "Found Head " << (int) j << " at position " << (int) i << ", second = " << (int) posValuesHashHead[j].second;
                 found = true;
@@ -356,7 +356,7 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
     //Are all variables not involved in the join appearing also in the head? (otherwise I need filtering)
     size_t size = 0; //This function is called when I am sure that the literal has some elements. Therefore, I set 1 as default value
     uint8_t columnIdx[256];
-    for (uint8_t i = 0; i < nValuesHead; ++i) {
+    for (int i = 0; i < nValuesHead; ++i) {
         columnIdx[i] = posValuesHead[i].second;
     }
     std::vector<std::shared_ptr<Column>> c = itr->getColumn(nValuesHead, columnIdx);
@@ -367,7 +367,7 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
             valueColumnsToFilter == NULL &&
             columnsToFilterOut == NULL) {
 
-        for (uint8_t i = 0; i < nValuesHead; ++i) {
+        for (int i = 0; i < nValuesHead; ++i) {
             columns[posValuesHead[i].first] = c[i];
             size_t sz = c[i]->size();
             if (i > 0) {
@@ -485,7 +485,7 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
     if (size > 0) {
 	//Add other constants
 	const Term_t *row = output->getRawRow();
-	for (uint8_t i = 0; i < pos; ++i) {
+	for (int i = 0; i < pos; ++i) {
 	    columns[otherPos[i]] = std::shared_ptr<Column>(
 		    new CompressedColumn(row[otherPos[i]], size));
 	}
@@ -495,17 +495,17 @@ void FilterHashJoin::run_processitr_columnversion(FCInternalTableItr *itr,
 	while (s < endCartprod) {
 	    //create constants with the values of the map
 	    const Term_t *row = &(mapValues->at(s));
-	    for (uint8_t i = 0; i < nValuesHashHead; ++i) {
+	    for (int i = 0; i < nValuesHashHead; ++i) {
 		columns[posValuesHashHead[i].first] = std::shared_ptr<Column>(
 			new CompressedColumn(row[posValuesHashHead[i].second], size));
 	    }
 
 	    /*
 	       if (s != startCarprod) {
-	       for (uint8_t i = 0; i < nValuesHead; ++i) {
+	       for (int i = 0; i < nValuesHead; ++i) {
 	       columns[posValuesHead[i].first] = columns[posValuesHead[i].first]; // NOOP??? --Ceriel
 	       }
-	       for (uint8_t i = 0; i < pos; ++i) {
+	       for (int i = 0; i < pos; ++i) {
 	       columns[otherPos[i]] = columns[otherPos[i]]; // NOOP??? --Ceriel
 	       }
 	       }
@@ -575,14 +575,14 @@ void FilterHashJoin::run_processitr_rowversion(FCInternalTableItr *itr, const bo
 	}
 
 	if (firstGroup) {
-	    for (uint8_t i = 0; i < nValuesHead; ++i) {
+	    for (int i = 0; i < nValuesHead; ++i) {
 		valuesHead[i] = itr->getCurrentValue(posValuesHeadRowEdition[i].second);
 	    }
 	    firstGroup = false;
 	} else {
 	    //Check if the current value is equivalent to the previous one
 	    bool ok = true;
-	    for (uint8_t i = 0; i < nValuesHead; ++i) {
+	    for (int i = 0; i < nValuesHead; ++i) {
 		if (itr->getCurrentValue(posValuesHeadRowEdition[i].second) != valuesHead[i]) {
 		    ok = false;
 		}
@@ -600,7 +600,7 @@ void FilterHashJoin::run_processitr_rowversion(FCInternalTableItr *itr, const bo
 		    doJoin_cartprod(valuesHead, startCarprod, endCartprod, otherVariablesContainer);
 		}
 		otherVariablesContainer.clear();
-		for (uint8_t i = 0; i < nValuesHead; ++i) {
+		for (int i = 0; i < nValuesHead; ++i) {
 		    valuesHead[i] = itr->getCurrentValue(posValuesHeadRowEdition[i].second);
 		}
 	    }
@@ -618,13 +618,13 @@ void FilterHashJoin::run_processitr_rowversion(FCInternalTableItr *itr, const bo
 	if (literalSubsumesHead) {
 	    //Filter first
 	    bool ok = true;
-	    for (uint8_t i = 0; i < nLastLiteralPosConstsInHead && ok; ++i) {
+	    for (int i = 0; i < nLastLiteralPosConstsInHead && ok; ++i) {
 		if (itr->getCurrentValue(lastLiteralPosConstsInHead[i]) != lastLiteralValueConstsInHead[i]) {
 		    ok = false;
 		}
 	    }
 	    if (ok) {
-		for (uint8_t i = 0; i < nValuesHashHead; ++i) {
+		for (int i = 0; i < nValuesHashHead; ++i) {
 		    otherVariablesContainer.push_back(itr->getCurrentValue(posOtherVariables[i]));
 		}
 

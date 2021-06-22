@@ -18,7 +18,7 @@ struct FilterHashJoinSorter {
     FilterHashJoinSorter(const uint8_t s, const std::pair<uint8_t, uint8_t> *positions);
 
     bool operator() (const Term_t *r1, const Term_t *r2) const {
-        for (uint8_t i = 0; i < nfields; ++i) {
+        for (int i = 0; i < nfields; ++i) {
             int64_t diff = r1[fields[i]] - r2[fields[i]];
             if (diff < 0)
                 return true;

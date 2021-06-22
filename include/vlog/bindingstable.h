@@ -21,7 +21,7 @@ struct BindingsRow {
 struct hash_BindingsRow {
     size_t operator()(const BindingsRow &x) const {
         size_t hash = 0;
-        for (uint8_t i = 0; i < x.size; ++i) {
+        for (int i = 0; i < x.size; ++i) {
             hash = (hash + (324723947 + x.row[i])) ^93485734985;
         }
         return hash;
@@ -102,7 +102,7 @@ class BindingsTable {
                 }
             }
             bool operator ()(const BindingsRow &i1, const BindingsRow &i2) const {
-                for (uint8_t i = 0; i < nfields; ++i) {
+                for (int i = 0; i < nfields; ++i) {
                     if (i1.row[fields[i]] != i2.row[fields[i]])
                         return i1.row[fields[i]] < i2.row[fields[i]];
                 }

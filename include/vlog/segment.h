@@ -44,7 +44,7 @@ struct SegmentSorter {
     bool operator ()(const size_t f1, const size_t f2) const {
         assert(f1 < maxSize);
         assert(f2 < maxSize);
-        for (uint8_t i = 0; i < vectors.size(); ++i) {
+        for (int i = 0; i < vectors.size(); ++i) {
             if ((*vectors[i])[f1] != (*vectors[i])[f2])
                 return (*vectors[i])[f1] < (*vectors[i])[f2];
         }
@@ -169,18 +169,18 @@ class Segment {
 
         Segment& operator =(const std::shared_ptr<Column> *v);
 
-        bool areAllColumnsPartOftheSameQuery(EDBLayer **layer, const Literal **lit,
-                std::vector<uint8_t> *posInLiteral)
-            const;
-
         size_t getRepresentationSize(std::set<uint64_t> &IDs) const;
+
+        bool areAllColumnsPartOftheSameQuery(EDBLayer **layer, const Literal **lit,
+                std::vector<uint8_t> *position)
+            const;
 
 #if DEBUG
         void checkSizes() const;
 #endif
 
         size_t getNRows() const {
-            for (uint8_t i = 0; i < nfields; ++i) {
+            for (int i = 0; i < nfields; ++i) {
                 if (columns[i] != NULL) {
                     if (!columns[i]->isEDB()) {
                         return columns[i]->size();
@@ -189,7 +189,7 @@ class Segment {
             }
 
             //What to do now?
-            for (uint8_t i = 0; i < nfields; ++i) {
+            for (int i = 0; i < nfields; ++i) {
                 if (columns[i] != NULL) {
                     return columns[i]->size();
                 }
@@ -198,7 +198,7 @@ class Segment {
         }
 
         bool isEmpty() const {
-            for (uint8_t i = 0; i < nfields; ++i) {
+            for (int i = 0; i < nfields; ++i) {
                 if (columns[i] != NULL) {
                     if (!columns[i]->isEmpty())
                         return false;
@@ -254,7 +254,7 @@ class Segment {
 
         uint8_t getNConstantFields() const {
             uint8_t n = 0;
-            for (uint8_t i = 0; i < nfields; ++i) {
+            for (int i = 0; i < nfields; ++i) {
                 if (columns[i] == NULL || columns[i]->isConstant()) {
                     n++;
                 }
@@ -271,7 +271,7 @@ class Segment {
         }
 
         bool isEDB() const {
-            for (uint8_t i = 0; i < nfields; ++i) {
+            for (int i = 0; i < nfields; ++i) {
                 if (columns[i] != NULL) {
                     if (!(columns[i]->isEDB())) {
                         return false;

@@ -88,18 +88,9 @@ std::vector<uint8_t> &pos2) {
 
     //Prepare the iterators
     VTuple t1 = l1.getTuple();
-    std::vector<uint8_t> fieldToSort;
-    fieldToSort.push_back(l1.getPosVars()[pos1[0]]);
-    if (pos1.size() == 2) {
-        fieldToSort.push_back(l1.getPosVars()[pos1[1]]);
-    }
-    itr1.init(q, &t1, &fieldToSort, true, multithreaded ? &mutex : NULL);
+    itr1.init(q, &t1, &pos1, true, multithreaded ? &mutex : NULL);
     VTuple t2 = l2.getTuple();
-    fieldToSort.clear();
-    fieldToSort.push_back(l2.getPosVars()[pos2[0]]);
-    if (pos2.size() == 2)
-        fieldToSort.push_back(l2.getPosVars()[pos2[1]]);
-    itr2.init(q, &t2, &fieldToSort, true, multithreaded ? &mutex : NULL);
+    itr2.init(q, &t2, &pos2, true, multithreaded ? &mutex : NULL);
 
     //Output
     std::vector<std::shared_ptr<ColumnWriter>> cols;
@@ -152,12 +143,8 @@ std::vector<uint8_t> &pos) {
 
     VTuple t = l.getTuple();
     assert(l.getNVars() < l.getTupleSize());
-    std::vector<uint8_t> fieldToSort;
-    fieldToSort.push_back(l.getPosVars()[pos[0]]);
-    if (pos.size() == 2)
-        fieldToSort.push_back(l.getPosVars()[pos[1]]);
     TridentTupleItr itr;
-    itr.init(q, &t, &fieldToSort, true, multithreaded ? &mutex : NULL);
+    itr.init(q, &t, &pos, true, multithreaded ? &mutex : NULL);
 
     //Output
     std::vector<std::shared_ptr<ColumnWriter>> cols;
@@ -170,7 +157,7 @@ std::vector<uint8_t> &pos) {
         PairItr *pitrO = itr.getPhysicalIterator();
         NewColumnTable *pitr = (NewColumnTable*) pitrO;
         //size_t idx = 0;
-        const bool firstCol = pos[0] == 1 || (pos[0] == 0 && l.getNVars() == 2);
+        const bool firstCol = l.getNVars() == 2;
         std::shared_ptr<Column> valuesToCh = valuesToCheck[0];
         std::unique_ptr<ColumnReader> valuesToChReader = valuesToCh->getReader();
 
@@ -377,7 +364,7 @@ void TridentTable::getQueryFromEDBRelation0(QSQQuery *query,
     const uint8_t npos = query->getNPosToCopy();
     while (itr.hasNext()) {
         itr.next();
-        for (uint8_t i = 0; i < npos; ++i) {
+        for (int i = 0; i < npos; ++i) {
             row[i] = itr.getElementAt(pos[i]);
         }
         outputTable->addRow(row);
@@ -645,7 +632,7 @@ std::shared_ptr<Column> TridentTable::checkIn(
     //Prepare the iterators
     VTuple t = l.getTuple();
     std::vector<uint8_t> fieldToSort;
-    fieldToSort.push_back(l.getPosVars()[posInL]);
+    fieldToSort.push_back(posInL);
     TridentTupleItr itr1;
     itr1.init(q, &t, &fieldToSort, true, multithreaded ? &mutex : NULL);
     PairItr *pitrO = itr1.getPhysicalIterator();

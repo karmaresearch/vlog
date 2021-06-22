@@ -14,12 +14,12 @@ FCTable::FCTable(std::mutex *mutex, const uint8_t sizeRow) :
 std::string FCTable::getSignature(const Literal &literal) {
     std::string out = "";
     std::vector<Var_t> existingVars;
-    for (uint8_t i = 0; i < literal.getTupleSize(); ++i) {
+    for (int i = 0; i < literal.getTupleSize(); ++i) {
         VTerm t = literal.getTermAtPos(i);
         if (t.isVariable()) {
             int idx = (int) (-1 * existingVars.size() - 1);
             bool found = false;
-            for (uint8_t j = 0; j < existingVars.size(); ++j) {
+            for (int j = 0; j < existingVars.size(); ++j) {
                 if (existingVars[j] == t.getId()) {
                     idx = -1 * j - 1;
                     found = true;
@@ -152,7 +152,7 @@ size_t FCTable::estimateCardinality(const Literal &literal, const size_t min, co
     uint8_t nconstants = 0;
     uint8_t posConstants[256];
     Term_t valueConstants[256];
-    for (uint8_t i = 0; i < literal.getTupleSize(); ++i) {
+    for (int i = 0; i < literal.getTupleSize(); ++i) {
         VTerm t = literal.getTermAtPos(i);
         if (!t.isVariable()) {
             posConstants[nconstants] = i;
@@ -220,19 +220,20 @@ std::shared_ptr<const FCTable> FCTable::filter(const Literal &literal,
         uint8_t nVarsToCopy = 0;
         uint8_t posVarsToCopy[256];
 
-        for (uint8_t i = 0; i < (uint8_t) literal.getTupleSize(); ++i) {
+        for (int i = 0; i < literal.getTupleSize(); ++i) {
             VTerm t = literal.getTermAtPos(i);
             if (!t.isVariable()) {
                 posConstantsToFilter[nConstantsToFilter] = i;
                 valuesConstantsToFilter[nConstantsToFilter++] = t.getValue();
             } else {
                 //Is it repeated?
-                for (uint8_t j = i + 1; j < (uint8_t) literal.getTupleSize(); ++j) {
+                for (int j = 0; j < i; ++j) {
                     if (literal.getTermAtPos(j).isVariable() &&
                             literal.getTermAtPos(j).getId() == t.getId()) {
-                        repeatedVars[nRepeatedVars].first = i;
-                        repeatedVars[nRepeatedVars].second = j;
+                        repeatedVars[nRepeatedVars].first = j;
+                        repeatedVars[nRepeatedVars].second = i;
                         nRepeatedVars++;
+                        break;
                     }
                 }
 
@@ -381,9 +382,9 @@ std::shared_ptr<const Segment> FCTable::retainFrom(
 
 bool FCTable::add(std::shared_ptr<const FCInternalTable> t,
         const Literal &literal,
-        const uint8_t posLiteralInRule,
+        const unsigned posLiteralInRule,
         const RuleExecutionDetails *rule,
-        const uint8_t ruleExecOrder,
+        const unsigned ruleExecOrder,
         const size_t iteration, const bool isCompleted,
         int nthreads) {
     assert(t->getRowSize() == this->getSizeRow());

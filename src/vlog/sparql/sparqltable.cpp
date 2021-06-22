@@ -121,7 +121,7 @@ void SparqlTable::query(QSQQuery *query, TupleTable *outputTable,
         EDBIterator *iter = getSortedIterator(*lit, sortFields);
         while (iter->hasNext()) {
             iter->next();
-            for (uint8_t i = 0; i < npos; ++i) {
+            for (int i = 0; i < npos; ++i) {
                 row[i] = iter->getElementAt(pos[i]);
             }
             outputTable->addRow(row);
@@ -333,25 +333,25 @@ EDBIterator *SparqlTable::getSortedIterator(const Literal &query,
     }
     std::vector<ColumnWriter *> writers;
     writers.resize(sz);
-    for (uint8_t i = 0; i < sz; ++i) {
+    for (int i = 0; i < sz; ++i) {
         writers[i] = new ColumnWriter();
     }
     while (it->hasNext()) {
         it->next();
-        for (uint8_t i = 0; i < sz; ++i) {
+        for (int i = 0; i < sz; ++i) {
             writers[i]->add(it->getElementAt(i));
         }
     }
     delete it;
 
     std::vector<std::shared_ptr<Column>> columns;
-    for (uint8_t i = 0; i < sz; ++i) {
+    for (int i = 0; i < sz; ++i) {
         columns.push_back(writers[i]->getColumn());
     }
 
     std::shared_ptr<Segment> segment = std::shared_ptr<Segment>(new Segment(sz, columns));
 
-    for (uint8_t i = 0; i < sz; ++i) {
+    for (int i = 0; i < sz; ++i) {
         delete writers[i];
     }
 

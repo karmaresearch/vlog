@@ -51,7 +51,7 @@ void RuleExecutor::calculateJoinsSizeIntermediateRelations() {
                     for (size_t j = 0; j < body.size(); ++j) {
                         Literal literal = body.at(j);
                         if (literal.getPredicate().getType() == EDB) {
-                            for (uint8_t m = 0; m < literal.getTupleSize(); ++m) {
+                            for (int m = 0; m < literal.getTupleSize(); ++m) {
                                 VTerm term = literal.getTermAtPos(m);
                                 if (term.isVariable() && term.getId() == t.getId()) {
                                     //match
@@ -85,7 +85,7 @@ void RuleExecutor::calculateJoinsSizeIntermediateRelations() {
         startJoins.push_back((short) joins.size());
         uint8_t nAdornments = 0;
         uint8_t nvars = 0;
-        for (uint8_t i = 0; i < literal.getTupleSize(); ++i) {
+        for (int i = 0; i < literal.getTupleSize(); ++i) {
             VTerm t = literal.getTermAtPos(i);
             if (t.isVariable()) {
                 if (adornedRule.doesVarAppearsInFollowingPatterns(j + 1, t.getId())) {
@@ -93,7 +93,7 @@ void RuleExecutor::calculateJoinsSizeIntermediateRelations() {
                     currentSignature.push_back(t.getId());
                 }
                 //if it exists in boundVars, then there is a join
-                for (uint8_t j = 0; j < boundVars.size(); ++j) {
+                for (int j = 0; j < boundVars.size(); ++j) {
                     if (boundVars[j] == t.getId()) {
                         joins.push_back(std::make_pair(nvars, j));
                         njoins++;
@@ -590,7 +590,7 @@ void RuleExecutor::copyLastRelInAnswers(QSQR *qsqr,
         Term_t tuple[256];
         uint8_t nvars = 0;
         uint8_t posVars[256];
-        for (uint8_t i = 0; i < adornedRule.getFirstHead().getTupleSize(); ++i) {
+        for (int i = 0; i < adornedRule.getFirstHead().getTupleSize(); ++i) {
             VTerm t = adornedRule.getFirstHead().getTermAtPos(i);
             if (t.isVariable()) {
                 posVars[nvars++] = i;
@@ -601,7 +601,7 @@ void RuleExecutor::copyLastRelInAnswers(QSQR *qsqr,
 
         for (size_t i = 0; i < nTuples; ++i) {
             const Term_t *supplRow = lastSupplRelation->getTuple(i);
-            for (uint8_t j = 0; j < nvars; ++j) {
+            for (int j = 0; j < nvars; ++j) {
                 tuple[posVars[j]] = supplRow[projectionLastSuppl
                     [j]];
             }
@@ -766,7 +766,7 @@ RuleExecutor::~RuleExecutor() {
 }
 
 char RuleExecutor::cmp(const uint64_t *row1, const uint64_t *row2, const std::pair<uint8_t, uint8_t> *joins, const uint8_t njoins) {
-    for (uint8_t i = 0; i < njoins; ++i) {
+    for (int i = 0; i < njoins; ++i) {
         Term_t v1 = (Term_t) row1[joins[i].first];
         Term_t v2 = row2[joins[i].second];
         if (v1 < v2) {

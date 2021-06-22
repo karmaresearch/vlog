@@ -101,7 +101,7 @@ class ResultJoinProcessor {
                 for (uint8_t i = 0; i < nCopyFromFirst; ++i) {
                     this->posFromFirst[i] = posFromFirst[i];
                 }
-                for (uint8_t i = 0; i < nCopyFromSecond; ++i) {
+                for (int i = 0; i < nCopyFromSecond; ++i) {
                     this->posFromSecond[i] = posFromSecond[i];
                 }
 #if USE_DUPLICATE_DETECTION

@@ -408,7 +408,7 @@ TupleTable *QSQR::evaluateQuery(int evaluateOrEstimate, QSQQuery *query,
             if (posJoins != NULL) {
                 //Modify the adornment of the pred. Set constant values that were
                 //set as variables
-                for (uint8_t i = 0; i < posJoins->size(); ++i) {
+                for (int i = 0; i < posJoins->size(); ++i) {
                     adornment = Predicate::changeVarToConstInAdornment(adornment,
                             posJoins->at(i));
                 }
@@ -429,7 +429,7 @@ TupleTable *QSQR::evaluateQuery(int evaluateOrEstimate, QSQQuery *query,
                 std::vector<Term_t>::iterator itr = possibleValuesJoins->begin();
                 while (itr != possibleValuesJoins->end()) {
                     //raiseIfExpired();
-                    for (uint8_t j = 0; j < posJoins->size(); ++j) {
+                    for (int j = 0; j < posJoins->size(); ++j) {
                         tuple[posJoins->at(j)] = *itr;
                         itr++;
                     }

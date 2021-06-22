@@ -25,15 +25,15 @@ struct FCBlock {
     std::shared_ptr<const FCInternalTable> table;
 
     Literal query;
-    uint8_t posQueryInRule;
     const RuleExecutionDetails *rule;
-    const uint8_t ruleExecOrder;
+    unsigned posQueryInRule;
+    const unsigned ruleExecOrder;
 
     bool isCompleted;
 
     FCBlock(size_t iteration, std::shared_ptr<const FCInternalTable> table,
-            Literal query, uint8_t posQueryInRule, const RuleExecutionDetails *rule,
-            const uint8_t ruleExecOrder, bool isCompleted) : iteration(iteration),
+            Literal query, unsigned posQueryInRule, const RuleExecutionDetails *rule,
+            const unsigned ruleExecOrder, bool isCompleted) : iteration(iteration),
     table(table), query(query), posQueryInRule(posQueryInRule),
     rule(rule), ruleExecOrder(ruleExecOrder),
     isCompleted(isCompleted) {
@@ -156,8 +156,8 @@ class FCTable {
                 std::shared_ptr<const FCInternalTable> t);
 
         bool add(std::shared_ptr<const FCInternalTable> t, const Literal &literal,
-                const uint8_t posLiteralInRule, const RuleExecutionDetails *detailsRule,
-                const uint8_t ruleExecOrder,
+                const unsigned posLiteralInRule, const RuleExecutionDetails *detailsRule,
+                const unsigned ruleExecOrder,
                 const size_t iteration, const bool isCompleted, int nthreads);
 
         int nBlocks() {

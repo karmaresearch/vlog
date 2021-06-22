@@ -202,7 +202,7 @@ TupleTable *BindingsTable::projectAndFilter(const Literal &l, const std::vector<
     uint8_t nvars = 0;
     uint64_t currentRow[256];	// Not Term_t; used in trident api.
 
-    for (uint8_t i = 0; i < l.getTupleSize(); ++i) {
+    for (int i = 0; i < l.getTupleSize(); ++i) {
         if (l.getTermAtPos(i).isVariable()) {
             vars[nvars++] = i;
         } else {
@@ -216,7 +216,7 @@ TupleTable *BindingsTable::projectAndFilter(const Literal &l, const std::vector<
     for (size_t i = 0; i < uniqueElements.size(); ++i) {
         Term_t *row = rawBindings->getOffset(i * nPosToCopy);
         bool ok = true;
-        for (uint8_t j = 0; j < nconsts; ++j) {
+        for (int j = 0; j < nconsts; ++j) {
             if (row[consts[j]] != l.getTermAtPos(consts[j]).getValue()) {
                 ok = false;
                 break;
@@ -237,13 +237,13 @@ TupleTable *BindingsTable::projectAndFilter(const Literal &l, const std::vector<
 		warn_done = true;
 	    }
 #endif
-            for (uint8_t m = 0; m < sizePosToFilter; ++m) {
+            for (int m = 0; m < sizePosToFilter; ++m) {
                 copyPosToFilter.get()[m] = posToFilter->at(m);
             }
 
             for (size_t j = 0; j < sizeValuesToFilter && !ok; j += sizePosToFilter) {
                 bool okRow = true;
-                for (uint8_t m = 0; m < sizePosToFilter; ++m) {
+                for (int m = 0; m < sizePosToFilter; ++m) {
                     if (row[copyPosToFilter.get()[m]] != valuesToFilter->at(j + m)) {
                         okRow = false;
                         break;
@@ -256,7 +256,7 @@ TupleTable *BindingsTable::projectAndFilter(const Literal &l, const std::vector<
         }
 
         if (ok) {
-            for (uint8_t j = 0; j < nvars; ++j)
+            for (int j = 0; j < nvars; ++j)
                 currentRow[j] = row[vars[j]];
             output->addRow(currentRow);
         }
@@ -270,7 +270,7 @@ TupleTable *BindingsTable::filter(const Literal &l, const std::vector<uint8_t> *
     Term_t consts[256];
     uint8_t posConsts[256];
     uint8_t nconsts = 0;
-    for (uint8_t i = 0; i < l.getTupleSize(); ++i) {
+    for (int i = 0; i < l.getTupleSize(); ++i) {
         if (!l.getTermAtPos(i).isVariable()) {
             posConsts[nconsts] = i;
             consts[nconsts++] = l.getTermAtPos(i).getValue();
@@ -294,7 +294,7 @@ TupleTable *BindingsTable::filter(const Literal &l, const std::vector<uint8_t> *
         Term_t *row = rawBindings->getOffset(i * nPosToCopy);
 
         bool ok = true;
-        for (uint8_t j = 0; j < nconsts; ++j) {
+        for (int j = 0; j < nconsts; ++j) {
             if (row[posConsts[j]] != consts[j]) {
                 ok = false;
                 break;
@@ -317,7 +317,7 @@ TupleTable *BindingsTable::filter(const Literal &l, const std::vector<uint8_t> *
                 const uint8_t sizePosToFilter = (uint8_t) posToFilter->size();
                 for (size_t j = 0; j < valuesToFilter->size() && !ok; j += sizePosToFilter) {
                     bool okRow = true;
-                    for (uint8_t m = 0; m < posToFilter->size(); ++m) {
+                    for (int m = 0; m < posToFilter->size(); ++m) {
                         if (row[posToFilter->at(m)] != valuesToFilter->at(j + m)) {
                             okRow = false;
                             break;

@@ -62,11 +62,11 @@ Literal Wizard::getMagicRelation(const bool hasPriority, std::shared_ptr<Program
     //new predicate
     std::string newPred = "MAGICI_" + std::to_string(pred) + "_" + std::to_string(adornment);
 
-    const uint8_t tupleSize = Predicate::getNFields(adornment);
+    const int tupleSize = Predicate::getNFields(adornment);
     VTuple newTuple(tupleSize);
     int j = 0;
     uint8_t adornmentNewPred = 0;
-    for (uint8_t i = 0; i < head.getTupleSize(); ++i) {
+    for (int i = 0; i < head.getTupleSize(); ++i) {
         //Check the "bound" terms
         if ((adornment >> i) & 1) { //Is bound
             adornmentNewPred += 1 << j;

@@ -337,9 +337,13 @@ bool EDBColumn::isConstant() const {
 
 bool EDBColumn::isIn(const Term_t t) const {
     VTuple tuple = l.getTuple();
-    tuple.set(VTerm(0, t), posColumn);
+    // tuple.set(VTerm(0, t), posColumn);
+    // Not correct: posColumn only counts variables, but in the literal we should adapt the
+    // entry at the position of the variable in the literal. --Ceriel
+    const uint8_t posInItr = l.getPosVars()[posColumn];
+    tuple.set(VTerm(0, t), posInItr);
     return layer.getCardinalityColumn(Literal(l.getPredicate(), tuple),
-            posColumn) > 0;
+            posInItr) > 0;
 }
 
 std::unique_ptr<ColumnReader> EDBColumn::getReader() const {

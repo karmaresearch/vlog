@@ -16,7 +16,7 @@ void RuleExecutionPlan::checkIfFilteringHashMapIsPossible(const Literal &head) {
     }
 
     bool differentVar = false;
-    for (uint8_t i = 0; i < head.getTupleSize(); ++i) {
+    for (int i = 0; i < head.getTupleSize(); ++i) {
         VTerm th = head.getTermAtPos(i);
         VTerm tl = lastLit->getTermAtPos(i);
         if (!th.isVariable()) {
@@ -40,7 +40,7 @@ void RuleExecutionPlan::checkIfFilteringHashMapIsPossible(const Literal &head) {
     filterLastHashMap = true;
 }
 
-RuleExecutionPlan RuleExecutionPlan::reorder(std::vector<uint8_t> &order,
+RuleExecutionPlan RuleExecutionPlan::reorder(std::vector<int> &order,
         const std::vector<Literal> &heads, bool copyAllVars) const {
     RuleExecutionPlan newPlan;
     newPlan.lastLiteralSharesWithHead = false;
@@ -69,7 +69,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
     std::map<Var_t,std::vector<uint8_t>> variablesNeededForHead;
     uint32_t countVars = 0;
     for (auto &headLiteral : heads) {
-        for (uint8_t headPos = 0; headPos < headLiteral.getTupleSize(); ++headPos) {
+        for (int headPos = 0; headPos < headLiteral.getTupleSize(); ++headPos) {
             const VTerm headTerm = headLiteral.getTermAtPos(headPos);
             if (headTerm.isVariable()) {
                 variablesNeededForHead[headTerm.getId()].push_back(countVars + headPos);
@@ -78,7 +78,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
         countVars += headLiteral.getTupleSize();
     }
 
-    for (uint8_t i = 0; i < plan.size(); ++i) {
+    for (int i = 0; i < plan.size(); ++i) {
         const Literal *currentLiteral = plan[i];
 
         std::vector<std::pair<uint8_t, uint8_t>> jc;
@@ -90,7 +90,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
             //No need to store any new variable. Just copy the old ones in the head
             //if the variables in "existingVariables" are needed for the head, then
             //save in "pf" [_idx_in_term_list_in_head_,_idx_in_existingVariables_]
-            for (uint8_t m = 0; m < existingVariables.size(); ++m) {
+            for (int m = 0; m < existingVariables.size(); ++m) {
                 if (variablesNeededForHead.count(existingVariables[m])) {
                     auto p = variablesNeededForHead.find(existingVariables[m]);
                     for (auto &el : p->second) {
@@ -100,11 +100,11 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
             }
         } else {
             //copy only the ones that will be used later on
-            for (uint8_t j = 0; j < existingVariables.size(); ++j) {
+            for (int j = 0; j < existingVariables.size(); ++j) {
                 // first check if the variable existingVariables[j] is needed in the future
                 bool isVarNeeded = false;
                 //Check in the rest of the body if the variable is mentioned
-                for (uint8_t m = i + 1; m < plan.size(); ++m) {
+                for (int m = i + 1; m < plan.size(); ++m) {
                     if (plan[m]->containsVariable(existingVariables[j])){
                         isVarNeeded = true;
                         break;
@@ -128,12 +128,17 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
         //Put in join coordinates between the previous and the current literal
         uint8_t litVars = 0;
         std::set<Var_t> processed; // This set is used to avoid repeated variables in the literal.
-        for (uint8_t x = 0; x < currentLiteral->getTupleSize(); ++x) {
+        for (int x = 0; x < currentLiteral->getTupleSize(); ++x) {
             const VTerm t = currentLiteral->getTermAtPos(x);
 
             if (t.isVariable()) {
                 // Check if it is a repeated variable. In that case, we skip it.
                 if (processed.count(t.getId())) {
+                    if (i != 0) {
+                        // i == 0 is a special case for the output coordinates (processRuleFirstAtom in
+                        // seminaiver.cpp).
+                        litVars++;
+                    }
                     continue;
                 }
                 processed.insert(t.getId());
@@ -152,7 +157,7 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
                     // first occurrence.
                     bool isVariableNeeded = false;
                     //Check next literals
-                    for (uint8_t m = i + 1; m < plan.size(); ++m) {
+                    for (int m = i + 1; m < plan.size(); ++m) {
                         if (plan[m]->containsVariable(t.getId())){
                             isVariableNeeded = true;
                             break;
@@ -215,18 +220,18 @@ void RuleExecutionPlan::calculateJoinsCoordinates(const std::vector<Literal> &he
 
                     //Then search among the last literal
                     if (!found) {
-                        int litVars = 0;
+                        int lv = 0;
                         for (int x = 0; x < currentLiteral->getTupleSize(); ++x) {
                             const VTerm t = currentLiteral->getTermAtPos(x);
                             if (t.isVariable()) {
                                 if (t.getId() == v) {
                                     extvars2pos[pair.first].push_back(
-                                            existingVariables.size() + litVars);
-                                    LOG(TRACEL) << "Position = " << (int) (existingVariables.size() + litVars);
+                                            existingVariables.size() + lv);
+                                    LOG(TRACEL) << "Position = " << (int) (existingVariables.size() + lv);
                                     found = true;
                                     break;
                                 }
-                                litVars++;
+                                lv++;
                             }
                         }
                     }

@@ -237,7 +237,7 @@ FCBlock Reasoner::getBlockFromQuery(Literal constantsQuery, Literal &boundQuery,
         uint8_t nPosToCopy = 0;
         uint8_t posToCopy[256];
         assert(boundQuery.getTupleSize() <= 256);
-        for (uint8_t i = 0; i < (uint8_t) boundQuery.getTupleSize(); ++i) {
+        for (int i = 0; i < (uint8_t) boundQuery.getTupleSize(); ++i) {
             if (!boundQuery.getTermAtPos(i).isVariable()) {
                 posToCopy[nPosToCopy++] = i;
                 tuple[i] = boundQuery.getTermAtPos(i).getValue();
@@ -246,10 +246,10 @@ FCBlock Reasoner::getBlockFromQuery(Literal constantsQuery, Literal &boundQuery,
 
         //Add the input tuples
         if (posJoins != NULL) {
-            const uint8_t addSize = (uint8_t) posJoins->size();
+            const int addSize = (int) posJoins->size();
 
             for (size_t i = 0; i < possibleValuesJoins->size(); i += addSize) {
-                for (uint8_t j = 0; j < addSize; ++j) {
+                for (int j = 0; j < addSize; ++j) {
                     tuple[posJoins->at(j)] = possibleValuesJoins->at(i + j);
                 }
                 inserter.addRow(tuple, posToCopy);
@@ -271,7 +271,7 @@ FCBlock Reasoner::getBlockFromQuery(Literal constantsQuery, Literal &boundQuery,
         //change the constantsQuery
         if (possibleValuesJoins != NULL && possibleValuesJoins->size() > 1) {
             uint8_t varId = 1;
-            for (uint8_t i = 0; i < nconstants; ++i) {
+            for (int i = 0; i < nconstants; ++i) {
                 if (!inserter.getSegment()->getColumn(i)->isConstant()) {
                     constantsTuple.set(VTerm(varId++, 0), i);
                 }
@@ -644,12 +644,12 @@ TupleIterator *Reasoner::getMagicIterator(Literal &query,
                     Term_t row = 0;
                     finalTable->addRow(&row);
                 } else {
-                    for (uint8_t j = 0; j < posVars.size(); ++j) {
+                    for (int j = 0; j < posVars.size(); ++j) {
                         finalTable->addValue(itrTable->getCurrentValue(j));
                     }
                 }
                 // Not sure about this. Was:
-                // for (uint8_t j = 0; j < rowsize; ++j) {
+                // for (int j = 0; j < rowsize; ++j) {
                 //     finalTable->addValue(itrTable->getCurrentValue(j));
                 // }
                 // TODO!
@@ -657,7 +657,7 @@ TupleIterator *Reasoner::getMagicIterator(Literal &query,
         } else {
             while (itrTable->hasNext()) {
                 itrTable->next();
-                for (uint8_t j = 0; j < nPosToCopy; ++j) {
+                for (int j = 0; j < nPosToCopy; ++j) {
                     outputTuple[posToCopy[j]] = itrTable->getCurrentValue(j);
                 }
                 finalTable->addRow(outputTuple);
@@ -743,7 +743,7 @@ TupleIterator *Reasoner::getIteratorWithMaterialization(SemiNaiver *sn, Literal 
                 }
             }
             if (copy) {
-                for (uint8_t i = 0; i < repeated.size(); ++i) {
+                for (int i = 0; i < repeated.size(); ++i) {
                     if (itrTable->getCurrentValue(repeated[i].first) != itrTable->getCurrentValue(repeated[i].second)) {
                         copy = false;
                         break;

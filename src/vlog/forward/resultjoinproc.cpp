@@ -2,12 +2,12 @@
 #include <vlog/fcinttable.h>
 
 void copyFromArray(Term_t *dest, FCInternalTableItr *source, const uint8_t n, const int *pos) {
-    for (uint8_t i = 0; i < n; ++i)
+    for (int i = 0; i < n; ++i)
         dest[i] = source->getCurrentValue((uint8_t) pos[i]);
 }
 
 void copyFromArray(Term_t *dest, const Term_t *source, const uint8_t n, const int *pos) {
-    for (uint8_t i = 0; i < n; ++i)
+    for (int i = 0; i < n; ++i)
         dest[i] = source[(uint8_t) pos[i]];
 }
 
@@ -32,7 +32,7 @@ void ResultJoinProcessor::copyRawRow(const Term_t *first,
 }
 
 /*bool InterTableJoinProcessor::eq(const Term_t *a1, const uint32_t idx) {
-  for (uint8_t i = 0; i < rowsize; ++i) {
+  for (int i = 0; i < rowsize; ++i) {
   if (a1[i] != segment->at(idx, i))
   return false;
   }
@@ -59,10 +59,10 @@ InterTableJoinProcessor::InterTableJoinProcessor(const uint8_t rowsize,
 void InterTableJoinProcessor::processResults(const int blockid, const Term_t *first,
         FCInternalTableItr* second, const bool unique) {
 
-    for (uint8_t i = 0; i < nCopyFromFirst; ++i) {
+    for (int i = 0; i < nCopyFromFirst; ++i) {
         row[posFromFirst[i].first] = first[posFromFirst[i].second];
     }
-    for (uint8_t i = 0; i < nCopyFromSecond; ++i) {
+    for (int i = 0; i < nCopyFromSecond; ++i) {
         row[posFromSecond[i].first] = second->getCurrentValue(posFromSecond[i].second);
     }
     //Add the row
@@ -80,11 +80,11 @@ void InterTableJoinProcessor::processResults(std::vector<int> &blockid, Term_t *
     }
     enlargeArray(newBufsize);
     for (int j = 0; j < blockid.size(); j++) {
-        for (uint8_t i = 0; i < nCopyFromFirst; ++i) {
+        for (int i = 0; i < nCopyFromFirst; ++i) {
             row[posFromFirst[i].first] = *p;
             p++;
         }
-        for (uint8_t i = 0; i < nCopyFromSecond; ++i) {
+        for (int i = 0; i < nCopyFromSecond; ++i) {
             row[posFromSecond[i].first] = *p;
             p++;
         }
@@ -106,11 +106,11 @@ void InterTableJoinProcessor::processResultsAtPos(const int blockid, const uint8
 
 void InterTableJoinProcessor::processResults(const int blockid, FCInternalTableItr *first,
         FCInternalTableItr* second, const bool unique) {
-    for (uint8_t i = 0; i < nCopyFromFirst; ++i) {
+    for (int i = 0; i < nCopyFromFirst; ++i) {
         row[posFromFirst[i].first] = first->getCurrentValue(posFromFirst[i].second);
 
     }
-    for (uint8_t i = 0; i < nCopyFromSecond; ++i) {
+    for (int i = 0; i < nCopyFromSecond; ++i) {
         row[posFromSecond[i].first] = second->getCurrentValue(posFromSecond[i].second);
     }
 
@@ -169,7 +169,7 @@ void InterTableJoinProcessor::addColumns(const int blockid,
         std::vector<std::shared_ptr<Column>> &columns,
         const bool unique, const bool sorted) {
     enlargeArray(blockid);
-    for (uint8_t i = 0; i < rowsize; ++i) {
+    for (int i = 0; i < rowsize; ++i) {
         segments[blockid]->addColumn(i, columns[i], sorted);
     }
 #if DEBUG
@@ -279,7 +279,7 @@ void InterTableJoinProcessor::processResults(const int blockid, const bool uniqu
         while (itr->hasNext()) {
             std::vector<Term_t> hashRow(rowsize);
             itr->next();
-            for (uint8_t i = 0; i < rowsize; i++) {
+            for (int i = 0; i < rowsize; i++) {
                 hashRow[i] = itr->getCurrentValue(i);
             }
             rowsHash->insert(hashRow);
@@ -293,7 +293,7 @@ void InterTableJoinProcessor::processResults(const int blockid, const bool uniqu
     if (rowsHash != NULL) {
         std::vector<Term_t> hashRow(rowsize);
 
-        for (uint8_t i = 0; i < rowsize; i++) {
+        for (int i = 0; i < rowsize; i++) {
             hashRow[i] = row[i];
         }
         if (! rowsHash->insert(hashRow).second) {
