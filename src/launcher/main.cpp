@@ -986,11 +986,12 @@ void runLiteralQuery(EDBLayer &edb, Program &p, Literal &literal, Reasoner &reas
         Metrics m;
         std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
         int depth = vm["featureDepth"].as<int>();
-        reasoner.getMetrics(literal, NULL, NULL, edb, p, m, depth);
+        string idbFeatures;
+        reasoner.getMetrics(literal, NULL, NULL, edb, p, m, depth, idbFeatures);
         std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
         LOG(INFOL) << "Query = " << literal.tostring(&p, &edb) << "Vector: " << \
-            m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
-            << ", " << m.countIntermediateQueries;
+        m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
+        << ", " << m.countIntermediateQueries << ", " << idbFeatures;
         LOG(INFOL) << "Time taken : " << durationMetrics.count() * 1000 << "ms";
         return;
     }
@@ -1258,7 +1259,7 @@ int main(int argc, const char** argv) {
                 //get logfile name from rules file
                 size_t dotIndex = rulesFile.find_last_of(".");
                 string logFileName = rulesFile.substr(0, dotIndex);
-                logFileName += "-training.log";
+                logFileName += "-idb-training.log";
                 // Run the queries with threshold 10s and repeat queries 3 times
                 // to take average of the running time
                 uint64_t timeout = vm["timeout"].as<unsigned int>();
@@ -1266,19 +1267,34 @@ int main(int argc, const char** argv) {
                 string algo = vm["reasoningAlgo"].as<string>();
                 int featureDepth = vm["featureDepth"].as<int>();
                 if (algo == "onlyMetrics") {
+                    ofstream logMetrics(logFileName);
                     for (auto query : trainingQueriesVector) {
                         Dictionary dictVariables;
                         Literal literal = program.parseLiteral(query, dictVariables);
                         Reasoner reasoner(vm["reasoningThreshold"].as<int64_t>());
                         Metrics m;
+                        string idbFeatures;
                         std::chrono::system_clock::time_point startMetrics = std::chrono::system_clock::now();
-                        reasoner.getMetrics(literal, NULL, NULL, *layer, program, m, featureDepth);
+                        reasoner.getMetrics(literal, NULL, NULL, *layer, program, m, featureDepth, idbFeatures);
                         std::chrono::duration<double> durationMetrics = std::chrono::system_clock::now() - startMetrics;
-                        LOG(INFOL) << "Query = " << query << "Vector: " << \
-                            m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
-                            << ", " << m.countIntermediateQueries;
+                        LOG(INFOL) << "Query = " << query << " Vector: " << \
+                        m.cost << ", " << m.estimate << ", "<< m.countRules << ", " <<m.countUniqueRules\
+                        << ", " << m.countIntermediateQueries << ", " << idbFeatures;
                         LOG(INFOL) << "Time taken : " << durationMetrics.count() * 1000 << "ms";
+                        LOG(INFOL) << "unmesh : " << idbFeatures;
+                        stringstream strMetrics;
+                        strMetrics  << std::to_string(m.cost) << ","
+                            << std::to_string(m.estimate) << ","
+                            << std::to_string(m.countRules) << ","
+                            << std::to_string(m.countUniqueRules) << ","
+                            << std::to_string(m.countIntermediateQueries) << ",";
+                        logMetrics << query << " " << strMetrics.str() << idbFeatures << endl;
                     }
+                    LOG(INFOL) << "unm : DONE *****";
+                    if (logMetrics.fail()) {
+                        LOG(ERRORL) << "Error writing to metrics log file" << logFileName;
+                    }
+                    logMetrics.close();
                 } else {
                     vector<Metrics> featuresVector;
                     vector<int> decisionVector;
