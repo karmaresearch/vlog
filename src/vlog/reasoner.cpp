@@ -853,9 +853,9 @@ void Reasoner::getMetrics(Literal &query, std::vector<uint8_t> *posBindings, std
 
     int i = 0;
     stringstream ss;
-    ss << sub_bound ? "1" : "0";
+    ss << (sub_bound ? "1" : "0");
     ss << ",";
-    ss << obj_bound ? "1" : "0";
+    ss << (obj_bound ? "1" : "0");
     ss << ",";
     for (auto pid : allPredIds) {
         auto it = std::find(idbIds.begin(), idbIds.end(), pid);

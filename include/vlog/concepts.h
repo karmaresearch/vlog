@@ -330,6 +330,8 @@ class Literal {
         // contains a constant, it gives -1.
         std::vector<int> getVarnumInLiteral() const;
 
+        std::vector<uint8_t> getVarCount() const;
+
         std::vector<std::pair<uint8_t, uint8_t>> getRepeatedVars() const;
 
         std::vector<Var_t> getSharedVars(const std::vector<Var_t> &vars) const;

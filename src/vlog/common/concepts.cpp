@@ -56,6 +56,20 @@ std::vector<uint8_t> Literal::getPosVars() const {
     return out;
 }
 
+/* Maps literal positions to var counts.
+ * */
+std::vector<uint8_t> Literal::getVarCount() const {
+    std::vector<uint8_t> out;
+    uint8_t cnt = 0;
+    for (uint8_t i = 0; i < getTupleSize(); ++i) {
+        out.push_back(cnt);
+        if (tuple.get(i).isVariable()) {
+            cnt++;
+        }
+    }
+    return out;
+}
+
 std::vector<int> Literal::getVarnumInLiteral() const {
     std::vector<int> out(tuple.getSize());
     int varNum = 0;
