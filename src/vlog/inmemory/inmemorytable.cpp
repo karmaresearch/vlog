@@ -77,9 +77,11 @@ std::string convertString(const char *s, int len) {
 
     std::string ss = std::string(s, s+len);
 
+    /*
     if (len > 1 && s[0] == '"' && s[len-1] == '"') {
         return (ss + "^^<http://www.w3.org/2001/XMLSchema#string>").c_str();
     }
+    */
     return ss;
 }
 

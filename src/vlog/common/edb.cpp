@@ -26,7 +26,7 @@
 #include <vlog/incremental/edb-table-importer.h>
 
 #include <climits>
-
+#include <inttypes.h>
 
 EDBLayer::EDBLayer(EDBLayer &db, bool copyTables) : conf(db.conf) {
     this->predDictionary = db.predDictionary;
@@ -1011,12 +1011,16 @@ std::shared_ptr<Column> EDBLayer::checkIn(
 
 bool EDBLayer::getDictNumber(const char *text, const size_t sizeText, uint64_t &id) const {
     bool resp = false;
+    size_t sz = sizeText;
+    if (sz > 43 && text[0] == '"' && ! strcmp(text + sz - 43, "^^<http://www.w3.org/2001/XMLSchema#string>")) {
+        sz -= 43;
+    }
     if (dbPredicates.size() > 0) {
         resp = dbPredicates.begin()->second.manager->
-            getDictNumber(text, sizeText, id);
+            getDictNumber(text, sz, id);
     }
     if (!resp && termsDictionary.get()) {
-        std::string t(text, sizeText);
+        std::string t(text, sz);
         resp = termsDictionary->get(t, id);
     }
     return resp;
@@ -1025,9 +1029,13 @@ bool EDBLayer::getDictNumber(const char *text, const size_t sizeText, uint64_t &
 bool EDBLayer::getOrAddDictNumber(const char *text, const size_t sizeText,
         uint64_t &id) {
     bool resp = false;
+    size_t sz = sizeText;
+    if (sz > 43 && text[0] == '"' && ! strcmp(text + sz - 43, "^^<http://www.w3.org/2001/XMLSchema#string>")) {
+        sz -= 43;
+    }
     if (dbPredicates.size() > 0) {
         resp = dbPredicates.begin()->second.manager->
-            getDictNumber(text, sizeText, id);
+            getDictNumber(text, sz, id);
     }
     if (!resp) {
         if (!termsDictionary.get()) {
@@ -1035,7 +1043,7 @@ bool EDBLayer::getOrAddDictNumber(const char *text, const size_t sizeText,
             termsDictionary = std::shared_ptr<Dictionary>(
                     new Dictionary(getNTerms()));
         }
-        std::string t(text, sizeText);
+        std::string t(text, sz);
         id = termsDictionary->getOrAdd(t);
         LOG(TRACEL) << "getOrAddDictNumber \"" << t << "\" returns " << id;
         resp = true;
@@ -1047,7 +1055,7 @@ bool EDBLayer::getDictText(const uint64_t id, char *text) const {
     if (IS_NUMBER(id)) {
         if (IS_UINT(id)) {
             uint64_t value = GET_UINT(id);
-            sprintf(text,"%llu",value);
+            sprintf(text,"%" PRIu64,value);
             return true;
         } else if (IS_FLOAT32(id)) {
             float value = GET_FLOAT32(id);
