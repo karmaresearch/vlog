@@ -2,6 +2,7 @@
 #include <vlog/seminaiver.h>
 
 #include <google/dense_hash_map>
+#include <climits>
 
 EGDRuleProcessor::EGDRuleProcessor(
         SemiNaiver *sn,
