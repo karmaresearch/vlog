@@ -41,7 +41,7 @@ int Checker::check(Program &p, std::string alg, std::string sameasAlgo,
         return 1;
     }
 
-    if (sameasAlgo != "" && alg != "MFA" && alg != "EMFA") {
+    if (sameasAlgo != "" && sameasAlgo != "NOTHING" && alg != "MFA" && alg != "EMFA") {
         LOG(ERRORL) << "The only acyclicity conditions that support equality"
             "reasoning are MFA and EMFA";
         throw 10;
