@@ -93,7 +93,7 @@ void TridentTupleItr::init(Querier *querier, const VTuple *t,
 
     //If some variables have the same name, then we must change it
     equalFields = t->getRepeatedVars();
-    physIterator = querier->get(idx, s, p, o);
+    physIterator = querier->getIterator(idx, s, p, o);
     if (mutex != NULL) {
         mutex->unlock();
     }
