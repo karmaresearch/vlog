@@ -971,13 +971,23 @@ Program::Program(EDBLayer *kb) : kb(kb),
     rewriteCounter(0),
     dictPredicates(kb->getPredDictionary()),
     cardPredicates(kb->getPredicateCardUnorderedMap()) {
-    }
+}
 
 Program::Program(Program *p, EDBLayer *kb) : kb(kb),
     rewriteCounter(0),
     dictPredicates(p->dictPredicates),
     cardPredicates(p->cardPredicates) {
+
+    Dictionary d = kb->getPredDictionary();
+    for (auto item : d.getMap()) {
+        if (dictPredicates.get(item.first) == -1) {
+            dictPredicates.add(item.first, item.second);
+        } else {
+            assert(dictPredicates.get(item.first) == item.second);
+        }
     }
+
+}
 
 std::string trim(const std::string& str, const std::string& whitespace = "\r \t") {
     const auto strBegin = str.find_first_not_of(whitespace);

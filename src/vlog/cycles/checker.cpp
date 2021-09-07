@@ -578,7 +578,7 @@ static bool rja_check(Program &p, Program &nongen_program, const Rule &rulev, co
 
     EDBLayer layer(*(nongen_program.getKB()), true);
 
-    Program newProgram(&nongen_program, &layer);
+    std::vector<std::string> newRules;
 
     for (auto pair : edbSet) {
         std::string edbName = "__DUMMY__" + std::to_string(pair.first);
@@ -594,7 +594,7 @@ static bool rja_check(Program &p, Program &nongen_program, const Rule &rulev, co
         }
         rule = rule + paramList + ") :- " + edbName + "(" + paramList + ")";
         LOG(DEBUGL) << "Adding rule: \"" << rule << "\"";
-        newProgram.parseRule(rule, false);
+        newRules.push_back(rule);
     }
 
     // Add another rule to the ruleset, to determine if what we are looking for is materialized.
@@ -632,8 +632,14 @@ static bool rja_check(Program &p, Program &nongen_program, const Rule &rulev, co
         }
         newRule = newRule + ")";
     }
+
+    newRules.push_back(newRule);
     LOG(DEBUGL) << "Adding rule: \"" << newRule << "\"";
-    newProgram.parseRule(newRule, false);
+
+    Program newProgram(&nongen_program, &layer);
+    for (auto rule: newRules) {
+        newProgram.parseRule(rule, false);
+    }
 
     std::shared_ptr<SemiNaiver> sn = Reasoner::getSemiNaiver(layer,
             &newProgram, true, true, false, TypeChase::SKOLEM_CHASE, 1, 0, false);

@@ -80,6 +80,19 @@ class Dictionary {
             }
         }
 
+        void add(const std::string &rawValue, Term_t id) {
+            SimpleInverseHashMap::const_iterator itr = inverseMap.find(id);
+            if (itr == inverseMap.end()) {
+                map.insert(std::make_pair(rawValue, id));
+                inverseMap.insert(std::make_pair(id, rawValue));
+                if (id >= counter) {
+                    counter = id + 1;
+                }
+            } else {
+                assert(false);
+            }
+        }
+
         std::vector<std::string> getKeys() const {
             std::vector<std::string> output;
             for (SimpleHashmap::const_iterator itr = map.begin(); itr != map.end(); ++itr) {
