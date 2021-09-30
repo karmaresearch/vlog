@@ -651,6 +651,34 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
         return;
     }
 
+    //The body might contain more variables than what
+    //is needed to create existential columns
+    //First I copy the columns from the body of the rule
+    std::vector<
+        std::pair<uint8_t, std::shared_ptr<Column>>> depc_t;
+    for(uint8_t i = 0; i < nCopyFromSecond; ++i) {
+        depc_t.push_back(std::make_pair(posFromSecond[i].first,
+                    c[posFromSecond[i].second]));
+    }
+    //I sort the columns according the order where they appear
+    //in the head
+    sort(depc_t.begin(), depc_t.end(),
+            [](const std::pair<Var_t, std::shared_ptr<Column>>& a,
+                const std::pair<Var_t, std::shared_ptr<Column>>& b) -> bool {
+            return a.first < b.first;
+            });
+    //Now that the columns are sorted, I no longer care
+    //about the indices
+
+    // Create global vector of head variables
+    std::vector<Var_t> headTerms;
+    for(const auto &at : atomTables) {
+        const auto& literal = at->getLiteral();
+        for(uint8_t i = 0; i < literal.getTupleSize(); ++i){
+            headTerms.push_back(literal.getTermAtPos(i).getId());
+        }
+    }
+    
     //Create existential columns store them in a vector with the corresponding
     //var ID
     std::map<Var_t, std::shared_ptr<Column>> extvars;
@@ -669,24 +697,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     }
                 }
                 if (!found && !extvars.count(t.getId())) { //Must be existential
-                    //The body might contain more variables than what
-                    //is needed to create existential columns
-                    //First I copy the columns from the body of the rule
-                    std::vector<
-                        std::pair<uint8_t, std::shared_ptr<Column>>> depc_t;
-                    for(uint8_t i = 0; i < nCopyFromSecond; ++i) {
-                        depc_t.push_back(std::make_pair(posFromSecond[i].first,
-                                    c[posFromSecond[i].second]));
-                    }
-                    //I sort the columns according the order where they appear
-                    //in the head
-                    sort(depc_t.begin(), depc_t.end(),
-                            [](const std::pair<Var_t, std::shared_ptr<Column>>& a,
-                                const std::pair<Var_t, std::shared_ptr<Column>>& b) -> bool {
-                            return a.first < b.first;
-                            });
-                    //Now that the columns are sorted, I no longer care
-                    //about the indices
+                    
                     std::vector<std::shared_ptr<Column>> depc;
                     std::vector<Var_t> varIds;
                     //A column may be used more than once in the head. Filter duplicates out.
@@ -695,7 +706,7 @@ void ExistentialRuleProcessor::addColumns(const int blockid,
                     //two different head variables over the same column, but in this case they must be treated as different --Marco
                     for(auto &el : depc_t) {
                         bool present = false;
-                        auto varId = literal.getTermAtPos(el.first).getId();
+                        auto varId = headTerms[el.first];
                         for (auto &l : varIds) {
                             if ( varId == l) {
                                 present = true;
