@@ -692,7 +692,10 @@ bool Checker::JA(Program &p, bool restricted) {
                 // current variable.
                 std::vector<vpos> intersect(dependencies.size() + it2.second.size());
                 auto ipos = std::set_intersection(dependencies.begin(), dependencies.end(), it2.second.begin(), it2.second.end(), intersect.begin());
-                if (ipos > intersect.begin()) {
+                // if (ipos > intersect.begin())
+                // Test if ALL dependencies are in the intersection, not just if the intersection is not emoty
+                // (issue #79).
+                if (ipos - intersect.begin() == dependencies.size()) {
                     g.addEdge(src, dest);
                 }
                 dest++;
