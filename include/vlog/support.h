@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "term.h"
+#include <kognac/logs.h>
 
 struct vlog_eqstr {
     bool operator()(const std::string &v1, const std::string &v2) const {
@@ -89,6 +90,7 @@ class Dictionary {
                     counter = id + 1;
                 }
             } else {
+                LOG(ERRORL) << "rawValue = " << rawValue << ", id = " << id << ", in-table = " << itr->second;
                 assert(false);
             }
         }

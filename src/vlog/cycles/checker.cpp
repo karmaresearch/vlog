@@ -240,9 +240,10 @@ bool Checker::EMFA(Program &p) {
     }
 }
 
-// Add special targets that have the head of existential rules as body, but only the non-existential variables in the head.
-// So, for instance, if we have a rule P(X,Y),Q(Y) :- R(X), then we add a rule Z(X) :- P(X,Y),Q(Y). This is for the implementation
-// of the blocked check.
+// Add special targets that have the head of existential rules as body, and first non-existential variables in the head, followed by the existential variables.
+// So, for instance, if we have a rule P(X,Y),Q(Y) :- R(X), then we add a rule Z(X,Y) :- P(X,Y),Q(Y). This is for the implementation
+// of the blocked check. This check matches the non-existential variables with a pattern, and checks that the
+// existential variables actually have "existential" values.
 void Checker::addBlockCheckTargets(Program &p, PredId_t ignorePredId) {
     std::vector<Rule> rules = p.getAllRules();
     for (auto rule : rules) {
@@ -258,11 +259,15 @@ void Checker::addBlockCheckTargets(Program &p, PredId_t ignorePredId) {
             }
 
             std::vector<Var_t> headvars = rule.getFrontierVariables(ignorePredId);
+            std::vector<Var_t> existentials = rule.getExistentialVariables();
             std::string newPred = "__GENERATED_PRED__" + std::to_string(rule.getId());
-            Predicate newp = p.getPredicate(p.getOrAddPredicate(newPred, headvars.size()));
-            VTuple t(headvars.size());
+            Predicate newp = p.getPredicate(p.getOrAddPredicate(newPred, headvars.size() + existentials.size()));
+            VTuple t(headvars.size() + existentials.size());
             for (int i = 0; i < headvars.size(); i++) {
                 t.set(VTerm(headvars[i], 0), i);
+            }
+            for (int i = 0; i < existentials.size(); i++) {
+                t.set(VTerm(existentials[i], 0), headvars.size() + i);
             }
             std::vector<Literal> h;
             h.push_back(Literal(newp, t));
@@ -580,10 +585,13 @@ static bool rja_check(Program &p, Program &nongen_program, const Rule &rulev, co
 
     std::vector<std::string> newRules;
 
+    Program newProgram(&nongen_program, &layer);
+
     for (auto pair : edbSet) {
         std::string edbName = "__DUMMY__" + std::to_string(pair.first);
-        layer.addInmemoryTable(edbName, pair.second);
         int cardinality = pair.second[0].size();
+        PredId_t predId = newProgram.getOrAddPredicate(edbName, cardinality);
+        layer.addInmemoryTable(edbName, predId, pair.second);
         std::string rule = p.getPredicateName(pair.first) + "(";
         std::string paramList = "";
         for (int i = 0; i < cardinality; i++) {
@@ -636,7 +644,6 @@ static bool rja_check(Program &p, Program &nongen_program, const Rule &rulev, co
     newRules.push_back(newRule);
     LOG(DEBUGL) << "Adding rule: \"" << newRule << "\"";
 
-    Program newProgram(&nongen_program, &layer);
     for (auto rule: newRules) {
         newProgram.parseRule(rule, false);
     }
@@ -771,8 +778,8 @@ bool Checker::JA(Program &p, bool restricted) {
                 dest++;
             }
             // Now check if the graph is cyclic.
-            // If it is, the ruleset is not JA (Joint Acyclic) (which means that the result is inconclusive).
-            // If the ruleset is JA, we know that the chase will terminate.
+            // If it is, the ruleset is not RJA (Joint Acyclic) (which means that the result is inconclusive).
+            // If the ruleset is RJA, we know that the chase will terminate.
             if (g.isCyclic()) {
                 LOG(DEBUGL) << "Ruleset is not " << type << "!";
                 return false;

@@ -1071,11 +1071,12 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
     //Check if the head is blocked in this set, i.e., if this predicate has matching derivations.
     auto itr = saturation->getTable(pred);
     bool found = false;
+    int nExistentials = ruleDetails->rule.getExistentialVariables().size();
     while ( ! found && !itr.isEmpty()) {
         auto table = itr.getCurrentTable();
         //Iterate over the content of the table
         auto tbItr = table->getIterator();
-        assert(tbItr->getNColumns() == toMatch.size());
+        assert(tbItr->getNColumns() == toMatch.size() + nExistentials);
         while (tbItr->hasNext()) {
             tbItr->next();
             found = true;
@@ -1087,7 +1088,17 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
                 }
             }
             if (found) {
-                break;
+                // Check that the existential variables are actually filled with an existential value.
+                for (int i = 0; i < nExistentials; i++) {
+                    auto value = tbItr->getCurrentValue(i + toMatch.size());
+                    if ((value & RULEVARMASK) == 0) {
+                        found = false;
+                        break;
+                    }
+                }
+                if (found) {
+                    break;
+                }
             }
         }
         table->releaseIterator(tbItr);
