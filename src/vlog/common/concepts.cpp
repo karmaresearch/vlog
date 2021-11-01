@@ -636,12 +636,11 @@ std::vector<Var_t> Rule::getVarsInBody() const {
 std::vector<Var_t> Rule::getExistentialVariables() const{
     std::vector<Var_t> out;
     std::vector<Var_t> bodyVars = getVarsInBody();
-    for(const auto& head : heads) {
-        for(auto var : head.getAllVars()) {
-            //Does var appear in the body?
-            if (std::find(bodyVars.begin(),bodyVars.end(),var) == bodyVars.end()){
-                out.push_back(var);
-            }
+    std::vector<Var_t> headVars = getVarsInHead();
+    for(auto var : headVars) {
+        //Does var appear in the body?
+        if (std::find(bodyVars.begin(),bodyVars.end(),var) == bodyVars.end()){
+            out.push_back(var);
         }
     }
     return out;
