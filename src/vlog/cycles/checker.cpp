@@ -428,62 +428,57 @@ bool Checker::RMSA(Program &originalProgram) {
     }
 }
 
+// Check if all body positions of var are included in input.
+static bool containsAll(uint8_t var, std::vector<Literal> &body, std::vector<std::pair<PredId_t, uint8_t>> &input) {
+    for (auto literal: body) {
+        auto tpl = literal.getTuple();
+        auto predId = literal.getPredicate().getId();
+        for (int i = 0; i < tpl.getSize(); i++) {
+            if (tpl.get(i).getId() == var) {
+                std::pair<PredId_t, uint8_t> val(predId, i);
+                if (std::find(input.begin(), input.end(), val) == input.end()) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
 
 static void closure(Program &p, std::map<PredId_t, std::vector<uint32_t>> &occurrences,
         std::vector<std::pair<PredId_t, uint8_t>> &input) {
-    std::vector<std::pair<PredId_t, uint8_t>> toProcess = input;
-    while (toProcess.size() > 0) {
-        std::vector<std::pair<PredId_t, uint8_t>> newPos;
-        // Go through all the rules, checking all bodies. If a <predicate, pos> matches with a variable of the rule,
-        // check for this variable in the heads, and add positions.
+    bool gotNew = true;
+    while (gotNew) {
+        gotNew = false;
+        std::vector<std::pair<PredId_t, uint8_t>> toProcess = input;
+        // For all positions in the set, for all rules, if all body positions of a variable in this
+        // rule are contained in the set, add all head positions of this variable.
         for (auto pos : toProcess) {
             for (auto ruleId : occurrences[pos.first]) {
                 auto &rule = p.getRule(ruleId);
                 auto body = rule.getBody();
-                for (auto lit : body) {
-                    if (lit.getPredicate().getId() == pos.first) {
-                        VTerm t = lit.getTermAtPos(pos.second);
-                        if (t.getId() != 0) {
-                            // ALL body positions of this variable in the rule must be in input before we may add the head.
-                            bool present = true;
-                            for (auto lit1 : body) {
-                                PredId_t predid = lit1.getPredicate().getId();
-                                for (int i = 0; i < lit1.getTupleSize(); i++) {
-                                    VTerm r = lit1.getTermAtPos(i);
-                                    if (r.getId() == t.getId()) {
-                                        bool found = true;
-                                        vpos vp(predid, i);
-                                        auto it = std::find(input.begin(), input.end(), vp);
-                                        if (it == input.end()) {
-                                            present = false;
-                                            break;
-                                        }
-                                    }
-                                }
-                                if (! present) break;
-                            }
-                            if (! present) {
-                                continue;
-                            }
-                            // Now, we can add all head positions.
-                            for (auto head : rule.getHeads()) {
-                                auto tpl = head.getTuple();
-                                for (int i = 0; i < tpl.getSize(); i++) {
-                                    if (tpl.get(i).getId() == t.getId()) {
-                                        std::pair<PredId_t, uint8_t> val(head.getPredicate().getId(), i);
-                                        if (std::find(input.begin(), input.end(), val) == input.end()) {
-                                            input.push_back(val);
-                                            newPos.push_back(val);
-                                        }
+                auto vars = rule.getFrontierVariables();
+                for (auto var : vars) {
+                    if (containsAll(var, body, input)) {
+
+                        // Now, we can add all head positions.
+                        for (auto head : rule.getHeads()) {
+                            auto tpl = head.getTuple();
+                            for (int i = 0; i < tpl.getSize(); i++) {
+                                if (tpl.get(i).getId() == var) {
+                                    std::pair<PredId_t, uint8_t> val(head.getPredicate().getId(), i);
+                                    if (std::find(input.begin(), input.end(), val) == input.end()) {
+                                        input.push_back(val);
+                                        gotNew = true;
                                     }
                                 }
                             }
                         }
+                        break;
                     }
                 }
             }
         }
-        toProcess = newPos;
     }
 }
 
@@ -671,50 +666,29 @@ bool Checker::JA(Program &p, bool restricted) {
 
     // Create a graph of dependencies
     Graph g(allExtVarsPos.size());
-    int src = 0;
     if (! restricted) {
+        int dest = 0;
         for (auto &it : allExtVarsPos) {
-            // For each existential variable, go back to the rule, this time to the body,
-            // and add all <pred, varpos> there to a list.
-            // These are the values used to compute a value for the existential variable.
             const Rule &rule = p.getRule(it.first.first);
-            LOG(TRACEL) << "Src = " << src << ", rule " << rule.tostring(&p, p.getKB());
             auto body = rule.getBody();
-            std::vector<vpos> dependencies;
-            // Collect <PredId_t, tuplepos> values on which the existential variables of this rule depend.
-            for (auto lit: body) {
-                for (int i = 0; i < lit.getTupleSize(); i++) {
-                    VTerm t = lit.getTermAtPos(i);
-                    if (t.getId() != 0) {
-                        vpos p(lit.getPredicate().getId(), i);
-                        dependencies.push_back(p);
+            auto vars = rule.getFrontierVariables();
+            int src = 0;
+            for (auto &it2: allExtVarsPos) {
+                for (auto var : vars) {
+                    if (containsAll(var, body, it2.second)) {
+                        g.addEdge(src, dest);
                     }
                 }
+                src++;
             }
-            // We need the dependencies sorted to be able to call std::set_intersection later on.
-            std::sort(dependencies.begin(), dependencies.end());
-            int dest = 0;
-            for (auto &it2: allExtVarsPos) {
-                // For each existential variable, check if a value of it could propagate to a value that is used to compute the
-                // current variable.
-                std::vector<vpos> intersect(dependencies.size() + it2.second.size());
-                auto ipos = std::set_intersection(dependencies.begin(), dependencies.end(), it2.second.begin(), it2.second.end(), intersect.begin());
-                // if (ipos > intersect.begin())
-                // Test if ALL dependencies are in the intersection, not just if the intersection is not emoty
-                // (issue #79).
-                if (ipos - intersect.begin() == dependencies.size()) {
-                    g.addEdge(src, dest);
-                }
-                dest++;
-            }
-            // Now check if the graph is cyclic.
-            // If it is, the ruleset is not JA (Joint Acyclic) (which means that the result is inconclusive).
-            // If the ruleset is JA, we know that the chase will terminate.
-            if (g.isCyclic()) {
-                LOG(DEBUGL) << "Ruleset is not " << type << "!";
-                return false;
-            }
-            src++;
+            dest++;
+        }
+        // Now check if the graph is cyclic.
+        // If it is, the ruleset is not JA (Joint Acyclic) (which means that the result is inconclusive).
+        // If the ruleset is JA, we know that the chase will terminate.
+        if (g.isCyclic()) {
+            LOG(DEBUGL) << "Ruleset is not " << type << "!";
+            return false;
         }
     } else {
         EDBLayer layer(*(p.getKB()), false);
@@ -734,6 +708,7 @@ bool Checker::JA(Program &p, bool restricted) {
             newProgram.parseRule(rule, false);
         }
 
+        int src = 0;
         for (auto &it : allExtVarsPos) {
             int dest = 0;
             const Rule &rulev = p.getRule(it.first.first);
