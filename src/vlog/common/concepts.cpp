@@ -972,6 +972,7 @@ Program::Program(EDBLayer *kb) : kb(kb),
     cardPredicates(kb->getPredicateCardUnorderedMap()) {
 }
 
+// Note: this constructor does not copy the rules! Is that intentional?
 Program::Program(Program *p, EDBLayer *kb) : kb(kb),
     rewriteCounter(0),
     dictPredicates(p->dictPredicates),
@@ -985,7 +986,6 @@ Program::Program(Program *p, EDBLayer *kb) : kb(kb),
             assert(dictPredicates.get(item.first) == item.second);
         }
     }
-
 }
 
 std::string trim(const std::string& str, const std::string& whitespace = "\r \t") {

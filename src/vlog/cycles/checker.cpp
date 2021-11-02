@@ -560,7 +560,7 @@ static void generateConstants(Program &p, std::map<PredId_t, std::vector<std::ve
     }
 }
 
-static bool rja_check(Program &p, Program &nongen_program, const Rule &rulev, const Rule &rulew, Var_t x, Var_t v, Var_t w) {
+static bool rja_check(Program &p, std::vector<std::string> &nonGeneratingRules, const Rule &rulev, const Rule &rulew, Var_t x, Var_t v, Var_t w) {
     std::map<PredId_t, std::vector<std::vector<std::string>>> edbSet;
     int constantCount = 0;
     std::map<Var_t, std::string> varConstantMapw;
@@ -576,17 +576,29 @@ static bool rja_check(Program &p, Program &nongen_program, const Rule &rulev, co
     generateConstants(p, edbSet, constantCount, varConstantMapv, rulev.getHeads());
     generateConstants(p, edbSet, constantCount, varConstantMapv, rulev.getBody());
 
-    EDBLayer layer(*(nongen_program.getKB()), true);
+    EDBLayer layer(*(p.getKB()), false);
 
     std::vector<std::string> newRules;
 
-    Program newProgram(&nongen_program, &layer);
+    Program newProgram(&p, &layer);
+
+    for (auto rule : nonGeneratingRules) {
+        newProgram.parseRule(rule, false);
+    }
 
     for (auto pair : edbSet) {
         std::string edbName = "__DUMMY__" + std::to_string(pair.first);
         int cardinality = pair.second[0].size();
         PredId_t predId = newProgram.getOrAddPredicate(edbName, cardinality);
         layer.addInmemoryTable(edbName, predId, pair.second);
+        /*
+        for (int i = 0; i < pair.second.size(); i++) {
+            LOG(DEBUGL) << "Adding fact:";
+            for (int j = 0; j < cardinality; j++) {
+                LOG(DEBUGL) << "    " << pair.second[i][j];
+            }
+        }
+        */
         std::string rule = p.getPredicateName(pair.first) + "(";
         std::string paramList = "";
         for (int i = 0; i < cardinality; i++) {
@@ -677,6 +689,7 @@ bool Checker::JA(Program &p, bool restricted) {
                 for (auto var : vars) {
                     if (containsAll(var, body, it2.second)) {
                         g.addEdge(src, dest);
+                        break;
                     }
                 }
                 src++;
@@ -691,8 +704,6 @@ bool Checker::JA(Program &p, bool restricted) {
             return false;
         }
     } else {
-        EDBLayer layer(*(p.getKB()), false);
-
         std::vector<std::string> nonGeneratingRules;
         std::vector<Rule> rules = p.getAllRules();
         for (auto rule : rules) {
@@ -702,62 +713,38 @@ bool Checker::JA(Program &p, bool restricted) {
                 nonGeneratingRules.push_back(ruleString);
             }
         }
-        Program newProgram(&layer);
-
-        for (auto rule : nonGeneratingRules) {
-            newProgram.parseRule(rule, false);
-        }
 
         int src = 0;
         for (auto &it : allExtVarsPos) {
-            int dest = 0;
             const Rule &rulev = p.getRule(it.first.first);
-            std::vector<Var_t> extVars = rulev.getExistentialVariables();
-            Var_t v = extVars[it.first.second];
-            LOG(TRACEL) << "Src = " << src << ", rule " << rulev.tostring(&p, p.getKB());
+            auto bodyv = rulev.getBody();
+            auto extVarsv = rulev.getExistentialVariables();
+            Var_t v = extVarsv[it.first.second];
+            int dest = 0;
             for (auto &it2: allExtVarsPos) {
                 const Rule &rulew = p.getRule(it2.first.first);
-                auto body = rulew.getBody();
-                extVars = rulew.getExistentialVariables();
-                Var_t w = extVars[it2.first.second];
-                LOG(TRACEL) << "Trying " << dest << ", rule " << rulew.tostring(&p, p.getKB());
-                std::map<Var_t, std::vector<vpos>> positions;
-                for (auto lit: body) {
-                    for (int i = 0; i < lit.getTupleSize(); i++) {
-                        VTerm t = lit.getTermAtPos(i);
-                        if (t.getId() != 0) {
-                            vpos p(lit.getPredicate().getId(), i);
-                            positions[t.getId()].push_back(p);
-                            LOG(TRACEL) << "    pred: " << lit.getPredicate().getId() << ", i = " << i;
-                        }
-                    }
-                }
-                for (auto pair : positions) {
-                    std::vector<vpos> intersect(pair.second.size() + it.second.size());
-                    auto ipos = std::set_intersection(it.second.begin(), it.second.end(), pair.second.begin(), pair.second.end(), intersect.begin());
-                    if (ipos - intersect.begin() == pair.second.size()) {
-                        // For this variable, all positions in the right-hand-side occur in the propagations of the existential variable.
-                        Var_t x = pair.first;
-                        LOG(TRACEL) << "We have a match for variable " << (int) x;
-                        // Now try the materialization and the test.
-                        // First compute the EDB set to materialize on.
-                        // See Definition 4 of the paper
-                        // Restricted Chase (Non) Termination for Existential Rules with Disjunctions
-                        // by David Carral, Irina Dragoste and Markus Kroetzsch
-                        if (rja_check(p, newProgram, rulev, rulew, x, v, w)) {
-                            g.addEdge(src,dest);
+                auto bodyw = rulew.getBody();
+                auto vars = rulew.getFrontierVariables();
+                auto extVarsw = rulew.getExistentialVariables();
+                Var_t w = extVarsw[it2.first.second];
+                for (auto var : vars) {
+                    if (containsAll(var, bodyw, it.second)) {
+                        if (rja_check(p, nonGeneratingRules, rulev, rulew, var, v, w)) {
+                            g.addEdge(src, dest);
+                            // Now check if the graph is cyclic. Cheap test, and may avoid doing more
+                            // rja_checks which are expensive.
+                            // If the graph is cyclic, the ruleset is not RJA (Restricted Joint Acyclic)
+                            // (which means that the result is inconclusive).
+                            // If the ruleset is RJA, we know that the chase will terminate.
+                            if (g.isCyclic()) {
+                                LOG(DEBUGL) << "Ruleset is not " << type << "!";
+                                return false;
+                            }
                             break;
                         }
                     }
                 }
                 dest++;
-            }
-            // Now check if the graph is cyclic.
-            // If it is, the ruleset is not RJA (Joint Acyclic) (which means that the result is inconclusive).
-            // If the ruleset is RJA, we know that the chase will terminate.
-            if (g.isCyclic()) {
-                LOG(DEBUGL) << "Ruleset is not " << type << "!";
-                return false;
             }
             src++;
         }
