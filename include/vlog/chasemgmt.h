@@ -140,6 +140,10 @@ class ChaseMgmt {
                 const int ruleToCheck = -1,
                 const PredId_t predIgnoreBlocking = -1);
 
+        uint64_t getNewFunctionTerm(uint64_t term, uint64_t &freshIDs);
+
+        std::string getString(uint64_t term);
+
         std::shared_ptr<Column> getNewOrExistingIDs(
                 uint32_t ruleid,
                 Var_t var,

@@ -56,15 +56,15 @@ uint64_t *ChaseMgmt::Rows::getRow(size_t id) {
 }
 
 static bool checkValue(uint64_t target, uint64_t v, std::set<uint64_t> &toCheck) {
-    // LOG(TRACEL) << "checkValue: target = " << target << ", v = " << v;
+    LOG(TRACEL) << "checkValue: target = " << target << ", v = " << v;
     if ((v & RULEVARMASK) == target) {
-        // LOG(TRACEL) << "TRUE";
+        LOG(TRACEL) << "TRUE";
         return true;
     }
     if (v != 0) {
         toCheck.insert(v);
     }
-    // LOG(TRACEL) << "FALSE";
+    LOG(TRACEL) << "FALSE";
     return false;
 }
 
@@ -180,6 +180,56 @@ bool ChaseMgmt::checkRecursive(uint64_t rv) {
     return checkRecursive(mask, rv);
 }
 
+std::string ChaseMgmt::getString(uint64_t term) {
+    if (term == COUNTER(term)) {
+        return std::to_string(term);
+    }
+    const uint64_t ruleID = GET_RULE(term);
+    auto *ruleContainer = getRuleContainer(ruleID);
+    const uint64_t varID = GET_VAR(term);
+    //Get the arguments of the function term from the chase mgmt
+    auto *rows = ruleContainer->getRows(varID);
+    const uint64_t localCounter = COUNTER(term);
+    uint64_t *values = rows->getRow(localCounter);
+    const uint64_t nvalues = rows->getSizeRow();
+    std::string result = "f_" + std::to_string(ruleID) + "_" + std::to_string(varID) + "(";
+    if (nvalues > 0) {
+        result += getString(values[0]);
+        for (int i = 1; i < nvalues; i++) {
+            result += ", " + getString(values[i]);
+        }
+    }
+    result += ")";
+    return result;
+}
+
+uint64_t ChaseMgmt::getNewFunctionTerm(uint64_t term, uint64_t &freshIDs) {
+    const uint64_t ruleID = GET_RULE(term);
+    auto *ruleContainer = getRuleContainer(ruleID);
+    const uint64_t varID = GET_VAR(term);
+    //Get the arguments of the function term from the chase mgmt
+    auto *rows = ruleContainer->getRows(varID);
+    const uint64_t localCounter = COUNTER(term);
+    uint64_t *values = rows->getRow(localCounter);
+    const uint64_t nvalues = rows->getSizeRow();
+    uint64_t newrow[256];
+    LOG(TRACEL) << "Adding new constants for function term " << getString(term);
+    for (int i = 0; i < nvalues; i++) {
+        if (values[i] == COUNTER(values[i])) {
+            newrow[i] = freshIDs++;
+        } else {
+            newrow[i] = getNewFunctionTerm(values[i], freshIDs);
+        }
+        LOG(DEBUGL) << "value was: " << getString(values[i]) << ", becomes " << getString(newrow[i]);
+    }
+    uint64_t value = 0;
+    if (!rows->existingRow(newrow, value)) {
+        value = rows->addRow(newrow);
+    }
+    LOG(DEBUGL) << "returning " << getString(value);
+    return value;
+}
+
 std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
         uint32_t ruleid,
         Var_t var,
@@ -209,18 +259,18 @@ std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
                 if ((ruleToCheck < 0 || ruleToCheck == ruleid) && ! cyclic) {
                     // Check if we are about to introduce a cyclic term ...
                     if ((row[j] & RULEVARMASK) != 0) {
-                        LOG(TRACEL) << "to check: " << rulevar << ", read value " << row[j];
+                        LOG(TRACEL) << "to check: ruleid = " << ruleid << ", varID = " << var << ", read value " << getString(row[j]);
                         if ((row[j] & RULEVARMASK) == rulevar) {
                             cyclic = true;
                         } else {
                             cyclic = checkRecursive(rulevar, row[j]);
                         }
-                        // LOG(TRACEL) << "cyclic = " << cyclic;
+                        LOG(TRACEL) << "cyclic = " << cyclic;
                     }
                 }
             }
         }
-        LOG(TRACEL) << "check: ruleid = " << ruleid << ", row[0] = " << row[0];
+        // LOG(TRACEL) << "check: ruleid = " << ruleid << ", row[0] = " << row[0];
         uint64_t value = 0;
         if (!rows->existingRow(row, value)) {
             value = rows->addRow(row);
