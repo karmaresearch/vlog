@@ -1228,6 +1228,7 @@ bool SemiNaiver::executeRule(RuleExecutionDetails &ruleDetails,
 #endif
 
     if (ignoreExistentialRules && rule.isExistential()) {
+        LOG(DEBUGL) << "Existential rule ignored";
         return false; //Skip the execution of existential rules if the flag is
         //set (should be only during the execution of RMFA or RMFC).
     }
