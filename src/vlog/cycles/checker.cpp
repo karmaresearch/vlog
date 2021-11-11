@@ -670,12 +670,22 @@ static bool rja_check(Program &p, std::vector<std::string> &nonGeneratingRules, 
     return retval;
 }
 
+void getNonGeneratingRules(Program &p, std::vector<std::string> &nonGeneratingRules) {
+    std::vector<Rule> rules = p.getAllRules();
+    for (auto rule : rules) {
+        if (! rule.isExistential()) {
+            std::string ruleString = rule.toprettystring(&p, p.getKB());
+            LOG(DEBUGL) << "NonGeneratingRule: \"" << ruleString << "\"";
+            nonGeneratingRules.push_back(ruleString);
+        }
+    }
+}
+
 bool Checker::JA(Program &p, bool restricted) {
     std::map<rpos, std::vector<vpos>> allExtVarsPos;
     std::string type = restricted ? "RJA" : "JA";
 
     getAllExtPropagatePositions(p, allExtVarsPos);
-
     // Create a graph of dependencies
     Graph g(allExtVarsPos.size());
     if (! restricted) {
@@ -705,14 +715,7 @@ bool Checker::JA(Program &p, bool restricted) {
         }
     } else {
         std::vector<std::string> nonGeneratingRules;
-        std::vector<Rule> rules = p.getAllRules();
-        for (auto rule : rules) {
-            if (! rule.isExistential()) {
-                std::string ruleString = rule.toprettystring(&p, p.getKB());
-                LOG(DEBUGL) << "NonGeneratingRule: \"" << ruleString << "\"";
-                nonGeneratingRules.push_back(ruleString);
-            }
-        }
+        getNonGeneratingRules(p, nonGeneratingRules);
 
         int src = 0;
         for (auto &it : allExtVarsPos) {
