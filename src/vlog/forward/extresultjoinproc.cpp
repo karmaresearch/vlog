@@ -815,6 +815,8 @@ std::vector<uint64_t> ExistentialRuleProcessor::blocked_check_computeBodyAtoms(
 std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::saturateInput(
         std::vector<Literal> &input, Program *program, EDBLayer *layer) {
 
+    int level = Logger::getMinLevel();
+    Logger::setMinLevel(WARNL);
     std::map<PredId_t, std::vector<uint64_t>> edbPredicates;
     std::map<PredId_t, std::vector<uint64_t>> idbPredicates;
 
@@ -889,7 +891,17 @@ std::unique_ptr<SemiNaiver> ExistentialRuleProcessor::saturateInput(
 
     //Launch the materialization
     lsn->run();
+    Logger::setMinLevel(level);
     return lsn;
+}
+
+void _addIfNotExists(std::vector<uint64_t> &list, uint64_t v) {
+    for (const auto val : list) {
+        if (val == v) {
+            return;
+        }
+    }
+    list.push_back(v);
 }
 
 void _addIfNotExist(std::vector<Literal> &output, Literal l) {
@@ -918,6 +930,8 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
 #if DEBUG
     LOG(DEBUGL) << "enhanceFuntionTerms, startFreshIDs = " << startFreshIDs;
 #endif
+    std::vector<uint64_t> functionTerms;
+
     for(size_t i = 0; i < output.size(); ++i) {
         const auto literal = output[i];
 #if DEBUG
@@ -925,90 +939,99 @@ void ExistentialRuleProcessor::enhanceFunctionTerms(
 #endif
         for(uint8_t j = 0; j < literal.getTupleSize(); ++j) {
             const auto &term = literal.getTermAtPos(j);
-            if (term.getValue() != COUNTER(term.getValue())) {
-                //This is a function term. Get rule ID
-                const uint64_t ruleID = GET_RULE(term.getValue());
-                auto *ruleContainer = chaseMgmt->getRuleContainer(ruleID);
-                assert(ruleContainer != NULL);
-                //Get var ID
-                const uint64_t varID = GET_VAR(term.getValue());
-                //Get the arguments of the function term from the chase mgmt
-                auto *rows = ruleContainer->getRows(varID);
-                const uint64_t localCounter = COUNTER(term.getValue());
-                uint64_t *values = rows->getRow(localCounter);
-                const uint64_t nvalues = rows->getSizeRow();
-                //Map them to variables
-                const auto &nameVars = rows->getNameArgVars();
-                std::map<Var_t, uint64_t> mappings;
-                for(int i = 0; i < nvalues; ++i) {
-                    mappings.insert(std::make_pair(nameVars[i], values[i]));
-                }
-                //Materialize the remaining facts giving fresh IDs to
-                //the rem. variables (only if RMFA, for RMFC, we use *).
-                auto const *rule = ruleContainer->getRule();
-                for(const auto &bLiteral : rule->getBody()) {
-                    if (! bLiteral.isNegated()) {
-                        VTuple t(bLiteral.getTupleSize());
-                        for(uint8_t m = 0; m < bLiteral.getTupleSize(); ++m) {
-                            const VTerm term = bLiteral.getTermAtPos(m);
-                            if (term.isVariable()) {
-                                Var_t varID = term.getId();
-                                if (!mappings.count(varID)) {
-                                    if (rmfa) {
-                                        mappings.insert(
-                                                std::make_pair(varID, startFreshIDs++));
-                                    } else {
-                                        Program *p = sn->get_RMFC_program();
-                                        assert(p != NULL);
-                                        uint64_t id = 0;
-                                        p->getKB()->getOrAddDictNumber("*", 1, id);
-                                        mappings.insert(
-                                                std::make_pair(varID, id));
-                                    }
-                                }
-                                t.set(VTerm(0, mappings[varID]), m);
-                            } else {
-                                t.set(term, m);
-                            }
-                        }
-                        _addIfNotExist(output, Literal(bLiteral.getPredicate(), t));
-                    }
-                }
-                //Also add the original variable, and consider other head atoms
-                assert(!mappings.count(varID));
-                mappings.insert(std::make_pair(varID, term.getValue()));
+            const auto termValue = term.getValue();
+            LOG(TRACEL) << "  Processing term " << chaseMgmt->getString(termValue);
+            if (termValue != COUNTER(termValue)) {
+                _addIfNotExists(functionTerms, termValue);
+            }
+        }
+    }
 
-                for(const auto &hLiteral : rule->getHeads()) {
-                    /*
-                       if (hLiteral.getPredicate().getId() ==
-                       literal.getPredicate().getId()) {
-                       continue;
-                       }
-                       */
-                    VTuple t(hLiteral.getTupleSize());
-                    for(uint8_t m = 0; m < hLiteral.getTupleSize(); ++m) {
-                        const VTerm term = hLiteral.getTermAtPos(m);
-                        if (term.isVariable()) {
-                            Var_t varID = term.getId();
-                            if (!mappings.count(varID)) {
-                                // Here, we must create a value for the existential variable, using the same row (I think ...)
-                                auto *vrows = ruleContainer->getRows(varID);
-                                uint64_t value;
-                                bool v = vrows->existingRow(values, value);
-                                assert(v);
-                                uint64_t rulevar = RULE_SHIFT(ruleID) + VAR_SHIFT(varID);
-                                mappings.insert(std::make_pair(varID, rulevar | value));
-                                // LOG(ERRORL) << "There are existential variables not defined. Must implement their retrievals";
-                                // throw 10;
+    for (size_t i = 0; i < functionTerms.size(); i++) {
+        auto termValue = functionTerms[i];
+        //This is a function term. Get rule ID
+        const uint64_t ruleID = GET_RULE(termValue);
+        auto *ruleContainer = chaseMgmt->getRuleContainer(ruleID);
+        assert(ruleContainer != NULL);
+        //Get var ID
+        const uint64_t varID = GET_VAR(termValue);
+        //Get the arguments of the function term from the chase mgmt
+        auto *rows = ruleContainer->getRows(varID);
+        const uint64_t localCounter = COUNTER(termValue);
+        uint64_t *values = rows->getRow(localCounter);
+        const uint64_t nvalues = rows->getSizeRow();
+        //Map them to variables
+        const auto &nameVars = rows->getNameArgVars();
+        std::map<Var_t, uint64_t> mappings;
+        for(int i = 0; i < nvalues; ++i) {
+            mappings.insert(std::make_pair(nameVars[i], values[i]));
+            if (values[i] != COUNTER(values[i])) {
+                //possibly a new function term.
+                _addIfNotExists(functionTerms, values[i]);
+            }
+        }
+        //Materialize the remaining facts giving fresh IDs to
+        //the rem. variables (only if RMFA, for RMFC, we use *).
+        auto const *rule = ruleContainer->getRule();
+        for(const auto &bLiteral : rule->getBody()) {
+            if (! bLiteral.isNegated()) {
+                VTuple t(bLiteral.getTupleSize());
+                for(uint8_t m = 0; m < bLiteral.getTupleSize(); ++m) {
+                    const VTerm term = bLiteral.getTermAtPos(m);
+                    if (term.isVariable()) {
+                        Var_t varID = term.getId();
+                        if (!mappings.count(varID)) {
+                            if (rmfa) {
+                                mappings.insert(
+                                    std::make_pair(varID, startFreshIDs++));
+                            } else {
+                                Program *p = sn->get_RMFC_program();
+                                assert(p != NULL);
+                                uint64_t id = 0;
+                                p->getKB()->getOrAddDictNumber("*", 1, id);
+                                mappings.insert(std::make_pair(varID, id));
                             }
-                            t.set(VTerm(0, mappings[varID]), m);
-                        } else {
-                            t.set(term, m);
                         }
+                        t.set(VTerm(0, mappings[varID]), m);
+                    } else {
+                        t.set(term, m);
                     }
-                    _addIfNotExist(output, Literal(hLiteral.getPredicate(), t));
+                }
+                _addIfNotExist(output, Literal(bLiteral.getPredicate(), t));
+            }
+        }
+        //Also add the original variable, and consider other head atoms
+        assert(!mappings.count(varID));
+        mappings.insert(std::make_pair(varID, termValue));
+
+        for(const auto &hLiteral : rule->getHeads()) {
+            /*
+               if (hLiteral.getPredicate().getId() ==
+               literal.getPredicate().getId()) {
+               continue;
+               }
+               */
+            VTuple t(hLiteral.getTupleSize());
+            for(uint8_t m = 0; m < hLiteral.getTupleSize(); ++m) {
+                const VTerm term = hLiteral.getTermAtPos(m);
+                if (term.isVariable()) {
+                    Var_t varID = term.getId();
+                    if (!mappings.count(varID)) {
+                        // Here, we must create a value for the existential variable, using the same row (I think ...)
+                        auto *vrows = ruleContainer->getRows(varID);
+                        uint64_t value;
+                        bool v = vrows->existingRow(values, value);
+                        assert(v);
+                        mappings.insert(std::make_pair(varID, value));
+                        // LOG(ERRORL) << "There are existential variables not defined. Must implement their retrievals";
+                        // throw 10;
+                    }
+                    t.set(VTerm(0, mappings[varID]), m);
+                } else {
+                    t.set(term, m);
                 }
             }
+            _addIfNotExist(output, Literal(hLiteral.getPredicate(), t));
         }
     }
 }
@@ -1017,6 +1040,20 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
         size_t sizeRow, PredId_t headPredicateToIgnore) {
     //For RMFC, we need to replace all non-skolem constants with *.
     uint64_t newrow[256];
+    //Get a starting value for the fresh IDs
+    uint64_t freshIDs = 2; //Just to be sure that it is not used before.
+
+#if DEBUG
+    EDBLayer &layer = sn->getEDBLayer();
+    LOG(DEBUGL) << "blocked_check, ruleId = " << ruleDetails->rule.getId() <<  ", rule = " << ruleDetails->rule.tostring(sn->getProgram(), &layer);
+    if (sizeRow > 0) {
+        std::string s = chaseMgmt->getString(row[0]);
+        for (int i = 1; i < sizeRow; i++) {
+            s += ", " + chaseMgmt->getString(row[i]);
+        }
+        LOG(DEBUGL) << "sigma = " << s;
+    }
+#endif
     Program *rmfc = sn->get_RMFC_program();
     if (rmfc != NULL) {
         if (chaseMgmt->getRuleToCheck() == ruleDetails->rule.getId() && ruleDetails->lastExecution <= 0) {
@@ -1028,17 +1065,37 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
         for (int i = 0; i < sizeRow; i++) {
             newrow[i] = (row[i] & RULEVARMASK) != 0 ? row[i] : 0;
         }
-        row = newrow;
+    } else {
+        // row represents the sigma map (or rather: Img(sigma)).
+        // Make it represent sigma prime.
+        for (int i = 0; i < sizeRow; i++) {
+            if (row[i] == COUNTER(row[i])) {
+                // Not a function term
+                newrow[i] = freshIDs++;
+            } else {
+                // Function term. Descend into the term, allocating new constants for the constants in there.
+                newrow[i] = chaseMgmt->getNewFunctionTerm(row[i], freshIDs);
+            }
+        }
     }
+    row = newrow;
 
+#if DEBUG
+    if (sizeRow > 0) {
+        std::string s = chaseMgmt->getString(row[0]);
+        for (int i = 1; i < sizeRow; i++) {
+            s += ", " + chaseMgmt->getString(row[i]);
+        }
+        LOG(DEBUGL) << "sigma prime = " << s;
+    }
+#endif
     std::vector<Literal> input; //"input" corresponds to B_\rho,\sigma in the paper
+
     //First I need to add to body atoms
+    
     std::vector<uint64_t> toMatch = blocked_check_computeBodyAtoms(input, row, headPredicateToIgnore);
 
     std::unique_ptr<SemiNaiver> saturation;
-
-    //Get a starting value for the fresh IDs
-    uint64_t freshIDs = 1; //0 is star
 
     //Then I need to add all facts relevant to produce the function terms
     enhanceFunctionTerms(input, freshIDs, sn->get_RMFC_program() == NULL);
@@ -1072,6 +1129,16 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
     auto itr = saturation->getTable(pred);
     bool found = false;
     int nExistentials = ruleDetails->rule.getExistentialVariables().size();
+#if DEBUG
+    LOG(DEBUGL) << "toMatch.size() = " << toMatch.size();
+    if (toMatch.size() > 0) {
+        std::string s = chaseMgmt->getString(toMatch[0]);
+        for (int i = 1; i < toMatch.size(); i++) {
+            s += ", " + chaseMgmt->getString(toMatch[i]);
+        }
+        LOG(DEBUGL) << "toMatch: " << s;
+    }
+#endif
     while ( ! found && !itr.isEmpty()) {
         auto table = itr.getCurrentTable();
         //Iterate over the content of the table
@@ -1080,6 +1147,15 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
         while (tbItr->hasNext()) {
             tbItr->next();
             found = true;
+#if DEBUG
+            {
+            std::string s = chaseMgmt->getString(tbItr->getCurrentValue(0));
+            for (int i = 1; i < toMatch.size() + nExistentials; i++) {
+                s += ", " + chaseMgmt->getString(tbItr->getCurrentValue(i));
+            }
+            LOG(DEBUGL) << "Trying to match: " << s;
+            }
+#endif
             for (int i = 0; i < toMatch.size(); i++) {
                 auto value = tbItr->getCurrentValue(i);
                 if (toMatch[i] != value) {
@@ -1088,17 +1164,7 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
                 }
             }
             if (found) {
-                // Check that the existential variables are actually filled with an existential value.
-                for (int i = 0; i < nExistentials; i++) {
-                    auto value = tbItr->getCurrentValue(i + toMatch.size());
-                    if ((value & RULEVARMASK) == 0) {
-                        found = false;
-                        break;
-                    }
-                }
-                if (found) {
-                    break;
-                }
+                break;
             }
         }
         table->releaseIterator(tbItr);
