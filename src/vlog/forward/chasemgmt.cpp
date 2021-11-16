@@ -230,6 +230,33 @@ uint64_t ChaseMgmt::getNewFunctionTerm(uint64_t term, uint64_t &freshIDs) {
     return value;
 }
 
+uint64_t ChaseMgmt::getFunctionTerm(uint64_t term, uint64_t id) {
+    const uint64_t ruleID = GET_RULE(term);
+    auto *ruleContainer = getRuleContainer(ruleID);
+    const uint64_t varID = GET_VAR(term);
+    //Get the arguments of the function term from the chase mgmt
+    auto *rows = ruleContainer->getRows(varID);
+    const uint64_t localCounter = COUNTER(term);
+    uint64_t *values = rows->getRow(localCounter);
+    const uint64_t nvalues = rows->getSizeRow();
+    uint64_t newrow[256];
+    LOG(TRACEL) << "Adding new constants for function term " << getString(term);
+    for (int i = 0; i < nvalues; i++) {
+        if (values[i] == COUNTER(values[i])) {
+            newrow[i] = id;
+        } else {
+            newrow[i] = getFunctionTerm(values[i], id);
+        }
+        LOG(DEBUGL) << "value was: " << getString(values[i]) << ", becomes " << getString(newrow[i]);
+    }
+    uint64_t value = 0;
+    if (!rows->existingRow(newrow, value)) {
+        value = rows->addRow(newrow);
+    }
+    LOG(DEBUGL) << "returning " << getString(value);
+    return value;
+}
+
 std::shared_ptr<Column> ChaseMgmt::getNewOrExistingIDs(
         uint32_t ruleid,
         Var_t var,

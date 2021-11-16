@@ -1062,8 +1062,10 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
             LOG(DEBUGL) << "blocked_check returns false";
             return false;
         }
+        uint64_t id = 0;
+        rmfc->getKB()->getOrAddDictNumber("*", 1, id);
         for (int i = 0; i < sizeRow; i++) {
-            newrow[i] = (row[i] & RULEVARMASK) != 0 ? row[i] : 0;
+            newrow[i] = (row[i] == COUNTER(row[i])) ? id : chaseMgmt->getFunctionTerm(row[i], id);
         }
     } else {
         // row represents the sigma map (or rather: Img(sigma)).
@@ -1111,7 +1113,7 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
         Literal lastLit = body.back();
         VTuple tupl(lastLit.getTupleSize());
         for (int i = 0; i < lastLit.getTupleSize(); i++) {
-            tupl.set(VTerm(0, row[i]), i);
+            tupl.set(VTerm(0, toMatch[i]), i);
         }
         input.push_back(Literal(lastLit.getPredicate(), tupl));
 #if DEBUG
