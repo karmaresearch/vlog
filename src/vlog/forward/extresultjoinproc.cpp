@@ -1041,10 +1041,13 @@ bool ExistentialRuleProcessor::blocked_check(uint64_t *row,
     //For RMFC, we need to replace all non-skolem constants with *.
     uint64_t newrow[256];
     //Get a starting value for the fresh IDs
-    uint64_t freshIDs = 2; //Just to be sure that it is not used before.
+    EDBLayer &layer = sn->getEDBLayer();
+    
+    uint64_t freshIDs;
+    layer.getOrAddDictNumber("*", 1, freshIDs);
+    freshIDs++;
 
 #if DEBUG
-    EDBLayer &layer = sn->getEDBLayer();
     LOG(DEBUGL) << "blocked_check, ruleId = " << ruleDetails->rule.getId() <<  ", rule = " << ruleDetails->rule.tostring(sn->getProgram(), &layer);
     if (sizeRow > 0) {
         std::string s = chaseMgmt->getString(row[0]);

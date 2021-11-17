@@ -173,8 +173,8 @@ std::string Literal::toprettystring(const Program *program, const EDBLayer *db, 
             out += "A" + std::to_string(tuple.get(i).getId());
         } else {
             if (replaceConstants) {
-                out += "*" + std::to_string(tuple.get(i).getValue());
-                //out += "*";
+                // out += "*" + std::to_string(tuple.get(i).getValue());
+                out += "*";
             } else if (db == NULL) {
                 out += std::to_string(tuple.get(i).getValue());
             } else {
