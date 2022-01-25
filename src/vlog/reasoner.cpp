@@ -955,6 +955,7 @@ TupleIterator *Reasoner::getEDBIterator(Literal &query,
             }
             newTable->addRow(row);
         }
+	delete itr;
         ptable = std::shared_ptr<TupleTable>(newTable);
     }
     //Add sort by if requested
