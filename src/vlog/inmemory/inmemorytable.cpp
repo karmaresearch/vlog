@@ -328,6 +328,7 @@ void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
             }
             outputTable->addRow(row);
         }
+        delete iter;
     } else {
         EDBIterator *iter = getSortedIterator2(*lit, *posToFilter);
         std::vector<Term_t *> values(valuesToFilter->size() / posToFilter->size());
@@ -369,6 +370,7 @@ void InmemoryTable::query(QSQQuery *query, TupleTable *outputTable,
             }
             outputTable->addRow(row);
         }
+        delete iter;
     }
 }
 
