@@ -104,7 +104,7 @@ size_t Segment::estimate(const uint8_t nconstantsToFilter,
         for (int j = 0; j < nconstantsToFilter; ++j) {
             if (readers[j]->next() != valuesConstantsToFilter[j]) {
                 ok = false;
-                break;
+                // break; // No, should read all columns
             }
         }
         if (ok)
