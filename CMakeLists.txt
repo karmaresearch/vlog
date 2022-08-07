@@ -12,6 +12,10 @@ endif()
 project (vlog)
 include(ExternalProject)
 set(CMAKE_MACOSX_RPATH 1)
+if (DIST)
+  set(CMAKE_OSX_ARCHITECTURES arm64 x86_64)
+  set(ONLY_ACIVE_ARCH NO)
+endif()
 
 #Set to release mode if nothing is specified
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
