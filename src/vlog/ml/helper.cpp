@@ -4,6 +4,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <ctime>
 #include <vlog/ml/helper.h>
 
 using namespace std;

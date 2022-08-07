@@ -558,7 +558,7 @@ std::pair<std::shared_ptr<const Segment>,
         SegmentInserter newTuples(nfields);
 
         auto itr = getSortedIterator();
-        Term_t row[nfields];
+        Term_t row[256];
         while (itr->hasNext()) {
             itr->next();
             for(size_t i = 0; i < nfields; ++i) {
