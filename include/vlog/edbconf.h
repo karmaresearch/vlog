@@ -32,7 +32,7 @@ class EDBConf {
 
         void setRootPath(std::string path);
 
-        std::string getRootPath() const;
+        VLIBEXP std::string getRootPath() const;
 
         const std::vector<Table> &getTables() const {
             return tables;
