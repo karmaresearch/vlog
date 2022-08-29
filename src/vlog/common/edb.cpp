@@ -123,10 +123,17 @@ void EDBLayer::addInmemoryTable(const EDBConf::Table &tableConf) {
     infot.id = (PredId_t) predDictionary->getOrAdd(pn);
     infot.type = tableConf.type;
     string repository = tableConf.params[0];
+#if defined(_WIN32)
+    if (repository.size() <= 1 || repository[1] != ':') {
+        //Relative path. Add the root path
+        repository = rootPath + DIR_SEP + repository;
+    }
+#else
     if (repository.size() > 0 && repository[0] != '/') {
         //Relative path. Add the root path
         repository = rootPath + "/" + repository;
     }
+#endif
     InmemoryTable *table;
     if (tableConf.params.size() == 2) {
         table = new InmemoryTable(repository,

@@ -288,6 +288,9 @@ extern "C" {
 		f = new VLogInfo();
 		try {
 			EDBConf conf(crawconf.c_str(), isfile);
+            if (isfile) {
+                conf.setRootPath(Utils::parentDir(crawconf));
+            }
 
 			try {
 				f->layer = new EDBLayer(conf, false);
