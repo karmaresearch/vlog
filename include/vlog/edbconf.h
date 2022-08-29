@@ -30,7 +30,7 @@ class EDBConf {
 
         EDBConf(std::string rawcontent) : EDBConf(rawcontent, true) {}
 
-        void setRootPath(std::string path);
+        VLIBEXP void setRootPath(std::string path);
 
         VLIBEXP std::string getRootPath() const;
 
