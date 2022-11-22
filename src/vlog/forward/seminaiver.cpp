@@ -1831,14 +1831,16 @@ void SemiNaiver::printCountAllIDBs(std::string prefix) {
     for (PredId_t i = 0; i < program->getNPredicates(); ++i) {
         if (predicatesTables[i] != NULL) {
             if (program->isPredicateIDB(i)) {
-                size_t count = predicatesTables[i]->getNAllRows();
-                if (count == 0) {
-                    emptyRel++;
-                }
                 std::string predname = program->getPredicateName(i);
-                LOG(DEBUGL) << prefix << "Cardinality of " <<
-                    predname << ": " << count;
-                c += count;
+                if (predname.rfind("__Generated", 0) != 0) {
+                    // Only count original predicates.
+                    size_t count = predicatesTables[i]->getNAllRows();
+                    LOG(DEBUGL) << prefix << "Cardinality of " << predname << ": " << count;
+                    if (count == 0) {
+                        emptyRel++;
+                    }
+                    c += count;
+                }
             }
         }
     }

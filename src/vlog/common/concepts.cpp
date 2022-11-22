@@ -1325,7 +1325,13 @@ void Program::addRule(std::vector<Literal> heads, std::vector<Literal> body,
         rewriteRule(heads, body);
     } else {
         Rule rule(allrules.size(), heads, body, isEGD);
-        addRule(rule);
+        if (heads.size() > 1 && rule.isExistential()) {
+            // Work-around for bug in existential multihead rules, github issue #98 and issue #64.
+            // Easiest fix is to just rewrite these rules.
+            rewriteRule(heads, body);
+        } else {
+            addRule(rule);
+        }
     }
 }
 
