@@ -1471,6 +1471,11 @@ void Program::rewriteRule(std::vector<Literal> &lHeads, std::vector<Literal> &lB
     std::vector<Literal> nh;
     nh.push_back(newHead);
     addRule(nh, lBody);
+    if (allrules[allrules.size() - 1].isExistential()) {
+        // if the rule just added is existential, also add "2-way atomic decomposition", to fix termination
+        // properties of the restricted chase.
+        addRule(nh, lHeads);
+    }
 
     // Then, for each original head, create a rule with the generated head as body.
     for (auto h : lHeads) {
