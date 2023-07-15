@@ -692,9 +692,11 @@ void SemiNaiver::storeOnFiles(std::string path, const bool decompress,
 
     //I create a new file for every idb predicate
     for (PredId_t i = 0; i < program->getNPredicates(); ++i) {
-        FCTable *table = predicatesTables[i];
-        if (table != NULL && !table->isEmpty()) {
-            storeOnFile(path + "/" + generateFileName(program->getPredicateName(i)), i, decompress, minLevel, csv);
+        if (program->isPredicateIDB(i)) {
+            FCTable *table = predicatesTables[i];
+            if (table != NULL && !table->isEmpty()) {
+                storeOnFile(path + "/" + generateFileName(program->getPredicateName(i)), i, decompress, minLevel, csv);
+            }
         }
     }
 }
